@@ -1,98 +1,118 @@
 """Contract checks for tools/gen_sounds.py: deterministic, small, loopable."""
 from pathlib import Path
-import io
-import struct
+import hashlib
 import sys
 import tempfile
-import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import gen_sounds
+import qoa
 
-SOUND_BUDGET = 2 * 1024 * 1024
-LOOPS = {"levels/water.wav", "levels/lava.wav", "levels/winds.wav"}
+SOUND_BUDGET = 1024 * 1024
+LOOPS = {"levels/water.qoa", "levels/lava.qoa", "levels/winds.qoa"}
 
 
 def decode(data):
-    with wave.open(io.BytesIO(data)) as clip:
-        assert clip.getnchannels() == 1, "mono"
-        assert clip.getsampwidth() == 2, "16-bit PCM"
-        assert clip.getframerate() == gen_sounds.SAMPLE_RATE
-        frames = clip.getnframes()
-        return struct.unpack(f"<{frames}h", clip.readframes(frames))
+    rate, pcm = qoa.decode(data)
+    assert rate == gen_sounds.SAMPLE_RATE
+    return pcm
 
 
-def nudge(data, delta):
-    """Copy a WAV with its middle sample shifted by `delta` int16 steps."""
-    with wave.open(io.BytesIO(data)) as clip:
-        frames = clip.getnframes()
-    header = len(data) - 2 * frames
-    offset = header + 2 * (frames // 2)
-    value = struct.unpack_from("<h", data, offset)[0]
-    value += delta if abs(value + delta) <= 32767 else -delta
-    out = bytearray(data)
-    struct.pack_into("<h", out, offset, value)
-    return bytes(out)
+def nudged(pcm, delta, count):
+    """Copy samples with `count` spread-out samples shifted by `delta`."""
+    out = list(pcm)
+    for i in range(1, count + 1):
+        j = i * len(out) // (count + 1)
+        out[j] = max(-32767, min(32767, out[j] + delta))
+    return out
 
 
-def check_tolerance(data):
-    # libm may differ by an ulp across platforms, so --check allows 1 LSB.
-    assert gen_sounds.wav_matches(data, data)
-    for delta in (1, -1):
-        assert gen_sounds.wav_matches(nudge(data, delta), data), delta
-    for delta in (2, -2):
-        assert not gen_sounds.wav_matches(nudge(data, delta), data), delta
-    assert not gen_sounds.wav_matches(data[:-2], data), "frame count must match"
-    header_changed = bytearray(data)
-    header_changed[24] ^= 1                     # sample-rate byte
-    assert not gen_sounds.wav_matches(bytes(header_changed), data), "header"
+def check_tolerance(pcm):
+    # libm may round a few samples differently on another platform, which
+    # can change a few encoded slices; --check must accept such a file.
+    data = gen_sounds.encode(pcm)
+    assert gen_sounds.qoa_matches(data, pcm, data)
+    other_platform = gen_sounds.encode(nudged(pcm, 1, 8))
+    assert gen_sounds.qoa_matches(other_platform, pcm, data), "1-LSB jitter rejected"
+    # A louder recipe, other samples or another length must not pass.
+    louder = gen_sounds.encode([max(-32767, min(32767, round(v * 1.06))) for v in pcm])
+    assert not gen_sounds.qoa_matches(louder, pcm, data), "0.5 dB louder sound accepted"
+    assert not gen_sounds.qoa_matches(gen_sounds.encode(pcm[::-1]), pcm, data)
+    assert not gen_sounds.qoa_matches(data[:-8], pcm, data), "length must match"
+    assert not gen_sounds.qoa_matches(b"RIFF" + data[4:], pcm, data), "not QOA"
 
 
-def check_write_skips_unchanged(rendered):
+def check_reference_vector():
+    # SHA-256 of what raylib's own encoder (src/external/qoa.h in the pinned
+    # raylib 6.0, qoa_encode) writes for these samples: a sawtooth over two
+    # frames, then full-scale noise. qoa.py must produce the same bytes.
+    samples, x = [((i * 2477) % 20000) - 10000 for i in range(5125)], 1
+    for _ in range(600):
+        x = (x * 1103515245 + 12345) & 0x7FFFFFFF
+        samples.append((x >> 8) % 60000 - 30000)
+    data = qoa.encode(samples, 22050)
+    assert len(data) == 2352, len(data)
+    assert hashlib.sha256(data).hexdigest() == (
+        "2363abb800125a12421a3fae0a0b669df4d441a334873d48e3b142ff71b08179"), "qoa.h mismatch"
+    rate, decoded = qoa.decode(data)
+    assert rate == 22050 and len(decoded) == len(samples)
+
+
+def check_write_skips_unchanged(pcm, rendered):
     # `make sounds` on a platform whose libm rounds differently must not
-    # rewrite files that only differ by the tolerated 1 LSB.
-    path = "player/player_jump.wav"
-    subset = {path: rendered[path]}
+    # rewrite files that decode as well as this platform's encoding.
+    path = "player/player_jump.qoa"
+    subset, samples = {path: rendered[path]}, {path: pcm[path]}
     with tempfile.TemporaryDirectory() as tmp:
         out_dir = Path(tmp)
-        assert gen_sounds.write_sounds(subset, out_dir) == {path: "written"}
+        assert gen_sounds.write_sounds(subset, samples, out_dir) == {path: "written"}
         assert (out_dir / path).read_bytes() == rendered[path]
-        within = nudge(rendered[path], 1)
+        within = gen_sounds.encode(nudged(pcm[path], 1, 8))
         (out_dir / path).write_bytes(within)
-        assert gen_sounds.write_sounds(subset, out_dir) == {path: "unchanged"}
+        assert gen_sounds.write_sounds(subset, samples, out_dir) == {path: "unchanged"}
         assert (out_dir / path).read_bytes() == within, "1-LSB file rewritten"
-        (out_dir / path).write_bytes(nudge(rendered[path], 2))
-        assert gen_sounds.write_sounds(subset, out_dir) == {path: "written"}
+        (out_dir / path).write_bytes(gen_sounds.encode(pcm[path][::-1]))
+        assert gen_sounds.write_sounds(subset, samples, out_dir) == {path: "written"}
         assert (out_dir / path).read_bytes() == rendered[path]
+        # A WAV left over from before the sounds became QOA is reported.
+        (out_dir / "player/player_jump.wav").write_bytes(b"RIFF")
+        assert gen_sounds.check(subset, samples, out_dir) == [
+            "assets/sounds/player/player_jump.wav is not produced by tools/gen_sounds.py"]
 
 
 def main():
-    first = gen_sounds.render_all()
-    assert first == gen_sounds.render_all(), "generation must be deterministic"
-    check_tolerance(first["player/player_jump.wav"])
-    check_write_skips_unchanged(first)
+    pcm = gen_sounds.render_all_pcm()
+    assert pcm == gen_sounds.render_all_pcm(), "generation must be deterministic"
+    rendered = gen_sounds.render_all(pcm)
+    check_reference_vector()
+    check_tolerance(pcm["player/player_hit.qoa"])
+    check_write_skips_unchanged(pcm, rendered)
     # The C code loads these exact paths; the generator owns all of them.
     committed = sorted(p.relative_to(gen_sounds.SOUND_DIR).as_posix()
-                       for p in gen_sounds.SOUND_DIR.rglob("*.wav"))
-    assert committed == sorted(first), (committed, sorted(first))
-    assert sum(map(len, first.values())) < SOUND_BUDGET, "sound budget"
-    for path, data in first.items():
-        pcm = decode(data)
-        peak = max(abs(v) for v in pcm)
+                       for p in gen_sounds.SOUND_DIR.rglob("*.qoa"))
+    assert committed == sorted(rendered), (committed, sorted(rendered))
+    assert sum(map(len, rendered.values())) < SOUND_BUDGET, "sound budget"
+    for path, data in rendered.items():
+        samples = pcm[path]
+        peak = max(abs(v) for v in samples)
         assert 0.25 * 32767 < peak < 0.75 * 32767, (path, peak)  # -12..-2.5 dBFS
-        duration = len(pcm) / gen_sounds.SAMPLE_RATE
+        duration = len(samples) / gen_sounds.SAMPLE_RATE
+        # What raylib plays is the decoded file, so the seams are checked there.
+        decoded = decode(data)
+        assert len(decoded) == len(samples), path
         if path in LOOPS:
             assert 4.0 <= duration <= 8.0, (path, duration)
             # Wrapping from the last sample to the first must be no bigger
             # than a typical step inside the loop, i.e. no click.
-            steps = [abs(pcm[i + 1] - pcm[i]) for i in range(len(pcm) - 1)]
-            assert abs(pcm[0] - pcm[-1]) <= 2 * sum(steps) / len(steps), path
+            steps = [abs(decoded[i + 1] - decoded[i]) for i in range(len(decoded) - 1)]
+            assert abs(decoded[0] - decoded[-1]) <= 2 * sum(steps) / len(steps), path
         else:
             assert duration <= 1.0, (path, duration)
-            assert abs(pcm[-1]) < 64, f"{path} must fade out, not cut off"
-    assert gen_sounds.main(["--check"]) == 0, "committed sounds are stale"
-    print(f"gen sounds test: ok ({len(first)} sounds)")
+            assert abs(samples[-1]) < 64, f"{path} must fade out, not cut off"
+            assert abs(decoded[-1]) < 64, f"{path} must still fade out once encoded"
+    assert gen_sounds.check(rendered, pcm) == [], "committed sounds are stale"
+    print(f"gen sounds test: ok ({len(rendered)} sounds)")
 
 
 if __name__ == "__main__":

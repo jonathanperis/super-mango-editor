@@ -93,7 +93,7 @@ def main() -> None:
     # turns on extra features unless every option is pinned explicitly.
     #
     # The game and editor are 2D, draw with the built-in font, load only PNG
-    # images and WAV/QOA sounds, and use GenImageColor (outside the generation
+    # images and QOA (or WAV) sounds, and use GenImageColor (outside the generation
     # block) as their only generated image. Everything else is compiled out:
     # 3D models, other file formats, image export and procedural images, the
     # compression/hash helpers, input recording, gestures, the 3D camera,

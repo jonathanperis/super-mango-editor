@@ -245,7 +245,7 @@ static void fill_rich_roundtrip_fixture(LevelDef *def)
 
     def->player_start_x = 24.0f;
     def->player_start_y = 176.0f;
-    strncpy(def->music_path, "assets/sounds/levels/water.wav",
+    strncpy(def->music_path, "assets/sounds/levels/water.qoa",
             sizeof(def->music_path) - 1);
     def->music_volume = 42;
     strncpy(def->floor_tile_path, "assets/sprites/levels/grass_tileset.png",
@@ -1408,6 +1408,36 @@ static int expect_unsafe_toml_rejected(const char *path, const char *body)
     return 0;
 }
 
+/*
+ * Levels saved while the shipped loops were WAV files still play them: the
+ * three old names load as the QOA files, and another .wav path is kept.
+ */
+static int legacy_wav_music_loads_as_qoa(void)
+{
+    static const struct { const char *saved, *loaded; } cases[] = {
+        {"assets/sounds/levels/water.wav", "assets/sounds/levels/water.qoa"},
+        {"assets/sounds/levels/lava.wav", "assets/sounds/levels/lava.qoa"},
+        {"assets/sounds/levels/winds.wav", "assets/sounds/levels/winds.qoa"},
+        {"assets/sounds/levels/my_song.wav", "assets/sounds/levels/my_song.wav"},
+    };
+    const char *path = TEST_OUT "test_legacy_music.toml";
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char body[128];
+        LevelDef def;
+        snprintf(body, sizeof(body), "music_path = \"%s\"\n", cases[i].saved);
+        if (write_unsafe_path_fixture(path, body) != 0) return 1;
+        int loaded = level_load_toml(path, &def);
+        remove(path);
+        if (loaded != 0) return fail("legacy music path should load");
+        if (strcmp(def.music_path, cases[i].loaded) != 0) {
+            fprintf(stderr, "level_serializer_test: %s loaded as %s, expected %s\n",
+                    cases[i].saved, def.music_path, cases[i].loaded);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int rejects_unsafe_toml_paths(void)
 {
     if (expect_unsafe_toml_rejected(TEST_OUT "test_unsafe_music.toml",
@@ -1481,6 +1511,7 @@ int main(void)
     if (rejects_oversized_checkpoints_transactionally() != 0) return 1;
     if (rejects_bad_runtime_links() != 0) return 1;
     if (rejects_unsafe_toml_paths() != 0) return 1;
+    if (legacy_wav_music_loads_as_qoa() != 0) return 1;
 
     puts("level_serializer_test: ok");
     return 0;

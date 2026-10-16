@@ -85,7 +85,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | Window size | 800 × 600 px OS window by default (native settings scale the canvas 1×–4×) |
 | Logical canvas | 400 × 300 px (2× pixel scale) |
 | Target FPS | 60 |
-| Audio | raylib/miniaudio-negotiated device format; decoded effects and streamed WAV music |
+| Audio | raylib/miniaudio-negotiated device format; decoded effects and streamed music, both QOA |
 | Libraries | raylib 6.0 (bundled GLFW on desktop), tomlc17 (TOML parser) |
 | Level format | TOML (`.toml` files in `levels/`) |
 

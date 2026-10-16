@@ -45,7 +45,7 @@ generated_by  = "Author Name"           # optional credit string
 screen_count  = 4                       # world width = screen_count × 400 px
 player_start_x = 79.0                   # player spawn x in logical pixels
 player_start_y = 124.5                  # player spawn y in logical pixels
-music_path    = "assets/sounds/levels/water.wav"
+music_path    = "assets/sounds/levels/water.qoa"
 music_volume  = 13                      # authored volume units 0–128
 floor_tile_path = "assets/sprites/levels/grass_tileset.png"
 initial_hearts  = 3                     # starting hit points
@@ -61,7 +61,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | `name`, `description`, `generated_by` | string | Valid UTF-8, at most 63, 4095 and 127 bytes. The editor warns when `name` is empty. |
 | `screen_count` | int | Number of 400px-wide screens, `0`–`99`; `0` means the default of 4. `4` → world is 1600px wide. The editor requires at least 1. |
 | `player_start_x/y` | float | Spawn x and foot/landing y in logical pixels; y is not the sprite's top edge. Both `0` means the engine default (x 80, y 172); otherwise the point must be inside the world. |
-| `music_path` | string | A WAV path matching `assets/sounds/*.wav`, relative to repo root, at most 63 bytes. Empty means no music. |
+| `music_path` | string | A sound matching `assets/sounds/*.qoa` (the shipped format) or `assets/sounds/*.wav`, relative to repo root, at most 63 bytes. Empty means no music. Levels saved when the shipped loops were WAV files name `assets/sounds/levels/water.wav`, `lava.wav` or `winds.wav`; those three load as the `.qoa` files, and the editor saves the new name. |
 | `music_volume` | int | Authored music volume: 0 (silent) – 128 (full), scaled by the player's music setting at playback. |
 | `floor_tile_path` | string | A PNG matching `assets/sprites/levels/*.png` used to tile the ground, at most 63 bytes. Per-level theming. |
 | `initial_hearts` | int | Starting hit points, `0`–`3`; `0` means the default (`MAX_HEARTS`, 3). |
@@ -586,7 +586,7 @@ name            = "My Level"
 screen_count    = 2
 player_start_x  = 40.0
 player_start_y  = 200.0
-music_path      = "assets/sounds/levels/water.wav"
+music_path      = "assets/sounds/levels/water.qoa"
 music_volume    = 15
 floor_tile_path = "assets/sprites/levels/grass_tileset.png"
 initial_hearts  = 3

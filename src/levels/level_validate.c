@@ -232,8 +232,14 @@ static int validate_level_paths(const LevelDef *def, char *err, size_t err_size,
 {
     char field[64];
 
-    if (validate_typed_path("music_path", def->music_path,
-                            "assets/sounds/", ".wav", err, err_size) != 0 &&
+    /*
+     * The shipped sounds are QOA. WAV stays accepted: raylib still reads it,
+     * and a level may name a WAV sound of its own. Any other name is reported
+     * against the .qoa form.
+     */
+    if (validate_typed_path("music_path", def->music_path, "assets/sounds/",
+                            ends_with(def->music_path, ".wav") ? ".wav" : ".qoa",
+                            err, err_size) != 0 &&
         stop_here(sink, err))
         return -1;
     if (validate_typed_path("floor_tile_path", def->floor_tile_path,
