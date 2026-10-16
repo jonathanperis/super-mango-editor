@@ -27,7 +27,7 @@ static const FishSpec s_regular_fish = {
 /* Return a random float in the inclusive range [min_s, max_s]. */
 static float fish_random_jump_delay(RandomStream *rng, float min_s, float max_s)
 {
-    float t = random_unit(rng);
+    float t = mrandom_unit(rng);
     return min_s + (max_s - min_s) * t;
 }
 
