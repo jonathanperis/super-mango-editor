@@ -23,6 +23,9 @@
  *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | [Campaign] |
  *   [Contrast] | file buttons
  *
+ * The tools and the on/off buttons are ui_toggle: the current tool, a
+ * shown grid, an open Campaign view and so on draw in the selected colour.
+ *
  * Each control has a tooltip naming its shortcut, when it has one.
  */
 void editor_render_toolbar(EditorState *es)
@@ -34,42 +37,31 @@ void editor_render_toolbar(EditorState *es)
     int bw = 64;
     int bh = 24;
 
-    if (ui_button(&es->ui, bx, by, bw, bh, "Select")) {
+    if (ui_toggle(&es->ui, bx, by, bw, bh, "Select", es->tool == TOOL_SELECT)) {
         es->tool = TOOL_SELECT;
     }
     ui_tooltip(&es->ui, "Select and move entities (1)");
-    if (es->tool == TOOL_SELECT) {
-        DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
-    }
 
     bx += bw + 4;
-    if (ui_button(&es->ui, bx, by, bw, bh, "Place")) {
+    if (ui_toggle(&es->ui, bx, by, bw, bh, "Place", es->tool == TOOL_PLACE)) {
         es->tool = TOOL_PLACE;
     }
     ui_tooltip(&es->ui, "Place the palette's entity (2)");
-    if (es->tool == TOOL_PLACE) {
-        DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
-    }
 
     bx += bw + 4;
-    if (ui_button(&es->ui, bx, by, bw, bh, "Delete")) {
+    if (ui_toggle(&es->ui, bx, by, bw, bh, "Delete", es->tool == TOOL_DELETE)) {
         es->tool = TOOL_DELETE;
     }
     ui_tooltip(&es->ui, "Delete what you click (3)");
-    if (es->tool == TOOL_DELETE) {
-        DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
-    }
 
     bx += bw + 20;
-    const char *grid_label = es->show_grid ? "[Grid]" : " Grid ";
-    if (ui_button(&es->ui, bx, by, 56, bh, grid_label)) {
+    if (ui_toggle(&es->ui, bx, by, 56, bh, "Grid", es->show_grid)) {
         es->show_grid ^= 1;
     }
     ui_tooltip(&es->ui, "Show the grid (G)");
 
     bx += 60;
-    const char *dbg_label = es->debug_play ? "[Debug]" : " Debug ";
-    if (ui_button(&es->ui, bx, by, 56, bh, dbg_label)) {
+    if (ui_toggle(&es->ui, bx, by, 56, bh, "Debug", es->debug_play)) {
         es->debug_play ^= 1;
     }
     ui_tooltip(&es->ui, "Playtest with the game's --debug overlay");
@@ -97,7 +89,7 @@ void editor_render_toolbar(EditorState *es)
     /* The Campaign view (Ctrl+M) covers the canvas; the button closes it
      * again (asking first about unsaved campaign edits). */
     bx += 88;
-    if (ui_button(&es->ui, bx, by, 84, bh, es->campaign ? "[Campaign]" : "Campaign")) {
+    if (ui_toggle(&es->ui, bx, by, 84, bh, "Campaign", es->campaign != NULL)) {
         if (es->campaign) (void)editor_campaign_close(es, 0);
         else (void)editor_campaign_open(es, NULL);
     }
@@ -107,7 +99,7 @@ void editor_render_toolbar(EditorState *es)
      * black faces, white outlines, text at 7:1 or more). The level canvas
      * keeps its own colours. */
     bx += 88;
-    if (ui_button(&es->ui, bx, by, 84, bh, es->high_contrast ? "[Contrast]" : "Contrast")) {
+    if (ui_toggle(&es->ui, bx, by, 84, bh, "Contrast", es->high_contrast)) {
         editor_set_high_contrast(es, !es->high_contrast);
         /* Remembered for the next session; without a preference folder
          * (render smoke) it simply stays for this one. */

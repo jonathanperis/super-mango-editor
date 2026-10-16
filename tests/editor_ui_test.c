@@ -582,6 +582,87 @@ done:
     return failed;
 }
 
+/*
+ * The colour at (x, y) of the toolbar alone, drawn into the window with
+ * the pointer parked in the status bar.  Memory readback is bottom-origin
+ * and BGRA (see session_test.c); this puts it back to RGBA top-down.
+ */
+static Color toolbar_pixel(EditorState *es, int x, int y)
+{
+    Color c = {0};
+    es->ui.mouse_x = NEUTRAL_X;
+    es->ui.mouse_y = NEUTRAL_Y;
+    BeginDrawing();
+    ClearBackground(BLACK);
+    editor_render_toolbar(es);
+    rlDrawRenderBatchActive();
+    Image shot = LoadImageFromScreen();
+    EndDrawing();
+    if (!IsImageValid(shot)) return c;
+#ifdef MANGO_MEMORY_TESTS
+    c = GetImageColor(shot, x, shot.height - 1 - y);
+    unsigned char red = c.r;
+    c.r = c.b;
+    c.b = red;
+#else
+    c = GetImageColor(shot, x, y);
+#endif
+    UnloadImage(shot);
+    return c;
+}
+
+/*
+ * The tools and the on/off buttons are toggles: a click switches them,
+ * and the one that is on is drawn in the selected colour, outlined in the
+ * accent colour under high contrast, instead of a bracketed label.
+ */
+static int toolbar_toggles_show_what_is_on(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int by = 4 + 12, select_x = 4 + 32, place_x = 72 + 32, delete_x = 140 + 32;
+    const int grid_x = 224 + 28, debug_x = 284 + 28;
+    Color selected, button, accent;
+    CHECK(open_editor(&es, NULL) == 0);
+    selected = ui_color(&es.ui, UI_COLOR_SELECTED);
+    button = ui_color(&es.ui, UI_COLOR_BUTTON);
+
+    /* Select is the starting tool, and the grid starts shown. */
+    CHECK(es.tool == TOOL_SELECT && es.show_grid && !es.debug_play);
+    CHECK(same_color(toolbar_pixel(&es, select_x, by - 8), selected));
+    CHECK(same_color(toolbar_pixel(&es, place_x, by - 8), button));
+    CHECK(same_color(toolbar_pixel(&es, grid_x, by - 8), selected));
+    CHECK(same_color(toolbar_pixel(&es, debug_x, by - 8), button));
+
+    click_frame(&es, place_x, by);
+    CHECK(es.tool == TOOL_PLACE);
+    click_frame(&es, delete_x, by);
+    CHECK(es.tool == TOOL_DELETE);
+    CHECK(same_color(toolbar_pixel(&es, delete_x, by - 8), selected));
+    CHECK(same_color(toolbar_pixel(&es, select_x, by - 8), button));
+    click_frame(&es, select_x, by);
+    CHECK(es.tool == TOOL_SELECT);
+
+    click_frame(&es, grid_x, by);
+    CHECK(!es.show_grid);
+    CHECK(same_color(toolbar_pixel(&es, grid_x, by - 8), button));
+    click_frame(&es, debug_x, by);
+    CHECK(es.debug_play);
+    CHECK(same_color(toolbar_pixel(&es, debug_x, by - 8), selected));
+
+    /* High contrast outlines the lit toggle in the accent colour, and the
+     * others in the plain border colour. */
+    editor_set_high_contrast(&es, 1);
+    accent = ui_color(&es.ui, UI_COLOR_ACCENT);
+    CHECK(same_color(toolbar_pixel(&es, debug_x, 4), accent));
+    CHECK(same_color(toolbar_pixel(&es, grid_x, 4), ui_color(&es.ui, UI_COLOR_BORDER)));
+    CHECK(same_color(toolbar_pixel(&es, debug_x, by - 4),
+                     ui_color(&es.ui, UI_COLOR_SELECTED)));
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -3604,6 +3685,7 @@ int main(void)
         CASE(ui_scrollbar_pages_drags_and_uses_its_clicks),
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
+        CASE(toolbar_toggles_show_what_is_on),
         CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
