@@ -785,7 +785,7 @@ AppSession *session_create(const AppSessionConfig *config)
      * can supply a context; production creates one here and retains it across
      * menu/game transitions. The game requires an audio device to start. */
     if (!IsWindowReady() && display_open(WINDOW_W, WINDOW_H, WINDOW_TITLE,
-        session->smoke_test_frames > 0 || getenv("MANGO_TEST_WINDOW") != NULL)) goto fail;
+        session->smoke_test_frames > 0 || getenv("MANGO_TEST_WINDOW") != NULL, 0)) goto fail;
     input_open(GAME_W, GAME_H);
     if (!IsAudioDeviceReady() && audio_open()) goto fail;
     /* Debug, smoke and replay are experiments, not personal progress. Keep

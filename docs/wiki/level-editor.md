@@ -43,6 +43,15 @@ make run-editor    # build game + editor, then launch editor
 | Panel | 384 × 656 px | Entity palette, properties inspector, level config (collapsible sections) |
 | Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message |
 
+The window opens at 1280 × 720 and can be resized or maximised, but not made
+smaller than that. The layout does not reflow: the editor always draws this
+1280 × 720 layout and scales the whole of it by the largest whole number that
+fits the window, centred with black margins, so every pixel stays square and
+sharp. A window from 1280 × 720 up to just under 2560 × 1440 (a maximised
+window on a 1080p monitor, for example) shows it at 1x; 2560 × 1440 or larger
+shows it at 2x. On a Retina Mac the window is measured in points, so the
+default size already draws at full pixel density.
+
 ---
 
 ## Tools
