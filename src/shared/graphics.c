@@ -33,7 +33,24 @@ static void display_set_icon(void)
 int display_open(int width, int height, const char *title, int hidden)
 {
     SetTraceLogLevel(LOG_WARNING);
-    SetConfigFlags(hidden ? FLAG_WINDOW_HIDDEN : FLAG_VSYNC_HINT);
+    unsigned int flags = hidden ? FLAG_WINDOW_HIDDEN : FLAG_VSYNC_HINT;
+#ifdef __APPLE__
+    /* Without this flag a Retina Mac gets a framebuffer at half its pixel
+     * density, which the compositor then stretches, blurring the pixel art.
+     * With it the framebuffer is full density while sizes stay in points:
+     * GetScreenWidth and glfwGetCursorPos both report points, and raylib's
+     * screen-scale matrix (applied by BeginDrawing and EndTextureMode)
+     * turns display_present's point rectangle into device pixels. So the
+     * letterbox below and input_pointer_to_logical keep using one unit.
+     *
+     * Not on Windows or X11: there raylib honours the flag by enlarging the
+     * window by the monitor's scale and calling SetMouseScale. Our GLFW
+     * cursor callbacks in input_backend.c read raw cursor positions, which
+     * SetMouseScale does not reach, so clicks would land in the wrong place.
+     * Those systems already give the window one device pixel per unit. */
+    flags |= FLAG_WINDOW_HIGHDPI;
+#endif
+    SetConfigFlags(flags);
     InitWindow(width, height, title);
     if (!IsWindowReady()) return -1;
     /* Escape belongs to pause/cancel/menu actions, not automatic raylib exit. */

@@ -308,6 +308,16 @@ The game renders to a **400×300 `RenderTexture2D`**, configured with point
 filtering when the screen creates it. `display_present` applies aspect-preserving
 scaling and the render-texture Y correction. At 800×600 this gives a **2x** pixel
 scale. `input_pointer_to_logical` applies the inverse viewport transform once.
+
+On macOS `display_open` also asks for raylib's `FLAG_WINDOW_HIGHDPI`, so a
+Retina display gets a full-density framebuffer instead of a half-density one
+the compositor would blur. Window sizes, `GetScreenWidth` and GLFW cursor
+positions all stay in points there; raylib's screen-scale matrix turns the
+presentation rectangle into device pixels, so the viewport and its inverse
+still agree. Windows and Linux do not set the flag: there raylib would resize
+the window by the monitor's scale and rescale the mouse through
+`SetMouseScale`, which the raw GLFW cursor callbacks in `input_backend.c` do
+not pass through.
 Gameplay hitboxes remain integer `IntRect` values; raylib's floating `Rectangle`
 is a drawing boundary type. Two hitboxes that merely touch edges do not overlap.
 
