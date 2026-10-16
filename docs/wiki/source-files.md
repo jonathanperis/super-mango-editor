@@ -43,7 +43,7 @@ src/
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
 │   ├── game_window.h / .c        Screen-owned logical render target
-│   ├── game_timing.h / .c        Fixed-step accumulator and frame clock
+│   ├── game_timing.h / .c        The game's step limits and deterministic smoke/replay frames, over shared/fixed_step
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
 │   ├── game_loop.c               Active-game frame runner (game_frame)
 │   ├── game_update.h / .c        s_update_steps table: one fixed step, in order
@@ -92,6 +92,7 @@ src/
 │   ├── audio.h / .c             Bounded sound voices, music streaming and device ownership
 │   ├── text.h / .c              Borrowed built-in font, text measurement, centred drawing and label texture creation
 │   ├── platform.h / .c          Monotonic time, UTF-8 copying and OS preference/executable paths
+│   ├── fixed_step.h / .c        Game-independent fixed-step clock: frame seconds in, whole steps out
 │   ├── asset_root.h / .c        Move a foreign working folder to the one holding assets/ and levels/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
 │   ├── printf_format.h          PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
@@ -354,7 +355,7 @@ Returns `0` on success. If a required window, texture, level, or subsystem resou
 ### `game_frame(GameState *gs)`
 
 `game_frame` performs one frame: real frame time -> events -> 0..5 fixed 1/60 s
-update steps -> render. Real time feeds an accumulator (`core/game_timing.c`), so
+update steps -> render. Real time feeds an accumulator (`shared/fixed_step.c`), so
 every step, live or replayed, has the same `dt`. `AppSession` is the only loop owner. See
 [Architecture](../architecture/) for routes and render order.
 
@@ -614,6 +615,7 @@ reports it, resident memory in MB.
 | `shared/text.h`, `shared/text.c` | CPU image versus GPU texture; borrowing raylib's built-in font |
 | `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and bounded label cache |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
+| `shared/fixed_step.h`, `shared/fixed_step.c` | The accumulator: clamped frame time, a step cap, and why restarts keep half a step |
 | `shared/asset_root.h`, `shared/asset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
 | `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |
 | `shared/printf_format.h` | How a compiler attribute lets our own printf-style wrappers get format-string checks |

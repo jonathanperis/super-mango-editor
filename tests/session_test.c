@@ -871,8 +871,8 @@ static int repeated_menu_game_ownership(void)
 
     session->game->screen.completion.complete = 1;
     session->game->screen.completion.pending_next_phase = 1;
-    session->game->screen.loop.clock_started = 1;
-    session->game->screen.loop.accumulator = 0.2; /* time that must not be caught up */
+    session->game->screen.loop.clock.started = 1;
+    session->game->screen.loop.clock.accumulator = 0.2; /* time that must not be caught up */
     session->game->screen.terminal_action_index = 0;
     if (push_confirm() != 0) return 1;
     {
@@ -889,10 +889,10 @@ static int repeated_menu_game_ownership(void)
         /* The clock restarts at "now" (during this frame, not before it), so
          * the next frame measures normal time (no hitch) and the 0.2 s
          * pending above is not caught up. */
-        if (expect_int("next level timing reset", session->game->screen.loop.clock_started == 1 &&
-                       session->game->screen.loop.prev_time >= frame_start &&
-                       session->game->screen.loop.prev_time <= GetTime() &&
-                       session->game->screen.loop.accumulator < GAME_FIXED_STEP, 1) != 0)
+        if (expect_int("next level timing reset", session->game->screen.loop.clock.started == 1 &&
+                       session->game->screen.loop.clock.prev_time >= frame_start &&
+                       session->game->screen.loop.clock.prev_time <= GetTime() &&
+                       session->game->screen.loop.clock.accumulator < GAME_FIXED_STEP, 1) != 0)
             return 1;
     }
 
@@ -1210,8 +1210,8 @@ static int pending_profile_keeps_exit_alive(void)
     session->profile.pending_revision = session->profile.revision;
     session->attempted_save_revision = session->profile.revision;
     session->game->screen.route = GAME_ROUTE_EXIT;
-    session->game->screen.loop.clock_started = 1;
-    session->game->screen.loop.prev_time = GetTime() - 0.1; /* 100 ms pending */
+    session->game->screen.loop.clock.started = 1;
+    session->game->screen.loop.clock.prev_time = GetTime() - 0.1; /* 100 ms pending */
     float elapsed = session->game->screen.completion.level_elapsed;
     session_frame(session);
     if (expect_int("pending save retains session", session->ended, 0) ||
@@ -1492,8 +1492,8 @@ static int fixed_step_accumulator_contract(void)
     /* A stall is clamped, capped and then forgotten (no spiral of death). */
     GameState stall = {0};
     game_timing_restart_clock(&stall);
-    stall.screen.loop.clock_started = 1;
-    stall.screen.loop.prev_time = GetTime() - 5.0;
+    stall.screen.loop.clock.started = 1;
+    stall.screen.loop.clock.prev_time = GetTime() - 5.0;
     float stalled = game_timing_frame_seconds(&stall);
     if (expect_float("stall clamped", stalled, (float)GAME_MAX_FRAME_SECONDS) ||
         expect_int("stall capped", game_timing_take_steps(&stall, stalled), GAME_MAX_STEPS_PER_FRAME) ||

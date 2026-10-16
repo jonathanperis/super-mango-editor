@@ -16,6 +16,7 @@
 #pragma once
 
 #include "../game.h"
+#include "../shared/fixed_step.h"
 
 /* Seconds simulated by one update step. */
 #define GAME_FIXED_STEP (1.0f / TARGET_FPS)
@@ -67,9 +68,7 @@ int game_timing_take_steps(GameState *gs, float seconds);
  */
 static inline void game_timing_restart_clock(GameState *gs)
 {
-    gs->screen.loop.prev_time = GetTime();
-    gs->screen.loop.clock_started = 1;
-    gs->screen.loop.accumulator = GAME_FIXED_STEP * 0.5;
+    fixed_step_restart(&gs->screen.loop.clock, GAME_FIXED_STEP);
 }
 
 /* Count down smoke-test frames and stop the game when the budget reaches zero. */
