@@ -267,6 +267,15 @@ tooltip: once the pointer has rested on it for `UI_TOOLTIP_DELAY_MS` (500 ms),
 The delay is timed with `UIState.time_ms`, which the owner sets each frame
 (`editor_run_frame` from `clock_millis`), so a test can step the clock by hand.
 
+The mouse cursor is collected the same immediate-mode way: `ui_begin_frame`
+resets `cursor_wish` to the arrow, editable fields ask for the I-beam while the
+pointer is on them, an owner can ask with `ui_set_cursor`, and `ui_apply_cursor`
+at the end of the frame (the up-down arrows win while a scrollbar thumb is
+dragged) calls `SetMouseCursor` only when the cursor changes. raylib's GLFW
+backend creates a new system cursor on every call and never frees it, so it
+must not be called every frame. The editor's `editor_update_cursor` adds the
+four-way arrows for an entity drag.
+
 A scrolled panel or list keeps a `UIScroll` (offset plus the wheel's leftover
 fraction), modelled on raygui's `GuiScrollPanel`. `ui_scroll_wheel` turns wheel
 notches into whole pixels or rows and keeps a trackpad's fractions for the next

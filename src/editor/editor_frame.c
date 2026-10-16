@@ -14,6 +14,13 @@
 #include "editor_validation.h"
 #include "editor_session.h"
 
+void editor_update_cursor(EditorState *es)
+{
+    /* Moving entities: the four-way arrows, whatever is under them. */
+    if (es->dragging && !es->playing) ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
+    ui_apply_cursor(&es->ui);
+}
+
 void editor_run_frame(EditorState *es)
 {
     uint32_t now = (uint32_t)clock_millis();
@@ -76,6 +83,8 @@ void editor_run_frame(EditorState *es)
         /* An open dropdown list goes on top of every panel drawn above. */
         ui_draw_overlays(&es->ui);
     }
+    /* The widgets drawn above said which cursor they want; set it once. */
+    editor_update_cursor(es);
     /* Ends texture mode, presents the scaled target, then calls EndDrawing.
      * EndDrawing polls the next frame's input and owns frame pacing; adding
      * another event poll or sleep here would perform that job twice. */
