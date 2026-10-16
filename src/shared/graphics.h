@@ -9,6 +9,12 @@
 
 int display_open(int width, int height, const char *title, int hidden);
 void display_present(RenderTexture2D target);
+/* Where display_present draws a canvas_w x canvas_h canvas inside a
+ * window_w x window_h window, in window units. At 1x or more it is the
+ * largest whole-number scale that fits, centred on whole-pixel offsets;
+ * a smaller window gets a fractional fit. All-zero for empty sizes.
+ * input_pointer_to_logical inverts it, so clicks match what is drawn. */
+Rectangle display_viewport(int window_w, int window_h, int canvas_w, int canvas_h);
 
 /* Asset slots own heap-stable raylib values. Borrowers never unload a slot.
  * Texture2D itself is a small handle, not the image pixels. Allocating a slot
