@@ -187,6 +187,7 @@ static void ui_frame(EditorState *es, int mx, int my)
         editor_render_status_bar(es);
         ui_draw_overlays(&es->ui);
     }
+    editor_update_cursor(es);
     EndTextureMode();
     EndDrawing();
 }
@@ -1139,6 +1140,59 @@ static int place_and_select_coin(EditorState *es, int sx, int sy)
     es->tool = TOOL_SELECT;
     click_frame(es, sx, sy);
     return es->level.coin_count == before + 1 && es->selection.type == ENT_COIN ? 0 : -1;
+}
+
+/*
+ * The mouse cursor follows what is under it: the I-beam on a field, the
+ * four-way arrows while a coin is dragged, the arrow elsewhere, and the
+ * system cursor is touched only when that changes.  (A scrollbar drag's
+ * up-down arrows are checked on a bare UIState below.)
+ */
+static int mouse_cursor_follows_fields_and_drags(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int sx = 300, sy = 300;
+    CHECK(open_editor(&es, NULL) == 0);
+
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.cursor_shown == MOUSE_CURSOR_DEFAULT);
+    int changes = es.ui.cursor_changes;
+    ui_frame(&es, CANVAS_W + 90, CFG_SCREENS_Y);
+    CHECK(es.ui.cursor_shown == MOUSE_CURSOR_IBEAM);
+    CHECK(es.ui.cursor_changes == changes + 1);
+    ui_frame(&es, CANVAS_W + 92, CFG_SCREENS_Y + 2);   /* still on it */
+    CHECK(es.ui.cursor_changes == changes + 1);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.cursor_shown == MOUSE_CURSOR_DEFAULT && es.ui.cursor_changes == changes + 2);
+
+    CHECK(place_and_select_coin(&es, sx, sy) == 0);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, sx, sy);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, sx + 30, sy + 10);
+    ui_frame(&es, sx + 30, sy + 10);
+    CHECK(es.dragging && es.ui.cursor_shown == MOUSE_CURSOR_RESIZE_ALL);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, sx + 30, sy + 10);
+    ui_frame(&es, sx + 30, sy + 10);
+    CHECK(!es.dragging && es.ui.cursor_shown == MOUSE_CURSOR_DEFAULT);
+
+    /* A dragged scrollbar thumb shows the up-down arrows. */
+    UIState ui;
+    UIScroll scroll = {0};
+    ui_init(&ui, NULL);
+    ui_begin_frame(&ui);
+    ui.mouse_x = 2; ui.mouse_y = 10; ui.mouse_clicked = 1; ui.mouse_down = 1;
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    CHECK(ui.scroll_drag == &scroll);
+    ui_apply_cursor(&ui);
+    CHECK(ui.cursor_shown == MOUSE_CURSOR_RESIZE_NS);
+    ui_begin_frame(&ui);
+    ui.mouse_down = 0;
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    ui_apply_cursor(&ui);
+    CHECK(ui.cursor_shown == MOUSE_CURSOR_DEFAULT && ui.cursor_changes == 2);
+done:
+    close_editor(&es);
+    return failed;
 }
 
 /*
@@ -3802,6 +3856,7 @@ int main(void)
         CASE(up_and_down_step_number_fields),
         CASE(number_field_steps_suit_the_field),
         CASE(arrow_keys_nudge_and_backspace_deletes),
+        CASE(mouse_cursor_follows_fields_and_drags),
         CASE(ctrl_d_duplicates_with_a_stepping_offset),
         CASE(snap_toggle_applies_to_placing_and_dragging),
         CASE(alt_click_cycles_through_overlapping_entities),

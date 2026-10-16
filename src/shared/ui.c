@@ -59,6 +59,7 @@ static void draw_text(UIState *ui, int x, int y,
  */
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh);
 static void note_widget(UIState *ui, int x, int y, int w, int h);
+static void field_cursor(UIState *ui, int x, int y, int w, int h, int is_active);
 
 static void notify_before_change(UIState *ui, int id)
 {
@@ -816,6 +817,17 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
            py >= ry && py < ry + rh;
 }
 
+/* An editable field shows the I-beam while the pointer is on it, or while
+ * a press in it drags out a selection; not under an open list, which takes
+ * the next press itself. */
+static void field_cursor(UIState *ui, int x, int y, int w, int h, int is_active)
+{
+    if (ui->dropdown_open_id != 0) return;
+    if (point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h) ||
+        (is_active && ui->edit_drag && ui->mouse_down))
+        ui->cursor_wish = MOUSE_CURSOR_IBEAM;
+}
+
 /* Remember the widget just drawn, for a ui_tooltip call that follows it. */
 static void note_widget(UIState *ui, int x, int y, int w, int h)
 {
@@ -908,6 +920,7 @@ void ui_begin_frame(UIState *ui)
     ui->tooltip_text = NULL;
     ui->tooltip_shown = 0;
     ui->last_w = ui->last_h = 0;
+    ui->cursor_wish = MOUSE_CURSOR_DEFAULT;
     ui->dropdown_click   = 0;
     ui->dropdown_options = NULL;
     ui->dropdown_key_move = 0;
@@ -1064,6 +1077,27 @@ void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *lab
 
 /* ------------------------------------------------------------------ */
 
+void ui_set_cursor(UIState *ui, int cursor)
+{
+    if (ui) ui->cursor_wish = cursor;
+}
+
+void ui_apply_cursor(UIState *ui)
+{
+    if (!ui) return;
+    int want = ui->scroll_drag ? MOUSE_CURSOR_RESIZE_NS : ui->cursor_wish;
+    if (want == ui->cursor_shown) return;
+    ui->cursor_shown = want;
+    ui->cursor_changes++;
+#ifndef MANGO_RAYLIB_MEMORY
+    /* Memory has no pointer and warns on every call; a hidden window
+     * (render smoke) has nothing to show it on. */
+    if (IsWindowReady() && !IsWindowHidden()) SetMouseCursor(want);
+#endif
+}
+
+/* ------------------------------------------------------------------ */
+
 /*
  * ui_label — Draw text at (x, y) in the style's text colour.
  *
@@ -1172,6 +1206,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
     }
     /* The mouse places the caret and drags out a selection. */
     if (is_active) edit_mouse(ui, x, y, w, h, clicked_on);
+    field_cursor(ui, x, y, w, h, is_active);
 
     /*
      * Deactivate if the user clicks somewhere else (clicked but NOT inside
@@ -1298,6 +1333,7 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
     }
     /* The mouse places the caret and drags out a selection. */
     if (is_active) edit_mouse(ui, x, y, w, h, clicked_on);
+    field_cursor(ui, x, y, w, h, is_active);
 
     /* Deactivate on click outside. */
     /* --- Keyboard handling while active --- */
@@ -1398,6 +1434,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     }
     /* The mouse places the caret and drags out a selection. */
     if (is_active) edit_mouse(ui, x, y, w, h, clicked_on);
+    field_cursor(ui, x, y, w, h, is_active);
 
     /* Deactivate on click outside. */
     /* --- Keyboard handling while active --- */

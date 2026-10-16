@@ -52,6 +52,8 @@ window on a 1080p monitor, for example) shows it at 1x; 2560 × 1440 or larger
 shows it at 2x. On a Retina Mac the window is measured in points, so the
 default size already draws at full pixel density.
 
+The mouse pointer changes with what it is over: an I-beam on a field you can type in, four-way arrows while entities are being dragged, and up-down arrows while a scrollbar's thumb is held.
+
 Resting the pointer on a toolbar control for half a second shows a tooltip saying what it does and its shortcut, if it has one (`Save (Ctrl+S)`, `Show the grid (G)`). Clicking the control hides the tip until the pointer moves to another one.
 
 ---
