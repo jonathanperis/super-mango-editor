@@ -15,6 +15,11 @@ static GLFWmousebuttonfun button_handler;
 static GLFWcursorposfun cursor_handler;
 static GLFWscrollfun scroll_handler;
 
+/* Joysticks GLFW sees, and which of those have a gamepad mapping. */
+static int joystick_present[4], joystick_mapped[4];
+bool test_input_gamepad_available(int index) { return index >= 0 && index < 4 && joystick_present[index]; }
+int test_input_joystick_is_gamepad(int index) { return index >= 0 && index < 4 && joystick_mapped[index]; }
+
 bool test_input_window_ready(void) { return window_ready != 0; }
 int test_input_screen_width(void) { return screen_w; }
 int test_input_screen_height(void) { return screen_h; }
@@ -192,5 +197,27 @@ int display_window_fit_test(void)
     /* Larger than the monitor: keep the top-left corner on it. */
     failed |= moved_is("too large", (IntRect){300, 300, 1600, 1200}, (IntRect){0, 0, 1280, 720}, 0, 40);
     failed |= moved_is("unknown monitor", (IntRect){-500, -500, 800, 600}, (IntRect){0}, -500, -500);
+    return failed;
+}
+
+/* On the desktop the controller is the first joystick GLFW has a gamepad
+ * mapping for: an unmapped device (a wheel, a flight stick) never reports
+ * a button, so it must not be chosen ahead of a real gamepad. */
+int input_gamepad_mapping_test(void)
+{
+    int failed = 0;
+    window_ready = 1;
+    input_open(400, 300);
+    joystick_present[0] = 1;                       /* unmapped joystick only */
+    if (input_first_gamepad() != 0) failed = 1;
+    joystick_present[2] = joystick_mapped[2] = 1;  /* plus a real gamepad */
+    if (input_first_gamepad() != 3) failed = 1;
+    joystick_mapped[0] = 1;                        /* the first one gains a mapping */
+    if (input_first_gamepad() != 1) failed = 1;
+    memset(joystick_present, 0, sizeof(joystick_present));
+    memset(joystick_mapped, 0, sizeof(joystick_mapped));
+    input_close();
+    window_ready = 0;
+    if (failed) fprintf(stderr, "input backend: unmapped joystick chosen as the controller\n");
     return failed;
 }

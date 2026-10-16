@@ -332,13 +332,30 @@ int input_modifiers(void)
         ((IsKeyDown(KEY_LEFT_SUPER)||IsKeyDown(KEY_RIGHT_SUPER)) ? INPUT_SUPER : 0);
 }
 
+/* Whether device index can drive the game. On the desktop, raylib calls any
+ * joystick GLFW sees "available", but reads buttons only through GLFW's
+ * gamepad mappings (SDL_GameControllerDB). A device without one, such as a
+ * flight stick, a racing wheel or a keyboard that also enumerates as a
+ * joystick, never reports a press, so choosing it would leave the player
+ * with a dead controller while a real gamepad sits at a later index. The
+ * browser and the Memory test backend keep their own rule. */
+static int gamepad_usable(int index)
+{
+    if (!IsGamepadAvailable(index)) return 0;
+#if !defined(MANGO_RAYLIB_MEMORY) && !defined(__EMSCRIPTEN__)
+    return glfwJoystickIsGamepad(index) == GLFW_TRUE;
+#else
+    return 1;
+#endif
+}
+
 int input_first_gamepad(void)
 {
     /* Keep the selected controller while it exists. A lower-index device
      * appearing later must not steal the current player's controls. */
     if (!IsWindowReady()) return 0;
-    if (gamepad && IsGamepadAvailable(gamepad-1)) return gamepad;
-    for (int i = 0; i < 4; i++) if (IsGamepadAvailable(i)) return i+1;
+    if (gamepad && gamepad_usable(gamepad-1)) return gamepad;
+    for (int i = 0; i < 4; i++) if (gamepad_usable(i)) return i+1;
     return 0;
 }
 
