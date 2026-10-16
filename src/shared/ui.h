@@ -250,6 +250,11 @@ void ui_focus_field(UIState *ui, int id);
 /* Draw a button and return 1 on its click frame, not every held-mouse frame.
  * An active edit must finish before the caller executes the button command. */
 int ui_button(UIState *ui, int x, int y, int w, int h, const char *label);
+/* A button for a state that is on or off (a tool, the grid, a view): drawn
+ * in the selected colour while `on`, with the accent outline when the style
+ * has outlines.  Returns 1 on its click frame, like ui_button; the caller
+ * flips the state. */
+int ui_toggle(UIState *ui, int x, int y, int w, int h, const char *label, int on);
 /* The same button while its command has nothing to act on: drawn darker with
  * a dim label, without a hover highlight, and it never takes a click. */
 void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *label);
