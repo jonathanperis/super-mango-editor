@@ -39,3 +39,17 @@ static inline int float_same_value(float a, float b)
     memcpy(&bits_b, &b, sizeof(bits_b));
     return bits_a == bits_b;
 }
+
+/*
+ * span_find — Index of the first span [starts[i], starts[i] + width) that
+ * holds x, or -1. Floor gaps are such spans: every "is this point over a
+ * gap" test asks this, comparing in float exactly as each caller did.
+ */
+static inline int span_find(float x, const int *starts, int count, int width)
+{
+    for (int i = 0; i < count; i++) {
+        float lo = (float)starts[i];
+        if (x >= lo && x < lo + (float)width) return i;
+    }
+    return -1;
+}
