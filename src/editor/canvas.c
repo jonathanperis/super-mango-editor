@@ -430,7 +430,7 @@ static void render_platforms(EditorState *es) {
 /* ---- Floor (9-slice with sea gap handling) ----------------------- */
 
 /*
- * render_floor — Draw the ground floor across the full world width.
+ * render_floor — Draw the ground floor's visible stretch of the world.
  *
  * Replicates the game's 9-slice floor rendering:
  *   - Grass_Tileset.png is 48x48, divided into 3x3 grid of 16x16 pieces.
@@ -440,6 +440,21 @@ static void render_platforms(EditorState *es) {
  */
 static void render_floor(EditorState *es) {
     const int P = TILE_SIZE / 3;  /* 9-slice piece size: 16 px */
+    const int world_w = EDITOR_WORLD_W(es);
+
+    /*
+     * Only walk the pieces the canvas can show.  A 50-screen level is
+     * 1,250 columns by 3 rows, and drawing all of them every frame cost
+     * thousands of clipped sprite draws for a strip a few dozen pieces
+     * wide.  Each piece's slice depends only on its own tx, so starting
+     * part-way along gives the same pixels; the one-piece margin on each
+     * side covers the int truncation in w2s_x.
+     */
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    int first_tx = ((int)(es->camera.x / (float)P) - 1) * P;
+    int last_tx  = (int)(es->camera.x + (float)CANVAS_W / zoom) + P;
+    if (first_tx < 0) first_tx = 0;
+    if (last_tx > world_w) last_tx = world_w;
 
     for (int ty = FLOOR_Y; ty < GAME_H; ty += P) {
         /* Choose which row of the 9-slice to sample */
@@ -448,7 +463,7 @@ static void render_floor(EditorState *es) {
         else if (ty + P >= GAME_H) piece_row = 2;  /* bottom: base edge  */
         else                       piece_row = 1;  /* middle: dirt fill  */
 
-        for (int tx = 0; tx < EDITOR_WORLD_W(es); tx += P) {
+        for (int tx = first_tx; tx < last_tx; tx += P) {
             /*
              * Skip this piece if it falls inside any floor gap.
              * A piece at tx is inside a gap when both edges are within
@@ -475,7 +490,7 @@ static void render_floor(EditorState *es) {
 
             /* World boundaries */
             if (tx <= 0)           at_left_edge  = 1;
-            if (tx + P >= EDITOR_WORLD_W(es)) at_right_edge = 1;
+            if (tx + P >= world_w) at_right_edge = 1;
 
             /* Gap boundaries */
             for (int g = 0; g < es->level.floor_gap_count; g++) {

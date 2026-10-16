@@ -90,7 +90,9 @@ rejects malformed ones. `editor-ui-test` drives the editor with input events
 and config panel clicks, box and Shift selection acting on the group, arrow-key
 nudges, Ctrl+D, the snap toggle, Alt+click cycling, text-field caret and Tab,
 validation messages that select the problem, the Campaign view and Playtest
-from here) and checks the resulting document and undo history. It and `editor-validation-test` edit a campaign in a
+from here) and checks the resulting document and undo history; it also reads the
+canvas back to check the floor still reaches both edges at every zoom and scroll.
+It and `editor-validation-test` edit a campaign in a
 scratch game folder, made and entered through `tests/test_folders.h`, so those
 cases run on Windows too. On POSIX it also covers the playtest process status
 and the native file pickers and the Campaign view's skip-this-step dialog through stand-in `osascript`/`zenity` scripts. They write scratch files
