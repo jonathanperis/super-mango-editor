@@ -11,6 +11,39 @@ and the project's Emscripten 6.0.9 toolchain. Desktop SDL backends are not used.
 raylib's automatic F12 screenshot shortcut is disabled because application
 bindings and explicit exports belong to Super Mango.
 
+## Trimmed feature set
+
+`build_raylib.py` keeps raylib's `config.h` (CMake's `CUSTOMIZE_BUILD` stays
+off) and switches individual features off with `-DSUPPORT_...=0` compiler flags.
+`config.h` only supplies a default when a flag is not already defined, and the
+sources test the value with `#if`, so each flag removes exactly that feature.
+Super Mango is 2D, uses the built-in font, loads PNG images and WAV/QOA sounds,
+and generates no images other than `GenImageColor` (which is outside the
+image-generation block). These are compiled out:
+
+| Flag set to 0 | Removes |
+|---------------|---------|
+| `SUPPORT_MODULE_RMODELS` | 3D models, meshes, materials and 3D drawing |
+| `SUPPORT_FILEFORMAT_BMP`, `GIF`, `QOI`, `DDS` | Image formats other than PNG |
+| `SUPPORT_FILEFORMAT_TTF`, `FNT` | Font files (the default font is built in) |
+| `SUPPORT_FILEFORMAT_OGG`, `MP3`, `XM`, `MOD` | Audio formats other than WAV and QOA |
+| `SUPPORT_IMAGE_EXPORT` | `ExportImage` and friends |
+| `SUPPORT_IMAGE_GENERATION` | `GenImageGradient*`, `GenImageChecked`, noise, cellular, text images |
+| `SUPPORT_COMPRESSION_API` | `CompressData`, Base64 and hash helpers |
+| `SUPPORT_AUTOMATION_EVENTS` | Input recording and replay |
+| `SUPPORT_GESTURES_SYSTEM` | Touch gesture detection (raw touch input remains) |
+| `SUPPORT_CAMERA_SYSTEM` | `UpdateCamera` for 3D cameras |
+| `SUPPORT_CLIPBOARD_IMAGE` | `GetClipboardImage` |
+| `SUPPORT_SCREEN_CAPTURE` | The F12 screenshot shortcut |
+
+PNG, WAV and QOA support stay on. Measured on Linux (clang release build and
+the Web build): the static library shrank from 3.36 MB to 2.37 MB, the
+stripped game from 1.99 MB to 1.65 MB, and `super-mango.wasm` from 635 KB to
+481 KB (259 KB to 193 KB gzipped). Calling a removed function fails at link
+time, so turning a feature back on means deleting its flag here; the build
+script is a raylib input, so that change rebuilds every raylib tree and
+invalidates CI's compiled-raylib caches.
+
 Source and library outputs stay in the selected `OUTDIR`; no system raylib
 installation is required. Keep native, web, debug, release and sanitizer build
 directories separate. Windows dependency builds use MinGW Makefiles.

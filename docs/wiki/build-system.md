@@ -52,7 +52,11 @@ The patches release alias converter caches and WAV decoders and avoid miniaudio
 null-pointer arithmetic. A macOS-only timing patch gives the existing partial
 busy wait an extra 1 ms wakeup margin to reduce sleep overshoot at 60 FPS; it
 uses a little more CPU near the deadline, not a full-frame spin. The bootstrap
-rejects unfamiliar patch contexts.
+rejects unfamiliar patch contexts. It also compiles out raylib features the
+game never calls (3D models, image/font/audio formats other than PNG, WAV and
+QOA, image export and generation, compression, input recording, gestures, the
+3D camera and clipboard images) with `-DSUPPORT_...=0` flags; the table in
+`vendor/raylib/README.md` lists them.
 Desktop uses bundled GLFW; Web uses the same Emscripten toolchain
 as the application. `RAYLIB_BUILD` defaults to `$(OUTDIR)/raylib`; web uses
 `$(OUTDIR)/raylib-web`. Keep build modes/toolchains in separate directories.
