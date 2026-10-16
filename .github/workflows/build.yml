@@ -218,13 +218,13 @@ jobs:
       - name: Fingerprint the raylib toolchain (Linux / macOS)
         id: toolchain
         if: matrix.target == 'native' && runner.os != 'Windows'
-        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; "$MANGO_CC" --version; cmake --version; } | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; "$MANGO_CC" --version; cmake --version; make -s raylib-options; } | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
       - name: Fingerprint the raylib toolchain (Windows)
         id: toolchain-windows
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; "$MANGO_CC" --version; cmake --version; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; "$MANGO_CC" --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
       - name: Cache compiled raylib
         if: matrix.target == 'native'
@@ -237,7 +237,7 @@ jobs:
             out/headless/raylib
             !out/headless/raylib/raylib-*/examples
             !out/headless/raylib/raylib-*/projects
-          key: raylib-build-${{ runner.os }}-debug-${{ steps.toolchain.outputs.id || steps.toolchain-windows.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py', 'Makefile') }}
+          key: raylib-build-${{ runner.os }}-debug-${{ steps.toolchain.outputs.id || steps.toolchain-windows.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
 
       # ── Emscripten SDK install (WebAssembly) ────────────────────────────────
       # The same emcc toolchain builds raylib's Web backend and the application.
@@ -251,6 +251,23 @@ jobs:
       - name: Verify Emscripten
         if: matrix.target == 'wasm'
         run: emcc --version
+
+      # The Web raylib tree (out/raylib-web) is cached the same way, keyed on
+      # the Emscripten SDK instead of a native compiler.
+      - name: Fingerprint the raylib toolchain (WebAssembly)
+        id: toolchain-web
+        if: matrix.target == 'wasm'
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; emcc --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled Web raylib
+        if: matrix.target == 'wasm'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out/raylib-web
+            !out/raylib-web/raylib-*/examples
+            !out/raylib-web/raylib-*/projects
+          key: raylib-build-web-${{ steps.toolchain-web.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
 
       - name: Install Node.js for host contracts and WebAssembly smoke
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -429,14 +446,17 @@ jobs:
       # which re-verifies the archive checksum, re-applies the patches (a no-op
       # when present) and re-runs CMake, and CMake rebuilds whatever its own
       # dependency tracking finds stale. The key must match exactly (no
-      # restore-keys): it covers the pin, the patches, the Makefile and build
-      # script that choose the CMake options, the runner image, compiler and
-      # CMake versions, and the workspace path CMake records, so a changed
-      # toolchain, option or path never reuses old objects. Pull requests
+      # restore-keys): it covers the pin, the patches, the build script that
+      # chooses the CMake flags, the Makefile's raylib option definitions
+      # (`make raylib-options`, not the whole Makefile, so unrelated edits
+      # keep the cache), the runner image, compiler and CMake versions, and
+      # the workspace path CMake records. Even a stale hit cannot link old
+      # objects: the restored tree carries its make-options.txt stamp, and
+      # options that differ from it re-run build_raylib.py. Pull requests
       # cannot write caches that main or tags read.
       - name: Fingerprint the raylib toolchain
         id: toolchain
-        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
       - name: Cache compiled sanitizer raylib
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -445,7 +465,7 @@ jobs:
             out-sanitize/raylib
             !out-sanitize/raylib/raylib-*/examples
             !out-sanitize/raylib/raylib-*/projects
-          key: raylib-build-linux-sanitize-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py', 'Makefile') }}
+          key: raylib-build-linux-sanitize-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
 
       - name: Start rendered-test display and audio
         run: |
@@ -525,6 +545,21 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '26.9.0'
+
+      # Coverage instruments only project code, so the Memory raylib tree is
+      # an ordinary one and is cached like the others (see sanitizers).
+      - name: Fingerprint the raylib toolchain
+        id: toolchain
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled raylib
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out/headless/raylib
+            !out/headless/raylib/raylib-*/examples
+            !out/headless/raylib/raylib-*/projects
+          key: raylib-build-linux-coverage-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
 
       - name: Coverage of the native tests
         run: make coverage CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory COVERAGE_MIN=90
@@ -634,6 +669,25 @@ jobs:
           clang --version
           pacman -Q mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-cmake
 
+      # Desktop and Memory raylib trees, cached as in the build job. The
+      # rolling toolchain changes the fingerprint, and so the key, whenever
+      # MSYS2 ships a new Clang or CMake.
+      - name: Fingerprint the raylib toolchain
+        id: toolchain
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled raylib
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out/raylib
+            !out/raylib/raylib-*/examples
+            !out/raylib/raylib-*/projects
+            out/headless/raylib
+            !out/headless/raylib/raylib-*/examples
+            !out/headless/raylib/raylib-*/projects
+          key: raylib-build-windows-clang-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
       - name: Install Node.js for host contracts
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -727,6 +781,27 @@ jobs:
               mingw-w64-ucrt-x86_64-make; then exit 0; fi
           done
           exit 1
+
+      # RAYLIB_AUDIO=null builds both trees under their -nullaudio names
+      # (desktop GLFW and Memory). Cached as in the build job.
+      - name: Fingerprint the raylib toolchain (Windows)
+        id: toolchain
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; gcc --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache compiled raylib
+        if: runner.os == 'Windows'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            out/raylib-nullaudio
+            !out/raylib-nullaudio/raylib-*/examples
+            !out/raylib-nullaudio/raylib-*/projects
+            out/headless/raylib-nullaudio
+            !out/headless/raylib-nullaudio/raylib-*/examples
+            !out/headless/raylib-nullaudio/raylib-*/projects
+          key: raylib-build-${{ runner.os }}-desktop-backend-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
 
       # Third-party Actions are allowlisted for this repository, so Mesa is
       # fetched directly from the pinned mesa-dist-win release and checked
