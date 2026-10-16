@@ -170,6 +170,8 @@ When one entity is selected with the Select tool, the Properties panel displays 
 
 Changes take effect immediately on the canvas (WYSIWYG).
 
+While a number field is being edited, `Up` and `Down` add or take away one step (`Shift`: ten steps), stopping at the field's limits. A whole-number field steps by its own step (a floor gap's `x` moves by one 16 px floor piece), otherwise by 1. A decimal field has no step of its own, so it moves by 1 when its value is 10 or more (positions and speeds, in pixels) and by 0.1 below that (parallax speeds and other factors); a speed that must not be 0 steps over it. The stepped value is staged like typing: `Enter`, `Tab` or a click elsewhere applies it as one undo step, and `Esc` discards it. Text fields ignore `Up` and `Down`.
+
 ### Checkpoint Workflow and Feedback
 
 1. Open the **World** palette category, choose **Checkpoint**, select **Place**, and click the intended respawn point.

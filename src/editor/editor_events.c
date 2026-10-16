@@ -247,6 +247,9 @@ static void editor_key(EditorState *es, const InputEvent *event)
         case KEY_RIGHT:     ui_edit_key(&es->ui, UI_KEY_RIGHT, shift); break;
         case KEY_HOME:      ui_edit_key(&es->ui, UI_KEY_HOME, shift);  break;
         case KEY_END:       ui_edit_key(&es->ui, UI_KEY_END, shift);   break;
+        /* A number field steps its value (Shift: ten steps). */
+        case KEY_UP:        ui_edit_key(&es->ui, UI_KEY_UP, shift);    break;
+        case KEY_DOWN:      ui_edit_key(&es->ui, UI_KEY_DOWN, shift);  break;
         case KEY_TAB:       ui_focus_next(&es->ui, shift ? -1 : 1); break;
         case KEY_ENTER: case KEY_KP_ENTER: es->ui.key_return = 1;  break;
         default: break;

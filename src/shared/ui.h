@@ -27,7 +27,8 @@ typedef enum {
     UI_KEY_BACKSPACE, UI_KEY_DELETE,
     UI_KEY_WORD_LEFT, UI_KEY_WORD_RIGHT,  /* Ctrl+Left / Ctrl+Right      */
     UI_KEY_SELECT_ALL,                    /* Ctrl+A                      */
-    UI_KEY_UP, UI_KEY_DOWN, UI_KEY_PICK   /* open dropdown lists only */
+    UI_KEY_UP, UI_KEY_DOWN,               /* lists; step a number field  */
+    UI_KEY_PICK                           /* open dropdown lists only    */
 } UIEditKey;
 
 #define UI_EDIT_BUFFER_SIZE LEVEL_DESCRIPTION_CAPACITY
@@ -224,7 +225,10 @@ void ui_cancel_active_edit(UIState *ui);
 /* Move the caret or delete a character in the active field, right away.
  * Typing queued earlier is inserted first, so keys and text keep the order
  * they were pressed in.  With extend (Shift held) a caret move selects the
- * text it passes over instead.  Does nothing when no field is active. */
+ * text it passes over instead.  In a number field UI_KEY_UP / UI_KEY_DOWN
+ * add or take away one step (ten with extend), inside the field's limits:
+ * an int field's own step, or 1; a float field 1 from 10 up and 0.1 below.
+ * Does nothing when no field is active. */
 void ui_edit_key(UIState *ui, UIEditKey key, int extend);
 /* Copy the active field's selected text into out (cut short to fit, never
  * inside a UTF-8 character) and return its length in bytes; 0 when
