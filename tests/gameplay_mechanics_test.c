@@ -1129,7 +1129,7 @@ done:
 
 static int setup_window(void)
 {
-    if (display_open(GAME_W, GAME_H, "gameplay mechanics", 1)) return 1;
+    if (display_open(GAME_W, GAME_H, "gameplay mechanics", 1, 0)) return 1;
     input_open(GAME_W, GAME_H);
     game_input_test_set_physical_state(0, 0);
     return audio_open() != 0;

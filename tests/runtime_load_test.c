@@ -484,7 +484,7 @@ static int load_shares_one_texture_per_tile_path(void)
     int failed = 1;
 
     /* A hidden window gives raylib a context to upload textures into. */
-    if (display_open(GAME_W, GAME_H, "runtime load test", 1) != 0) {
+    if (display_open(GAME_W, GAME_H, "runtime load test", 1, 0) != 0) {
         fprintf(stderr, "runtime_load_test: hidden window failed\n");
         return 1;
     }

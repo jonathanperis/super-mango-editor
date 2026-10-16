@@ -7,7 +7,11 @@
 #include <stdlib.h>
 #include "geometry.h"
 
-int display_open(int width, int height, const char *title, int hidden);
+/* Open the process's one window at width x height. hidden: an unseen
+ * window for tests and smoke runs. resizable: the user may resize it, down
+ * to width x height (the editor); the canvas keeps its size and
+ * display_present letterboxes it at a whole-number scale. */
+int display_open(int width, int height, const char *title, int hidden, int resizable);
 void display_present(RenderTexture2D target);
 /* Where display_present draws a canvas_w x canvas_h canvas inside a
  * window_w x window_h window, in window units. At 1x or more it is the
