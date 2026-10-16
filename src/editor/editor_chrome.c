@@ -20,7 +20,8 @@
  * editor_render_toolbar — Draw the top toolbar (32 px tall, full width).
  *
  * Layout from left to right:
- *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | [Campaign] | file buttons
+ *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | [Campaign] |
+ *   [Contrast] | file buttons
  */
 void editor_render_toolbar(EditorState *es)
 {
@@ -35,7 +36,7 @@ void editor_render_toolbar(EditorState *es)
         es->tool = TOOL_SELECT;
     }
     if (es->tool == TOOL_SELECT) {
-        DrawRectangle(bx, by+bh, bw, 2, UI_BTN_ACTIVE);
+        DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
     }
 
     bx += bw + 4;
@@ -43,7 +44,7 @@ void editor_render_toolbar(EditorState *es)
         es->tool = TOOL_PLACE;
     }
     if (es->tool == TOOL_PLACE) {
-        DrawRectangle(bx, by+bh, bw, 2, UI_BTN_ACTIVE);
+        DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
     }
 
     bx += bw + 4;
@@ -51,7 +52,7 @@ void editor_render_toolbar(EditorState *es)
         es->tool = TOOL_DELETE;
     }
     if (es->tool == TOOL_DELETE) {
-        DrawRectangle(bx, by+bh, bw, 2, UI_BTN_ACTIVE);
+        DrawRectangle(bx, by+bh, bw, 2, ui_color(&es->ui, UI_COLOR_SELECTED));
     }
 
     bx += bw + 20;
@@ -91,6 +92,15 @@ void editor_render_toolbar(EditorState *es)
     if (ui_button(&es->ui, bx, by, 84, bh, es->campaign ? "[Campaign]" : "Campaign")) {
         if (es->campaign) (void)editor_campaign_close(es, 0);
         else (void)editor_campaign_open(es, NULL);
+    }
+
+    /* High contrast re-themes every widget and panel (UI_STYLE_HIGH_CONTRAST:
+     * black faces, white outlines, text at 7:1 or more). The level canvas
+     * keeps its own colours. */
+    bx += 88;
+    if (ui_button(&es->ui, bx, by, 84, bh, es->high_contrast ? "[Contrast]" : "Contrast")) {
+        es->high_contrast ^= 1;
+        es->ui.style = es->high_contrast ? UI_STYLE_HIGH_CONTRAST : UI_STYLE_DEFAULT;
     }
 
     int rx = EDITOR_W - 4 - 52;
@@ -147,7 +157,7 @@ void editor_render_status_bar(EditorState *es)
     /* Snap indicator: bright while on, dim while off (key S toggles). */
     ui_label_color(&es->ui, 150, bar_y + 8,
                    es->snap_to_grid ? "Snap: on" : "Snap: off",
-                   es->snap_to_grid ? UI_ACCENT : UI_TEXT_DIM);
+                   es->snap_to_grid ? ui_color(&es->ui, UI_COLOR_ACCENT) : ui_color(&es->ui, UI_COLOR_TEXT_DIM));
 
     const char *tool_names[] = { "Select", "Place", "Delete" };
     const char *tool_name = (es->tool >= 0 && es->tool < 3)
@@ -169,8 +179,8 @@ void editor_render_status_bar(EditorState *es)
                       es->ui.mouse_y >= bar_y && es->ui.mouse_y < bar_y + STATUS_H;
         ui_label_color(&es->ui, 330, bar_y + 8, summary,
                        es->validation_report.error_count > 0 ?
-                       (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
-        if (hovered) DrawRectangle(330, bar_y + 22, width, 1, UI_TEXT_DIM);
+                       ui_color(&es->ui, UI_COLOR_ERROR) : ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+        if (hovered) DrawRectangle(330, bar_y + 22, width, 1, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         if (hovered && es->ui.mouse_clicked) {
             es->ui.mouse_clicked = 0;
             (void)editor_focus_validation_issue(es, 0);
@@ -194,7 +204,7 @@ void editor_render_status_bar(EditorState *es)
     ui_label(&es->ui, 600, bar_y + 8, info_text);
     if (es->status_message[0] != '\0') {
         ui_label_color(&es->ui, 920, bar_y + 8,
-                       es->status_message, UI_TEXT_DIM);
+                       es->status_message, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     }
 }
 
@@ -207,7 +217,7 @@ void editor_render_play_overlay(EditorState *es)
              "Playing level...");
     ui_label_color(&es->ui, EDITOR_W / 2 - 80, EDITOR_H / 2 - 10,
                    "Close the game window or click Stop",
-                   UI_TEXT_DIM);
+                   ui_color(&es->ui, UI_COLOR_TEXT_DIM));
 
     if (ui_button(&es->ui, EDITOR_W / 2 - 40, EDITOR_H / 2 + 30,
                   80, 28, "Stop")) {

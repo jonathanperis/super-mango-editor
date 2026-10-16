@@ -1313,7 +1313,7 @@ static void draw_row(EditorState *es, EditorCampaign *c, int i, int y)
     }
     if (i == c->selected)
         DrawRectangle(CAMPAIGN_VIEW_X - 4, y - 2, right - CAMPAIGN_VIEW_X + 4,
-                      CAMPAIGN_ROW_H, UI_BTN_HOT);
+                      CAMPAIGN_ROW_H, ui_color(&es->ui, UI_COLOR_HOT));
 
     snprintf(text, sizeof(text), "%d. %s", i + 1, entry->path);
     ui_label(&es->ui, CAMPAIGN_VIEW_X, y + 2, text);
@@ -1331,7 +1331,7 @@ static void draw_row(EditorState *es, EditorCampaign *c, int i, int y)
             editor_campaign_check(es);
         }
     } else {
-        ui_label_color(&es->ui, CAMPAIGN_NAME_X, y + 2, "(cannot load)", UI_TEXT_DIM);
+        ui_label_color(&es->ui, CAMPAIGN_NAME_X, y + 2, "(cannot load)", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     }
     ui_label_color(&es->ui, CAMPAIGN_NAME_X + CAMPAIGN_NAME_W + 12, y + 2,
                    entry->available ? "ok" : entry->problem,
@@ -1439,11 +1439,11 @@ void editor_campaign_render(EditorState *es)
     else
         ui_label_color(&es->ui, CAMPAIGN_VIEW_X, TOOLBAR_H + 30,
                        "The start menu lists these in order; each level's next_phase "
-                       "must name the next one.", UI_TEXT_DIM);
-    ui_label_color(&es->ui, CAMPAIGN_VIEW_X, TOOLBAR_H + 50, "Level file", UI_TEXT_DIM);
-    ui_label_color(&es->ui, CAMPAIGN_NAME_X, TOOLBAR_H + 50, "Name (menu label)", UI_TEXT_DIM);
+                       "must name the next one.", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+    ui_label_color(&es->ui, CAMPAIGN_VIEW_X, TOOLBAR_H + 50, "Level file", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+    ui_label_color(&es->ui, CAMPAIGN_NAME_X, TOOLBAR_H + 50, "Name (menu label)", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     ui_label_color(&es->ui, CAMPAIGN_NAME_X + CAMPAIGN_NAME_W + 12, TOOLBAR_H + 50,
-                   "Game's verdict", UI_TEXT_DIM);
+                   "Game's verdict", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
 
     rows = CAMPAIGN_VISIBLE_ROWS;
     if (c->scroll > (int)c->catalog.count - rows) c->scroll = (int)c->catalog.count - rows;
