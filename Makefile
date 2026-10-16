@@ -207,7 +207,7 @@ TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validati
                    $(TEST_EDITOR_UI_OBJ) \
                    $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,tools hit_test editor_clipboard \
                    editor_events canvas editor_panels editor_layout palette properties \
-                   editor_playtest file_dialog undo)
+                   editor_playtest file_dialog dialog_choice undo)
 # The editor's own window, chrome and frame, for editor-ui-test.
 TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \
                    editor_frame editor_textures)
@@ -379,7 +379,6 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 $(TEST_TARGETS): | $(OUTDIR)
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
 $(OUTDIR)/game-events-test: $(filter-out $(OBJDIR)/src/input/input_backend.o,$(PLATFORM_OBJS)) $(TEST_INPUT_BACKEND_OBJ) $(TEST_SOURCE_DIR)/input_backend_test.o
-$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/editor/dialog_choice.o
 # A rebuilt dependency must refresh consumers and relink executables. Exported
 # headers retain upstream timestamps, so header mtimes alone are insufficient.
 # The flag stamps recompile the objects whose compile flags changed (game and

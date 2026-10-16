@@ -6,6 +6,7 @@
  * editor_events.c translates commands into document/history operations.
  */
 #include "editor.h"
+#include "dialog_choice.h"    /* dialog_choice_attach */
 #include "editor_campaign.h"  /* editor_campaign_free */
 #include "editor_frame.h"
 #include "editor_files.h"
@@ -26,6 +27,9 @@ int editor_init(EditorState *es, int hidden)
     es->frame_target = LoadRenderTexture(EDITOR_W, EDITOR_H);
     if (!IsRenderTextureValid(es->frame_target)) goto fail;
     SetTextureFilter(es->frame_target.texture, TEXTURE_FILTER_POINT);
+    /* Prompts show the last frame behind them (dialog_choice.c). */
+    es->prompt_backdrop = LoadRenderTexture(EDITOR_W, EDITOR_H);
+    if (!IsRenderTextureValid(es->prompt_backdrop)) goto fail;
     es->font = font_load();
     if (!es->font) goto fail;
 
@@ -46,6 +50,8 @@ int editor_init(EditorState *es, int hidden)
     /* Tooltips stay inside the logical canvas, not the scaled window. */
     es->ui.view_w = EDITOR_W;
     es->ui.view_h = EDITOR_H;
+    /* Yes/no prompts draw in this window, over this editor. */
+    dialog_choice_attach(es);
     es->ui.before_command = editor_before_command;
     es->ui.before_command_context = es;
     if (!hidden) {
@@ -81,6 +87,7 @@ void editor_loop(EditorState *es)
 
 void editor_cleanup(EditorState *es)
 {
+    dialog_choice_attach(NULL);
     editor_campaign_free(es);
     /* Release cached labels and textures while their GPU context is alive.
      * UIState borrows the font; it must not be used after font_unload. */
@@ -93,6 +100,9 @@ void editor_cleanup(EditorState *es)
     if (IsRenderTextureValid(es->frame_target))
         UnloadRenderTexture(es->frame_target);
     es->frame_target = (RenderTexture2D){0};
+    if (IsRenderTextureValid(es->prompt_backdrop))
+        UnloadRenderTexture(es->prompt_backdrop);
+    es->prompt_backdrop = (RenderTexture2D){0};
     /* Restore backend callbacks before destroying the window they belong to. */
     input_close();
     if (IsWindowReady()) CloseWindow();

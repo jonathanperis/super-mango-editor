@@ -96,7 +96,7 @@ resulting document and undo history; it also reads the canvas back to check the 
 edges at every zoom and scroll. It and `editor-validation-test` edit a campaign in a
 scratch game folder, made and entered through `tests/test_folders.h`, so those
 cases run on Windows too. On POSIX it also covers the playtest process status
-and the native file pickers and the Campaign view's skip-this-step dialog through stand-in `osascript`/`zenity` scripts. They write scratch files
+and the native file pickers through stand-in `osascript`/`zenity` scripts. The in-window prompts are answered with queued events (keys, clicks, closing the window), on every system; a prompt opened mid-frame must leave the frame's target and clip as it found them. They write scratch files
 under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
 `make test`, `make sanitize` and `make coverage` can run at the same time in one
 checkout. Test objects are also built with `-DMANGO_TESTING`, which turns on the

@@ -6,6 +6,7 @@
  */
 #include "editor_frame.h"
 #include "canvas.h"
+#include "dialog_choice.h"
 #include "editor_chrome.h"
 #include "editor_events.h"
 #include "editor_recovery.h"
@@ -72,6 +73,7 @@ void editor_run_frame(EditorState *es)
      * the world canvas so they appear above it (the painter's algorithm). */
     BeginDrawing();
     BeginTextureMode(es->frame_target);
+    es->drawing_target = &es->frame_target;   /* a prompt may leave and return */
     ClearBackground((Color){0x1a, 0x1a, 0x1a, 255});
     if (es->playing)
         editor_render_play_overlay(es);
@@ -85,6 +87,9 @@ void editor_run_frame(EditorState *es)
     }
     /* The widgets drawn above said which cursor they want; set it once. */
     editor_update_cursor(es);
+    /* Keep this complete frame for a prompt to show behind it. */
+    dialog_choice_keep_frame(es);
+    es->drawing_target = NULL;
     /* Ends texture mode, presents the scaled target, then calls EndDrawing.
      * EndDrawing polls the next frame's input and owns frame pacing; adding
      * another event poll or sleep here would perform that job twice. */

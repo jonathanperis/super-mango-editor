@@ -1940,33 +1940,6 @@ static int read_picker_output(const char *output, char *buf, int buf_size)
 static int dialog_quoting_and_picked_paths_stay_literal(void)
 {
     char buf[64];
-    char *quoted;
-    int failed = 0;
-
-    /* PowerShell: ASCII and Unicode single quotes are all doubled, so the
-     * file name stays one literal string instead of ending it early. */
-    quoted = dialog_quote_powershell("x\xE2\x80\x99;Start-Process calc;\xE2\x80\x98.toml");
-    failed |= !quoted || expect_string("powershell smart quotes", quoted,
-        "'x\xE2\x80\x99\xE2\x80\x99;Start-Process calc;\xE2\x80\x98\xE2\x80\x98.toml'");
-    free(quoted);
-    quoted = dialog_quote_powershell("it's \xE2\x80\x9A\xE2\x80\x9B \xE2\x80\x9C");
-    failed |= !quoted || expect_string("powershell all marks", quoted,
-        "'it''s \xE2\x80\x9A\xE2\x80\x9A\xE2\x80\x9B\xE2\x80\x9B \xE2\x80\x9C'");
-    free(quoted);
-    /* zenity: exit 1 is Cancel unless the extra button printed its label. */
-    {
-        const char *const labels[3] = {"Save", "Discard", "Cancel"};
-        failed |= expect_int("zenity ok", dialog_zenity_selection(0, "", labels, 3, 0, 2, 1), 0);
-        failed |= expect_int("zenity cancel", dialog_zenity_selection(1, "", labels, 3, 0, 2, 1), 2);
-        failed |= expect_int("zenity extra", dialog_zenity_selection(1, "Discard", labels, 3, 0, 2, 1), 1);
-        failed |= expect_int("zenity two-button ignores label",
-                             dialog_zenity_selection(1, "Discard", labels, 2, 0, 1, -1), 1);
-        failed |= expect_int("zenity failure", dialog_zenity_selection(5, "", labels, 3, 0, 2, 1), -1);
-    }
-    quoted = dialog_quote_posix("it's <b>&amp;");
-    failed |= !quoted || expect_string("posix quote", quoted, "'it'\\''s <b>&amp;'");
-    free(quoted);
-    if (failed) return 1;
 
     /* A picked name containing a line break is refused, never truncated.
      * "\r\n" is a line ending only on Windows; elsewhere the '\r' belongs

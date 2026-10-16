@@ -386,7 +386,9 @@ The ` *` in the title compares the view with the files, so it follows the histor
 | Open by drag-and-drop | Drop one `.toml` file on the window | Opens it like a recent file; closes the Campaign view first |
 | Campaign view | `Ctrl+M` / Campaign button | Edit the campaign manifest (see [Campaign View](#campaign-view)) |
 
-The title bar and status bar show an asterisk (`*`) after the filename when there are unsaved changes. New, Open, a recent file, a dropped level, recovery and quit first ask **Save / Discard / Cancel** when the level has been modified; Save continues only if the save succeeds. On Linux these three-button prompts use zenity's extra button.
+The title bar and status bar show an asterisk (`*`) after the filename when there are unsaved changes. New, Open, a recent file, a dropped level, recovery and quit first ask **Save / Discard / Cancel** when the level has been modified; Save continues only if the save succeeds.
+
+These questions, and the editor's other two- and three-button ones (an invalid field value, replacing a file, a file changed on disk, the Recover picker, skipping an Undo step), are asked inside the editor window: the editor dims behind a box with the question and its buttons. The highlighted button starts on the safe default and `Enter` (or `Space`) presses it; `Tab`, `Shift+Tab` and the arrow keys move the highlight; `Esc`, or closing the window, cancels; a click (press and release on the same button) chooses that button. The editor waits until one is chosen. Only the file pickers (Open, Save As) are still the system's own dialogs.
 
 A drop opens a level only when it is exactly one file ending in `.toml` (in any letter case); two files, or a picture, leave the document alone and the status bar says `Drop one .toml level to open it`. Drops are ignored while a playtest runs. If the Campaign view has unsaved changes, the first drop only warns (`Save them, or drop the level again to discard them`) and a second drop closes the view and opens the level. raylib copies a dropped path into a fixed buffer (256 bytes on Windows, 4096 elsewhere) and cuts a longer one short, so a path that fills it is refused; open such a file with `Ctrl+O`.
 
@@ -432,9 +434,12 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
 | `src/shared/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |
 | `src/shared/serializer_save.c`, `serializer_emit.c`, `serializer_io.c` | TOML emission and atomic file persistence |
-| `file_dialog.c`, `dialog_choice.c` | Native OS file picker and button prompts (macOS `osascript`, Linux `zenity`, Windows PowerShell) |
+| `file_dialog.c` | Native OS file pickers for Open and Save As (macOS `osascript`, Linux `zenity`, Windows PowerShell) |
+| `dialog_choice.c` / `dialog_choice.h` | The two- and three-button prompts, drawn in the editor window by a small frame loop of their own (`dialog_choice`) |
 
-The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning its raylib render target, textures, level data, camera, tools, undo history and UI state. Text uses raylib's built-in font, which the UI borrows and never unloads. The standalone editor owns its process window; native file pickers and confirmations use the existing OS-dialog boundary.
+The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning its raylib render target, textures, level data, camera, tools, undo history and UI state. Text uses raylib's built-in font, which the UI borrows and never unloads. The standalone editor owns its process window; native file pickers use the existing OS-dialog boundary, and confirmations are drawn in that window.
+
+`dialog_choice` keeps the old blocking call, so its callers did not change: it runs its own loop of frames (input, draw, present) until a button is chosen. A prompt can open while events are handled or in the middle of drawing (a toolbar button or a field acts when it is drawn). For the second case the frame records what it has bound: `EditorState.drawing_target` names the render target texture mode is drawing into, and every clip goes through `ui_clip_begin` / `ui_scroll_begin`, which remember it in `UIState`. The prompt ends both, draws into a target of its own over a dimmed copy of the last complete frame (`prompt_backdrop`, copied by `dialog_choice_keep_frame` after every frame), and on return binds the target and sets the clip again, so the interrupted frame carries on. A mouse release it reads for a press made before it opened is put back in the input queue for the editor. Test builds answer prompts with queued events; once those run out, the prompt returns -1 (no answer), as it does at once in a hidden window.
 
 ---
 
