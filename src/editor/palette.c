@@ -149,14 +149,14 @@ static int palette_content_height(void)
  * palette_title_bar — The fixed "PALETTE" title at the top of the panel.
  *
  * It does not scroll and is drawn with a slightly lighter background
- * (UI_TITLE_BG) than the content below.  Clicking it collapses or expands
+ * (UI_COLOR_TITLE) than the content below.  Clicking it collapses or expands
  * the whole palette.
  */
 static void palette_title_bar(EditorState *es, int panel_x, int panel_y)
 {
     UIState *ui = &es->ui;
 
-    DrawRectangle(panel_x, panel_y, PANEL_W, TITLE_H, UI_TITLE_BG);
+    DrawRectangle(panel_x, panel_y, PANEL_W, TITLE_H, ui_color(ui, UI_COLOR_TITLE));
 
     /* Click header to toggle expand/collapse */
     int hdr_hovered = (ui->mouse_x >= panel_x &&
@@ -168,10 +168,10 @@ static void palette_title_bar(EditorState *es, int panel_x, int panel_y)
 
     const char *pal_sym = es->palette_open ? "v" : ">";
     int pal_sym_w = ui_text_width(ui, pal_sym);
-    ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_sym, UI_ACCENT);
+    ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_sym, ui_color(ui, UI_COLOR_ACCENT));
     ui_label_color(ui, panel_x + PAD_X + pal_sym_w, panel_y + 6,
                    " PALETTE",
-                   hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
+                   hdr_hovered ? ui_color(ui, UI_COLOR_TEXT) : ui_color(ui, UI_COLOR_TEXT_DIM));
 }
 
 /*
@@ -191,10 +191,10 @@ static void palette_category_header(UIState *ui, int cat, int panel_x, int row_y
     const char *cat_sym = category_open[cat] ? "v" : ">";
     int cat_sym_w = ui_text_width(ui, cat_sym);
     ui_label_color(ui, panel_x + PAD_X, row_y + 7,
-                   cat_sym, UI_ACCENT);
+                   cat_sym, ui_color(ui, UI_COLOR_ACCENT));
     ui_label_color(ui, panel_x + PAD_X + cat_sym_w, row_y + 7,
                    editor_entity_category_name((EditorEntityCategory)cat),
-                   hdr_hovered ? UI_TEXT : UI_TEXT_DIM);
+                   hdr_hovered ? ui_color(ui, UI_COLOR_TEXT) : ui_color(ui, UI_COLOR_TEXT_DIM));
 
     ui_separator(ui,
                  panel_x + PAD_X,
@@ -219,17 +219,18 @@ static void palette_entry_row(EditorState *es, EntityType type,
 
     /* ---- Draw row background ---- */
     if (is_selected) {
-        /* UI_ACCENT (#4A90D9) contrasts well against the dark panel. */
-        DrawRectangle(panel_x, row_y, PANEL_W, ROW_H, UI_ACCENT);
+        /* The selection colour carries the text colour in every style (the
+         * default one is the accent blue). */
+        DrawRectangle(panel_x, row_y, PANEL_W, ROW_H, ui_color(ui, UI_COLOR_SELECTED));
     } else if (hovered) {
         /* Feedback before the click. */
-        DrawRectangle(panel_x, row_y, PANEL_W, ROW_H, UI_BTN_HOT);
+        DrawRectangle(panel_x, row_y, PANEL_W, ROW_H, ui_color(ui, UI_COLOR_HOT));
     }
-    /* Else: no background drawn — the panel's UI_BG shows through. */
+    /* Else: no background drawn — the panel colour shows through. */
 
     /*
-     * The name is bright white (UI_TEXT) whether or not the row is
-     * selected: the accent background gives enough contrast, and dim text
+     * The name is the text colour (UI_COLOR_TEXT) whether or not the row is
+     * selected: the selection background gives enough contrast, and dim text
      * would be hard to read.  The +4 vertical offset centres the 13-px
      * font within the 22-px row height: (22 - 13) / 2 ~ 4.
      */
@@ -237,7 +238,7 @@ static void palette_entry_row(EditorState *es, EntityType type,
                    panel_x + PAD_X + 8,  /* extra indent under category */
                    row_y + 4,
                    editor_entity_palette_name(type),
-                   UI_TEXT);
+                   ui_color(ui, UI_COLOR_TEXT));
 
     /*
      * mouse_clicked is 1 only on the frame the button went down (not while

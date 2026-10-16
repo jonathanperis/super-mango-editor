@@ -224,13 +224,13 @@ static void field_label(EditorState *es, int y, const char *key, int id)
  * (the entity properties and Level Config).
  *
  * Fills the bar, toggles *open when it is clicked, and draws the ">"/"v"
- * symbol in UI_ACCENT followed by title, which turns from UI_ACCENT to
- * UI_TEXT while hovered.  The bar is ROW_H + 4 px tall.
+ * symbol in UI_COLOR_ACCENT followed by title, which turns from the accent to
+ * UI_COLOR_TEXT while hovered.  The bar is ROW_H + 4 px tall.
  */
 static void draw_section_title(EditorState *es, int x, int y,
                                const char *title, int *open)
 {
-    DrawRectangle(x, y, PROP_W, ROW_H+4, UI_TITLE_BG);
+    DrawRectangle(x, y, PROP_W, ROW_H+4, ui_color(&es->ui, UI_COLOR_TITLE));
 
     int hovered = (es->ui.mouse_x >= x &&
                    es->ui.mouse_x < x + PROP_W &&
@@ -241,9 +241,9 @@ static void draw_section_title(EditorState *es, int x, int y,
 
     const char *sym = *open ? "v" : ">";
     int sym_w = ui_text_width(&es->ui, sym);
-    ui_label_color(&es->ui, x + 8, y + 4, sym, UI_ACCENT);
+    ui_label_color(&es->ui, x + 8, y + 4, sym, ui_color(&es->ui, UI_COLOR_ACCENT));
     ui_label_color(&es->ui, x + 8 + sym_w, y + 4, title,
-                   hovered ? UI_TEXT : UI_ACCENT);
+                   hovered ? ui_color(&es->ui, UI_COLOR_TEXT) : ui_color(&es->ui, UI_COLOR_ACCENT));
 }
 
 /*
@@ -338,9 +338,9 @@ static void draw_checkpoint_properties(EditorState *es, int y)
     ui_label(&es->ui, CONTENT_X, y, "screen:");
     char screen_text[32];
     snprintf(screen_text, sizeof(screen_text), "%d (derived)", screen);
-    ui_label_color(&es->ui, FIELD_X, y, screen_text, UI_TEXT_DIM);
+    ui_label_color(&es->ui, FIELD_X, y, screen_text, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     y += ROW_H;
-    ui_label_color(&es->ui, CONTENT_X, y, "Respawn when crossed.", UI_TEXT_DIM);
+    ui_label_color(&es->ui, CONTENT_X, y, "Respawn when crossed.", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     y += ROW_H;
     /* Start a playtest standing on this checkpoint (the game's
      * --start-checkpoint), like Shift+F5 with it selected. */
@@ -1263,9 +1263,9 @@ void properties_render(EditorState *es, int start_y, int available_h)
         y += 6;
         ui_label_color(&es->ui, CONTENT_X, y,
                        "Drag, arrows, Delete, Ctrl+C / Ctrl+D act on all.",
-                       UI_TEXT_DIM);
+                       ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         ui_label_color(&es->ui, CONTENT_X, y + 18,
-                       "Shift+click adds or removes one.", UI_TEXT_DIM);
+                       "Shift+click adds or removes one.", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         EndScissorMode();
         return;
     }
@@ -1351,9 +1351,9 @@ static void config_subsection_header(EditorState *es, int x, int y,
 
     const char *sym = *open ? "v" : ">";
     int sym_w = ui_text_width(&es->ui, sym);
-    ui_label_color(&es->ui, x + 8, y, sym, UI_ACCENT);
+    ui_label_color(&es->ui, x + 8, y, sym, ui_color(&es->ui, UI_COLOR_ACCENT));
     ui_label_color(&es->ui, x + 8 + sym_w, y, label,
-                   hovered ? UI_TEXT : UI_TEXT_DIM);
+                   hovered ? ui_color(&es->ui, UI_COLOR_TEXT) : ui_color(&es->ui, UI_COLOR_TEXT_DIM));
 }
 
 /* Where the validation rows were drawn this frame, for the wheel; empty
@@ -1381,8 +1381,8 @@ static int message_row(EditorState *es, int x, int y, const char *text, Color co
     int selected = es->focus_area == EDITOR_FOCUS_MESSAGES &&
                    strcmp(es->selected_message, text) == 0;
 
-    if (selected) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_ACTIVE);
-    else if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_HOT);
+    if (selected) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, ui_color(&es->ui, UI_COLOR_SELECTED));
+    else if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, ui_color(&es->ui, UI_COLOR_HOT));
     ui_label_color(&es->ui, x + 16, y, text, color);
     if (!hovered || !es->ui.mouse_clicked) return 0;
     es->ui.mouse_clicked = 0;
@@ -1409,7 +1409,7 @@ static int config_validation(EditorState *es, int x, int y)
 
     y = config_load_problems(es, x, y);
     ui_label_color(&es->ui, x + 8, y, editor_validation_summary(report),
-                   report->error_count > 0 ? (Color){0xFF,0x70,0x70,0xFF} : UI_TEXT_DIM);
+                   report->error_count > 0 ? ui_color(&es->ui, UI_COLOR_ERROR) : ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     y += 20;
 
     /* Keep the window on the list as it shrinks or grows. */
@@ -1422,7 +1422,7 @@ static int config_validation(EditorState *es, int x, int y)
         msg_list_bottom = y + shown * 18;
     }
     for (int i = first; i < first + shown; i++) {
-        Color msg_color = i < report->error_count ? (Color){0xFF,0x70,0x70,0xFF}
+        Color msg_color = i < report->error_count ? ui_color(&es->ui, UI_COLOR_ERROR)
                                                   : (Color){0xFF,0xC0,0x60,0xFF};
         if (message_row(es, x, y, report->messages[i], msg_color) &&
             report->locations[i].path[0] != '\0')
@@ -1433,7 +1433,7 @@ static int config_validation(EditorState *es, int x, int y)
         char where[96];   /* the words below with three row numbers */
         snprintf(where, sizeof(where), "Rows %d-%d of %d (the wheel scrolls them)",
                  first + 1, first + shown, count);
-        ui_label_color(&es->ui, x + 16, y, where, UI_TEXT_DIM);
+        ui_label_color(&es->ui, x + 16, y, where, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         y += 18;
     }
     /* The report keeps EDITOR_VALIDATION_MAX_MESSAGES; say how many more
@@ -1443,7 +1443,7 @@ static int config_validation(EditorState *es, int x, int y)
         if (hidden > 0) {
             char more[48];
             snprintf(more, sizeof(more), "... and %d more", hidden);
-            ui_label_color(&es->ui, x + 16, y, more, UI_TEXT_DIM);
+            ui_label_color(&es->ui, x + 16, y, more, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
             y += 18;
         }
     }
@@ -1469,8 +1469,8 @@ static int config_load_problems(EditorState *es, int x, int y)
     hovered = es->ui.mouse_x >= x && es->ui.mouse_x < x + PROP_W &&
               es->ui.mouse_y >= y && es->ui.mouse_y < y + 18 &&
               es->ui.mouse_y >= cfg_clip_top && es->ui.mouse_y < cfg_clip_bottom;
-    if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, UI_BTN_HOT);
-    ui_label_color(&es->ui, x + 8, y, heading, (Color){0xFF,0x70,0x70,0xFF});
+    if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, ui_color(&es->ui, UI_COLOR_HOT));
+    ui_label_color(&es->ui, x + 8, y, heading, ui_color(&es->ui, UI_COLOR_ERROR));
     if (hovered && es->ui.mouse_clicked) {
         es->ui.mouse_clicked = 0;
         es->load_report.count = 0;
@@ -1479,13 +1479,13 @@ static int config_load_problems(EditorState *es, int x, int y)
     }
     y += 18;
     for (int i = 0; i < report->count; i++) {
-        (void)message_row(es, x, y, report->messages[i], (Color){0xFF,0x70,0x70,0xFF});
+        (void)message_row(es, x, y, report->messages[i], ui_color(&es->ui, UI_COLOR_ERROR));
         y += 18;
     }
     if (report->total > report->count) {
         char more[48];
         snprintf(more, sizeof(more), "... and %d more", report->total - report->count);
-        ui_label_color(&es->ui, x + 16, y, more, UI_TEXT_DIM);
+        ui_label_color(&es->ui, x + 16, y, more, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         y += 18;
     }
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
@@ -1497,7 +1497,7 @@ static int config_recent_files(EditorState *es, int x, int y)
 {
     if (es->recent_file_count <= 0) return y;
 
-    ui_label_color(&es->ui, x + 8, y, "Recent files (Ctrl+1..5):", UI_TEXT_DIM);
+    ui_label_color(&es->ui, x + 8, y, "Recent files (Ctrl+1..5):", ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     y += 18;
     for (int i = 0; i < es->recent_file_count; i++) {
         /* Keep each entry to one panel-width line: the file name at the
@@ -1506,7 +1506,7 @@ static int config_recent_files(EditorState *es, int x, int y)
         char recent[64];
         editor_path_for_display(es->recent_files[i], shown_path, sizeof(shown_path));
         snprintf(recent, sizeof(recent), "%d: %s", i + 1, shown_path);
-        ui_label_color(&es->ui, x + 16, y, recent, UI_TEXT_DIM);
+        ui_label_color(&es->ui, x + 16, y, recent, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         y += 18;
     }
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
@@ -1545,7 +1545,7 @@ static int config_level_fields(EditorState *es, int x, int y)
         char width_text[32];
         snprintf(width_text, sizeof(width_text), "= %lldpx",
                  (long long)es->level.screen_count * GAME_W);
-        ui_label_color(&es->ui, x + 140, y, width_text, UI_TEXT_DIM);
+        ui_label_color(&es->ui, x + 140, y, width_text, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     }
     y += 24;
 

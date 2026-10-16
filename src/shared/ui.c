@@ -587,6 +587,26 @@ static void draw_text(UIState *ui, int x, int y,
     font_draw(ui->font, text, x, y, c);
 }
 
+/* Outline a button or dropdown face when the style asks for one. */
+static void draw_control_border(UIState *ui, int x, int y, int w, int h)
+{
+    if (ui->style.border_width <= 0 || !IsWindowReady()) return;
+    DrawRectangleLinesEx((Rectangle){(float)x, (float)y, (float)w, (float)h},
+                         (float)ui->style.border_width, ui_color(ui, UI_COLOR_BORDER));
+}
+
+/* A field's border: accent while editing, dim otherwise. The default style
+ * draws a 1 px line; a style with border_width draws that many pixels. */
+static void draw_field_border(UIState *ui, int x, int y, int w, int h, int is_active)
+{
+    if (!IsWindowReady()) return;
+    Color border = ui_color(ui, is_active ? UI_COLOR_ACCENT : UI_COLOR_TEXT_DIM);
+    if (ui->style.border_width > 0)
+        DrawRectangleLinesEx((Rectangle){(float)x, (float)y, (float)w, (float)h},
+                             (float)ui->style.border_width, border);
+    else DrawRectangleLines(x, y, w, h, border);
+}
+
 /*
  * text_width_of — Width in pixels of the bytes [from, to) of text.
  */
@@ -716,11 +736,11 @@ static void draw_active_edit(UIState *ui, int x, int y, int w)
         size_t lo = (size_t)from > start ? (size_t)from : start;
         size_t hi = (size_t)to < end ? (size_t)to : end;
         int left = x + 4 + text_width_of(ui, text, start, lo);
-        draw_rect(left, y + 2, text_width_of(ui, text, lo, hi), 16, UI_BTN_ACTIVE);
+        draw_rect(left, y + 2, text_width_of(ui, text, lo, hi), 16, ui_color(ui, UI_COLOR_SELECTED));
     }
     memcpy(display, text + start, end - start);
     display[end - start] = '\0';
-    draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+    draw_text(ui, x + 4, y + 3, display, ui_color(ui, UI_COLOR_TEXT));
 
     /*
      * The monotonic clock returns milliseconds. Dividing by 500 and checking
@@ -728,7 +748,7 @@ static void draw_active_edit(UIState *ui, int x, int y, int w)
      */
     if ((clock_millis() / 500) % 2) {
         int caret_x = x + 4 + text_width_of(ui, text, start, cursor);
-        draw_rect(caret_x, y + 3, 1, 14, UI_TEXT);
+        draw_rect(caret_x, y + 3, 1, 14, ui_color(ui, UI_COLOR_TEXT));
     }
 }
 
@@ -748,10 +768,44 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
  * memset ensures all per-frame and retained fields start at zero/NULL.
  * The caller releases any previous cache before reinitializing.
  */
+/* The UI_* colours of ui.h, as constants a static table can hold. */
+const UIStyle UI_STYLE_DEFAULT = {{
+    [UI_COLOR_PANEL]    = {0x2D, 0x2D, 0x2D, 0xFF},
+    [UI_COLOR_TITLE]    = {0x3D, 0x3D, 0x3D, 0xFF},
+    [UI_COLOR_INPUT]    = {0x1D, 0x1D, 0x1D, 0xFF},
+    [UI_COLOR_BUTTON]   = {0x4D, 0x4D, 0x4D, 0xFF},
+    [UI_COLOR_HOT]      = {0x5D, 0x5D, 0x5D, 0xFF},
+    [UI_COLOR_SELECTED] = {0x4A, 0x90, 0xD9, 0xFF},
+    [UI_COLOR_TEXT]     = {0xE0, 0xE0, 0xE0, 0xFF},
+    [UI_COLOR_TEXT_DIM] = {0x80, 0x80, 0x80, 0xFF},
+    [UI_COLOR_ACCENT]   = {0x4A, 0x90, 0xD9, 0xFF},
+    [UI_COLOR_WARNING]  = {0xFF, 0xBE, 0x5A, 0xFF},
+    [UI_COLOR_ERROR]    = {0xFF, 0x70, 0x70, 0xFF},
+    [UI_COLOR_BORDER]   = {0x4D, 0x4D, 0x4D, 0xFF},
+}, 0};
+
+/* Black faces with white outlines and text; every text colour is at least
+ * 7:1 against every face it is drawn on (WCAG AAA); editor_ui_test checks. */
+const UIStyle UI_STYLE_HIGH_CONTRAST = {{
+    [UI_COLOR_PANEL]    = {0x00, 0x00, 0x00, 0xFF},
+    [UI_COLOR_TITLE]    = {0x20, 0x20, 0x20, 0xFF},
+    [UI_COLOR_INPUT]    = {0x00, 0x00, 0x00, 0xFF},
+    [UI_COLOR_BUTTON]   = {0x00, 0x00, 0x00, 0xFF},
+    [UI_COLOR_HOT]      = {0x3A, 0x3A, 0x3A, 0xFF},
+    [UI_COLOR_SELECTED] = {0x00, 0x30, 0x7A, 0xFF},
+    [UI_COLOR_TEXT]     = {0xFF, 0xFF, 0xFF, 0xFF},
+    [UI_COLOR_TEXT_DIM] = {0xD8, 0xD8, 0xD8, 0xFF},
+    [UI_COLOR_ACCENT]   = {0xFF, 0xD4, 0x00, 0xFF},
+    [UI_COLOR_WARNING]  = {0xFF, 0xC0, 0x60, 0xFF},
+    [UI_COLOR_ERROR]    = {0xFF, 0x90, 0x90, 0xFF},
+    [UI_COLOR_BORDER]   = {0xFF, 0xFF, 0xFF, 0xFF},
+}, 1};
+
 void ui_init(UIState *ui, TextFont *font)
 {
     memset(ui, 0, sizeof(*ui));
     ui->font     = font;
+    ui->style    = UI_STYLE_DEFAULT;
     clear_active_edit(ui);
 }
 
@@ -855,8 +909,9 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
     int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
 
     /* Choose background colour based on hover state. */
-    Color bg = hovered ? UI_BTN_HOT : UI_BTN;
+    Color bg = ui_color(ui, hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON);
     draw_rect(x, y, w, h, bg);
+    draw_control_border(ui, x, y, w, h);
 
     /*
      * Centre the label text inside the button rectangle.
@@ -869,7 +924,7 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
     font_measure(ui->font, label, &tw, &th);
     int tx = x + (w - tw) / 2;   /* horizontal centre */
     int ty = y + (h - th) / 2;   /* vertical centre   */
-    draw_text(ui, tx, ty, label, UI_TEXT);
+    draw_text(ui, tx, ty, label, ui_color(ui, UI_COLOR_TEXT));
 
     /* Return 1 only on the click-down frame while hovering. */
     if (hovered && ui->mouse_clicked) {
@@ -895,22 +950,23 @@ void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *lab
 {
     int tw = 0, th = 0;
 
-    draw_rect(x, y, w, h, UI_TITLE_BG);
+    draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_TITLE));
+    draw_control_border(ui, x, y, w, h);
     font_measure(ui->font, label, &tw, &th);
-    draw_text(ui, x + (w - tw) / 2, y + (h - th) / 2, label, UI_TEXT_DIM);
+    draw_text(ui, x + (w - tw) / 2, y + (h - th) / 2, label, ui_color(ui, UI_COLOR_TEXT_DIM));
 }
 
 /* ------------------------------------------------------------------ */
 
 /*
- * ui_label — Draw text at (x, y) in the default UI_TEXT colour.
+ * ui_label — Draw text at (x, y) in the style's text colour.
  *
  * This is the most common widget — just a text string, no background,
  * no interactivity.  Used for field labels, section headers, status text.
  */
 void ui_label(UIState *ui, int x, int y, const char *text)
 {
-    draw_text(ui, x, y, text, UI_TEXT);
+    draw_text(ui, x, y, text, ui_color(ui, UI_COLOR_TEXT));
 }
 
 /* ------------------------------------------------------------------ */
@@ -938,7 +994,7 @@ void ui_label_color(UIState *ui, int x, int y, const char *text,
 void ui_panel(UIState *ui, int x, int y, int w, int h)
 {
     (void)ui;
-    draw_rect(x, y, w, h, UI_BG);
+    draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_PANEL));
 }
 
 /* ------------------------------------------------------------------ */
@@ -975,7 +1031,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
     int changed   = 0;
 
     /* --- Background and border --- */
-    draw_rect(x, y, w, h, UI_INPUT_BG);
+    draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_INPUT));
 
     /*
      * Draw a 1-pixel border around the field.  The accent colour indicates
@@ -983,8 +1039,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
      *
      * Only the outline is drawn; the field background stays intact.
      */
-    Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
-    if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
+    draw_field_border(ui, x, y, w, h, is_active);
 
     /* --- Activation on click, or by Tab from the previous field --- */
     int clicked_on = !is_active && ui->mouse_clicked &&
@@ -1063,7 +1118,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
         /* Inactive: show the current value as a plain number. */
         char display[32];
         snprintf(display, sizeof(display), "%d", *value);
-        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+        draw_text(ui, x + 4, y + 3, display, ui_color(ui, UI_COLOR_TEXT));
     }
 
     return changed;
@@ -1108,10 +1163,9 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
     int changed   = 0;
 
     /* --- Background and border --- */
-    draw_rect(x, y, w, h, UI_INPUT_BG);
+    draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_INPUT));
 
-    Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
-    if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
+    draw_field_border(ui, x, y, w, h, is_active);
 
     /* --- Activation on click, or by Tab from the previous field --- */
     int clicked_on = !is_active && ui->mouse_clicked &&
@@ -1175,7 +1229,7 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
     } else {
         char display[32];
         snprintf(display, sizeof(display), "%.9g", *value);
-        draw_text(ui, x + 4, y + 3, display, UI_TEXT);
+        draw_text(ui, x + 4, y + 3, display, ui_color(ui, UI_COLOR_TEXT));
     }
 
     return changed;
@@ -1201,10 +1255,9 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     int changed   = 0;
 
     /* --- Background and border --- */
-    draw_rect(x, y, w, h, UI_INPUT_BG);
+    draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_INPUT));
 
-    Color border = is_active ? UI_ACCENT : UI_TEXT_DIM;
-    if (IsWindowReady()) DrawRectangleLines(x, y, w, h, border);
+    draw_field_border(ui, x, y, w, h, is_active);
 
     /* --- Activation on click, or by Tab from the previous field --- */
     int clicked_on = !is_active && ui->mouse_clicked &&
@@ -1279,7 +1332,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
         draw_active_edit(ui, x, y, w);
     } else {
         draw_text(ui, x + 4, y + 3,
-                  buf[0] ? buf : "Untitled", UI_TEXT_DIM);
+                  buf[0] ? buf : "Untitled", ui_color(ui, UI_COLOR_TEXT_DIM));
     }
 
     return changed;
@@ -1336,21 +1389,22 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     /* --- Draw the header (always visible) --- */
     int hovered_header = point_in_rect(ui->mouse_x, ui->mouse_y,
                                        x, y, w, h);
-    Color header_bg = hovered_header ? UI_BTN_HOT : UI_BTN;
+    Color header_bg = ui_color(ui, hovered_header ? UI_COLOR_HOT : UI_COLOR_BUTTON);
     draw_rect(x, y, w, h, header_bg);
+    draw_control_border(ui, x, y, w, h);
 
     /* Show the currently selected option text (or "---" if out of range). */
     const char *current = (*selected >= 0 && *selected < count)
                           ? options[*selected]
                           : "---";
-    draw_text(ui, x + 4, y + 3, current, UI_TEXT);
+    draw_text(ui, x + 4, y + 3, current, ui_color(ui, UI_COLOR_TEXT));
 
     /*
      * Draw a small "▼" indicator on the right side of the header to signal
      * that this is a dropdown.  We use the "v" character as a simple stand-in;
      * the font may or may not have a real triangle glyph.
      */
-    draw_text(ui, x + w - 14, y + 3, "v", UI_TEXT_DIM);
+    draw_text(ui, x + w - 14, y + 3, "v", ui_color(ui, UI_COLOR_TEXT_DIM));
 
     /* A focus request (ui_focus_field, e.g. a jump from a validation
      * message) opens the list: for a dropdown, that is taking the focus.
@@ -1456,12 +1510,12 @@ void ui_draw_overlays(UIState *ui)
 
         /* Highlight: accent colour for the selected item, hot for hover
          * and for the row the keyboard highlights. */
-        Color bg = i == ui->dropdown_selected                 ? UI_BTN_ACTIVE
-                 : hovered || i == ui->dropdown_highlight ? UI_BTN_HOT
-                                                          : UI_BTN;
-        draw_rect(ui->dropdown_x, oy, ui->dropdown_w, h, bg);
+        UIColorRole face = i == ui->dropdown_selected                 ? UI_COLOR_SELECTED
+                         : hovered || i == ui->dropdown_highlight ? UI_COLOR_HOT
+                                                                  : UI_COLOR_BUTTON;
+        draw_rect(ui->dropdown_x, oy, ui->dropdown_w, h, ui_color(ui, face));
         draw_text(ui, ui->dropdown_x + 4, oy + 3,
-                  ui->dropdown_options[i], UI_TEXT);
+                  ui->dropdown_options[i], ui_color(ui, UI_COLOR_TEXT));
     }
 }
 
@@ -1475,8 +1529,7 @@ void ui_draw_overlays(UIState *ui)
  */
 void ui_separator(UIState *ui, int x, int y, int w)
 {
-    (void)ui;
-    if (IsWindowReady()) DrawLine(x, y, x + w, y, UI_TEXT_DIM);
+    if (IsWindowReady()) DrawLine(x, y, x + w, y, ui_color(ui, UI_COLOR_TEXT_DIM));
 }
 
 /* ------------------------------------------------------------------ */

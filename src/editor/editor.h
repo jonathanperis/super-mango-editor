@@ -475,6 +475,7 @@ typedef struct {
 
     /* ---- UI toggles --------------------------------------------------- */
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
+    int            high_contrast; /* 1 = ui.style is UI_STYLE_HIGH_CONTRAST     */
     /* 1 = placing and dragging snap to the TILE_SIZE grid (key S).  Holding
      * Shift inverts it for one click or drag.  input_mods are the modifier
      * keys of the latest mouse event, which tools and the ghost read. */

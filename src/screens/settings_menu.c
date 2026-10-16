@@ -6,6 +6,17 @@
 
 static const char *const actions[PROFILE_ACTION_COUNT] = {"Left", "Right", "Up", "Down", "Jump", "Run"};
 
+/* The menu's own palette over the shared widget style, or the high-contrast
+ * style when the player turned that setting on. */
+static UIStyle menu_style(int high_contrast)
+{
+    if (high_contrast) return UI_STYLE_HIGH_CONTRAST;
+    UIStyle style = UI_STYLE_DEFAULT;
+    style.color[UI_COLOR_PANEL] = (Color){10, 12, 18, 255};
+    style.color[UI_COLOR_SELECTED] = (Color){40, 70, 105, 255};
+    return style;
+}
+
 static void shorten_utf8(char *text)
 {
     size_t size = strlen(text);
@@ -29,7 +40,7 @@ static void render_status(UIState *ui, const char *text)
                    ui_text_width(ui, line) + ui_text_width(ui, "...") > 364)) shorten_utf8(line);
             strcat(line, "...");
         }
-        ui_label_color(ui, 18, 265 + row * 15, line, (Color){255,190,90,255});
+        ui_label_color(ui, 18, 265 + row * 15, line, ui_color(ui, UI_COLOR_WARNING));
         text += consumed;
         while (*text == ' ') text++;
     }
@@ -156,14 +167,15 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
     int unavailable = game_settings_has_unavailable_binding(&profile->data.settings);
     if (!menu->open && !profile->error && !profile->pending_text && !unavailable) return;
     if (menu->ui.font != font) { ui_cleanup(&menu->ui); ui_init(&menu->ui, font); }
+    menu->ui.style = menu_style(profile->data.settings.high_contrast);
     if (!menu->open) {
-        DrawRectangle(8, 278, 384, 18, (Color){10,12,18,255});
+        DrawRectangle(8, 278, 384, 18, ui_color(&menu->ui, UI_COLOR_PANEL));
         ui_label_color(&menu->ui,12,278+(18-TEXT_FONT_SIZE)/2,profile->error ? "Profile issue - F1: details" :
                        unavailable ? "Binding unavailable - F1: remap" : "Saving profile...",
-                       (Color){255,190,90,255});
+                       ui_color(&menu->ui, UI_COLOR_WARNING));
         return;
     }
-    DrawRectangle(8, 4, 384, 292, (Color){10,12,18,255});
+    DrawRectangle(8, 4, 384, 292, ui_color(&menu->ui, UI_COLOR_PANEL));
     ui_label(&menu->ui, 18, 12, menu->page ? "CONTROLS" : "SETTINGS");
     const GameSettings *s = &profile->data.settings;
     int rows = menu->page ? 13 : 11;
@@ -189,7 +201,7 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
         }
         int y = 36 + row*16;
         if (row == menu->selected) {
-            DrawRectangle(16, y-1, 368, 16, (Color){40,70,105,255});
+            DrawRectangle(16, y-1, 368, 16, ui_color(&menu->ui, UI_COLOR_SELECTED));
         }
         /* Center the label inside the 16 px highlight that starts at y-1. */
         ui_label(&menu->ui, 20, y - 1 + (16-TEXT_FONT_SIZE)/2, label);
