@@ -69,6 +69,14 @@
 #define CFG_NAME_Y    (TOOLBAR_H + 64 + 4)
 #define CFG_SCREENS_Y (TOOLBAR_H + 136 + 4)
 
+/* A dropped path this long fills raylib's MAX_FILEPATH_LENGTH buffer
+ * (256 on Windows, 4096 elsewhere, less the NUL). */
+#ifdef _WIN32
+#define EDITOR_DROP_TEST_LONG 255
+#else
+#define EDITOR_DROP_TEST_LONG 4095
+#endif
+
 static RenderTexture2D tiny_target;
 
 /* ------------------------------------------------------------------ */
@@ -154,6 +162,7 @@ static void ui_frame(EditorState *es, int mx, int my)
     arm_dialog_seams();
     ui_begin_frame(&es->ui);
     while (input_poll(&event)) editor_handle_event(es, &event);
+    editor_handle_dropped_files(es);
     es->mouse_x = es->ui.mouse_x = mx;
     es->mouse_y = es->ui.mouse_y = my;
     es->ui.mouse_down = es->mouse_down;
@@ -1547,6 +1556,102 @@ static const char *campaign_rows(const EditorState *es)
         letters[count] = view->levels[count].path[sizeof("levels/") - 1];
     letters[count] = '\0';
     return letters;
+}
+
+/* Drop `count` paths on the window and run the frame that sees them. */
+static void drop_frame(EditorState *es, const char *const *paths, unsigned int count)
+{
+    editor_test_drop_files(paths, count);
+    ui_frame(es, NEUTRAL_X, NEUTRAL_Y);
+}
+
+/*
+ * A level file dropped on the window opens like a recent file: it asks
+ * about unsaved changes, closes the Campaign view first (whose unsaved
+ * edits need a second drop to discard), and anything but exactly one
+ * .toml file is turned away with a status message.
+ */
+static int dropped_level_opens_like_a_recent_file(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    static char long_path[EDITOR_DROP_TEST_LONG + 1];
+    const char *one[] = {"levels/a.toml"};
+    const char *upper[] = {"levels/B.TOML"};
+    const char *two[] = {"levels/a.toml", "levels/b.toml"};
+    const char *art[] = {"levels/a.png"};
+    const char *delta[] = {"levels/d.toml"};
+    const char *too_long[] = {long_path};
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+
+    drop_frame(&es, one, 1);
+    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(strcmp(es.level.name, "Alpha") == 0);
+    CHECK(strstr(es.status_message, "Loaded levels/a.toml") != NULL);
+
+    /* The extension is matched in any case: this one reached the loader,
+     * which then could not find it. */
+    drop_frame(&es, upper, 1);
+    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(strstr(es.status_message, "Load failed") != NULL);
+
+    /* Two files, or one that is not a level, change nothing. */
+    drop_frame(&es, two, 2);
+    CHECK(strcmp(es.status_message, "Drop one .toml level to open it") == 0);
+    drop_frame(&es, art, 1);
+    CHECK(strcmp(es.status_message, "Drop one .toml level to open it") == 0);
+    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+
+    /* A path as long as raylib's buffer may have been cut short. */
+    memset(long_path, 'x', sizeof(long_path) - 1);
+    memcpy(long_path + sizeof(long_path) - 1 - 5, ".toml", 5);
+    drop_frame(&es, too_long, 1);
+    CHECK(strstr(es.status_message, "too long") != NULL);
+    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+
+    /* Unsaved changes ask first: Cancel keeps them, Discard opens. */
+    es.level.screen_count = 5;
+    editor_refresh_dirty(&es);
+    CHECK(es.modified);
+    editor_test_set_discard_choice(0);
+    drop_frame(&es, delta, 1);
+    CHECK(strcmp(es.file_path, "levels/a.toml") == 0 && es.level.screen_count == 5);
+    CHECK(strstr(es.status_message, "cancelled") != NULL);
+    editor_test_set_discard_choice(1);
+    drop_frame(&es, delta, 1);
+    CHECK(strcmp(es.file_path, "levels/d.toml") == 0 && !es.modified);
+    CHECK(strcmp(es.level.name, "Delta") == 0);
+
+    /* The Campaign view closes for the dropped level... */
+    CHECK(editor_campaign_open(&es, NULL) == 0 && es.campaign != NULL);
+    drop_frame(&es, one, 1);
+    CHECK(es.campaign == NULL && strcmp(es.file_path, "levels/a.toml") == 0);
+    /* ...but with unsaved campaign edits only on the second drop. */
+    CHECK(editor_campaign_open(&es, NULL) == 0);
+    CHECK(editor_campaign_move(&es, 2, -1) == 0);
+    drop_frame(&es, delta, 1);
+    CHECK(es.campaign != NULL && strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(strstr(es.status_message, "drop the level again") != NULL);
+    drop_frame(&es, delta, 1);
+    CHECK(es.campaign == NULL && strcmp(es.file_path, "levels/d.toml") == 0);
+
+    /* A playtest owns the editor until it ends. */
+    es.playing = 1;
+    editor_test_drop_files(one, 1);
+    editor_handle_dropped_files(&es);
+    es.playing = 0;
+    CHECK(strcmp(es.file_path, "levels/d.toml") == 0);
+    CHECK(strstr(es.status_message, "Playtest running") != NULL);
+done:
+    editor_test_drop_files(NULL, 0);
+    editor_test_set_discard_choice(-1);
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    close_editor(&es);
+    return failed;
 }
 
 /* Click button `index` (a CampaignButton) of the Campaign view's bottom row. */
@@ -3449,6 +3554,7 @@ int main(void)
         CASE(box_and_shift_select_act_on_the_group),
         CASE(validation_rows_scroll_and_copy),
         CASE(text_fields_select_copy_cut_and_paste),
+        CASE(dropped_level_opens_like_a_recent_file),
         CASE(campaign_view_reorders_renames_and_saves),
         CASE(campaign_undo_and_redo_replay_each_edit),
         CASE(campaign_rename_is_one_undo_step),
