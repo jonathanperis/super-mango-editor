@@ -40,6 +40,7 @@
 #define EDITOR_PREF_ORG      "Super Mango"
 #define EDITOR_PREF_APP      "Editor"
 #define EDITOR_RECENT_NAME   "editor_recent.txt"
+#define EDITOR_SETTINGS_NAME "editor_settings.txt"
 
 static unsigned long editor_playtest_sequence;
 static void (*editor_test_load_hook)(const char *path);
@@ -134,6 +135,7 @@ int editor_init_persistence_paths(EditorState *es)
     es->autosave_path[0] = '\0';
     es->playtest_path[0] = '\0';
     es->recent_path[0] = '\0';
+    es->settings_path[0] = '\0';
     es->recovery_root_path[0] = '\0';
     es->recovery_entry_count = 0;
     es->pending_recovery_id = 0;
@@ -146,10 +148,14 @@ int editor_init_persistence_paths(EditorState *es)
         editor_make_playtest_path(es) != 0 ||
         editor_preference_file_path(es, EDITOR_RECENT_NAME,
                                     es->recent_path,
-                                    sizeof(es->recent_path)) != 0) {
+                                    sizeof(es->recent_path)) != 0 ||
+        editor_preference_file_path(es, EDITOR_SETTINGS_NAME,
+                                    es->settings_path,
+                                    sizeof(es->settings_path)) != 0) {
         es->autosave_path[0] = '\0';
         es->playtest_path[0] = '\0';
         es->recent_path[0] = '\0';
+        es->settings_path[0] = '\0';
         return -1;
     }
 
@@ -749,6 +755,54 @@ void editor_load_recent_files(EditorState *es)
         es->recent_file_count++;
     }
     fclose(fp);
+}
+
+void editor_set_high_contrast(EditorState *es, int on)
+{
+    if (!es) return;
+    es->high_contrast = on ? 1 : 0;
+    es->ui.style = es->high_contrast ? UI_STYLE_HIGH_CONTRAST : UI_STYLE_DEFAULT;
+}
+
+void editor_load_settings(EditorState *es)
+{
+    FILE *fp;
+    char line[64];
+
+    if (!es || es->settings_path[0] == '\0') return;
+    fp = serializer_fopen_utf8(es->settings_path, "rb");
+    if (!fp) return;
+    while (fgets(line, sizeof(line), fp)) {
+        /* A line too long for `line` is no setting: skip the rest of it. */
+        if (!strchr(line, '\n') && !feof(fp)) {
+            int ch;
+            while ((ch = fgetc(fp)) != '\n' && ch != EOF) { }
+            continue;
+        }
+        line[strcspn(line, "\r\n")] = '\0';
+        if (strcmp(line, "high_contrast=1") == 0) editor_set_high_contrast(es, 1);
+        else if (strcmp(line, "high_contrast=0") == 0) editor_set_high_contrast(es, 0);
+    }
+    fclose(fp);
+}
+
+/* Rewrite the settings atomically, like the recent list below. */
+int editor_save_settings(const EditorState *es)
+{
+    char temp_path[SERIALIZER_IO_PATH_MAX];
+    FILE *fp;
+
+    if (!es || es->settings_path[0] == '\0') return -1;
+    if (serializer_make_temp_path(es->settings_path, temp_path,
+                                  sizeof(temp_path)) != 0) return -1;
+    fp = serializer_open_temp(es->settings_path, temp_path, sizeof(temp_path));
+    if (!fp) return -1;
+    if (fprintf(fp, "high_contrast=%d\n", es->high_contrast ? 1 : 0) < 0) {
+        fclose(fp);
+        serializer_remove_temp(temp_path);
+        return -1;
+    }
+    return editor_commit_temp_file(fp, temp_path, es->settings_path);
 }
 
 /*

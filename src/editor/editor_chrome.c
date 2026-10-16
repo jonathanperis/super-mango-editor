@@ -99,8 +99,11 @@ void editor_render_toolbar(EditorState *es)
      * keeps its own colours. */
     bx += 88;
     if (ui_button(&es->ui, bx, by, 84, bh, es->high_contrast ? "[Contrast]" : "Contrast")) {
-        es->high_contrast ^= 1;
-        es->ui.style = es->high_contrast ? UI_STYLE_HIGH_CONTRAST : UI_STYLE_DEFAULT;
+        editor_set_high_contrast(es, !es->high_contrast);
+        /* Remembered for the next session; without a preference folder
+         * (render smoke) it simply stays for this one. */
+        if (es->settings_path[0] != '\0' && editor_save_settings(es) != 0)
+            editor_set_status(es, "Could not save the Contrast setting");
     }
 
     int rx = EDITOR_W - 4 - 52;
