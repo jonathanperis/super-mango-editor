@@ -367,6 +367,11 @@ int game_profile_decode(GameProfileData *out, const char *text)
             if (integer(value, &data->settings.ghost)) goto done;
             has_version2_field = 1;
         }
+        else if (!strcmp(key, "fullscreen")) {
+            /* Optional within version 2; see game_profile.h. */
+            if (integer(value, &data->settings.fullscreen)) goto done;
+            has_version2_field = 1;
+        }
         else if (!strcmp(key, "format_version")) {
             /* Version 1 (no Continue point, no ghost setting) still loads;
              * see game_profile.h. */
@@ -452,10 +457,11 @@ int game_profile_encode(const GameProfileData *data, char *text, size_t capacity
     const GameSettings *s = &data->settings;
     if (append(text, capacity, &used,
                "format_version = %d\nmusic_volume = %d\neffects_volume = %d\nmuted = %d\n"
-               "dead_zone = %d\nwindow_scale = %d\nhigh_contrast = %d\nreduced_motion = %d\nghost = %d\nlast_level = ",
+               "dead_zone = %d\nwindow_scale = %d\nhigh_contrast = %d\nreduced_motion = %d\nghost = %d\n"
+               "fullscreen = %d\nlast_level = ",
                PROFILE_FORMAT_VERSION,
                s->music_volume,s->effects_volume,s->muted,s->dead_zone,s->window_scale,s->high_contrast,s->reduced_motion,
-               s->ghost) ||
+               s->ghost,s->fullscreen) ||
         quoted(text, capacity, &used, data->last_level)) return -1;
     for (int kind = 0; kind < 2; kind++) {
         if (append(text, capacity, &used, "\n%s = [", kind ? "buttons" : "keys")) return -1;

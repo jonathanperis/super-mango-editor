@@ -18,11 +18,12 @@ typedef struct {
     int music_volume, effects_volume, muted, dead_zone, window_scale;
     int high_contrast, reduced_motion;
     int ghost;      /* 1 = draw the time-trial ghost of the best run (format 2) */
+    int fullscreen; /* 1 = borderless fullscreen on the desktop (optional, format 2) */
     int keys[PROFILE_ACTION_COUNT]; /* version-1 wire IDs, translated at input */
     int buttons[PROFILE_ACTION_COUNT];
 } GameSettings;
 
-#define GAME_SETTINGS_DEFAULTS {128,128,0,8000,2,0,0,1, \
+#define GAME_SETTINGS_DEFAULTS {128,128,0,8000,2,0,0,1,0, \
     {BINDING_KEY_A,BINDING_KEY_D,BINDING_KEY_W,BINDING_KEY_S,BINDING_KEY_SPACE,BINDING_KEY_LEFT_SHIFT}, \
     {PAD_LEFT,PAD_RIGHT,PAD_UP,PAD_DOWN,PAD_A,PAD_RIGHT_SHOULDER}}
 
@@ -37,6 +38,10 @@ typedef struct {
  * table (the Continue point) and the `ghost` setting. A version-1 profile
  * still loads: it has no Continue point, the ghost setting takes its
  * default (on), and the next save writes it as version 2.
+ *
+ * `fullscreen` arrived later without a new version: it is optional, and a
+ * version-2 profile without it loads windowed. Only version-2 writers ever
+ * wrote it, so a version-1 file that has it is damaged, as with `ghost`.
  */
 #define PROFILE_FORMAT_VERSION 2
 

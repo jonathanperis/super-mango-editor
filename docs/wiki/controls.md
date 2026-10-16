@@ -76,7 +76,7 @@ The overlay text is snapshotted in [Overlay Snapshots](../overlay-snapshots/) so
 
 - **Open:** F1 on either screen; gamepad Y in the start menu or Back during gameplay/pause. On terminal overlays, Back exits; use F1 for settings.
 - **Navigate:** Up/Down or D-pad selects a row, wrapping at the ends; Left/Right changes values on the main page; Enter, keypad Enter, Space or A/Start activates, and a mouse click activates a row. Esc or B/Back closes, or cancels binding capture first; either one also clears the message about a refused binding. The start menu's **Settings** button opens the panel exactly as F1 does.
-- **Options:** music/effects volume (0–128 in steps of 8), mute, stick dead zone (0–28000 in steps of 1000), native window scale (1×–4×; not applied in the browser; a monitor too small for the chosen scale gets the largest one that fits with room for the title bar and taskbar, and the window is moved back onto the monitor if it grew past an edge — the setting itself is kept for a bigger monitor), high-contrast outlines (also switches this menu to black with white text at 7:1 or more), reduced motion, **Ghost (best run)** on/off (default on; see [Time Trial Ghost](#time-trial-ghost)), control remapping (a separate page of 12 binding rows) and **Restore default settings**, which resets every setting, not only controls.
+- **Options:** music/effects volume (0–128 in steps of 8), mute, stick dead zone (0–28000 in steps of 1000), native window scale (1×–4×; not applied in the browser; a monitor too small for the chosen scale gets the largest one that fits with room for the title bar and taskbar, and the window is moved back onto the monitor if it grew past an edge — the setting itself is kept for a bigger monitor), **Fullscreen** on/off (desktop only: borderless fullscreen at the desktop's resolution, with the game at the largest whole-number scale that fits; turning it off brings the window back at its window-scale size; saved in the profile, default off; see [Browser / WebAssembly Input](#browser--webassembly-input) for the browser), high-contrast outlines (also switches this menu to black with white text at 7:1 or more), reduced motion, **Ghost (best run)** on/off (default on; see [Time Trial Ghost](#time-trial-ghost)), control remapping (a separate page of 12 binding rows) and **Restore default settings**, which resets every setting, not only controls.
 - **Remapping:** Left, Right, Up, Down, Jump and Run each have keyboard and gamepad bindings. Duplicates are rejected, as are reserved keys (Esc, F1, Tab, Enter, keypad Enter, the arrows and Right Shift) and buttons (Back, Start, Guide, B); misc, paddle and touchpad buttons cannot be captured. Arrows remain available. F2–F10, `-` and `=` belong to the [debug inspector](#debug-inspector-keys) and are refused in every run, because normal and debug runs share one profile. A profile saved with one of them bound has that control put back on its default key (every key, if that default is taken), with a warning; the rest of the profile still loads.
 
 Settings apply when the panel closes. Normal runs save settings, the last played
@@ -111,7 +111,9 @@ it is applied, and that level starts from its beginning. **Play**, **Retry**,
 stores it as a `[resume]` table, added in profile `format_version` 2 together with
 the `ghost` setting; version-1
 profiles load unchanged (Ghost on, no Continue point) and are written as version 2
-on the next save.
+on the next save. The later `fullscreen` setting is optional within version 2: a
+profile without it starts windowed. A build from before that setting refuses a
+profile that has it, keeping the file untouched and using defaults for that run.
 
 ### Time Trial Ghost
 
@@ -178,6 +180,13 @@ Jump/Confirm, Run, Pause/Back and Settings. Multiple pointers can hold movement
 and jump together; cancellation, focus loss and screen changes clear held input.
 Touch actions remain independent of remapped keyboard keys and are disabled
 until the runtime starts and after it exits.
+
+A browser lets a page enter fullscreen only while it handles the player's own
+click or key press, so the in-game **Fullscreen** row cannot do it there and
+says to use the page's button instead. The standalone page (`web/shell.html`)
+has a **Fullscreen** button under the game that puts the game and its touch
+buttons fullscreen; Esc leaves. Browsers without element fullscreen, such as
+Safari on iPhone, do not show the button.
 
 ### Browser Replay
 
