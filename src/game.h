@@ -50,6 +50,7 @@
 
 #include "shared/graphics.h"        /* Texture2D, RenderTexture2D, IntRect */
 #include "shared/audio.h"           /* MusicTrack pointer */
+#include "shared/fixed_step.h"      /* FixedStepClock, in GameLoopState */
 #include "game_assets.h"            /* GameAssets: shared sprites and sounds */
 #include "shared/asset_cache.h"     /* AssetCache: GameState borrows the session's */
 #include "game_fwd.h"               /* the GameState typedef name */
@@ -138,14 +139,12 @@ typedef struct {
 /*
  * GameLoopState — bookkeeping for the fixed-step frame loop (game_timing.c).
  *
- * Real time between frames is added to `accumulator`; the simulation then
- * consumes it in steps of exactly 1/TARGET_FPS seconds. Leftover time (less
+ * Real time between frames is added to `clock.accumulator`; the simulation
+ * then consumes it in steps of exactly 1/TARGET_FPS seconds. Leftover time (less
  * than one step) waits for the next frame.
  */
 typedef struct {
-    double prev_time;      /* GetTime() seconds when the previous frame began   */
-    double accumulator;    /* real seconds waiting to be simulated              */
-    int    clock_started;  /* 0 = no previous frame time yet (first frame)      */
+    FixedStepClock clock;  /* frame time → fixed steps (shared/fixed_step.h)    */
     int    fp_prev_riding; /* float platform player stood on last step          */
     int    smoke_frames_run; /* frames actually executed by a smoke run         */
 } GameLoopState;

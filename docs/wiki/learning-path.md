@@ -34,7 +34,7 @@ before trying to generalize the engine:
 2. `src/input/input_backend.c` collects ordered commands. `game_events.c`
    decides who handles them; held movement is sampled separately in `game_input.c`.
 3. `src/core/game_loop.c` measures real time, runs zero or more fixed 1/60 s
-   simulation steps (`src/core/game_timing.c` keeps the accumulator), then asks
+   simulation steps (`src/shared/fixed_step.c` keeps the accumulator), then asks
    `src/render/game_render.c` to draw once. `src/shared/graphics.c` presents the
    logical canvas in the window.
 4. `src/editor/editor_frame.c` shows the same sequence for immediate-mode
@@ -173,7 +173,7 @@ velocity as constant for the whole step, so the result is off by an amount
 that depends on how long the step is: 413 px at 30 Hz, 403 px at 144 Hz, for a
 fall that should be 400 px. If `dt` were the real frame time, a jump would
 reach a different height on a 144 Hz monitor than on a 60 Hz one. With fixed
-1/60 s steps (the accumulator in `game_timing.c` decides only *how many* steps
+1/60 s steps (the accumulator in `fixed_step.c` decides only *how many* steps
 to run each frame), the error is still there (406.7 px instead of 400), but it
 is the same everywhere, so jumps, replays and tests give the same result on
 every machine.
