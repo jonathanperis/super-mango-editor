@@ -923,6 +923,45 @@ done:
     return failed;
 }
 
+/* A paste that includes the one Last Star moves it and places the rest as
+ * one step. Undoing that step reports a change, not "placed", and shows
+ * the star, the one entity the undo leaves in the level. */
+static int mixed_step_reports_change_and_shows_survivor(void)
+{
+    int failed = 0;
+    EditorState es;
+    EditorRect r;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 8;
+    es.level.coin_count = 1;
+    es.level.coins[0].x = 100.0f;
+    es.level.coins[0].y = 200.0f;
+    es.level.last_star = (LastStarPlacement){3000.0f, 200.0f};
+    CHECK(undo_group_begin(es.undo, 2) != 0);
+    Command place = {0};
+    place.type = CMD_PLACE;
+    place.entity_type = ENT_COIN;
+    place.entity_index = 0;
+    place.after.coin = es.level.coins[0];
+    CHECK(undo_push(es.undo, &place));
+    Command move = {0};
+    move.type = CMD_MOVE;
+    move.entity_type = ENT_LAST_STAR;
+    move.before.last_star = (LastStarPlacement){2900.0f, 200.0f};
+    move.after.last_star = es.level.last_star;
+    CHECK(undo_push(es.undo, &move));
+    undo_group_end(es.undo);
+    es.camera.x = 0.0f;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 0 && es.level.last_star.x == 2900.0f);
+    CHECK(strcmp(es.status_message, "Undid: changed 2 entities") == 0);
+    CHECK(editor_entity_bounds(&es.level, ENT_LAST_STAR, 0, &r) && canvas_shows(&es, &r));
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int canvas_place_select_drag_delete_and_undo(void)
 {
     int failed = 0;
@@ -4162,6 +4201,7 @@ int main(void)
         CASE(palette_clicks_choose_what_the_place_tool_adds),
         CASE(canvas_place_select_drag_delete_and_undo),
         CASE(history_reports_and_reveals_the_step),
+        CASE(mixed_step_reports_change_and_shows_survivor),
         CASE(properties_panel_handles_every_entity_type),
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),
