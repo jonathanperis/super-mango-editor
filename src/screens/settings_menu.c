@@ -107,6 +107,7 @@ void settings_menu_open(SettingsMenu *menu)
     menu->open = 1;
     menu->page = menu->selected = menu->capture = 0;
     menu->wheel_rest = 0.0f;
+    menu->wheel_row = -1;
     menu->message[0] = '\0';
 }
 
@@ -196,7 +197,11 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
         if (!value_row(menu, row)) { menu->wheel_rest = 0.0f; return 1; }
         /* A trackpad sends many fractional notches; gather them into whole
          * steps so one swipe does not race a volume from 0 to 100%. */
-        if (row != menu->selected) menu->wheel_rest = 0.0f;
+        /* The remainder belongs to the row it was gathered on: once the
+         * wheel turns over another row (whether the selection moved there by
+         * the wheel, a click or the keys), it starts again from nothing. */
+        if (row != menu->wheel_row) menu->wheel_rest = 0.0f;
+        menu->wheel_row = row;
         menu->selected = row;
         menu->wheel_rest += event->wheel;
         while (menu->wheel_rest >= 1.0f) { adjust(menu, profile, 1); menu->wheel_rest -= 1.0f; }
