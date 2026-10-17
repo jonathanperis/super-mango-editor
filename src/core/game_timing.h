@@ -74,3 +74,35 @@ static inline void game_timing_restart_clock(GameState *gs)
 
 /* Count down smoke-test frames and stop the game when the budget reaches zero. */
 void game_timing_tick_smoke(GameState *gs);
+
+/*
+ * Render-only interpolation. On a display faster than TARGET_FPS most frames
+ * run no step, so drawing the latest step alone shows the same picture two
+ * or three times and then jumps (judder at 120/144 Hz). Instead a frame is
+ * drawn between the last two steps, as far along as the time waiting in the
+ * accumulator: one step behind at most, but moving every frame.
+ *
+ * Only drawing uses it. game_timing_note_step copies the player's and the
+ * camera's position before each step into GameLoopState, and the render
+ * view reads them; nothing in the simulation reads either, and the steps,
+ * their order and their inputs are unchanged, so runs and replays are too.
+ */
+
+/* Beyond this many pixels in one step (a respawn, a camera snap, a new
+ * level) the view shows the new position rather than sweeping across. */
+#define GAME_INTERP_MAX_JUMP 48.0f
+
+typedef struct {
+    int   cam_x;            /* camera left edge to draw with              */
+    float player_x, player_y; /* where to draw the player sprite           */
+} GameRenderView;
+
+/* Remember the player and camera as they are before the next fixed step. */
+void game_timing_note_step(GameState *gs);
+
+/* Where this frame draws the camera and player. The latest step itself
+ * (cam_x and the player as they are) in debug mode, whose hitboxes must
+ * match the sprite, and in smoke, replay and experiment runs, whose
+ * pictures must not depend on frame timing; otherwise between the last two
+ * steps by the accumulator's fraction of a step. */
+GameRenderView game_timing_render_view(const GameState *gs, int cam_x);

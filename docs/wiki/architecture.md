@@ -152,7 +152,18 @@ before the next picture (`src/core/game_timing.c`):
 
 A 60 Hz display runs one step per frame; a 120/144 Hz display (the browser
 follows `requestAnimationFrame`) runs zero steps on some frames and just
-redraws. The accumulator restarts half a step full after pauses and loads, which
+redraws. So that those redraws are not the same picture shown twice and then a
+jump (judder), the frame draws the player and the camera between the last two
+steps: `game_timing_note_step` records both before each step, and
+`game_timing_render_view` blends them by the accumulator's share of a step,
+so the picture runs up to one step (16.7 ms) behind the simulation but moves
+every frame. It is drawing only: the renderer gets a copy of the player at the
+blended position and the simulation never reads the recorded values, so the
+steps, their order and their inputs are unchanged. A move of more than 48 px
+in one step (a respawn, a camera snap, a new level) is shown where it lands.
+Debug mode (whose hitbox outlines must sit on the sprite) and smoke, replay
+and experiment runs draw the latest step itself. Enemies, hazards and
+platforms are still drawn at their latest step. The accumulator restarts half a step full after pauses and loads, which
 absorbs sub-millisecond vsync jitter. Frame time is clamped to 0.25 s and at most
 5 steps run per frame; excess time is dropped (below 12 FPS the game slows down
 instead of spiralling). Smoke and scripted replays feed exactly one step per

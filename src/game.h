@@ -148,6 +148,11 @@ typedef struct {
     int    clock_started;  /* 0 = no previous frame time yet (first frame)      */
     int    fp_prev_riding; /* float platform player stood on last step          */
     int    smoke_frames_run; /* frames actually executed by a smoke run         */
+    /* Render-only: the player and camera before the latest fixed step, so a
+     * frame between two steps can be drawn between them. The simulation
+     * never reads these (game_timing_render_view does). */
+    float  prev_player_x, prev_player_y, prev_camera_x;
+    int    has_prev;         /* 1 once a step has recorded the values above   */
 } GameLoopState;
 
 /*

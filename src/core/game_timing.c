@@ -47,6 +47,44 @@ int game_timing_take_steps(GameState *gs, float seconds)
     return steps;
 }
 
+void game_timing_note_step(GameState *gs)
+{
+    gs->screen.loop.prev_player_x = gs->world.player.x;
+    gs->screen.loop.prev_player_y = gs->world.player.y;
+    gs->screen.loop.prev_camera_x = gs->world.camera.x;
+    gs->screen.loop.has_prev = 1;
+}
+
+/* from + (to - from) * t, or to itself when the step jumped too far. */
+static float blend(float from, float to, float t)
+{
+    float d = to - from;
+    if (d > GAME_INTERP_MAX_JUMP || d < -GAME_INTERP_MAX_JUMP) return to;
+    return from + d * t;
+}
+
+GameRenderView game_timing_render_view(const GameState *gs, int cam_x)
+{
+    GameRenderView view = {cam_x, gs->world.player.x, gs->world.player.y};
+    const GameLoopState *loop = &gs->screen.loop;
+    if (!loop->has_prev || gs->screen.debug_mode || gs->screen.replay_script_path[0] ||
+        gs->screen.smoke_test_frames > 0 || loop->smoke_frames_run > 0 || gs->screen.experiment)
+        return view;
+    float t = (float)(loop->accumulator / GAME_FIXED_STEP);
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    view.cam_x = (int)blend(loop->prev_camera_x, gs->world.camera.x, t);
+    /* A respawn may move one axis far and not the other; both belong to
+     * the same jump, so either one snaps the player to where it is now. */
+    float dx = gs->world.player.x - loop->prev_player_x, dy = gs->world.player.y - loop->prev_player_y;
+    if (dx <= GAME_INTERP_MAX_JUMP && dx >= -GAME_INTERP_MAX_JUMP &&
+        dy <= GAME_INTERP_MAX_JUMP && dy >= -GAME_INTERP_MAX_JUMP) {
+        view.player_x = loop->prev_player_x + dx * t;
+        view.player_y = loop->prev_player_y + dy * t;
+    }
+    return view;
+}
+
 void game_timing_tick_smoke(GameState *gs)
 {
     if (gs->screen.smoke_test_frames > 0) {
