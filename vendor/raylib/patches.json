@@ -20,5 +20,15 @@
       "before": "        result = ma_channel_converter_init_preallocated(&channelConverterConfig, ma_offset_ptr(pHeap, heapLayout.channelConverterOffset), &pConverter->channelConverter);",
       "after": "        /* Super Mango: passthrough conversion may have a null, zero-sized heap. */\n        result = ma_channel_converter_init_preallocated(&channelConverterConfig, pHeap != NULL ? ma_offset_ptr(pHeap, heapLayout.channelConverterOffset) : NULL, &pConverter->channelConverter);"
     }
+  ],
+  "src/platforms/rcore_desktop_glfw.c": [
+    {
+      "before": "void SetMouseCursor(int cursor)\n{\n    CORE.Input.Mouse.cursor = cursor;\n    if (cursor == MOUSE_CURSOR_DEFAULT) glfwSetCursor(platform.handle, NULL);\n    else\n    {\n        // NOTE: Mapping internal GLFW enum values to MouseCursor enum values\n        glfwSetCursor(platform.handle, glfwCreateStandardCursor(0x00036000 + cursor));\n    }\n}",
+      "after": "// Super Mango: each standard cursor is created once and reused; creating one on\n// every call leaked a GLFW cursor per change. glfwTerminate frees them all, and\n// ClosePlatform forgets them so a later window creates fresh ones.\nstatic GLFWcursor *superMangoStandardCursors[11] = { 0 };\n\nvoid SetMouseCursor(int cursor)\n{\n    CORE.Input.Mouse.cursor = cursor;\n    if (cursor == MOUSE_CURSOR_DEFAULT) glfwSetCursor(platform.handle, NULL);\n    else if ((cursor > 0) && (cursor < 11))\n    {\n        // NOTE: Mapping internal GLFW enum values to MouseCursor enum values\n        if (superMangoStandardCursors[cursor] == NULL) superMangoStandardCursors[cursor] = glfwCreateStandardCursor(0x00036000 + cursor);\n        glfwSetCursor(platform.handle, superMangoStandardCursors[cursor]);\n    }\n}"
+    },
+    {
+      "before": "void ClosePlatform(void)\n{\n    glfwDestroyWindow(platform.handle);\n    glfwTerminate();\n",
+      "after": "void ClosePlatform(void)\n{\n    glfwDestroyWindow(platform.handle);\n    glfwTerminate();\n    // Super Mango: glfwTerminate destroyed the cached standard cursors.\n    for (int i = 0; i < 11; i++) superMangoStandardCursors[i] = NULL;\n"
+    }
   ]
 }

@@ -69,6 +69,14 @@ contexts. Repeated builds recognize the already-applied changes.
 - miniaudio's data-converter initialization passes a null heap through unchanged
   for a zero-allocation passthrough conversion instead of adding zero to null.
 
+One desktop leak is fixed the same way. Upstream `SetMouseCursor` on the GLFW
+backend calls `glfwCreateStandardCursor` on every call and never frees the
+result, so each cursor change (the editor's I-beam over a field, the arrows of a
+drag) leaked one system cursor until exit. The patched function creates each of
+the ten standard shapes once and reuses it; `glfwTerminate` frees them, and
+`ClosePlatform` forgets them so a later window in the same process creates
+fresh ones.
+
 These fixes retain the 6.0 public API, formats and playback behavior. Source
 modifications are marked in the affected files. The session/audio regressions
 exercise the real library, and Linux CI keeps leak detection enabled.
