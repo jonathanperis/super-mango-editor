@@ -359,6 +359,25 @@ done:
     return failed;
 }
 
+/* The hurt window blinks the sprite at 5 Hz; with reduced motion it stays
+ * on screen, half transparent, for the whole window instead. */
+static int hurt_blink_honours_reduced_motion(void)
+{
+    int failed = 0;
+    Player p = {0};
+    Color tint;
+    CHECK(player_hurt_tint(&p, 0, &tint) && tint.a == 255);
+    CHECK(player_hurt_tint(&p, 1, &tint) && tint.a == 255);
+    p.hurt_timer = 0.95f;  /* 9th 100 ms interval: the blink's off phase */
+    CHECK(!player_hurt_tint(&p, 0, &tint));
+    CHECK(player_hurt_tint(&p, 1, &tint) && tint.a == 128 && tint.r == 255);
+    p.hurt_timer = 1.05f;  /* 10th interval: on */
+    CHECK(player_hurt_tint(&p, 0, &tint) && tint.a == 255);
+    CHECK(player_hurt_tint(&p, 1, &tint) && tint.a == 128);
+done:
+    return failed;
+}
+
 static int spikes_hurt_once_per_invincibility(void)
 {
     int failed = 0;
@@ -1241,6 +1260,7 @@ int main(void)
         CASE(blue_flame_erupts_on_a_cycle_and_burns),
         CASE(axe_traps_swing_spin_and_hit),
         CASE(spikes_hurt_once_per_invincibility),
+        CASE(hurt_blink_honours_reduced_motion),
         CASE(spike_blocks_follow_their_rails),
         CASE(jumping_spider_leaps_the_gap),
         CASE(jumping_spider_minimum_speed_clears_a_gap),

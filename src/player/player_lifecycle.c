@@ -151,17 +151,34 @@ int player_init(Player *player, AssetCache *cache)
 }
 
 /*
- * player_render — Draw the player sprite at its current position.
+ * player_hurt_tint — How the sprite shows the invincibility after a hit.
  *
- * While hurt_timer > 0 the sprite blinks on/off every 100 ms to give visual
- * feedback that the player was hit and is temporarily invincible.
+ * While hurt_timer > 0 the sprite normally blinks on/off every 100 ms. With
+ * reduced motion that 5 Hz flicker is exactly what the player asked to
+ * avoid, so the sprite stays drawn, half transparent, for the whole window.
+ * Returns 0 for a frame that skips the sprite; *tint is the colour to draw
+ * with otherwise. Only reads the player, so drawing never changes a run.
  */
-void player_render(Player *player, int cam_x)
+int player_hurt_tint(const Player *player, int reduced_motion, Color *tint)
 {
-    if (player->hurt_timer > 0.0f) {
-        int interval = (int)(player->hurt_timer * 1000.0f) / 100;
-        if (interval % 2 != 0) return;
+    *tint = WHITE;
+    if (player->hurt_timer <= 0.0f) return 1;
+    if (reduced_motion) {
+        tint->a = 128;
+        return 1;
     }
+    int interval = (int)(player->hurt_timer * 1000.0f) / 100;
+    return interval % 2 == 0;
+}
+
+/*
+ * player_render — Draw the player sprite at its current position, blinking
+ * (or, with reduced motion, translucent) while hurt (player_hurt_tint).
+ */
+void player_render(const Player *player, int cam_x, int reduced_motion)
+{
+    Color tint;
+    if (!player_hurt_tint(player, reduced_motion, &tint)) return;
 
     /* Cast float world position to integer screen pixels at render time. */
     IntRect dst = {
@@ -172,7 +189,7 @@ void player_render(Player *player, int cam_x)
     };
 
     int flip = player->facing_left ? SPRITE_FLIP_X : SPRITE_NORMAL;
-    sprite_draw(player->texture, &player->frame, &dst, 0, flip, WHITE);
+    sprite_draw(player->texture, &player->frame, &dst, 0, flip, tint);
 }
 
 /*

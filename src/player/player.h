@@ -168,8 +168,13 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    int prev_fp_landed_idx,
                    int world_w);
 
-/* Draw the player sprite at its current position, offset by the camera. */
-void player_render(Player *player, int cam_x);
+/* Draw the player sprite at its current position, offset by the camera.
+ * reduced_motion swaps the hurt blink for a steady translucent sprite. */
+void player_render(const Player *player, int cam_x, int reduced_motion);
+
+/* The hurt look for this frame: 0 to skip the sprite (blink off), else 1
+ * with *tint set (WHITE, or half alpha while hurt with reduced motion). */
+int player_hurt_tint(const Player *player, int reduced_motion, Color *tint);
 
 /* Return the player's tightly-inset physics hitbox (logical pixels). */
 IntRect player_get_hitbox(const Player *player);
