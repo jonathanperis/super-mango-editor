@@ -43,6 +43,7 @@
 #include "editor/editor_files.h"
 #include "editor/editor_frame.h"
 #include "editor/editor_layout.h"
+#include "editor/editor_minimap.h"
 #include "editor/editor_panels.h"
 #include "editor/editor_playtest.h"
 #include "editor/editor_session.h"
@@ -957,6 +958,45 @@ static int mixed_step_reports_change_and_shows_survivor(void)
     CHECK(es.level.coin_count == 0 && es.level.last_star.x == 2900.0f);
     CHECK(strcmp(es.status_message, "Undid: changed 2 entities") == 0);
     CHECK(editor_entity_bounds(&es.level, ENT_LAST_STAR, 0, &r) && canvas_shows(&es, &r));
+done:
+    close_editor(&es);
+    return failed;
+}
+
+/* The overview strip under the canvas spans the whole level: a click
+ * centres the view there, a drag slides it, and the release lets go. */
+static int minimap_jumps_and_drags_the_view(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 8;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    uint64_t before = doc_hash(&es);
+    float world_w = editor_world_width(&es.level);
+    CHECK(editor_minimap_world_x(&es, EDITOR_MINIMAP_X) == 0.0f);
+    CHECK(editor_minimap_world_x(&es, EDITOR_MINIMAP_X + EDITOR_MINIMAP_WIDTH) == world_w);
+    CHECK(editor_minimap_contains(EDITOR_MINIMAP_X, EDITOR_MINIMAP_Y + EDITOR_MINIMAP_HEIGHT - 1) &&
+          !editor_minimap_contains(EDITOR_MINIMAP_X, EDITOR_H - STATUS_H + 8));
+
+    const int y = EDITOR_MINIMAP_Y + 3, mid = EDITOR_MINIMAP_X + EDITOR_MINIMAP_WIDTH / 2;
+    float view_w = (float)CANVAS_W / es.camera.zoom;
+    CHECK(es.camera.x == 0.0f);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, mid, y);
+    ui_frame(&es, mid, y);
+    CHECK(fabsf(es.camera.x + view_w / 2.0f - editor_minimap_world_x(&es, mid)) < 0.5f);
+    float clicked_x = es.camera.x;
+    push_event(INPUT_MOUSE_MOVE, 0, 0, mid + 100, y);
+    ui_frame(&es, mid + 100, y);
+    CHECK(es.minimap_dragging && es.camera.x > clicked_x);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, mid + 100, y);
+    ui_frame(&es, mid + 100, y);
+    CHECK(!es.minimap_dragging);
+    /* Released, the pointer passing over the strip moves nothing. */
+    float dropped_x = es.camera.x;
+    ui_frame(&es, EDITOR_MINIMAP_X, y);
+    CHECK(es.camera.x == dropped_x);
+    CHECK(doc_hash(&es) == before && es.level.coin_count == 0);
 done:
     close_editor(&es);
     return failed;
@@ -4202,6 +4242,8 @@ int main(void)
         CASE(canvas_place_select_drag_delete_and_undo),
         CASE(history_reports_and_reveals_the_step),
         CASE(mixed_step_reports_change_and_shows_survivor),
+
+        CASE(minimap_jumps_and_drags_the_view),
         CASE(properties_panel_handles_every_entity_type),
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),

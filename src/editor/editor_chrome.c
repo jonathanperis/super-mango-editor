@@ -14,6 +14,7 @@
 #include "editor_session.h"    /* editor reset/confirm helpers */
 #include "editor_validation.h" /* editor_validation_summary */
 #include "entity_meta.h"       /* editor_placed_entity_total */
+#include "editor_minimap.h"    /* editor_minimap_render */
 #include "../shared/ui.h"      /* ui_panel, ui_button, ui_label */
 
 /*
@@ -185,9 +186,10 @@ void editor_render_status_bar(EditorState *es)
         const char *summary = editor_validation_summary(&es->validation_report);
         int width = ui_text_width(&es->ui, summary);
         int clickable = es->validation_report.message_count > 0;
+        /* Above the overview strip, whose rows take their own clicks. */
         int hovered = clickable &&
                       es->ui.mouse_x >= 330 && es->ui.mouse_x < 330 + width &&
-                      es->ui.mouse_y >= bar_y && es->ui.mouse_y < bar_y + STATUS_H;
+                      es->ui.mouse_y >= bar_y && es->ui.mouse_y < EDITOR_MINIMAP_Y;
         ui_label_color(&es->ui, 330, bar_y + 8, summary,
                        es->validation_report.error_count > 0 ?
                        ui_color(&es->ui, UI_COLOR_ERROR) : ui_color(&es->ui, UI_COLOR_TEXT_DIM));
@@ -217,6 +219,8 @@ void editor_render_status_bar(EditorState *es)
         ui_label_color(&es->ui, 920, bar_y + 8,
                        es->status_message, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     }
+    /* Last, in the rows under the text: the level overview strip. */
+    editor_minimap_render(es);
 }
 
 /*
