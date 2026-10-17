@@ -6,14 +6,23 @@
 
 static const char *const actions[PROFILE_ACTION_COUNT] = {"Left", "Right", "Up", "Down", "Jump", "Run"};
 
-/* The menu's own palette over the shared widget style, or the high-contrast
- * style when the player turned that setting on. */
-static UIStyle menu_style(int high_contrast)
+/* The game menus' own palette over the shared widget style, or the
+ * high-contrast style when the player turned that setting on. The start
+ * menu draws with it too, so both screens switch together. */
+UIStyle settings_menu_style(int high_contrast)
 {
     if (high_contrast) return UI_STYLE_HIGH_CONTRAST;
     UIStyle style = UI_STYLE_DEFAULT;
     style.color[UI_COLOR_PANEL] = (Color){10, 12, 18, 255};
     style.color[UI_COLOR_SELECTED] = (Color){40, 70, 105, 255};
+    /* The start menu's buttons: blue when hovered, a darker face when
+     * disabled, and a light outline, as they looked before the style. */
+    style.color[UI_COLOR_HOT] = (Color){74, 144, 217, 255};
+    style.color[UI_COLOR_TITLE] = (Color){45, 45, 45, 255};
+    style.color[UI_COLOR_BORDER] = (Color){224, 224, 224, 255};
+    style.border_width = 1;
+    /* Gold for the cleared-level star and the value marks. */
+    style.color[UI_COLOR_ACCENT] = (Color){240, 200, 90, 255};
     return style;
 }
 
@@ -217,7 +226,7 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
     int unavailable = game_settings_has_unavailable_binding(&profile->data.settings);
     if (!menu->open && !profile->error && !profile->pending_text && !unavailable) return;
     if (menu->ui.font != font) { ui_cleanup(&menu->ui); ui_init(&menu->ui, font); }
-    menu->ui.style = menu_style(profile->data.settings.high_contrast);
+    menu->ui.style = settings_menu_style(profile->data.settings.high_contrast);
     if (!menu->open) {
         DrawRectangle(8, 278, 384, 18, ui_color(&menu->ui, UI_COLOR_PANEL));
         ui_label_color(&menu->ui,12,278+(18-TEXT_FONT_SIZE)/2,profile->error ? "Profile issue - F1: details" :

@@ -36,6 +36,11 @@ static int point_in_rect(int x, int y, int rx, int ry, int w, int h)
     return x >= rx && x < rx+w && y >= ry && y < ry+h;
 }
 
+UIStyle start_menu_style(const StartMenu *menu)
+{
+    return settings_menu_style(menu && menu->profile && menu->profile->data.settings.high_contrast);
+}
+
 static void select_level(StartMenu *menu, int index)
 {
     /* Wrap at the catalog ends; the manifest, not a directory scan, owns the
@@ -131,20 +136,21 @@ static void fit_text(TextFont *font, char *text, size_t capacity, int max_width)
  * time and best coins. The selected row is highlighted; a broken entry is
  * drawn in dark grey, like the disabled Play button.
  */
-static void draw_level_list(StartMenu *menu)
+static void draw_level_list(StartMenu *menu, const UIStyle *style)
 {
-    Color text = {200,200,200,255}, dim = {80,80,80,255}, gold = {240,200,90,255};
+    Color text = style->color[UI_COLOR_TEXT], dim = style->color[UI_COLOR_TEXT_DIM];
+    Color star = style->color[UI_COLOR_ACCENT];
     size_t first = list_first_row(menu);
     for (size_t i = first; i < menu->catalog->count && i < first + START_MENU_LIST_ROWS; i++) {
         StartMenuLevelRow row;
         start_menu_level_row(menu, i, &row);
         int y = LIST_Y + (int)(i - first) * LIST_ROW_H;
         if ((int)i == menu->selected_level)
-            DrawRectangle(LIST_X, y, LIST_W, LIST_ROW_H, (Color){40,70,105,255});
+            DrawRectangle(LIST_X, y, LIST_W, LIST_ROW_H, style->color[UI_COLOR_SELECTED]);
         int text_y = y + (LIST_ROW_H - TEXT_FONT_SIZE) / 2;
         Color color = row.available ? text : dim;
         /* A star for a cleared level; the default font has no check mark. */
-        font_draw(menu->font, row.cleared ? "*" : "-", LIST_X + 6, text_y, row.cleared ? gold : color);
+        font_draw(menu->font, row.cleared ? "*" : "-", LIST_X + 6, text_y, row.cleared ? star : color);
         fit_text(menu->font, row.name, sizeof(row.name), 200);
         font_draw(menu->font, row.name, LIST_X + 18, text_y, color);
         font_draw(menu->font, row.time, LIST_X + 230, text_y, color);
@@ -172,6 +178,12 @@ static IntRect continue_button(void)
     return (IntRect){BTN_PAIR_X, BTN_Y, BTN_W, BTN_H};
 }
 
+/* The strip at the bottom that opens the settings panel, as F1 / Y do. */
+static IntRect settings_button(void)
+{
+    return (IntRect){125, 270, 150, 24};
+}
+
 /* route is MENU_ROUTE_PLAY (from the start) or MENU_ROUTE_CONTINUE. */
 static void start_level(StartMenu *menu, MenuRoute route)
 {
@@ -188,17 +200,21 @@ static void start_level(StartMenu *menu, MenuRoute route)
     menu->route = route;
 }
 
-static void draw_button(StartMenu *menu, IntRect r, const char *label, int enabled)
+/* Drawn with the menu style's roles, as ui_button would, but the clicks
+ * stay in start_menu_frame's own event loop with the keyboard and pad. */
+static void draw_button(StartMenu *menu, const UIStyle *style, IntRect r,
+                        const char *label, int enabled)
 {
     Vector2 mouse = input_mouse();
     int hovering = point_in_rect((int)mouse.x, (int)mouse.y, r.x, r.y, r.w, r.h);
     /* A disabled button is darker and never highlights on hover. */
-    Color color = !enabled ? (Color){45,45,45,255} :
-                  hovering ? (Color){74,144,217,255} : (Color){77,77,77,255};
-    DrawRectangle(r.x, r.y, r.w, r.h, color);
-    DrawRectangleLines(r.x, r.y, r.w, r.h, (Color){224, 224, 224, 255});
+    UIColorRole face = !enabled ? UI_COLOR_TITLE : hovering ? UI_COLOR_HOT : UI_COLOR_BUTTON;
+    DrawRectangle(r.x, r.y, r.w, r.h, style->color[face]);
+    if (style->border_width > 0)
+        DrawRectangleLinesEx((Rectangle){(float)r.x, (float)r.y, (float)r.w, (float)r.h},
+                             (float)style->border_width, style->color[UI_COLOR_BORDER]);
     font_draw_centered(menu->font, label, r.x + r.w/2, r.y + (r.h-TEXT_FONT_SIZE)/2,
-                       enabled ? WHITE : (Color){110,110,110,255});
+                       style->color[enabled ? UI_COLOR_TEXT : UI_COLOR_TEXT_DIM]);
 }
 
 int start_menu_init(StartMenu *menu)
@@ -269,7 +285,8 @@ int start_menu_frame(StartMenu *menu)
         if (event.type == INPUT_MOUSE_DOWN && event.button == MOUSE_BUTTON_LEFT) {
             int list_h = START_MENU_LIST_ROWS * LIST_ROW_H;
             IntRect play = play_button(menu), resume = continue_button();
-            if (menu->settings_menu && point_in_rect(event.x,event.y,125,270,150,24))
+            IntRect settings = settings_button();
+            if (menu->settings_menu && point_in_rect(event.x, event.y, settings.x, settings.y, settings.w, settings.h))
                 settings_menu_open(menu->settings_menu);
             else if (point_in_rect(event.x, event.y, play.x, play.y, play.w, play.h))
                 start_level(menu, MENU_ROUTE_PLAY);
@@ -304,14 +321,15 @@ int start_menu_frame(StartMenu *menu)
     ClearBackground(BLACK);
     IntRect logo = {(MENU_GAME_W - LOGO_DISPLAY_W) / 2, LOGO_Y, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
     sprite_draw(menu->logo_tex, NULL, &logo, 0, SPRITE_NORMAL, WHITE);
-    draw_level_list(menu);
+    UIStyle style = start_menu_style(menu);
+    draw_level_list(menu, &style);
     const CampaignLevel *entry = selected_entry(menu);
     int can_continue = start_menu_can_continue(menu);
-    Color red = {220,120,120,255};
-    if (can_continue) draw_button(menu, continue_button(), "Continue", 1);
-    draw_button(menu, play_button(menu), "Play", entry->available);
+    Color red = style.color[UI_COLOR_ERROR];
+    if (can_continue) draw_button(menu, &style, continue_button(), "Continue", 1);
+    draw_button(menu, &style, play_button(menu), "Play", entry->available);
     char text[160];
-    Color grey = {120,120,120,255};
+    Color grey = style.color[UI_COLOR_TEXT_DIM];
     /* Under the Play button: the selected level's full result, or why it
      * cannot be played. The list above already shows every level's best. */
     StartMenuLevelRow row;
@@ -319,7 +337,7 @@ int start_menu_frame(StartMenu *menu)
     const GameProgress *best = row.cleared ? game_profile_result(menu->profile, entry->path) : NULL;
     if (best) snprintf(text, sizeof(text), "Best: %s  %s coins  %d pts", row.time, row.coins, best->best_score);
     else snprintf(text, sizeof(text), "%s: not cleared yet", entry->display_name);
-    font_draw_centered(menu->font, text, MENU_GAME_W/2, 214, entry->available ? grey : (Color){80,80,80,255});
+    font_draw_centered(menu->font, text, MENU_GAME_W/2, 214, grey);
     if (menu->error_message[0])
         font_draw_centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, red);
     else if (!entry->available) {
@@ -332,15 +350,13 @@ int start_menu_frame(StartMenu *menu)
         if (resume->checkpoint >= 0) snprintf(at, sizeof(at), "checkpoint %d", resume->checkpoint + 1);
         else snprintf(at, sizeof(at), "%s", resume->legacy_screen > 0 ? "last screen reached" : "the start");
         snprintf(text, sizeof(text), "Continue from %s: %d pts, %d lives", at, resume->score, resume->lives);
-        font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, (Color){150,200,150,255});
+        font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, style.color[UI_COLOR_ACCENT]);
     }
     font_draw_centered(menu->font, can_continue ? "Arrows: level  Enter/A: play  C/X: continue  Esc: exit"
                                                 : "Arrows/D-pad: level  Enter/A: play  Esc: exit",
                        MENU_GAME_W/2, 250, grey);
-    if (menu->settings_menu) {
-        DrawRectangle(125,270,150,24,(Color){50,65,85,255});
-        font_draw_centered(menu->font,"Settings (F1 / Y)",MENU_GAME_W/2,270+(24-TEXT_FONT_SIZE)/2,WHITE);
-    }
+    if (menu->settings_menu)
+        draw_button(menu, &style, settings_button(), "Settings (F1 / Y)", 1);
     settings_menu_render(menu->settings_menu,menu->profile,menu->font);
     display_present(menu->frame_target);
     return 1;
