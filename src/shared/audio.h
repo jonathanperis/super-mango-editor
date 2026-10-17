@@ -30,6 +30,9 @@ void sound_play(SoundEffect *sound, int volume);
 /* sound_play with a stereo position: pan -1 is left, 0 centre, 1 right
  * (raylib 6's range; sound_pan_for_screen_x computes it from the screen). */
 void sound_play_at(SoundEffect *sound, int volume, float pan);
+/* sound_play_at with a pitch as well: 1 plays the sample as recorded, 2 an
+ * octave up (and in half the time), as raylib's SetSoundPitch. */
+void sound_play_ex(SoundEffect *sound, int volume, float pan, float pitch);
 void sound_set_volume(SoundEffect *sound, int volume);
 void sound_stop_all(void);
 /* Silence every voice playing this one sound; the sample stays loaded. */

@@ -102,6 +102,11 @@ void sound_play(SoundEffect *sound, int volume)
 
 void sound_play_at(SoundEffect *sound, int volume, float pan)
 {
+    sound_play_ex(sound, volume, pan, 1.0f);
+}
+
+void sound_play_ex(SoundEffect *sound, int volume, float pan, float pitch)
+{
     if (!sound) return;
     for (int i = 0; i < EFFECT_VOICES; i++) {
         EffectVoice *voice = &voices[i];
@@ -118,6 +123,7 @@ void sound_play_at(SoundEffect *sound, int volume, float pan)
         /* Set on every play: a fresh alias starts centred, and a source on
          * one side of the screen should sound from that side. */
         SetSoundPan(alias, pan);
+        SetSoundPitch(alias, pitch);
         PlaySound(alias);
         return;
     }
