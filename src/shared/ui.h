@@ -269,10 +269,11 @@ void ui_focus_field(UIState *ui, int id);
 void ui_set_cursor(UIState *ui, int cursor);
 /* End of frame: show the cursor this frame asked for (the resize arrows
  * while a scrollbar thumb is dragged), calling raylib only when it
- * changes.  raylib's GLFW backend makes a new system cursor on every
- * SetMouseCursor and never frees it, so calling it every frame would
- * pile them up.  A hidden window or the Memory test backend has no
- * cursor to set; there only cursor_shown follows. */
+ * changes.  (Upstream raylib's GLFW backend made a new system cursor on
+ * every SetMouseCursor; the pinned build reuses one per shape, see
+ * vendor/raylib/README.md, but there is still no reason to call it every
+ * frame.)  A hidden window or the Memory test backend has no cursor to
+ * set; there only cursor_shown follows. */
 void ui_apply_cursor(UIState *ui);
 /* Draw a button and return 1 on its click frame, not every held-mouse frame.
  * An active edit must finish before the caller executes the button command. */

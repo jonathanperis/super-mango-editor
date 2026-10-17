@@ -271,9 +271,10 @@ The mouse cursor is collected the same immediate-mode way: `ui_begin_frame`
 resets `cursor_wish` to the arrow, editable fields ask for the I-beam while the
 pointer is on them, an owner can ask with `ui_set_cursor`, and `ui_apply_cursor`
 at the end of the frame (the up-down arrows win while a scrollbar thumb is
-dragged) calls `SetMouseCursor` only when the cursor changes. raylib's GLFW
-backend creates a new system cursor on every call and never frees it, so it
-must not be called every frame. The editor's `editor_update_cursor` adds the
+dragged) calls `SetMouseCursor` only when the cursor changes. Upstream raylib's
+GLFW backend created a new system cursor on every call and never freed it; the
+pinned build is patched to create each shape once (see
+`vendor/raylib/README.md`), and the editor still only calls it on a change. The editor's `editor_update_cursor` adds the
 four-way arrows for an entity drag.
 
 Clip drawing with `ui_clip_begin` / `ui_clip_end` (or `ui_scroll_begin` /
