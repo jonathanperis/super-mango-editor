@@ -79,7 +79,10 @@ static unsigned char *qoa_put(unsigned char *at, unsigned long long value, int b
  * - a file header promising one sample, followed by a frame of twenty, wrote
  *   twenty samples into a one-sample buffer (a heap write). The buffer now
  *   covers whole frames, so the frame decodes inside it.
- * The sanitizer build turns either write back into a hard failure. */
+ * The first case fails in every build: an unbounded decoder accepts the file.
+ * The second only differs in where the samples land, so only the sanitizer
+ * build (the CI Sanitizers job runs this test under ASan) can see the
+ * out-of-bounds write; elsewhere it pins the decoded result. */
 int qoa_bounds_contract_test(void)
 {
     unsigned char nine[8 + 8 + 9 * 16] = {0}, *at = nine;
@@ -95,7 +98,9 @@ int qoa_bounds_contract_test(void)
     at = qoa_put(at, 1, 4);
     at = qoa_put(at, (1ull << 56) | (44100ull << 32) | (20ull << 16) | (sizeof(longer) - 8), 8);
     Wave bounded = LoadWaveFromMemory(".qoa", longer, (int)sizeof(longer));
-    failed |= bounded.data != NULL && bounded.frameCount > 20;
+    /* The frame's twenty samples decode into the whole-frame buffer and
+     * are what raylib reports. */
+    failed |= bounded.data == NULL || bounded.frameCount != 20 || bounded.channels != 1;
     UnloadWave(bounded);
     if (failed) fprintf(stderr, "audio: a crafted QOA header was trusted past its buffer\n");
     return failed;
