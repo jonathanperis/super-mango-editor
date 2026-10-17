@@ -1579,7 +1579,9 @@ static int dropped_level_opens_like_a_recent_file(void)
     int moved = 0;
     static char long_path[EDITOR_DROP_TEST_LONG + 1];
     const char *one[] = {"levels/a.toml"};
-    const char *upper[] = {"levels/B.TOML"};
+    /* No file of this name exists in any letter case: Windows and macOS
+     * would open levels/b.toml for "levels/B.TOML". */
+    const char *upper[] = {"levels/missing.TOML"};
     const char *two[] = {"levels/a.toml", "levels/b.toml"};
     const char *art[] = {"levels/a.png"};
     const char *delta[] = {"levels/d.toml"};
