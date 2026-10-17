@@ -25,6 +25,7 @@ void editor_update_cursor(EditorState *es)
 void editor_run_frame(EditorState *es)
 {
     uint32_t now = (uint32_t)clock_millis();
+    editor_pace_frames(es);
     /* Clear one-shot flags before draining commands. Otherwise the previous
      * click or Return key would be applied again on the following frame. */
     ui_begin_frame(&es->ui);

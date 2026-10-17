@@ -486,3 +486,29 @@ EditorExternalChoice editor_confirm_external_change(EditorState *es)
     editor_set_status(es, "Save cancelled: file changed externally");
     return EDITOR_EXTERNAL_CANCEL;
 }
+
+int editor_frame_rate_for(int hidden, int focused)
+{
+    if (hidden) return 0;
+    return focused ? EDITOR_FPS_FOCUSED : EDITOR_FPS_UNFOCUSED;
+}
+
+void editor_pace_frames(EditorState *es)
+{
+#ifdef MANGO_RAYLIB_MEMORY
+    /* The Memory backend's window never gains or loses focus for real. */
+    (void)es;
+#else
+    /* An editor in the background redraws an unchanging frame 60 times a
+     * second for nothing; 10 keeps hover and timers alive at a sixth of
+     * the work. Not EnableEventWaiting: that would stop the frames that
+     * autosave, tooltips and the playtest status check depend on. Those
+     * timers read clock_millis, so they keep their time at any rate. */
+    if (!IsWindowReady()) return;
+    int rate = editor_frame_rate_for(IsWindowHidden(), IsWindowFocused());
+    if (rate && rate != es->frame_rate) {
+        SetTargetFPS(rate);
+        es->frame_rate = rate;
+    }
+#endif
+}
