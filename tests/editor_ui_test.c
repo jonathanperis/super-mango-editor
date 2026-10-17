@@ -997,6 +997,10 @@ static int minimap_jumps_and_drags_the_view(void)
     ui_frame(&es, EDITOR_MINIMAP_X, y);
     CHECK(es.camera.x == dropped_x);
     CHECK(doc_hash(&es) == before && es.level.coin_count == 0);
+    /* A click pressed and released within one frame still jumps. */
+    es.camera.x = 0.0f;
+    click_frame(&es, mid, y);
+    CHECK(es.camera.x > 0.0f && !es.minimap_dragging);
 done:
     close_editor(&es);
     return failed;
