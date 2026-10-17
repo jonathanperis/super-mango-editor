@@ -14,6 +14,7 @@
 #include "editor_playtest.h"
 #include "editor_validation.h"
 #include "editor_session.h"
+#include "editor_shortcuts.h"
 
 void editor_update_cursor(EditorState *es)
 {
@@ -85,6 +86,8 @@ void editor_run_frame(EditorState *es)
         editor_render_status_bar(es);
         /* An open dropdown list goes on top of every panel drawn above. */
         ui_draw_overlays(&es->ui);
+        /* The F1 shortcut list covers even that. */
+        editor_shortcut_sheet_render(es);
     }
     /* The widgets drawn above said which cursor they want; set it once. */
     editor_update_cursor(es);
