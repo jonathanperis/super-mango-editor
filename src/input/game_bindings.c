@@ -34,13 +34,16 @@ int game_settings_has_unavailable_binding(const GameSettings *settings)
     return 0;
 }
 
+static int in_range(int value, int min, int max) { return value >= min && value <= max; }
+
 int game_settings_valid(const GameSettings *s)
 {
-    if (s->music_volume < 0 || s->music_volume > 128 || s->effects_volume < 0 || s->effects_volume > 128 ||
-        s->dead_zone < 0 || s->dead_zone > 28000 || s->window_scale < 1 || s->window_scale > 4 ||
-        (s->muted != 0 && s->muted != 1) || (s->high_contrast != 0 && s->high_contrast != 1) ||
-        (s->reduced_motion != 0 && s->reduced_motion != 1) || (s->ghost != 0 && s->ghost != 1) ||
-        (s->fullscreen != 0 && s->fullscreen != 1)) return 0;
+    /* One check per setting: numbers inside their ranges, switches 0 or 1. */
+    if (!in_range(s->music_volume, 0, 128) || !in_range(s->effects_volume, 0, 128) ||
+        !in_range(s->dead_zone, 0, 28000) || !in_range(s->window_scale, 1, 4)) return 0;
+    const int switches[] = {s->muted, s->high_contrast, s->reduced_motion, s->ghost, s->fullscreen};
+    for (size_t i = 0; i < sizeof(switches) / sizeof(switches[0]); i++)
+        if (!in_range(switches[i], 0, 1)) return 0;
     for (int i = 0; i < PROFILE_ACTION_COUNT; i++) {
         if (!game_settings_key_allowed(s->keys[i]) || !game_settings_button_allowed(s->buttons[i])) return 0;
         for (int j = 0; j < i; j++)
