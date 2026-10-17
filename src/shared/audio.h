@@ -27,6 +27,9 @@ void sound_unload(SoundEffect *sound);
 /* Volumes use authored/profile units 0..128. Each play gets independent
  * alias state; it shares the sample bytes without taking ownership of them. */
 void sound_play(SoundEffect *sound, int volume);
+/* sound_play with a stereo position: pan -1 is left, 0 centre, 1 right
+ * (raylib 6's range; sound_pan_for_screen_x computes it from the screen). */
+void sound_play_at(SoundEffect *sound, int volume, float pan);
 void sound_set_volume(SoundEffect *sound, int volume);
 void sound_stop_all(void);
 /* Silence every voice playing this one sound; the sample stays loaded. */

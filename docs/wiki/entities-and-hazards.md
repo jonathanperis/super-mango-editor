@@ -63,7 +63,7 @@ patrol_x1  = 310.0
 
 **File:** `src/entities/bird.c` / `bird.h`; movement, sound, hitbox and render are shared with the faster bird, tuned by a `BirdSpec`  
 **Sprite:** `assets/sprites/entities/bird.png` — 144×48 px, 3 frames of 48×48 px  
-**Behaviour:** Slow sine-wave sky patrol. Flies horizontally while oscillating vertically around `base_y` using a sine curve. The wing-flap sound effect plays once per animation cycle with distance-based volume.
+**Behaviour:** Slow sine-wave sky patrol. Flies horizontally while oscillating vertically around `base_y` using a sine curve. The wing-flap sound effect plays once per animation cycle with distance-based volume, panned toward the side of the screen the bird is on.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

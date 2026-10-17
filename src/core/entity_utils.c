@@ -58,6 +58,17 @@ int sound_volume_for_distance(float dist, float audible_range, int max_volume)
     return (int)((1.0f - fraction) * (float)max_volume);
 }
 
+/* Linear from the screen's left edge to its right edge; beyond either edge
+ * the pan stays at that side's limit. */
+float sound_pan_for_screen_x(float source_x, int cam_x, float screen_w)
+{
+    if (!(screen_w > 0.0f)) return 0.0f;
+    float across = (source_x - (float)cam_x) / screen_w;  /* 0 left .. 1 right */
+    if (across < 0.0f) across = 0.0f;
+    if (across > 1.0f) across = 1.0f;
+    return (across * 2.0f - 1.0f) * SOUND_PAN_MAX;
+}
+
 /* ------------------------------------------------------------------ */
 
 /*

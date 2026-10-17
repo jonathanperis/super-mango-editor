@@ -182,6 +182,8 @@ Steps to add a new sound:
 
 ```c
 sound_play(gs->assets.audio.<name>, 128); // null-safe; per-play volume in authored units
+// A source on screen: fade with distance and pan to its side (-1 left .. 1 right).
+sound_play_at(snd, vol, sound_pan_for_screen_x(source_x, cam_x, (float)GAME_W));
 ```
 
 ---
