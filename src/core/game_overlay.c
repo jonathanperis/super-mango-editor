@@ -87,6 +87,14 @@ void game_music_sync(const GameState *gs)
     else music_pause();
 }
 
+int game_music_volume(const GameState *gs, int authored_volume)
+{
+    if (!gs || !gs->screen.profile) return authored_volume;
+    const GameSettings *s = &gs->screen.profile->data.settings;
+    /* The settings slider scales the level's authored volume (0-128). */
+    return s->muted ? 0 : authored_volume * s->music_volume / 128;
+}
+
 void game_audio_apply_settings(const GameState *gs)
 {
     if (!gs || !gs->screen.profile) return;
@@ -102,8 +110,6 @@ void game_audio_apply_settings(const GameState *gs)
     sound_set_volume(gs->assets.audio.spider_attack, volume);
     sound_set_volume(gs->assets.audio.dive, volume);
 
-    /* The settings slider scales the level's authored volume (0-128). */
     const LevelDef *level = gs->world.runtime.current_level;
-    if (level)
-        music_set_volume(s->muted ? 0 : level->music_volume * s->music_volume / 128);
+    if (level) music_set_volume(game_music_volume(gs, level->music_volume));
 }
