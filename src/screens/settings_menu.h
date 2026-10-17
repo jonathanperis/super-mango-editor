@@ -6,6 +6,7 @@ typedef struct SettingsMenu {
     int open, page, selected, capture; /* capture: 0 none, 1 keyboard, 2 gamepad */
     char message[128];
     float wheel_rest; /* wheel notches not yet turned into a step */
+    int   wheel_row;  /* the row wheel_rest was gathered on; -1 = none */
     UIState ui;
 } SettingsMenu;
 

@@ -538,6 +538,16 @@ static int settings_mouse_changes_values(void)
     event.wheel = 2.0f;
     settings_menu_event(menu,profile,&event,PAD_BACK);
     CHECK(profile->data.settings.effects_volume == effects + 8);
+    /* A half notch left on one row does not carry to the next: half on
+     * effects, a click on music, then half on music is no step yet. */
+    event = (InputEvent){.type=INPUT_WHEEL,.x=100,.y=36 + 16 * 1 + 4,.wheel=-0.5f};
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    event = (InputEvent){.type=INPUT_MOUSE_DOWN,.button=MOUSE_BUTTON_LEFT,.x=360,.y=row_y};
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    music = profile->data.settings.music_volume;
+    event = (InputEvent){.type=INPUT_WHEEL,.x=100,.y=row_y,.wheel=-0.5f};
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(profile->data.settings.music_volume == music && menu->selected == 0);
     /* Off the value rows the wheel changes nothing, and a click on an
      * action row still activates it (Configure controls opens its page). */
     GameSettings before = profile->data.settings;
