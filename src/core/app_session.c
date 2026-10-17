@@ -492,6 +492,9 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->screen.start_x = session->start.x;
     game->screen.start_checkpoint = session->start.checkpoint;
     session->start.kind = LEVEL_START_DEFAULT;
+    /* Borrowed from the session before game_init, so the level that init
+     * loads already starts its music at the player's mute and slider. */
+    game->screen.profile = &session->profile;
     if (game_init(game)) {
         /* Keep its reason (a missing sprite, say) for the menu. */
         copy_path(session->load_error, sizeof(session->load_error), game->screen.load_error);
@@ -499,7 +502,6 @@ static GameState *session_make_game(AppSession *session, const char *path, const
         return NULL;
     }
     game_timing_restart_clock(game);
-    game->screen.profile = &session->profile;
     game->screen.settings_menu = &session->settings;
     /* These two pointers are borrowed from the longer-lived session. The
      * screen must not free them when a replay replaces its GameState. */

@@ -585,8 +585,12 @@ static int persistent_session(void)
     session_destroy(&session);
     config.level_path=NULL; config.continue_last=1;
     puts("profile session: continue");
+    /* The saved mute holds from the first level's first sample, before
+     * any settings are applied on a frame. */
+    test_last_music_volume = -1;
     session=session_create(&config);
     CHECK(session && session->game && session->profile.data.settings.muted==1);
+    CHECK(test_last_music_volume==0);
     CHECK(!strcmp(session->game->screen.profile_level_key,"levels/00_sandbox_01.toml"));
     CHECK(session->profile.data.count==1);
     /* A remembered stage that no longer loads used to end the program;
