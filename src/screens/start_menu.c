@@ -357,7 +357,7 @@ int start_menu_frame(StartMenu *menu)
                        MENU_GAME_W/2, 250, grey);
     if (menu->settings_menu)
         draw_button(menu, &style, settings_button(), "Settings (F1 / Y)", 1);
-    settings_menu_render(menu->settings_menu,menu->profile,menu->font);
+    settings_menu_render(menu->settings_menu, menu->profile, menu->font, menu->controller);
     display_present(menu->frame_target);
     return 1;
 }
