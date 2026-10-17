@@ -82,11 +82,31 @@ static void adjust(SettingsMenu *menu, GameProfile *profile, int direction)
     if (*value != updated) { *value = updated; changed(profile); }
 }
 
+/* Rows a click side or the wheel can lower and raise: the main page's
+ * values (not the browser's Fullscreen row, which the page owns). */
+static int value_row(const SettingsMenu *menu, int row)
+{
+#ifdef __EMSCRIPTEN__
+    if (row == 5) return 0;
+#endif
+    return !menu->page && row >= 0 && row <= 8;
+}
+
+/* The row under a pointer, or -1 outside the list. */
+static int row_at(const SettingsMenu *menu, int x, int y)
+{
+    int rows = menu->page ? 13 : 12;
+    if (x < 18 || x >= 382 || y < 36) return -1;
+    int row = (y - 36) / 16;
+    return row < rows ? row : -1;
+}
+
 void settings_menu_open(SettingsMenu *menu)
 {
     if (!menu) return;
     menu->open = 1;
     menu->page = menu->selected = menu->capture = 0;
+    menu->wheel_rest = 0.0f;
     menu->message[0] = '\0';
 }
 
@@ -160,10 +180,27 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
     if (!menu->page && (key == KEY_RIGHT || button == PAD_RIGHT)) adjust(menu, profile, 1);
     if (game_input_event_confirms(event)) activate(menu, profile);
     if (event->type == INPUT_MOUSE_DOWN && event->button == MOUSE_BUTTON_LEFT) {
-        int row = (event->y - 36) / 16;
-        if (event->x >= 18 && event->x < 382 && event->y >= 36 && row < rows) {
-            menu->selected = row; activate(menu, profile);
+        int row = row_at(menu, event->x, event->y);
+        if (row >= 0) {
+            menu->selected = row;
+            /* A value row's halves match its < and > marks: the left half
+             * lowers, the right half raises. Other rows still activate. */
+            if (value_row(menu, row)) {
+                menu->message[0] = '\0';
+                adjust(menu, profile, event->x < 200 ? -1 : 1);
+            } else activate(menu, profile);
         }
+    }
+    if (event->type == INPUT_WHEEL) {
+        int row = row_at(menu, event->x, event->y);
+        if (!value_row(menu, row)) { menu->wheel_rest = 0.0f; return 1; }
+        /* A trackpad sends many fractional notches; gather them into whole
+         * steps so one swipe does not race a volume from 0 to 100%. */
+        if (row != menu->selected) menu->wheel_rest = 0.0f;
+        menu->selected = row;
+        menu->wheel_rest += event->wheel;
+        while (menu->wheel_rest >= 1.0f) { adjust(menu, profile, 1); menu->wheel_rest -= 1.0f; }
+        while (menu->wheel_rest <= -1.0f) { adjust(menu, profile, -1); menu->wheel_rest += 1.0f; }
     }
     return 1;
 }
@@ -217,7 +254,14 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
             DrawRectangle(16, y-1, 368, 16, ui_color(&menu->ui, UI_COLOR_SELECTED));
         }
         /* Center the label inside the 16 px highlight that starts at y-1. */
-        ui_label(&menu->ui, 20, y - 1 + (16-TEXT_FONT_SIZE)/2, label);
+        int text_y = y - 1 + (16-TEXT_FONT_SIZE)/2;
+        if (value_row(menu, row)) {
+            /* The marks show which half of the row a click lowers or raises. */
+            Color mark = ui_color(&menu->ui, UI_COLOR_ACCENT);
+            ui_label_color(&menu->ui, 20, text_y, "<", mark);
+            ui_label_color(&menu->ui, 380 - ui_text_width(&menu->ui, ">"), text_y, ">", mark);
+            ui_label(&menu->ui, 32, text_y, label);
+        } else ui_label(&menu->ui, 20, text_y, label);
     }
     const char *status = menu->message[0] ? menu->message :
         profile->error ? profile->status :
