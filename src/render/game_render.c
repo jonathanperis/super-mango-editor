@@ -464,7 +464,7 @@ static void render_ghost(GameState *gs, int cam_x)
  * level hides them. */
 static void render_player(GameState *gs, int cam_x)
 {
-    player_render(&gs->world.player, cam_x);
+    player_render(&gs->world.player, cam_x, reduced_motion(gs));
 }
 
 /*
