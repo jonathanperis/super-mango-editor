@@ -13,6 +13,7 @@
 #include "../shared/asset_cache.h"  /* AssetCache — the menu's three files come from it */
 #include "../shared/text.h"
 #include "../shared/audio.h"
+#include "../shared/ui.h"     /* UIStyle */
 
 #include "../input/game_input.h"
 #include "../levels/level_session.h"
@@ -74,6 +75,10 @@ typedef struct {
 
 /* How many list rows fit between the logo and the Play button. */
 #define START_MENU_LIST_ROWS 5
+
+/* The colours and outline the menu draws with: the game menus' style
+ * (settings_menu_style), high contrast when the profile asks for it. */
+UIStyle start_menu_style(const StartMenu *menu);
 
 /* Fill row for catalog entry index (index must be < catalog->count). */
 void start_menu_level_row(const StartMenu *menu, size_t index, StartMenuLevelRow *row);

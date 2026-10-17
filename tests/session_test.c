@@ -1620,6 +1620,16 @@ static int level_select_lists_best_results(void)
         expect_int("row click does not play", menu->route, MENU_ROUTE_NONE) ||
         expect_int("row click path", strcmp(menu->selected_level_path, catalog.levels[1].path), 0))
         goto done;
+    /* The menu draws with the settings panel's style: outlined buttons by
+     * default, and the high-contrast table once that setting is on. */
+    UIStyle style = start_menu_style(menu);
+    if (expect_int("menu buttons outlined", style.border_width, 1)) goto done;
+    profile.data.settings.high_contrast = 1;
+    style = start_menu_style(menu);
+    if (expect_int("menu follows high contrast",
+                   memcmp(&style, &UI_STYLE_HIGH_CONTRAST, sizeof(style)), 0) ||
+        expect_int("high-contrast frame presents", start_menu_frame(menu), 1))
+        goto done;
     failed = 0;
 done:
     start_menu_close(&menu);

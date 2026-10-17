@@ -20,3 +20,7 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
 void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
                            TextFont *font);
 void settings_menu_cleanup(SettingsMenu *menu);
+
+/* The style the game's menus draw with: their own palette, or
+ * UI_STYLE_HIGH_CONTRAST when that setting is on. */
+UIStyle settings_menu_style(int high_contrast);
