@@ -102,6 +102,7 @@ typedef struct {
      * thumb the pointer took it, in pixels from its top. */
     UIScroll *scroll_drag;
     int       scroll_grab;
+    int       scroll_drag_seen;  /* its scrollbar ran this frame */
     /* ---- Input for this frame, filled after ui_begin_frame ---- */
     int mouse_x, mouse_y,       /* logical canvas coordinates */
         mouse_clicked,         /* press edge: a button acts once */
