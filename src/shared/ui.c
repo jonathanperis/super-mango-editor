@@ -1794,7 +1794,7 @@ void ui_scroll_clamp(UIScroll *scroll, int content, int view)
 int ui_scroll_begin(UIScroll *scroll, int x, int y, int w, int view_h, int content_h)
 {
     ui_scroll_clamp(scroll, content_h, view_h);
-    BeginScissorMode(x, y, w, view_h);
+    if (IsWindowReady()) BeginScissorMode(x, y, w, view_h);
     s_scroll_clip_active = 1;
     s_scroll_clip_x = x;
     s_scroll_clip_y = y;
@@ -1805,7 +1805,7 @@ int ui_scroll_begin(UIScroll *scroll, int x, int y, int w, int view_h, int conte
 
 void ui_scroll_end(void)
 {
-    EndScissorMode();
+    if (IsWindowReady()) EndScissorMode();
     s_scroll_clip_active = 0;
 }
 
