@@ -54,10 +54,11 @@
             width: min(100vw, calc(100vh * 4 / 3));
             max-width: none;
         }
-        /* With the touch pad shown, the picture leaves room for it below
-           (48 px buttons, 8 px padding, 2 px borders: 68 px). */
+        /* With the touch pad shown, the picture leaves room for it below:
+           two rows of 48 px buttons, the gap and the padding, the same
+           132 px the windowed layout keeps for it. */
         #canvas-container:fullscreen:has(.mango-touch-controls) canvas {
-            width: min(100vw, calc((100vh - 68px) * 4 / 3));
+            width: min(100vw, calc((100vh - 132px) * 4 / 3));
         }
         #canvas-container:fullscreen .mango-touch-controls {
             width: min(100vw, 800px);
