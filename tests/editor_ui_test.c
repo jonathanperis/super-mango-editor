@@ -394,6 +394,11 @@ static int floor_reaches_both_canvas_edges_at_any_scroll(void)
     const Color backdrop = {255, 0, 255, 255};
     const float zooms[] = {1.0f, 2.0f, 3.0f, 5.0f};  /* the zoom menu */
     CHECK(open_editor(&es, NULL) == 0);
+    /* A new level has no sky image, so the canvas starts as flat sky blue:
+     * a stretch the floor failed to cover shows that blue. */
+    const Color sky = {0x87, 0xCE, 0xEB, 255};
+    const Color sky_swapped = {0xEB, 0xCE, 0x87, 255};   /* Memory reads BGRA */
+    CHECK(es.textures.sky == NULL);
     es.level.screen_count = 12;
     es.level.floor_gaps[0] = 400;
     es.level.floor_gaps[1] = 2000;
@@ -404,7 +409,9 @@ static int floor_reaches_both_canvas_edges_at_any_scroll(void)
             es.camera.zoom = zooms[z];
             /* Start, end and odd fractional positions in between. */
             es.camera.x = step * (world_w / 8.0f) + (step % 3) * 7.3f;
-            es.camera.y = 0.0f;
+            /* Centre the dirt row vertically so it is on screen at every
+             * zoom (at 3x and 5x the world is taller than the canvas). */
+            es.camera.y = (float)(FLOOR_Y + TILE_SIZE / 2) - (CANVAS_H / 2) / es.camera.zoom;
             canvas_clamp_camera(&es);
             /* Drawn straight to the window: the Memory backend reads back
              * the framebuffer but not textures. */
@@ -416,12 +423,14 @@ static int floor_reaches_both_canvas_edges_at_any_scroll(void)
             EndDrawing();
             CHECK(IsImageValid(shot) && shot.width == EDITOR_W && shot.height == EDITOR_H);
 #ifdef MANGO_MEMORY_TESTS
-            /* Memory readback is bottom-origin (and BGRA, which the
-             * magenta backdrop does not notice). */
+            /* Memory readback is bottom-origin (and BGRA: the magenta
+             * backdrop does not notice, the sky is checked both ways). */
             ImageFlipVertical(&shot);
 #endif
             /* Middle of the dirt row, in screen pixels. */
             int sy = (int)((FLOOR_Y + TILE_SIZE / 2 - es.camera.y) * es.camera.zoom) + TOOLBAR_H;
+            CHECK(sy >= TOOLBAR_H && sy < TOOLBAR_H + CANVAS_H);
+            int checked = 0;
             for (int sx = 0; sx < CANVAS_W; sx++) {
                 float wx = sx / es.camera.zoom + es.camera.x;
                 int near_gap = 0;
@@ -430,12 +439,16 @@ static int floor_reaches_both_canvas_edges_at_any_scroll(void)
                                 wx < es.level.floor_gaps[g] + FLOOR_GAP_W + 2.0f;
                 if (near_gap || wx >= world_w - 1.0f) continue;
                 Color c = GetImageColor(shot, sx, sy);
-                if (same_color(c, backdrop)) {
+                checked++;
+                if (same_color(c, backdrop) || same_color(c, sky) || same_color(c, sky_swapped)) {
                     fprintf(stderr, "floor missing at zoom %.1f camera %.1f sx %d\n",
                             es.camera.zoom, es.camera.x, sx);
                     CHECK(0);
                 }
             }
+            /* Most of the row is floor (only the gaps and the world's end
+             * are skipped), so the check above really ran. */
+            CHECK(checked > CANVAS_W / 2);
             UnloadImage(shot);
             shot = (Image){0};
         }
