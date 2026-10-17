@@ -41,6 +41,13 @@ def main() -> None:
     # download. It is still verified below, so a stale or corrupt shared copy
     # fails closed instead of building unpinned code.
     archive = args.archive or build / "source.tar.gz"
+    # This build directory's own download is only a cache: after the pin
+    # changes (a raylib upgrade) it holds the previous archive, so fetch the
+    # pinned one again instead of failing. A shared --archive is someone
+    # else's copy and still fails closed below.
+    if (not args.archive and archive.is_file() and
+            hashlib.sha256(archive.read_bytes()).hexdigest() != pin["sha256"]):
+        archive.unlink()
     if not archive.is_file():
         with urllib.request.urlopen(pin["url"], timeout=120) as response:
             payload = response.read()
