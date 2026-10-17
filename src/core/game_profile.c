@@ -457,11 +457,16 @@ int game_profile_encode(const GameProfileData *data, char *text, size_t capacity
     const GameSettings *s = &data->settings;
     if (append(text, capacity, &used,
                "format_version = %d\nmusic_volume = %d\neffects_volume = %d\nmuted = %d\n"
-               "dead_zone = %d\nwindow_scale = %d\nhigh_contrast = %d\nreduced_motion = %d\nghost = %d\n"
-               "fullscreen = %d\nlast_level = ",
+               "dead_zone = %d\nwindow_scale = %d\nhigh_contrast = %d\nreduced_motion = %d\nghost = %d\n",
                PROFILE_FORMAT_VERSION,
                s->music_volume,s->effects_volume,s->muted,s->dead_zone,s->window_scale,s->high_contrast,s->reduced_motion,
-               s->ghost,s->fullscreen) ||
+               s->ghost)) return -1;
+    /* fullscreen came later within format version 2, and builds from
+     * before it refuse a profile with a key they do not know.  Writing it
+     * only when it is on keeps a windowed player's profile readable by
+     * those builds; a missing key reads as 0. */
+    if (s->fullscreen && append(text, capacity, &used, "fullscreen = 1\n")) return -1;
+    if (append(text, capacity, &used, "last_level = ") ||
         quoted(text, capacity, &used, data->last_level)) return -1;
     for (int kind = 0; kind < 2; kind++) {
         if (append(text, capacity, &used, "\n%s = [", kind ? "buttons" : "keys")) return -1;
