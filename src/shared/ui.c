@@ -918,6 +918,13 @@ void ui_begin_frame(UIState *ui)
      */
     if (!ui->dropdown_seen) ui->dropdown_open_id = 0;
     ui->dropdown_seen    = 0;
+    /* Likewise a scrollbar drag ends with the button (mouse_down still
+     * holds the last frame's state here; it is reset below) or with its
+     * scrollbar: a panel that stopped being drawn (a playtest took the
+     * window, say) never sees the release, and the up-down cursor would
+     * stay. */
+    if (!ui->scroll_drag_seen || !ui->mouse_down) ui->scroll_drag = NULL;
+    ui->scroll_drag_seen = 0;
     /* The pointer left every widget with a tip: the next one it rests on
      * starts its delay afresh. */
     if (!ui->tooltip_seen) ui->tooltip_w = ui->tooltip_h = 0;
@@ -1858,6 +1865,7 @@ int ui_scrollbar_input(UIState *ui, UIScroll *scroll, int x, int y, int w, int h
         if (!ui->mouse_down) {
             ui->scroll_drag = NULL;
         } else {
+            ui->scroll_drag_seen = 1;
             /* Put the thumb where the pointer holds it, as a share of the
              * track it can travel, rounded to the nearest unit. */
             int travel = h - thumb_h;
@@ -1871,6 +1879,7 @@ int ui_scrollbar_input(UIState *ui, UIScroll *scroll, int x, int y, int w, int h
         if (ui->mouse_y >= thumb_y && ui->mouse_y < thumb_y + thumb_h) {
             ui->scroll_drag = scroll;
             ui->scroll_grab = ui->mouse_y - thumb_y;
+            ui->scroll_drag_seen = 1;
         } else {
             scroll->offset += ui->mouse_y < thumb_y ? -view : view;
         }

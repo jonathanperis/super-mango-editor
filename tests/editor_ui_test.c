@@ -368,6 +368,51 @@ done:
     return failed;
 }
 
+/*
+ * A thumb drag ends at the next frame once its scrollbar is no longer run
+ * (F5 hands the window to the playtest overlay, and the panel's release
+ * is never seen) or the button was up, so the up-down cursor goes back.
+ */
+static int scrollbar_drag_ends_with_its_bar(void)
+{
+    int failed = 0;
+    UIState ui;
+    UIScroll scroll = {0};
+    ui_init(&ui, NULL);
+
+    /* Take the 25 px thumb at the top of a 100 px track. */
+    ui_begin_frame(&ui);
+    ui.mouse_x = 2; ui.mouse_y = 10; ui.mouse_clicked = 1; ui.mouse_down = 1;
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    CHECK(ui.scroll_drag == &scroll);
+    ui_apply_cursor(&ui);
+    CHECK(ui.cursor_shown == MOUSE_CURSOR_RESIZE_NS);
+    /* Held, and the bar runs again: the drag goes on. */
+    ui_begin_frame(&ui);
+    ui.mouse_down = 1;
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    CHECK(ui.scroll_drag == &scroll);
+    /* Still held, but the panel is not drawn: the next frame lets go. */
+    ui_begin_frame(&ui);
+    ui.mouse_down = 1;
+    ui_begin_frame(&ui);
+    ui.mouse_down = 1;
+    CHECK(ui.scroll_drag == NULL);
+    ui_apply_cursor(&ui);
+    CHECK(ui.cursor_shown == MOUSE_CURSOR_DEFAULT);
+
+    /* Released in a frame the bar did not see the release in. */
+    ui_begin_frame(&ui);
+    ui.mouse_y = 10; ui.mouse_clicked = 1; ui.mouse_down = 1;
+    (void)ui_scrollbar_input(&ui, &scroll, 0, 0, 5, 100, 100, 400);
+    CHECK(ui.scroll_drag == &scroll);
+    ui.mouse_down = 0;
+    ui_begin_frame(&ui);
+    CHECK(ui.scroll_drag == NULL);
+done:
+    return failed;
+}
+
 /* A scrolled panel still draws its fields scrolled out of view; those must
  * not show the I-beam over whatever is under the pointer there. */
 static int scrolled_out_field_wants_no_ibeam(void)
@@ -4049,6 +4094,7 @@ int main(void)
         CASE(ui_scroll_keeps_fractions_and_stays_in_range),
         CASE(scrolled_out_field_wants_no_ibeam),
         CASE(ui_scrollbar_pages_drags_and_uses_its_clicks),
+        CASE(scrollbar_drag_ends_with_its_bar),
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(toolbar_toggles_show_what_is_on),
