@@ -1,1 +1,3 @@
 levels/*.toml text eol=lf
+# Pinned upstream data, verified by SHA-256: keep the bytes exactly as fetched.
+vendor/raylib/gamecontrollerdb/* -text

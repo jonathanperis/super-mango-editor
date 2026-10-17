@@ -56,6 +56,31 @@ to retain event ordering and per-event modifiers; raylib still maintains sampled
 device state and owns polling. The Memory suite verifies this adapter with
 test-owned callback registration, independently of a display server.
 
+## Gamepad mappings
+
+The desktop input only uses a controller GLFW has a gamepad mapping for
+(`glfwJoystickIsGamepad`), so GLFW's built-in table decides which pads work.
+Upstream refreshes that table by hand: raylib regenerated it from
+SDL_GameControllerDB in 2025, and a GLFW update can bring back GLFW's own,
+smaller copy. `build_raylib.py` therefore always writes
+`src/external/glfw/src/mappings.h` itself, the way GLFW's `update_mappings`
+target (`CMake/GenerateMappings.cmake`) does: every Windows, macOS and Linux
+line of `gamecontrollerdb/gamecontrollerdb.txt`, in file order, fills the
+placeholders of the archive's own `mappings.h.in`, which keeps GLFW's notices
+and its built-in XInput entries.
+
+`gamecontrollerdb/` holds the database and its zlib license exactly as
+published at SDL_GameControllerDB commit
+`c1d5289a1f713b30a2c121e9fe6529d39360be0f` (2026-10-02). `manifest.json`
+records that commit, the raw-file URL and the SHA-256, which the build checks
+before use; `.gitattributes` keeps Git from changing its line endings. The
+copy is vendored rather than downloaded so offline and CI builds need only the
+raylib archive. The table is compiled in, so releases need no mapping file and
+the game makes no `SetGamepadMappings` call. To refresh it, download
+`gamecontrollerdb.txt` and `LICENSE` from a newer upstream commit, then update
+the commit, URL and SHA-256 together. Lines GLFW cannot parse (output
+modifiers such as `+leftx`) are skipped by GLFW at start-up, as before.
+
 ## Retained source fixes
 
 Linux ASan/LeakSanitizer/UBSan exposed three upstream audio defects. The bootstrap

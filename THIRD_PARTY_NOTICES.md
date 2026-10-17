@@ -28,6 +28,18 @@ Native OS graphics/audio libraries remain required. Windows packaging resolves
 both executables' non-system runtime dependencies and includes their owning
 MSYS2 packages' available license files under `licenses/msys2/`.
 
+## SDL_GameControllerDB
+
+Copyright (C) 1997-2025 Sam Lantinga. zlib license.
+Source: https://github.com/mdqinc/SDL_GameControllerDB
+
+GLFW's built-in gamepad mappings, compiled into the native game and editor, are
+generated at build time from `gamecontrollerdb.txt` at upstream commit
+`c1d5289a1f713b30a2c121e9fe6529d39360be0f`, kept unmodified in
+`vendor/raylib/gamecontrollerdb/` with its license; `vendor/raylib/manifest.json`
+records its URL and SHA-256. Release archives include the license as
+`licenses/raylib-dependencies/sdl-gamecontrollerdb.txt`.
+
 ## Artwork
 
 Artwork is credited to JuhoSprite's Super Mango 2D Pixel Art Platformer Asset Pack:

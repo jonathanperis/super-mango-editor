@@ -75,6 +75,7 @@ def main() -> None:
                 raise SystemExit(f"raylib patch does not match pinned source: {name}")
         if text != original:
             path.write_text(text, encoding="utf-8", newline="\n")
+    write_gamepad_mappings(source, pin["gamecontrollerdb"])
     output = build / "build"
     generator = "MinGW Makefiles" if os.name == "nt" else "Unix Makefiles"
     command = ["cmake", "-G", generator, "-S", str(source), "-B", str(output),
@@ -129,6 +130,47 @@ def main() -> None:
     # to rebuild, the library keeps its old timestamp, so the game objects that
     # depend on it are not recompiled. The Makefile records a successful run in
     # its own build-done.stamp file instead.
+
+
+MAPPING_PLATFORMS = (("WIN32", "platform:Windows"), ("COCOA", "platform:Mac OS X"),
+                     ("LINUX", "platform:Linux"))
+
+
+def write_gamepad_mappings(source: Path, pin: dict) -> None:
+    """Regenerate GLFW's built-in gamepad mappings from the pinned database.
+
+    Our input only reads controllers GLFW has a gamepad mapping for, so the
+    mappings compiled into GLFW decide which pads work at all. This is GLFW's
+    own update_mappings step (CMake/GenerateMappings.cmake) in Python, fed the
+    checksum-pinned copy of SDL_GameControllerDB in vendor/raylib/ instead of
+    a live download: Windows, macOS and Linux lines go, in file order, into
+    the placeholders of the archive's own mappings.h.in, whose notices and
+    built-in XInput entries stay as upstream wrote them.
+    """
+    database = ROOT / "vendor/raylib/gamecontrollerdb/gamecontrollerdb.txt"
+    payload = database.read_bytes()
+    if hashlib.sha256(payload).hexdigest() != pin["sha256"]:
+        raise SystemExit(f"{database.relative_to(ROOT)} does not match its pinned checksum")
+    groups: dict[str, list[str]] = {name: [] for name, _ in MAPPING_PLATFORMS}
+    for line in payload.decode("utf-8").splitlines():
+        if not line[:1] or line[0] not in "0123456789abcdefABCDEF":
+            continue
+        if '"' in line or "\\" in line:
+            raise SystemExit("gamecontrollerdb.txt: a mapping would not be a plain C string")
+        for name, marker in MAPPING_PLATFORMS:
+            if marker in line:
+                groups[name].append(f'"{line}",')
+                break
+    folder = source / "src/external/glfw/src"
+    text = (folder / "mappings.h.in").read_text(encoding="utf-8")
+    for name, lines in groups.items():
+        placeholder = f"@GLFW_{name}_MAPPINGS@"
+        if text.count(placeholder) != 1 or not lines:
+            raise SystemExit(f"GLFW mappings.h.in: cannot fill {placeholder}")
+        text = text.replace(placeholder, "\n".join(lines))
+    target = folder / "mappings.h"
+    if target.read_text(encoding="utf-8") != text:
+        target.write_text(text, encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":
