@@ -55,7 +55,7 @@ session_destroy(session) / browser terminal cleanup
 
 ## App Session and Game Frame
 
-`AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation and event polling. Native visible windows use its **60 FPS** limiter; hidden smoke runs are uncapped and retain fixed simulation steps.
+`AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation and event polling. Native visible windows use its **60 FPS** limiter; hidden smoke runs are uncapped and retain fixed simulation steps. Each click on the native close button is reported once, as an Exit request; it replaces a Play, Continue, Next Level, Replay or Level Select route chosen earlier in the same frame (a fatal error still wins), so a close is never lost to a screen change.
 
 On Web, Emscripten's animation-frame callback owns scheduling. `display_open`
 sets raylib's target FPS to zero so `EndDrawing` returns to the browser instead

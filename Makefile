@@ -625,8 +625,7 @@ TEST_OBJ_FLAGS_src/input/input_backend = -UMANGO_RAYLIB_MEMORY \
 	-DglfwSetKeyCallback=test_input_set_key -DglfwSetCharCallback=test_input_set_char \
 	-DglfwSetMouseButtonCallback=test_input_set_button -DglfwSetCursorPosCallback=test_input_set_cursor \
 	-DglfwSetScrollCallback=test_input_set_scroll \
-	-DIsGamepadAvailable=test_input_gamepad_available -DglfwJoystickIsGamepad=test_input_joystick_is_gamepad \
-	-DglfwSetWindowShouldClose=test_input_set_should_close
+	-DIsGamepadAvailable=test_input_gamepad_available -DglfwJoystickIsGamepad=test_input_joystick_is_gamepad
 
 $(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/level_serializer_test.o $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
