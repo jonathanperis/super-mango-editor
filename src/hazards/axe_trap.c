@@ -73,6 +73,8 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
          */
         int on_screen = (t->x >= (float)cam_x - AXE_DISPLAY_W &&
                          t->x <= (float)cam_x + GAME_W + AXE_DISPLAY_W);
+        /* The whoosh comes from the side of the screen the axe is on. */
+        float pan = sound_pan_for_screen_x(t->x, cam_x, (float)GAME_W);
 
         if (t->mode == AXE_MODE_PENDULUM) {
             /*
@@ -108,7 +110,7 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
             if (fabsf(t->angle) > AXE_SWING_AMPLITUDE * 0.95f) {
                 if (!t->sound_played) {
                     if (snd_axe && on_screen && vol > 0) {
-                        sound_play(snd_axe, vol);
+                        sound_play_at(snd_axe, vol, pan);
                     }
                     t->sound_played = 1;
                 }
@@ -130,7 +132,7 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
              */
             if (t->angle >= 360.0f) {
                 if (snd_axe && on_screen && vol > 0) {
-                    sound_play(snd_axe, vol);
+                    sound_play_at(snd_axe, vol, pan);
                 }
             }
 

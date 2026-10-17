@@ -62,7 +62,8 @@ void jumping_spiders_update(JumpingSpider *spiders, int count, float dt,
                     float dist = fabsf(player_x - spider_cx);
                     int vol = sound_volume_for_distance(dist, JSPIDER_AUDIBLE_RANGE, JSPIDER_VOL_MAX);
                     if (vol > 0) {
-                        sound_play(snd_attack, vol);
+                        sound_play_at(snd_attack, vol,
+                                      sound_pan_for_screen_x(spider_cx, cam_x, (float)GAME_W));
                     }
                 }
             }

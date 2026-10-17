@@ -57,7 +57,7 @@ static void bird_flap_sound(const BirdSpec *spec, const Bird *b,
         int vol = sound_volume_for_distance(dist, (float)GAME_W,
                                             BIRD_FLAP_VOL_MAX);
         if (vol > 0) {
-            sound_play(snd_flap, vol);
+            sound_play_at(snd_flap, vol, sound_pan_for_screen_x(bird_cx, cam_x, (float)GAME_W));
         }
     }
 }

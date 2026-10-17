@@ -103,6 +103,23 @@ void patrol_update(float *x, float *vx, float entity_w,
  */
 int sound_volume_for_distance(float dist, float audible_range, int max_volume);
 
+/* The widest pan sound_pan_for_screen_x gives: a sound at the screen edge
+ * leans hard toward that side but stays faintly audible in the other ear. */
+#define SOUND_PAN_MAX 0.75f
+
+/*
+ * sound_pan_for_screen_x — stereo position for a sound at world x.
+ *
+ * raylib 6 pans from -1 (left) through 0 (centre) to 1 (right); this maps
+ * the visible screen onto -SOUND_PAN_MAX .. SOUND_PAN_MAX, so a sound
+ * comes from where its source is drawn. It only reads its arguments, so a
+ * pan never changes the simulation that triggered the sound.
+ *
+ * Usage:
+ *   sound_play_at(snd, vol, sound_pan_for_screen_x(source_cx, cam_x, GAME_W));
+ */
+float sound_pan_for_screen_x(float source_x, int cam_x, float screen_w);
+
 /* ------------------------------------------------------------------ */
 /* Sea-gap avoidance                                                   */
 /* ------------------------------------------------------------------ */
