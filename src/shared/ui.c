@@ -817,13 +817,22 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
            py >= ry && py < ry + rh;
 }
 
-/* An editable field shows the I-beam while the pointer is on it, or while
- * a press in it drags out a selection; not under an open list, which takes
- * the next press itself. */
+/* The view a ui_scroll_begin panel is clipped to, while one is open. A
+ * scrolled panel still calls every field, including rows scrolled out of
+ * its view; those must not claim the pointer over whatever is drawn there. */
+static int s_scroll_clip_active;
+static int s_scroll_clip_x, s_scroll_clip_y, s_scroll_clip_w, s_scroll_clip_h;
+
+/* An editable field shows the I-beam while the pointer is on it (and on
+ * the visible part of its scrolled panel), or while a press in it drags out
+ * a selection; not under an open list, which takes the next press itself. */
 static void field_cursor(UIState *ui, int x, int y, int w, int h, int is_active)
 {
     if (ui->dropdown_open_id != 0) return;
-    if (point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h) ||
+    int visible = !s_scroll_clip_active ||
+                  point_in_rect(ui->mouse_x, ui->mouse_y, s_scroll_clip_x, s_scroll_clip_y,
+                                s_scroll_clip_w, s_scroll_clip_h);
+    if ((visible && point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) ||
         (is_active && ui->edit_drag && ui->mouse_down))
         ui->cursor_wish = MOUSE_CURSOR_IBEAM;
 }
@@ -1786,12 +1795,18 @@ int ui_scroll_begin(UIScroll *scroll, int x, int y, int w, int view_h, int conte
 {
     ui_scroll_clamp(scroll, content_h, view_h);
     BeginScissorMode(x, y, w, view_h);
+    s_scroll_clip_active = 1;
+    s_scroll_clip_x = x;
+    s_scroll_clip_y = y;
+    s_scroll_clip_w = w;
+    s_scroll_clip_h = view_h;
     return y - (scroll ? scroll->offset : 0);
 }
 
 void ui_scroll_end(void)
 {
     EndScissorMode();
+    s_scroll_clip_active = 0;
 }
 
 void ui_scroll_reveal(UIScroll *scroll, int top, int bottom,
