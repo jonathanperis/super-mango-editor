@@ -41,46 +41,6 @@ static const char *clipboard_get(void) { return GetClipboardText(); }
 #endif
 
 /*
- * Files dropped on the window, through raylib.  Test builds read a list a
- * test hands over instead: the headless raylib the tests run on has no
- * window to drop onto.
- */
-#ifdef MANGO_TESTING
-static char **s_test_drop_paths;
-static unsigned int s_test_drop_count;
-
-void editor_test_drop_files(const char *const *paths, unsigned int count)
-{
-    /* raylib's list is not const either; nothing here writes through it. */
-    s_test_drop_paths = (char **)paths;
-    s_test_drop_count = paths ? count : 0;
-}
-
-static int dropped_files_take(FilePathList *files)
-{
-    if (s_test_drop_count == 0) return 0;
-    files->count = s_test_drop_count;
-    files->paths = s_test_drop_paths;
-    s_test_drop_count = 0;
-    s_test_drop_paths = NULL;
-    return 1;
-}
-
-static void dropped_files_release(FilePathList files) { (void)files; }
-#else
-static int dropped_files_take(FilePathList *files)
-{
-    if (!IsFileDropped()) return 0;
-    *files = LoadDroppedFiles();
-    return 1;
-}
-
-/* raylib would free a stale list when the next drop arrives, but
- * unloading each drop at once keeps its paths from lingering. */
-static void dropped_files_release(FilePathList files) { UnloadDroppedFiles(files); }
-#endif
-
-/*
  * raylib copies each dropped path into a MAX_FILEPATH_LENGTH buffer and
  * cuts a longer path short without saying so.  The macro is private to
  * raylib's rcore.c, which sets it to 256 on Windows and 4096 elsewhere; a
@@ -91,6 +51,71 @@ static void dropped_files_release(FilePathList files) { UnloadDroppedFiles(files
 #define EDITOR_DROP_PATH_LIMIT 256
 #else
 #define EDITOR_DROP_PATH_LIMIT 4096
+#endif
+
+/*
+ * Files dropped on the window, through raylib.  LoadDroppedFiles does not
+ * copy anything: it lends raylib's own list, which UnloadDroppedFiles
+ * frees and which the next drop frees and replaces (WindowDropCallback).
+ * Any event poll can deliver that next drop, and the in-window prompt
+ * polls every frame it shows, so the list is released before anything
+ * that can ask a question.
+ *
+ * Test builds keep a list of their own that behaves the same way, since
+ * the headless raylib the tests run on has no window to drop onto: a new
+ * drop overwrites the paths of one still held (so a stale pointer reads
+ * the new path, as reused memory would), and releasing a list that a
+ * newer drop already replaced counts as a misuse (raylib would free it
+ * twice).
+ */
+#ifdef MANGO_TESTING
+#define TEST_DROP_MAX 4
+static char s_test_drop_text[TEST_DROP_MAX][EDITOR_DROP_PATH_LIMIT];
+static char *s_test_drop_paths[TEST_DROP_MAX];
+static unsigned int s_test_drop_count;
+static unsigned int s_test_drop_generation;  /* bumped by every drop */
+static unsigned int s_test_drop_taken;       /* the generation last taken */
+static int s_test_drop_misuses;
+
+void editor_test_drop_files(const char *const *paths, unsigned int count)
+{
+    if (!paths) count = 0;
+    if (count > TEST_DROP_MAX) count = TEST_DROP_MAX;
+    for (unsigned int i = 0; i < count; i++) {
+        snprintf(s_test_drop_text[i], sizeof(s_test_drop_text[i]), "%s", paths[i]);
+        s_test_drop_paths[i] = s_test_drop_text[i];
+    }
+    s_test_drop_count = count;
+    s_test_drop_generation++;
+}
+
+int editor_test_drop_misuses(void) { return s_test_drop_misuses; }
+
+static int dropped_files_take(FilePathList *files)
+{
+    if (s_test_drop_count == 0) return 0;
+    files->count = s_test_drop_count;
+    files->paths = s_test_drop_paths;
+    s_test_drop_taken = s_test_drop_generation;
+    return 1;
+}
+
+static void dropped_files_release(FilePathList files)
+{
+    (void)files;
+    if (s_test_drop_count == 0 || s_test_drop_taken != s_test_drop_generation)
+        s_test_drop_misuses++;
+    s_test_drop_count = 0;
+}
+#else
+static int dropped_files_take(FilePathList *files)
+{
+    if (!IsFileDropped()) return 0;
+    *files = LoadDroppedFiles();
+    return 1;
+}
+
+static void dropped_files_release(FilePathList files) { UnloadDroppedFiles(files); }
 #endif
 
 /* ".toml" at the end of path, in any case (Windows and macOS file names
@@ -106,8 +131,10 @@ static int path_is_toml(const char *path)
     return 1;
 }
 
-/* Open the one level in a drop, the way Ctrl+1..5 opens a recent one. */
-static void open_dropped_level(EditorState *es, const FilePathList *files)
+/* Open the one level in a drop, the way Ctrl+1..5 opens a recent one.
+ * path is the editor's own copy of it, or NULL when the drop was not
+ * exactly one .toml file. */
+static void open_dropped_level(EditorState *es, const char *path)
 {
     if (es->playing) {
         editor_set_status(es, "Playtest running: click Stop or close the game window to edit");
@@ -119,11 +146,10 @@ static void open_dropped_level(EditorState *es, const FilePathList *files)
         editor_set_status(es, "Release the mouse to finish the move first (Esc cancels it)");
         return;
     }
-    if (files->count != 1 || !files->paths[0] || !path_is_toml(files->paths[0])) {
+    if (!path) {
         editor_set_status(es, "Drop one .toml level to open it");
         return;
     }
-    const char *path = files->paths[0];
     if (strlen(path) >= EDITOR_DROP_PATH_LIMIT - 1) {
         editor_set_status(es, "Dropped path is too long to open safely: use Ctrl+O");
         return;
@@ -144,9 +170,19 @@ static void open_dropped_level(EditorState *es, const FilePathList *files)
 void editor_handle_dropped_files(EditorState *es)
 {
     FilePathList files = {0};
+    /* One byte past raylib's buffer: a copy of a path that filled it is
+     * still long enough for open_dropped_level to refuse. */
+    static char path[EDITOR_DROP_PATH_LIMIT + 1];
+    int is_level;
+
     if (!dropped_files_take(&files)) return;
-    open_dropped_level(es, &files);
+    is_level = files.count == 1 && files.paths[0] && path_is_toml(files.paths[0]);
+    if (is_level) snprintf(path, sizeof(path), "%s", files.paths[0]);
+    /* Before open_dropped_level, which may ask about unsaved changes: the
+     * prompt's frames poll events, and a drop among them frees this list
+     * (see dropped_files_take). */
     dropped_files_release(files);
+    open_dropped_level(es, is_level ? path : NULL);
 }
 
 /*

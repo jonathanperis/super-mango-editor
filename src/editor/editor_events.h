@@ -36,6 +36,10 @@ void editor_handle_dropped_files(EditorState *es);
 const char *editor_test_clipboard(void);
 void editor_test_set_clipboard(const char *text);
 /* The next editor_handle_dropped_files sees these paths as one drop.  The
- * strings are borrowed: keep them alive until that frame has run. */
+ * paths are copied into a list that behaves like raylib's: a drop made
+ * while an earlier one is still held replaces it in place. */
 void editor_test_drop_files(const char *const *paths, unsigned int count);
+/* Times the editor released a drop that a newer one had already replaced
+ * (raylib would have freed that list twice). */
+int editor_test_drop_misuses(void);
 #endif
