@@ -79,6 +79,8 @@ Entity colours are by palette category and stay the same in the high-contrast st
 
 Resting the pointer on a toolbar control for half a second shows a tooltip saying what it does and its shortcut, if it has one (`Save (Ctrl+S)`, `Show the grid (G)`). Clicking the control hides the tip until the pointer moves to another one.
 
+**F1** shows every keyboard and mouse shortcut in a panel over the editor, drawn in the UI style (so the Contrast toggle applies). While it is up, keys, typing, clicks and the wheel change nothing beneath it; **F1** or **Esc** closes it, and so does a click, which does nothing else. The list and the toolbar tooltips come from one table (`src/editor/editor_shortcuts.c`), so they cannot disagree; a shortcut added to `editor_events.c` needs its row there.
+
 ---
 
 ## Tools
@@ -444,6 +446,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor_frame.c`, `editor_events.c` | One frame (validation, autosave, drawing) and keyboard/mouse/wheel event routing, including every shortcut |
 | `editor_chrome.c`, `editor_panels.c`, `editor_layout.c` | Toolbar, status bar and side-panel layout |
 | `editor_minimap.c` | The [minimap](#minimap) strip in the status bar: drawing and click/drag scrolling |
+| `editor_shortcuts.c` | The shortcut table behind the toolbar tooltips and the F1 shortcut list |
 | `editor_files.c`, `editor_session.c` | Open/save/Save As, playtest copies and recent files; dirty tracking, document hash and confirmation prompts; the focus-dependent frame cap (`editor_pace_frames`, called by the editor's frame and a prompt's) |
 | `editor_recovery.c` | Autosave every 30 s while dirty, and crash recovery: finding leftover snapshots, the Recover picker, loading and retiring them |
 | `editor_playtest.c` | Launching, stopping and reaping the playtest game process |

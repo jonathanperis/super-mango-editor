@@ -47,6 +47,7 @@
 #include "editor/editor_panels.h"
 #include "editor/editor_playtest.h"
 #include "editor/editor_session.h"
+#include "editor/editor_shortcuts.h"
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
 #include "editor/properties.h"
@@ -191,6 +192,7 @@ static void ui_frame(EditorState *es, int mx, int my)
         editor_render_side_panels(es);
         editor_render_status_bar(es);
         ui_draw_overlays(&es->ui);
+        editor_shortcut_sheet_render(es);
     }
     editor_update_cursor(es);
     EndTextureMode();
@@ -1015,6 +1017,54 @@ static int minimap_jumps_and_drags_the_view(void)
     /* Inside the level, a small entity is still a pixel where it stands. */
     CHECK(editor_minimap_strip_rect(world_w, world_w / 2.0f, 0.0f, 1.0f, 1.0f, &l, &t, &w, &h) &&
           l == EDITOR_MINIMAP_X + EDITOR_MINIMAP_WIDTH / 2 && w == 1 && h == 1);
+done:
+    close_editor(&es);
+    return failed;
+}
+
+/* F1 shows the shortcut list over the editor; while it is up, keys and
+ * clicks change nothing beneath it, and F1, Esc or a click close it. The
+ * toolbar's tooltips come from the same table. */
+static int f1_sheet_lists_the_shortcuts(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(strcmp(editor_shortcut_tooltip(EDITOR_SHORTCUT_SAVE), "Save (Ctrl+S)") == 0);
+    CHECK(strcmp(editor_shortcut_tooltip(EDITOR_SHORTCUT_PLAYTEST), "Playtest (F5; Shift+F5 from here)") == 0);
+    CHECK(editor_shortcut_tooltip(EDITOR_SHORTCUT_UNDO) == NULL);
+    CHECK(ui_text_width(&es.ui, "Undo") > 0);  /* the font measures, so the widths below mean something */
+    for (int i = 0; i < EDITOR_SHORTCUT_COUNT; i++) {
+        const EditorShortcut *s = editor_shortcut((EditorShortcutId)i);
+        CHECK(s && s->keys && s->keys[0] && s->action && s->action[0]);
+        /* Each column fits the 640 px panel (keys 190 px, then the action). */
+        if (ui_text_width(&es.ui, s->keys) > 180 || ui_text_width(&es.ui, s->action) > 426)
+            fprintf(stderr, "shortcut row too wide: %s / %s (%d px)\n", s->keys, s->action,
+                    ui_text_width(&es.ui, s->action));
+        CHECK(ui_text_width(&es.ui, s->keys) <= 180 && ui_text_width(&es.ui, s->action) <= 426);
+    }
+
+    key_frame(&es, KEY_F1, 0);
+    CHECK(es.shortcut_sheet_open);
+    /* Keys under the sheet do nothing: 2 would pick the Place tool. */
+    key_frame(&es, KEY_TWO, 0);
+    CHECK(es.tool == TOOL_SELECT && es.shortcut_sheet_open);
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(!es.shortcut_sheet_open);
+    key_frame(&es, KEY_F1, 0);
+    key_frame(&es, KEY_F1, 0);
+    CHECK(!es.shortcut_sheet_open);
+    /* A click closes it without placing, selecting or pressing anything. */
+    key_frame(&es, KEY_TWO, 0);
+    es.palette_type = ENT_COIN;
+    key_frame(&es, KEY_F1, 0);
+    click_frame(&es, 300, 300);
+    CHECK(!es.shortcut_sheet_open && es.level.coin_count == 0 && !es.mouse_down);
+    click_frame(&es, 300, 300);
+    CHECK(es.level.coin_count == 1);
+    /* Once closed, F1 and Esc are ordinary keys again: Esc leaves Place. */
+    key_frame(&es, KEY_ESCAPE, 0);
+    CHECK(es.tool == TOOL_SELECT);
 done:
     close_editor(&es);
     return failed;
@@ -4262,6 +4312,7 @@ int main(void)
         CASE(mixed_step_reports_change_and_shows_survivor),
 
         CASE(minimap_jumps_and_drags_the_view),
+        CASE(f1_sheet_lists_the_shortcuts),
         CASE(properties_panel_handles_every_entity_type),
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),

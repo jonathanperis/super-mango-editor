@@ -74,6 +74,7 @@ src/
 │   ├── editor_panels.h / .c      Palette/properties panel rendering
 │   ├── editor_layout.h / .c      Editor layout metrics
 │   ├── editor_minimap.h / .c     Level overview strip in the status bar: entities by category, the view's frame, click/drag to scroll
+│   ├── editor_shortcuts.h / .c   The shortcut table: toolbar tooltips and the F1 shortcut list drawn from it
 │   ├── editor_textures.h / .c    Editor texture loading/cleanup
 │   ├── editor_files.h / .c       Open/save, playtest copies, recent files; saving through a symlink keeps the link
 │   ├── editor_recovery.h / .c    Autosave snapshots and crash recovery (find, offer, load and retire them)
