@@ -11,7 +11,8 @@ function host(file, pattern, options = {}) {
     function element(id = '') {
         const handlers = new Map();
         const node = { id, style: {}, dataset: {}, children: [], disabled: false,
-            textContent: '', handlers,
+            textContent: '', handlers, classes: new Set(),
+            classList: { add(name) { node.classes.add(name); } },
             addEventListener(name, fn) { handlers.set(name, fn); },
             removeEventListener(name) { handlers.delete(name); },
             appendChild(child) { this.children.push(child); child.parent = this; },
@@ -132,4 +133,19 @@ assert.equal(shell.nodes.get('canvas').fullscreenRequests, undefined, 'canvas we
 assert.equal(shell.document.activeElement, shell.nodes.get('canvas'), 'keyboard stayed on the button');
 const noFullscreen = host('web/shell.html', /<script>([\s\S]*?)<\/script\b[^>]*>/i, { fullscreen: false });
 assert.equal(noFullscreen.nodes.get('fullscreen-btn').hidden, true, 'fullscreen button shown where it cannot work');
+// The game keeps room for the button only where the button is shown.
+assert(shell.nodes.get('canvas-container').classes.has('with-fullscreen-button'),
+    'no room kept for the shown fullscreen button');
+assert(!noFullscreen.nodes.get('canvas-container').classes.has('with-fullscreen-button'),
+    'room kept for a hidden fullscreen button');
+const shellCss = fs.readFileSync(path.join(__dirname, '../web/shell.html'), 'utf8')
+    .match(/<style>([\s\S]*?)<\/style>/)[1];
+const containerWidth = selector => {
+    const rule = shellCss.match(new RegExp(selector + '\\s*\\{([^}]*)\\}'));
+    assert(rule, `missing CSS rule ${selector}`);
+    return rule[1].match(/width:\s*([^;]*);/)[1];
+};
+assert.match(containerWidth('#canvas-container'), /100svh - 132px/, 'hidden button still reserves its row');
+assert.match(containerWidth('#canvas-container\\.with-fullscreen-button'), /100svh - 176px/,
+    'shown button lost its row');
 console.log('web_host_test: ok');

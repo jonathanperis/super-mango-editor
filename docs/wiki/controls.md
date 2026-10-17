@@ -186,7 +186,8 @@ click or key press, so the in-game **Fullscreen** row cannot do it there and
 says to use the page's button instead. The standalone page (`web/shell.html`)
 has a **Fullscreen** button under the game that puts the game and its touch
 buttons fullscreen; Esc leaves. Browsers without element fullscreen, such as
-Safari on iPhone, do not show the button.
+Safari on iPhone, do not show the button, and the game there uses the room it
+would have taken.
 
 ### Browser Replay
 

@@ -23,10 +23,16 @@
         }
         #canvas-container {
             position: relative;
-            /* 132 px of the viewport stays free for the touch pad and 44 px
-               for the Fullscreen button under the game. */
-            width: min(800px, 100%, max(184px, calc((100svh - 176px) * 4 / 3)));
+            /* 132 px of the viewport stays free for the touch pad. */
+            width: min(800px, 100%, max(184px, calc((100svh - 132px) * 4 / 3)));
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        /* And 44 px more for the Fullscreen button under the game, only
+           where the boot script shows it: it stays hidden in browsers
+           without element fullscreen (iPhone Safari), where the game gets
+           that room. */
+        #canvas-container.with-fullscreen-button {
+            width: min(800px, 100%, max(184px, calc((100svh - 176px) * 4 / 3)));
         }
         canvas {
             display: block;
@@ -125,6 +131,7 @@
         var gameContainer = document.getElementById('canvas-container');
         if (fullscreenButton && document.fullscreenEnabled && gameContainer.requestFullscreen) {
             fullscreenButton.hidden = false;
+            gameContainer.classList.add('with-fullscreen-button');
             fullscreenButton.addEventListener('click', function() {
                 var request = gameContainer.requestFullscreen();
                 if (request && request.catch) request.catch(function() {});
