@@ -499,6 +499,8 @@ typedef struct {
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            frame_rate;    /* cap editor_pace_frames set last; 0 = none yet */
     int            minimap_dragging; /* a press on the overview strip is held */
+    int            shortcut_sheet_open;  /* F1 shortcut list shown (editor_shortcuts.c) */
+    int            shortcut_sheet_press; /* the click that closed it awaits its release */
     /* Side panels scrolled in pixels; each keeps its own trackpad remainder. */
     UIScroll       config_scroll;
     UIScroll       palette_scroll;

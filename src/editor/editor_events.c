@@ -9,6 +9,7 @@
 #include "editor_panels.h"
 #include "editor_playtest.h"
 #include "editor_session.h"
+#include "editor_shortcuts.h"
 #include "editor_undo_apply.h"
 #include "../shared/geometry.h"  /* float_same_value */
 #include "tools.h"
@@ -637,6 +638,8 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         }
         return;
     }
+    /* The F1 shortcut list, while open, takes the keys and clicks. */
+    if (editor_shortcut_sheet_event(es, event)) return;
 
     switch (event->type) {
     case INPUT_QUIT:
