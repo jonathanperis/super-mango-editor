@@ -513,7 +513,7 @@ Swinging pendulum or spinning axe hazard. Two behaviour modes: swing (60 degree 
 
 ### `collectibles/coin.h` / `collectibles/coin.c`
 
-Gold coin collectible. AABB pickup awards the level's `coin_score` (100 by default); crossing `score_per_life` grants a bonus life. Asset: `coin.png`.
+Gold coin collectible. AABB pickup awards the level's `coin_score` (100 by default); crossing `score_per_life` grants a bonus life. Asset: `coin.png`. `coin_streak_pitch` raises the pickup chime a semitone per quick pickup (`CoinStreak`, kept in `GameScreen` and fed only the world's `sim_steps`).
 
 ### `collectibles/health_star.h` / `collectibles/health_star.c`
 

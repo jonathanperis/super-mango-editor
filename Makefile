@@ -618,7 +618,7 @@ $(TEST_OBJDIR)/%.o: %.c | $(OUTDIR)
 TEST_OBJ_FLAGS_src/shared/audio = -DSetMusicVolume=test_SetMusicVolume \
 	-DLoadSoundAlias=test_LoadSoundAlias -DSetSoundVolume=test_SetSoundVolume \
 	-DUnloadSoundAlias=test_UnloadSoundAlias -DUnloadSound=test_UnloadSound \
-	-DSetSoundPan=test_SetSoundPan
+	-DSetSoundPan=test_SetSoundPan -DSetSoundPitch=test_SetSoundPitch
 TEST_OBJ_FLAGS_src/core/app_session = -DSetWindowSize=test_SetWindowSize \
 	-DToggleBorderlessWindowed=test_ToggleBorderlessWindowed -DIsWindowState=test_IsWindowState
 TEST_OBJ_FLAGS_src/input/input_backend = -UMANGO_RAYLIB_MEMORY \

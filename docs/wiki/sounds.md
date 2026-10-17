@@ -168,6 +168,10 @@ from -1 (left) through 0 (centre) to 1 (right); `sound_play` is
 `sound_play_at` at 0. The pan only reads the camera and the source, so it
 never changes a run.
 
+`sound_play_ex(sound, volume, pan, pitch)` also sets the voice's pitch (1 as
+recorded, 2 an octave up). The coin chime uses it: each quick pickup in a
+streak plays a semitone higher (see [Coin](../collectibles-and-surfaces/#coin)).
+
 The pinned dependency includes three documented audio fixes: alias converter
 cache release, WAV decoder release, and miniaudio's zero-allocation passthrough
 initialization. They are applied on every platform by `tools/build_raylib.py`;

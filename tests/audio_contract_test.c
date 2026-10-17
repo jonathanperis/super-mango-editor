@@ -6,6 +6,7 @@ static int observing, alias_count, alias_frees, bad_order;
 static Sound aliases[2];
 static float volumes[2];
 static float pans[2] = {99.0f, 99.0f};
+static float pitches[2] = {99.0f, 99.0f};
 
 Sound test_LoadSoundAlias(Sound source)
 {
@@ -27,6 +28,14 @@ void test_SetSoundPan(Sound sound, float pan)
     if (observing) for (int i = 0; i < alias_count; i++)
         if (aliases[i].stream.buffer == sound.stream.buffer) pans[i] = pan;
     SetSoundPan(sound, pan);
+}
+
+/* Records each observed voice's pitch (1 = as recorded). */
+void test_SetSoundPitch(Sound sound, float pitch)
+{
+    if (observing) for (int i = 0; i < alias_count; i++)
+        if (aliases[i].stream.buffer == sound.stream.buffer) pitches[i] = pitch;
+    SetSoundPitch(sound, pitch);
 }
 
 void test_UnloadSoundAlias(Sound alias)
@@ -57,22 +66,24 @@ int audio_contract_test(void)
     alias_count = alias_frees = bad_order = 0;
     sound_set_volume(effect, 64);
     pans[0] = pans[1] = 99.0f;
+    pitches[0] = pitches[1] = 99.0f;
     sound_play(effect, 128);
-    sound_play_at(effect, 32, -0.5f);
+    sound_play_ex(effect, 32, -0.5f, 1.25f);
     int failed = alias_count != 2;
     if (!failed) {
         /* A plain play is centred; sound_play_at sets the voice's own pan. */
         failed = aliases[0].stream.buffer == aliases[1].stream.buffer ||
                  !IsSoundPlaying(aliases[0]) || !IsSoundPlaying(aliases[1]) ||
                  volumes[0] != 0.5f || volumes[1] != 0.125f ||
-                 pans[0] != 0.0f || pans[1] != -0.5f;
+                 pans[0] != 0.0f || pans[1] != -0.5f ||
+                 pitches[0] != 1.0f || pitches[1] != 1.25f;
         sound_set_volume(effect, 32);
         failed |= volumes[0] != 0.25f || volumes[1] != 0.0625f;
     }
     sound_unload(effect);
     failed |= alias_frees != 2 || bad_order;
     observing = 0;
-    if (failed) fprintf(stderr, "audio: overlap, per-voice volume, pan or sample ownership failed\n");
+    if (failed) fprintf(stderr, "audio: overlap, per-voice volume, pan, pitch or sample ownership failed\n");
     return failed;
 }
 

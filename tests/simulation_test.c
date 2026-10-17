@@ -453,6 +453,56 @@ static int collision_hurts_once_and_collects_coins(void)
     game_collide(&gs, GAME_FIXED_STEP);
     game_collide(&gs, GAME_FIXED_STEP);
     CHECK(gs.world.coins[0].active == 0 && gs.world.score == 100 && gs.world.hearts == 2);
+    CHECK(gs.screen.coin_streak.count == 1);
+done:
+    return failed;
+}
+
+/* Quick pickups raise the coin chime a semitone each, up to a cap, and a
+ * pause starts again at the recorded pitch. Same steps, same pitches. */
+static int coin_streak_raises_the_chime(void)
+{
+    int failed = 0;
+    CoinStreak streak = {0};
+    CHECK(coin_streak_pitch(&streak, 100) == 1.0f);
+    float second = coin_streak_pitch(&streak, 100 + COIN_STREAK_GAP_STEPS);
+    CHECK(second > 1.05f && second < 1.06f && streak.count == 2);
+    float pitch = second;
+    for (int i = 0; i < 20; i++) {
+        float next = coin_streak_pitch(&streak, 146 + (uint32_t)i);
+        CHECK(next >= pitch);
+        pitch = next;
+    }
+    CHECK(pitch > 1.58f && pitch < 1.59f);  /* capped eight semitones up */
+    CHECK(coin_streak_pitch(&streak, 165 + COIN_STREAK_GAP_STEPS + 1) == 1.0f);
+    /* A restarted step clock (a new attempt) never continues a streak. */
+    coin_streak_pitch(&streak, 400);
+    CHECK(coin_streak_pitch(&streak, 3) == 1.0f && streak.count == 1);
+
+    /* In play: two coins on consecutive steps make a streak of two, and the
+     * world comes out exactly as without one. */
+    GameState gs = {0}, plain = {0};
+    for (int run = 0; run < 2; run++) {
+        GameState *g = run ? &plain : &gs;
+        stand_player_on_floor(g, 290.0f);
+        g->world.hearts = g->world.lives = 3;
+        g->world.rules.coin_score = 100;
+        g->world.score_life_next = 1000;
+        g->world.coin_count = 2;
+        g->world.coins[0] = (Coin){.x = 300, .y = 230, .active = 1};
+        g->world.coins[1] = (Coin){.x = 330, .y = 230, .active = 1};
+    }
+    plain.screen.coin_streak.count = 5;  /* a streak already going */
+    for (int run = 0; run < 2; run++) {
+        GameState *g = run ? &plain : &gs;
+        g->world.sim_steps = 10;
+        game_collide(g, GAME_FIXED_STEP);
+        g->world.player.x = 320.0f;
+        g->world.sim_steps = 11;
+        game_collide(g, GAME_FIXED_STEP);
+    }
+    CHECK(gs.screen.coin_streak.count == 2 && gs.world.score == 200);
+    CHECK(memcmp(&gs.world, &plain.world, sizeof(gs.world)) == 0);
 done:
     return failed;
 }
@@ -604,5 +654,7 @@ int game_simulation_contract_test(void)
     failures += jumps;
     int collide = collision_hurts_once_and_collects_coins();
     printf("simulation: hazard and coin collision %s\n", collide ? "FAIL" : "PASS");
-    return failures + scenario + jump + tunnel + collide;
+    int streak = coin_streak_raises_the_chime();
+    printf("simulation: coin streak pitch %s\n", streak ? "FAIL" : "PASS");
+    return failures + scenario + jump + tunnel + collide + streak;
 }
