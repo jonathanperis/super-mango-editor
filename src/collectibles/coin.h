@@ -9,6 +9,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
+#include <stdint.h>  /* uint32_t */
 
 #define MAX_COINS       64     /* coin slots across the full world         */
 #define COIN_DISPLAY_W  16     /* render width  in logical pixels          */
@@ -38,3 +39,31 @@ typedef struct {
  */
 void coins_render(const Coin *coins, int count,
                   Texture2D *tex, int cam_x);
+
+/* A coin picked up within this many fixed steps (0.75 s) of the previous
+ * one continues the streak; a longer gap starts a new one. */
+#define COIN_STREAK_GAP_STEPS 45
+/* Semitones the chime can climb: the ninth quick coin and later ones all
+ * play eight semitones up. */
+#define COIN_STREAK_MAX_RISE 8
+
+/*
+ * CoinStreak — the run of quick coin pickups the chime's pitch follows.
+ *
+ * Audio feedback only: the simulation never reads it, and it reads only
+ * the world's step clock, so a streak cannot change a run or a replay.
+ * count is the pickups in the current streak (0 = none yet); last_step
+ * is the world's sim_steps at the latest one.
+ */
+typedef struct {
+    int      count;
+    uint32_t last_step;
+} CoinStreak;
+
+/*
+ * coin_streak_pitch — Record a coin pickup at step `step` and return the
+ * pitch to play the chime at: 1.0 for the first coin of a streak, then one
+ * semitone higher per quick pickup, up to COIN_STREAK_MAX_RISE semitones.
+ * Deterministic: a fixed table, no randomness, no wall clock.
+ */
+float coin_streak_pitch(CoinStreak *streak, uint32_t step);

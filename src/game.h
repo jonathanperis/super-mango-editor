@@ -403,6 +403,9 @@ typedef struct {
                                              tuning line after F6/F7/-/+    */
     } inspector;
     struct GameExperiment *experiment; /* owned opt-in capture/replay */
+    /* Quick coin pickups raise the chime's pitch; audio only, read from
+     * world.sim_steps and never by the simulation (collectibles/coin.h). */
+    CoinStreak    coin_streak;
 } GameScreen;
 
 /*

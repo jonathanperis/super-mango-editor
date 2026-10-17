@@ -310,7 +310,9 @@ void game_collide(GameState *gs, float dt)
         if (rect_intersects(&phit, &cbox)) {
             gs->world.coins[i].active = 0;
             game_award_score(gs, gs->world.rules.coin_score);
-            sound_play(gs->assets.audio.coin, 128);
+            /* The chime climbs with a streak of quick pickups. */
+            sound_play_ex(gs->assets.audio.coin, 128, 0.0f,
+                          coin_streak_pitch(&gs->screen.coin_streak, gs->world.sim_steps));
             if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "COIN[%d] collected", i);
         }
     }
