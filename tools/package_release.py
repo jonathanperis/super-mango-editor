@@ -53,6 +53,9 @@ def copy_notices(bundle: Path, source: Path, dlls: list[Path] | None = None) -> 
     dependencies = licenses / "raylib-dependencies"
     dependencies.mkdir()
     shutil.copy2(source / "src/external/glfw/LICENSE.md", dependencies / "glfw.txt")
+    # GLFW's built-in gamepad mappings are generated from this database.
+    shutil.copy2(ROOT / "vendor/raylib/gamecontrollerdb/LICENSE",
+                 dependencies / "sdl-gamecontrollerdb.txt")
     # Preserve complete upstream files rather than heuristically extracting
     # license paragraphs from third-party code with different notice layouts.
     for path in sorted((source / "src/external").iterdir()):

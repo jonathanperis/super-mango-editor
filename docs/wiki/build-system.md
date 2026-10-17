@@ -52,7 +52,10 @@ The patches release alias converter caches and WAV decoders and avoid miniaudio
 null-pointer arithmetic. A macOS-only timing patch gives the existing partial
 busy wait an extra 1 ms wakeup margin to reduce sleep overshoot at 60 FPS; it
 uses a little more CPU near the deadline, not a full-frame spin. The bootstrap
-rejects unfamiliar patch contexts. It also compiles out raylib features the
+rejects unfamiliar patch contexts. It regenerates GLFW's built-in gamepad
+mappings from the checksum-pinned SDL_GameControllerDB copy in
+`vendor/raylib/gamecontrollerdb/`, as GLFW's own `update_mappings` step does
+from a live download. It also compiles out raylib features the
 game never calls (3D models, image/font/audio formats other than PNG, WAV and
 QOA, image export and generation, compression, input recording, gestures, the
 3D camera and clipboard images) with `-DSUPPORT_...=0` flags; the table in
