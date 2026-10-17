@@ -24,6 +24,7 @@
 
 #include "file_dialog.h"    /* dialog_choice */
 #include "dialog_choice.h"
+#include "editor_session.h" /* editor_pace_frames */
 
 #include <string.h>          /* strlen, memcpy */
 
@@ -311,6 +312,8 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
         InputEvent event;
         int got = 0;
 
+        /* Focus can come back while the question is up; pace like a frame. */
+        editor_pace_frames(es);
         draw_prompt(es, target, title, message, labels, &layout, focus, input_mouse());
         input_collect();
 #ifdef MANGO_TESTING

@@ -611,6 +611,18 @@ done:
 /* The default style is the editor look the UI_* colours describe, with no
  * control outlines; the high-contrast style keeps every text colour at the
  * WCAG AAA ratio (7:1) or more on every face it is drawn on. */
+/* A shown editor slows to 10 frames a second while another window has
+ * focus and returns to 60 with it; a hidden (smoke) window is left alone. */
+static int unfocused_editor_slows_its_frames(void)
+{
+    int failed = 0;
+    CHECK(editor_frame_rate_for(0, 1) == EDITOR_FPS_FOCUSED && EDITOR_FPS_FOCUSED == 60);
+    CHECK(editor_frame_rate_for(0, 0) == EDITOR_FPS_UNFOCUSED && EDITOR_FPS_UNFOCUSED == 10);
+    CHECK(editor_frame_rate_for(1, 0) == 0 && editor_frame_rate_for(1, 1) == 0);
+done:
+    return failed;
+}
+
 static int ui_styles_keep_the_default_look_and_high_contrast(void)
 {
     int failed = 0;
@@ -4143,6 +4155,7 @@ int main(void)
 #endif
         CASE(campaign_skip_prompt_keeps_the_step_by_default),
         CASE(prompt_returns_to_the_interrupted_frame),
+        CASE(unfocused_editor_slows_its_frames),
 #undef CASE
     };
     int failures = 0;

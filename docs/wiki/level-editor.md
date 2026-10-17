@@ -52,6 +52,13 @@ window on a 1080p monitor, for example) shows it at 1x; 2560 × 1440 or larger
 shows it at 2x. On a Retina Mac the window is measured in points, so the
 default size already draws at full pixel density.
 
+While another window has focus (the playtest game, a file picker, your
+browser) the editor draws 10 frames a second instead of 60, and goes back to
+60 as soon as it has focus again. It keeps running rather than waiting for
+input, so autosave, tooltips and the playtest status check work as before;
+they time themselves by the clock, not by frames. A hidden window (the
+`--smoke-test` render) keeps its own pacing.
+
 The mouse pointer changes with what it is over: an I-beam on a field you can type in, four-way arrows while entities are being dragged, and up-down arrows while a scrollbar's thumb is held.
 
 Resting the pointer on a toolbar control for half a second shows a tooltip saying what it does and its shortcut, if it has one (`Save (Ctrl+S)`, `Show the grid (G)`). Clicking the control hides the tip until the pointer moves to another one.
@@ -418,7 +425,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor.c` / `editor.h` | Core state struct, init/loop/cleanup, `EntityType` enum (31 types), `EditorTool`, `EditorCamera`, `Selection` |
 | `editor_frame.c`, `editor_events.c` | One frame (validation, autosave, drawing) and keyboard/mouse/wheel event routing, including every shortcut |
 | `editor_chrome.c`, `editor_panels.c`, `editor_layout.c` | Toolbar, status bar and side-panel layout |
-| `editor_files.c`, `editor_session.c` | Open/save/Save As, playtest copies and recent files; dirty tracking, document hash and confirmation prompts |
+| `editor_files.c`, `editor_session.c` | Open/save/Save As, playtest copies and recent files; dirty tracking, document hash and confirmation prompts; the focus-dependent frame cap (`editor_pace_frames`, called by the editor's frame and a prompt's) |
 | `editor_recovery.c` | Autosave every 30 s while dirty, and crash recovery: finding leftover snapshots, the Recover picker, loading and retiring them |
 | `editor_playtest.c` | Launching, stopping and reaping the playtest game process |
 | `editor_campaign.c` | The Campaign view: editing `levels/campaigns/main.toml` with the game's campaign rules (`src/levels/campaign_catalog.c`), and the view's own undo history |
