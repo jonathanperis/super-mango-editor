@@ -180,9 +180,35 @@ def main() -> int:
             raise AssertionError(f"invalid campaign fixture accepted: {name}")
 
     check_campaign_display_names()
+    check_shipped_wav_loops(asset_manifest)
 
     print("validate_levels_test: ok")
     return 0
+
+
+def check_shipped_wav_loops(asset_manifest: set[str]) -> None:
+    """The old WAV loop names count as the QOA files the loader reads.
+
+    The shipped levels still name them: a level's bytes key the ghosts and
+    Continue points players saved, so renaming the loops did not rewrite
+    the levels.  Only music_path maps, and only those three names.
+    """
+    level = ROOT / "levels" / "00_sandbox_01.toml"
+    check = validate_levels.validate_asset_reference
+    for name in ("water", "lava", "winds"):
+        if check(level, "music_path", f"assets/sounds/levels/{name}.wav", asset_manifest):
+            raise AssertionError(f"old {name}.wav loop name rejected")
+    if not check(level, "music_path", "assets/sounds/levels/rain.wav", asset_manifest):
+        raise AssertionError("missing WAV music accepted")
+    if not check(level, "floor_tile_path", "assets/sounds/levels/lava.wav", asset_manifest):
+        raise AssertionError("old loop name accepted outside music_path")
+    for name, loop in (("00_sandbox_01", "water"), ("01_lugio_01", "lava"),
+                       ("02_lugio_02", "lava")):
+        music = validate_levels.load_level(ROOT / "levels" / f"{name}.toml")["music_path"]
+        if music != f"assets/sounds/levels/{loop}.wav":
+            raise AssertionError(
+                f"levels/{name}.toml music_path changed to {music}: its bytes key "
+                "players' ghosts and Continue points")
 
 
 def check_campaign_display_names() -> None:
