@@ -374,19 +374,17 @@ void input_collect(void)
 #ifndef __EMSCRIPTEN__
     /* Only desktop windows have an OS close request. raylib's Web version
      * of WindowShouldClose sleeps through Asyncify; calling it from our
-     * browser-owned frame callback aborts the non-Asyncify build. */
-    if (WindowShouldClose()) {
-        input_push(&(InputEvent){.type=INPUT_QUIT});
-#ifndef MANGO_RAYLIB_MEMORY
-        /* GLFW keeps a close request set until something clears it, so one
-         * click on the window's close button would otherwise ask to quit
-         * again on every frame: after "Cancel" on an unsaved-changes prompt
-         * the prompt would come straight back, and an in-window prompt
-         * would read the same request as its own Cancel. Report it once;
-         * the owner decides, and a new click asks again. */
-        if (input_window) glfwSetWindowShouldClose(input_window, GLFW_FALSE);
-#endif
-    }
+     * browser-owned frame callback aborts the non-Asyncify build.
+     *
+     * Each click on the close button is reported once: raylib's desktop
+     * PollInputEvents (run by EndDrawing) copies GLFW's close flag into
+     * the value WindowShouldClose returns and then clears GLFW's flag, so
+     * the next poll reads false unless the user clicks again.  That is
+     * why "Cancel" on the quit prompt sticks, and why a prompt's own
+     * frames do not see the click that opened it.  It holds because the
+     * game, the editor and the editor's prompt each call input_collect
+     * once per presented frame, so once per poll. */
+    if (WindowShouldClose()) input_push(&(InputEvent){.type=INPUT_QUIT});
 #endif
     int device = input_first_gamepad();
     if (device != gamepad) {

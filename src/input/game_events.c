@@ -64,7 +64,12 @@ void game_handle_events(GameState *gs)
         }
         if (game_inspector_event(gs, &event)) continue;
         if (event.type == INPUT_QUIT) {
-            if (gs->screen.route == GAME_ROUTE_NONE) gs->screen.route = GAME_ROUTE_EXIT;
+            /* Closing the window wins over a route this batch already
+             * chose (Next level, Replay, Level select): the player asked
+             * to leave, and opening another screen would drop that.  A
+             * fatal error or the smoke test's exit ends the run anyway. */
+            if (gs->screen.route != GAME_ROUTE_FATAL && gs->screen.route != GAME_ROUTE_SMOKE_EXIT)
+                gs->screen.route = GAME_ROUTE_EXIT;
         } else if (event.type == INPUT_FOCUS) {
             game_overlay_set_pause_reason(gs, GAME_PAUSE_REASON_FOCUS, !event.focused);
             sync_pause_music(gs);

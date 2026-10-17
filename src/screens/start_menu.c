@@ -259,7 +259,9 @@ int start_menu_frame(StartMenu *menu)
     InputEvent event;
     while (input_poll(&event)) {
         if (event.type == INPUT_QUIT) {
-            if (menu->route == MENU_ROUTE_NONE) menu->route = MENU_ROUTE_EXIT;
+            /* Closing the window wins over Play or Continue chosen earlier
+             * in this batch; a fatal error ends the run anyway. */
+            if (menu->route != MENU_ROUTE_FATAL) menu->route = MENU_ROUTE_EXIT;
             continue;
         }
         if (menu->route != MENU_ROUTE_NONE) continue;
