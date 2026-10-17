@@ -55,6 +55,8 @@
 #include "test_folders.h"
 #include "test_paths.h"
 
+#include <rlgl.h>  /* rlGetActiveFramebuffer: which target draws land in */
+
 #define CHECK(test) do { if (!(test)) { \
     fprintf(stderr, "editor_ui_test:%d: %s\n", __LINE__, #test); \
     failed = 1; goto done; } } while (0)
@@ -4014,7 +4016,11 @@ static int prompt_returns_to_the_interrupted_frame(void)
         "A message long enough to wrap onto a second line inside the box, with a "
         "path wider than the box itself: /home/someone/projects/super-mango/levels/"
         "campaigns/a-very-long-folder-name/another-folder/main-campaign-level.toml";
+    CHECK(rlGetActiveFramebuffer() == tiny_target.id);
     int result = dialog_choice("Question", message, labels, 2, 1, 0, &choice);
+    /* The frame's own target takes the draws again, not the screen the
+     * prompt presented to. */
+    CHECK(rlGetActiveFramebuffer() == tiny_target.id);
     CHECK(es.ui.clip_active && es.ui.clip_x == 10 && es.ui.clip_y == 20 &&
           es.ui.clip_w == 30 && es.ui.clip_h == 40);
     DrawRectangle(0, 0, 4, 4, ui_color(&es.ui, UI_COLOR_ACCENT));  /* still drawing */
