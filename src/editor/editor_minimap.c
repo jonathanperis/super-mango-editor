@@ -75,6 +75,10 @@ void editor_minimap_render(EditorState *es)
      * so a drag slides the view along the level. The press is the strip's,
      * like a button's: nothing else on the status bar acts on it. */
     if (es->ui.mouse_clicked && editor_minimap_contains(es->ui.mouse_x, es->ui.mouse_y)) {
+        /* Jump on the press itself: a quick click can be released within
+         * the same frame (likely at the unfocused 10 fps), and must still
+         * move the view. Holding the button then drags. */
+        editor_minimap_jump(es, es->ui.mouse_x);
         es->minimap_dragging = 1;
         es->ui.mouse_clicked = 0;
     }
