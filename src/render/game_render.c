@@ -653,7 +653,8 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      * With VSync enabled, presenting also blocks until the monitor is
      * ready for the next frame (typically ~16ms at 60 Hz).
      */
-    settings_menu_render(gs->screen.settings_menu, gs->screen.profile, gs->screen.hud.font);
+    settings_menu_render(gs->screen.settings_menu, gs->screen.profile, gs->screen.hud.font,
+                         gs->screen.controller);
     display_present(gs->screen.frame_target);
     return 1;
 }

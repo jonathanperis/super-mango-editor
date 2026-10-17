@@ -63,6 +63,9 @@ Vector2 input_mouse(void);
 Vector2 input_pointer_to_logical(Vector2 position);
 int input_modifiers(void);
 int input_first_gamepad(void); /* device index + 1, zero when unavailable */
+/* The name the system gives controller (device index + 1, as above), or
+ * NULL when there is none or it is gone; "" when it reports no name. */
+const char *input_gamepad_name(int controller);
 /* Translation is explicit: profile numbers are never cast to raylib enums.
  * A known legacy binding may translate to KEY_NULL (preserve it and warn). */
 int input_key_from_binding(int binding);
