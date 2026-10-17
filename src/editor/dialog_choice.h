@@ -50,4 +50,8 @@ void dialog_choice_keep_frame(EditorState *es);
  * of the last prompt opened (a test can then click its buttons). */
 int dialog_choice_test_frames(void);
 const DialogLayout *dialog_choice_test_layout(void);
+/* Called in each prompt frame right after its events are collected, where
+ * a real window could deliver anything (another dropped file, say).  NULL
+ * stops it. */
+void dialog_choice_test_set_poll_hook(void (*hook)(void));
 #endif
