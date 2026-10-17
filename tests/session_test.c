@@ -63,7 +63,7 @@ static int context_probe_alive(Texture2D probe)
     int ok = IsImageValid(image) && image.width > 1 && image.height > 1;
     if (ok) {
 #ifdef MANGO_MEMORY_TESTS
-        /* raylib 6.0 Memory readback is bottom-origin/BGRA. Normalize only this
+        /* raylib 6.2 Memory readback is bottom-origin/BGRA. Normalize only this
          * test probe; desktop rendering/readback still has the RGBA contract. */
         Color pixel = GetImageColor(image, 1, image.height-2);
         unsigned char red = pixel.r;

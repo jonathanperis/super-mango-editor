@@ -43,12 +43,12 @@ static const char *clipboard_get(void) { return GetClipboardText(); }
 /*
  * raylib copies each dropped path into a MAX_FILEPATH_LENGTH buffer and
  * cuts a longer path short without saying so.  The macro is private to
- * raylib's rcore.c, which sets it to 256 on Windows and 4096 elsewhere; a
- * path that fills the buffer may have lost its end, so it is refused
- * rather than opening some other file.
+ * raylib's rcore.c, which sets it to 260 (MAX_PATH) on Windows and 4096
+ * elsewhere; a path that fills the buffer may have lost its end, so it is
+ * refused rather than opening some other file.
  */
 #ifdef _WIN32
-#define EDITOR_DROP_PATH_LIMIT 256
+#define EDITOR_DROP_PATH_LIMIT 260
 #else
 #define EDITOR_DROP_PATH_LIMIT 4096
 #endif

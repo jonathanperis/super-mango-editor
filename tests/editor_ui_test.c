@@ -73,9 +73,9 @@
 #define CFG_SCREENS_Y (TOOLBAR_H + 136 + 4)
 
 /* A dropped path this long fills raylib's MAX_FILEPATH_LENGTH buffer
- * (256 on Windows, 4096 elsewhere, less the NUL). */
+ * (260 on Windows, 4096 elsewhere, less the NUL). */
 #ifdef _WIN32
-#define EDITOR_DROP_TEST_LONG 255
+#define EDITOR_DROP_TEST_LONG 259
 #else
 #define EDITOR_DROP_TEST_LONG 4095
 #endif

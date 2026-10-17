@@ -70,7 +70,7 @@ RELEASE_RAYLIB_BUILD = $(if $(filter command line environment,$(origin RAYLIB_BU
 ifeq ($(OS),Windows_NT)
 PLATFORM_LIBS = -lopengl32 -lgdi32 -lwinmm -lshell32 -lole32 -lpsapi -lbcrypt -lm
 else ifeq ($(shell uname -s),Darwin)
-PLATFORM_LIBS = -framework OpenGL -framework Cocoa -framework IOKit -framework CoreAudio -framework CoreVideo -lm
+PLATFORM_LIBS = -framework OpenGL -framework Cocoa -framework IOKit -framework CoreAudio -framework CoreVideo -framework QuartzCore -lm
 else
 PLATFORM_LIBS = -lGL -lX11 -lpthread -ldl -lrt -lm
 endif

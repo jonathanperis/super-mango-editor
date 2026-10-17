@@ -45,7 +45,7 @@ def check_tolerance(pcm):
 
 def check_reference_vector():
     # SHA-256 of what raylib's own encoder (src/external/qoa.h in the pinned
-    # raylib 6.0, qoa_encode) writes for these samples: a sawtooth over two
+    # raylib 6.2, qoa_encode) writes for these samples: a sawtooth over two
     # frames, then full-scale noise. qoa.py must produce the same bytes.
     samples, x = [((i * 2477) % 20000) - 10000 for i in range(5125)], 1
     for _ in range(600):

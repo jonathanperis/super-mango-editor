@@ -77,6 +77,17 @@ def main() -> None:
             path.write_text(text, encoding="utf-8", newline="\n")
     write_gamepad_mappings(source, pin["gamecontrollerdb"])
     output = build / "build"
+    # A new pin extracts a new raylib-<commit> folder, and CMake refuses to
+    # reuse a build tree configured from another source folder. Start that
+    # tree afresh. Only the folder name is compared: CMake may spell the
+    # absolute path differently from Python (C:/ against /c/ under MSYS2).
+    cache = output / "CMakeCache.txt"
+    if cache.is_file():
+        homes = [line.split("=", 1)[1] for line in
+                 cache.read_text(encoding="utf-8", errors="replace").splitlines()
+                 if line.startswith("CMAKE_HOME_DIRECTORY:")]
+        if not homes or homes[0].replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] != source.name:
+            shutil.rmtree(output)
     generator = "MinGW Makefiles" if os.name == "nt" else "Unix Makefiles"
     command = ["cmake", "-G", generator, "-S", str(source), "-B", str(output),
                "-DBUILD_EXAMPLES=OFF", "-DBUILD_SHARED_LIBS=OFF",
