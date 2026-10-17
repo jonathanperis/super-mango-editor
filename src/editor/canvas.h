@@ -23,6 +23,7 @@
  * no circular dependency (editor.h does not include canvas.h).
  */
 #include "editor.h"
+#include "hit_test.h"  /* EditorRect */
 
 /*
  * canvas_render — Draw the entire level canvas for one frame.
@@ -69,3 +70,10 @@ void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy);
  * (0..CANVAS_W, TOOLBAR_H..TOOLBAR_H+CANVAS_H), 0 otherwise.
  */
 int canvas_contains(int sx, int sy);
+
+/* Whether any part of world rectangle r is inside the canvas's view. */
+int canvas_shows(const EditorState *es, const EditorRect *r);
+
+/* Scroll so world rectangle r sits in the middle of the canvas (as far as
+ * the world's edges allow), keeping the zoom. */
+void canvas_center_on(EditorState *es, const EditorRect *r);

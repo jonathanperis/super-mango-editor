@@ -318,6 +318,19 @@ int canvas_contains(int sx, int sy) {
            sy >= TOOLBAR_H && sy < TOOLBAR_H + CANVAS_H;
 }
 
+int canvas_shows(const EditorState *es, const EditorRect *r) {
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    return r->x + r->w > es->camera.x && r->x < es->camera.x + CANVAS_W / zoom &&
+           r->y + r->h > es->camera.y && r->y < es->camera.y + CANVAS_H / zoom;
+}
+
+void canvas_center_on(EditorState *es, const EditorRect *r) {
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    es->camera.x = r->x + r->w / 2.0f - (float)CANVAS_W / (2.0f * zoom);
+    es->camera.y = r->y + r->h / 2.0f - (float)CANVAS_H / (2.0f * zoom);
+    canvas_clamp_camera(es);
+}
+
 /* ================================================================== */
 /* Internal rendering functions — one per visual layer / entity type    */
 /* ================================================================== */
