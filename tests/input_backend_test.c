@@ -24,6 +24,11 @@ bool test_input_window_ready(void) { return window_ready != 0; }
 int test_input_screen_width(void) { return screen_w; }
 int test_input_screen_height(void) { return screen_h; }
 GLFWwindow *test_input_current_context(void) { return (GLFWwindow *)(uintptr_t)1; }
+/* input_collect clears a reported close request; nothing to record here. */
+void test_input_set_should_close(GLFWwindow *window, int value)
+{
+    (void)window; (void)value;
+}
 void test_input_cursor_pos(GLFWwindow *window, double *x, double *y)
 {
     (void)window; *x = 400; *y = 368;

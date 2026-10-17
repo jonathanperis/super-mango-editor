@@ -375,7 +375,18 @@ void input_collect(void)
     /* Only desktop windows have an OS close request. raylib's Web version
      * of WindowShouldClose sleeps through Asyncify; calling it from our
      * browser-owned frame callback aborts the non-Asyncify build. */
-    if (WindowShouldClose()) input_push(&(InputEvent){.type=INPUT_QUIT});
+    if (WindowShouldClose()) {
+        input_push(&(InputEvent){.type=INPUT_QUIT});
+#ifndef MANGO_RAYLIB_MEMORY
+        /* GLFW keeps a close request set until something clears it, so one
+         * click on the window's close button would otherwise ask to quit
+         * again on every frame: after "Cancel" on an unsaved-changes prompt
+         * the prompt would come straight back, and an in-window prompt
+         * would read the same request as its own Cancel. Report it once;
+         * the owner decides, and a new click asks again. */
+        if (input_window) glfwSetWindowShouldClose(input_window, GLFW_FALSE);
+#endif
+    }
 #endif
     int device = input_first_gamepad();
     if (device != gamepad) {
