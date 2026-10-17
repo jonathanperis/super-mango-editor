@@ -15,15 +15,15 @@ exact upstream commit and local patch inventory.
 
 ## raylib and native dependencies
 
-raylib 6.0 is built from the source/checksum pin in `vendor/raylib/manifest.json`.
-Source: https://github.com/raysan5/raylib/releases/tag/6.0
+raylib 6.2 is built from the source/checksum pin in `vendor/raylib/manifest.json`.
+Source: https://github.com/raysan5/raylib/releases/tag/6.2
 Copyright (c) 2013–2026 Ramon Santamaria (@raysan5). zlib/libpng license.
 
 Native builds statically link raylib with bundled GLFW; browser builds use the
 Web backend. Archives include `licenses/raylib.txt`, GLFW's notice and the
 license-bearing external files under `licenses/raylib-dependencies/`.
 Those bundled components have their own terms, retained in those files.
-`vendor/raylib/README.md` documents the marked raylib/miniaudio/qoa source fixes.
+`vendor/raylib/README.md` documents the marked raylib/miniaudio source fixes.
 Native OS graphics/audio libraries remain required. Windows packaging resolves
 both executables' non-system runtime dependencies and includes their owning
 MSYS2 packages' available license files under `licenses/msys2/`.

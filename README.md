@@ -29,7 +29,7 @@ code a learner can trace over a shorter version that hides a step.
 | Technology | Version | Purpose |
 |-----------|---------|---------|
 | C | C11 | Language standard (`clang -std=c11`) |
-| raylib | 6.0, pinned source/checksum | Window, graphics, input, PNG loading, built-in text font and audio; bundled GLFW on desktop |
+| raylib | 6.2, pinned source/checksum | Window, graphics, input, PNG loading, built-in text font and audio; bundled GLFW on desktop |
 | CMake | Available platform version | Out-of-source raylib dependency build; Make remains the application entry point |
 | tomlc17 | R260821 + project patches | TOML v1.1 parser; [upstream provenance and patch inventory](vendor/tomlc17/README.md) |
 | Emscripten | 6.0.9 in CI | WebAssembly compilation for browser play |
@@ -54,7 +54,7 @@ The [manual](https://jonathanperis.github.io/super-mango-editor/docs/) covers ea
 A C11 compiler (`clang` or `gcc`), `make`, CMake, Python 3 (3.12+
 recommended) and Node.js 22.12+ (CI uses 26.9.0), which `make test` needs for
 its four JavaScript host-contract tests. The first build downloads and verifies
-the pinned raylib 6.0 source; no system raylib is needed. See [dependency provenance](vendor/raylib/README.md).
+the pinned raylib 6.2 source; no system raylib is needed. See [dependency provenance](vendor/raylib/README.md).
 
 **macOS:**
 

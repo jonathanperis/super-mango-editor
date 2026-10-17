@@ -20,7 +20,7 @@ Do not comment on these paths; they are generated, vendored or lockfiles:
 
 ### `src/**/*.{c,h}`
 
-C11 game and level editor built on pinned raylib 6.0. Check memory
+C11 game and level editor built on pinned raylib 6.2. Check memory
 safety first: bounds on every array/string write (snprintf results,
 strlen vs buffer size, fixed MAX_* capacities), integer overflow in
 size math, NULL checks after allocation, ownership/lifetime of

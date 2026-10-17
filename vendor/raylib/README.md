@@ -1,7 +1,7 @@
 # raylib dependency
 
-The game and editor use **raylib 6.0**, built from upstream commit
-`dbc56a87da87d973a9c5baa4e7438a9d20121d28`.
+The game and editor use **raylib 6.2**, built from upstream commit
+`02566453880e06bec97f5b8160fa6fe1e98397ca`.
 
 `manifest.json` pins the HTTPS source archive and SHA-256. `tools/build_raylib.py`
 verifies it before extraction, applies the documented source fixes in
@@ -60,9 +60,11 @@ test-owned callback registration, independently of a display server.
 
 The desktop input only uses a controller GLFW has a gamepad mapping for
 (`glfwJoystickIsGamepad`), so GLFW's built-in table decides which pads work.
-Upstream refreshes that table by hand: raylib regenerated it from
-SDL_GameControllerDB in 2025, and a GLFW update can bring back GLFW's own,
-smaller copy. `build_raylib.py` therefore always writes
+Upstream refreshes that table by hand: raylib 6.0 carried a 2025
+regeneration from SDL_GameControllerDB (1837 entries), and 6.2's GLFW 3.5.1
+update brought back GLFW's own copy (928 entries: 7 Xbox Series entries
+instead of 42, 69 8BitDo instead of 212, no DualSense Edge).
+`build_raylib.py` therefore always writes
 `src/external/glfw/src/mappings.h` itself, the way GLFW's `update_mappings`
 target (`CMake/GenerateMappings.cmake`) does: every Windows, macOS and Linux
 line of `gamecontrollerdb/gamecontrollerdb.txt`, in file order, fills the
@@ -83,16 +85,13 @@ modifiers such as `+leftx`) are skipped by GLFW at start-up, as before.
 
 ## Retained source fixes
 
-Linux ASan/LeakSanitizer/UBSan exposed three upstream audio defects. The bootstrap
-applies the same exact replacements on every platform and rejects unknown patch
-contexts. Repeated builds recognize the already-applied changes.
+The bootstrap applies the same exact replacements on every platform and
+rejects unknown patch contexts. Repeated builds recognize the already-applied
+changes.
 
-- `UnloadSoundAlias` releases its own converter residual cache while retaining
-  the shared sample data until the owning sound is unloaded.
-- `UnloadMusicStream` frees the allocated WAV decoder after `drwav_uninit` closes
-  its internal resources, matching the ownership of other allocated decoders.
 - miniaudio's data-converter initialization passes a null heap through unchanged
-  for a zero-allocation passthrough conversion instead of adding zero to null.
+  for a zero-allocation passthrough conversion instead of adding zero to null
+  (found by UBSan).
 
 One desktop leak is fixed the same way. Upstream `SetMouseCursor` on the GLFW
 backend calls `glfwCreateStandardCursor` on every call and never frees the
@@ -102,27 +101,32 @@ the ten standard shapes once and reuses it; `glfwTerminate` frees them, and
 `ClosePlatform` forgets them so a later window in the same process creates
 fresh ones.
 
-### QOA decoder bounds
-
-raylib 6.0's bundled `src/external/qoa.h` predates two upstream bounds fixes,
-so a crafted `.qoa` file passed to `LoadSound`/`LoadWave` (the shipped sounds
-are QOA) could write out of bounds: a header with more than eight channels
-overran `qoa_desc`'s decoder-state array on the stack, and a frame declaring
-more samples than the file header overran the heap sample buffer
-([raysan5/raylib#6161](https://github.com/raysan5/raylib/issues/6161)). The
-patch applies the
-[raysan5/raylib#6162](https://github.com/raysan5/raylib/pull/6162) re-vendor of
-phoboslab/qoa `f73b4a36` hunk by hunk: the patched file equals raylib 6.2's
-`qoa.h` apart from the marker comments. The header rejects more than
-`QOA_MAX_CHANNELS`, each frame bounds its slices by its own data and by
-`QOA_SLICES_PER_FRAME`, and the sample buffer is sized in whole frames with an
-overflow guard. Valid files decode to the same samples; the encoder is
-unchanged, so `tools/qoa.py` still matches it. The session test feeds both
-crafted files to `LoadWaveFromMemory`.
-
-These fixes retain the 6.0 public API, formats and playback behavior. Source
+These fixes retain the 6.2 public API, formats and playback behavior. Source
 modifications are marked in the affected files. The session/audio regressions
 exercise the real library, and Linux CI keeps leak detection enabled.
+
+### Fixes now upstream
+
+raylib 6.2 contains the fixes this project used to patch into 6.0, so those
+patches are gone:
+
+- `UnloadSoundAlias` frees the alias's converter cache
+  ([raysan5/raylib#5857](https://github.com/raysan5/raylib/pull/5857)), and
+  `UnloadMusicStream` frees the WAV decoder
+  ([raysan5/raylib#5963](https://github.com/raysan5/raylib/pull/5963)); LeakSanitizer
+  found both.
+- `qoa.h` bounds a crafted `.qoa` file's channel count and frame size
+  ([raysan5/raylib#6162](https://github.com/raysan5/raylib/pull/6162), for
+  [#6161](https://github.com/raysan5/raylib/issues/6161)). The session test
+  still feeds both crafted files to `LoadWaveFromMemory`.
+
+6.2 also brings fixes the game relies on without a patch: `CloseAudioDevice`
+stops the device before destroying its lock (#6039), window centring no longer
+overflows on unsigned sizes (#6119), Windows borderless fullscreen is no longer
+always on top and restores the window size when left (#5868, #6253), the
+OpenGL ES default shaders use high precision (#6264), and the software
+renderer used by the Memory tests clips scissor rectangles the right way up
+and keeps triangle spans inside the framebuffer (#5976, #5849).
 
 ### Native macOS frame pacing
 
@@ -137,7 +141,7 @@ uncapped. The tradeoff is up to roughly one additional millisecond of active
 waiting per capped frame, not a full-frame busy loop. OS scheduling or expensive
 frames can still miss a deadline; this is a target cadence, not a real-time guarantee.
 
-Upstream source and release: https://github.com/raysan5/raylib/releases/tag/6.0
+Upstream source and release: https://github.com/raysan5/raylib/releases/tag/6.2
 
 Release packaging includes raylib's license, the GLFW license, and the
 license-bearing external headers/source files from this pinned source tree.
