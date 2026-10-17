@@ -4,7 +4,7 @@
 
 #include "editor_panels.h"
 
-#include "canvas.h"        /* canvas_clamp_camera */
+#include "canvas.h"        /* canvas_center_on */
 #include "editor_layout.h" /* editor_config_total_height */
 #include "editor_session.h" /* editor_finish_field_edit, editor_set_status */
 #include "entity_meta.h"   /* editor_selection_reconcile */
@@ -140,12 +140,7 @@ int editor_focus_validation_issue(EditorState *es, int message)
         es->panel_open = 1;
         /* "spiders[2].vx" also puts the caret in spider 2's vx field. */
         properties_focus_entity_field(es, type, index, where->field);
-        if (editor_entity_bounds(&es->level, type, index, &r)) {
-            float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
-            es->camera.x = r.x + r.w / 2.0f - (float)CANVAS_W / (2.0f * zoom);
-            es->camera.y = r.y + r.h / 2.0f - (float)CANVAS_H / (2.0f * zoom);
-            canvas_clamp_camera(es);
-        }
+        if (editor_entity_bounds(&es->level, type, index, &r)) canvas_center_on(es, &r);
         editor_set_status(es, "%s %d: %s", editor_entity_type_name(type), index, text);
         return 1;
     }
