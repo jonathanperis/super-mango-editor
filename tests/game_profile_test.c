@@ -293,6 +293,13 @@ static int resume_codec_and_migration(void)
     CHECK(game_profile_decode(decoded, "format_version = 2\nfullscreen = 1\n") == 0 && decoded->settings.fullscreen == 1);
     CHECK(game_profile_encode(decoded, text, PROFILE_TEXT_MAX) == 0 && strstr(text, "\nfullscreen = 1\n"));
     CHECK(game_profile_decode(decoded, text) == 0 && decoded->settings.fullscreen == 1);
+    /* Windowed, the key is left out, so a build from before it (which
+     * refuses keys it does not know) still reads the profile; a written
+     * "fullscreen = 0" still loads. */
+    CHECK(game_profile_decode(decoded, "format_version = 2\nfullscreen = 0\n") == 0 &&
+          decoded->settings.fullscreen == 0);
+    CHECK(game_profile_encode(decoded, text, PROFILE_TEXT_MAX) == 0 && !strstr(text, "fullscreen"));
+    CHECK(game_profile_decode(decoded, text) == 0 && decoded->settings.fullscreen == 0);
     CHECK(game_profile_decode(decoded, "format_version = 1\nfullscreen = 0\n") == -1);
     CHECK(game_profile_decode(decoded, "format_version = 2\nfullscreen = 2\n") == -1);
     CHECK(game_profile_decode(decoded, version1) == 0);

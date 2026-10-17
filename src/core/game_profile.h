@@ -40,8 +40,10 @@ typedef struct {
  * default (on), and the next save writes it as version 2.
  *
  * `fullscreen` arrived later without a new version: it is optional, and a
- * version-2 profile without it loads windowed. Only version-2 writers ever
- * wrote it, so a version-1 file that has it is damaged, as with `ghost`.
+ * version-2 profile without it loads windowed. It is written only when on,
+ * so builds from before it, which refuse keys they do not know, still read
+ * a windowed player's profile. Only version-2 writers ever wrote it, so a
+ * version-1 file that has it is damaged, as with `ghost`.
  */
 #define PROFILE_FORMAT_VERSION 2
 

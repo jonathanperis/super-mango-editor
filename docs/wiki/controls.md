@@ -112,8 +112,9 @@ stores it as a `[resume]` table, added in profile `format_version` 2 together wi
 the `ghost` setting; version-1
 profiles load unchanged (Ghost on, no Continue point) and are written as version 2
 on the next save. The later `fullscreen` setting is optional within version 2: a
-profile without it starts windowed. A build from before that setting refuses a
-profile that has it, keeping the file untouched and using defaults for that run.
+profile without it starts windowed, and it is saved only while Fullscreen is on.
+A build from before that setting refuses a profile that has it, keeping the file
+untouched and using defaults for that run.
 
 ### Time Trial Ghost
 
