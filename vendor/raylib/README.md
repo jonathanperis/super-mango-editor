@@ -101,6 +101,19 @@ the ten standard shapes once and reuses it; `glfwTerminate` frees them, and
 `ClosePlatform` forgets them so a later window in the same process creates
 fresh ones.
 
+### WAV decoder hardening
+
+raylib 6.2's `src/external/dr_wav.h` is an unmodified copy of mackron/dr_libs
+`243e26ffa0` (2026-04-26). dr_libs fixed more malformed-file handling after it:
+a short `fact` chunk, `fmt` chunk parsing, bounds and size checks on metadata
+and `smpl` chunks against the file size, AIFF files with unusual bit depths,
+an integer overflow in the AIFF block alignment, and sample conversion
+errors. Levels may name WAV files, so the patch replaces the file hunk by hunk
+with dr_libs `019e75ba8e` (2026-08-31, the last commit touching `dr_wav.h`):
+the result equals that upstream file apart from a two-line marker in its
+header comment. The public API and version (0.14.6) are unchanged. When
+raylib vendors a newer dr_wav, drop these hunks.
+
 These fixes retain the 6.2 public API, formats and playback behavior. Source
 modifications are marked in the affected files. The session/audio regressions
 exercise the real library, and Linux CI keeps leak detection enabled.
