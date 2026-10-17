@@ -141,6 +141,33 @@ static int failed_next_level_keeps_completion_overlay(void)
     return 0;
 }
 
+/* A window close in the same batch as a chosen route still leaves: it
+ * replaces Next level, Replay and Level select, but not a fatal error. */
+static int close_wins_over_a_pending_route(void)
+{
+    InputEvent quit = {.type=INPUT_QUIT};
+    GameState gs = {0};
+    gs.screen.completion.complete = 1;
+    gs.screen.completion.pending_next_phase = 1;
+    gs.screen.terminal_action_index = 0;
+
+    if (push_key(KEY_ENTER) != 0 || input_push(&quit) != 1) return 1;
+    game_handle_events(&gs);
+    if (expect_int("close after Next level exits", gs.screen.route, GAME_ROUTE_EXIT) != 0) return 1;
+
+    gs.screen.route = GAME_ROUTE_NONE;
+    gs.screen.terminal_action_index = 1;
+    if (push_key(KEY_ENTER) != 0 || input_push(&quit) != 1) return 1;
+    game_handle_events(&gs);
+    if (expect_int("close after Replay exits", gs.screen.route, GAME_ROUTE_EXIT) != 0) return 1;
+
+    gs.screen.route = GAME_ROUTE_FATAL;
+    if (input_push(&quit) != 1) return 1;
+    game_handle_events(&gs);
+    if (expect_int("close keeps a fatal route", gs.screen.route, GAME_ROUTE_FATAL) != 0) return 1;
+    return 0;
+}
+
 static int game_over_retry_stays_in_place(void)
 {
     GameState gs = {0};
@@ -329,6 +356,7 @@ int main(void)
     if (controller_start_respects_completion_priority_over_game_over() != 0) return 1;
     if (completion_navigation_and_first_route_wins() != 0) return 1;
     if (failed_next_level_keeps_completion_overlay() != 0) return 1;
+    if (close_wins_over_a_pending_route() != 0) return 1;
     if (game_over_retry_stays_in_place() != 0) return 1;
     if (keyboard_escape_toggles_pause_in_active_gameplay() != 0) return 1;
     if (confirm_resume_latches_the_jump_button() != 0) return 1;

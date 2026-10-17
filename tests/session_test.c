@@ -288,6 +288,21 @@ static int campaign_broken_level_disables_only_its_entry(void)
     if (push_key(KEY_RIGHT) || push_confirm()) goto done;
     start_menu_frame(menu);
     if (expect_int("playable entry starts", menu->route, MENU_ROUTE_PLAY)) goto done;
+    /* A window close in the same batch as Play still leaves; a fatal
+     * error stays fatal. */
+    menu->route = MENU_ROUTE_NONE;
+    {
+        InputEvent quit = {.type=INPUT_QUIT};
+        if (push_confirm() || input_push(&quit) != 1) goto done;
+        start_menu_frame(menu);
+        if (expect_int("close wins over Play", menu->route, MENU_ROUTE_EXIT)) goto done;
+        menu->route = MENU_ROUTE_FATAL;
+        menu->route_waiting_render = 1;   /* keeps reading events */
+        if (input_push(&quit) != 1) goto done;
+        start_menu_frame(menu);
+        menu->route_waiting_render = 0;
+        if (expect_int("close keeps a fatal route", menu->route, MENU_ROUTE_FATAL)) goto done;
+    }
     start_menu_close(&menu);
 
     /* A level that does not lead to the next entry is unavailable too. */
