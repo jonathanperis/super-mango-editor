@@ -70,7 +70,8 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    int *out_bridge_landed_idx,
                    int prev_fp_landed_idx,
                    int world_w);
-void player_render(Player *player, int cam_x);
+void player_render(const Player *player, int cam_x, int reduced_motion);
+int player_hurt_tint(const Player *player, int reduced_motion, Color *tint);
 IntRect player_get_hitbox(const Player *player);
 void player_reset(Player *player);
 void player_cleanup(Player *player, AssetCache *cache);
@@ -162,6 +163,11 @@ overwritten by the climbing controls on the next step. For
 `PLAYER_KNOCKBACK_GRAB_LOCK` after the hit (while `hurt_timer`, which starts
 at `PLAYER_HURT_TIME`, is above `PLAYER_HURT_TIME - PLAYER_KNOCKBACK_GRAB_LOCK`)
 Up does not grab a climbable, so holding it cannot cancel the knockback.
+
+While `hurt_timer` is above zero `player_render` blinks the sprite on and off
+every 100 ms. With the **Reduced motion** setting it draws the sprite steadily
+at half alpha instead (`player_hurt_tint`); the renderer passes the setting in,
+and neither function writes to the player, so the simulation is unchanged.
 
 ---
 
