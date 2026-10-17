@@ -630,6 +630,64 @@ done:
     return failed;
 }
 
+/* A frame between two fixed steps draws the player and camera between
+ * them, by the accumulator's share of a step, and never touches the run. */
+static int render_view_interpolates_without_touching_the_run(void)
+{
+    int failed = 0;
+    GameState gs = {0};
+    gs.world.player.x = 100.0f; gs.world.player.y = 200.0f; gs.world.camera.x = 50.0f;
+    GameRenderView view = game_timing_render_view(&gs, 50);
+    CHECK(view.cam_x == 50 && view.player_x == 100.0f);   /* no earlier step yet */
+    game_timing_note_step(&gs);
+    gs.world.player.x = 104.0f; gs.world.player.y = 198.0f; gs.world.camera.x = 54.0f;
+    gs.screen.loop.accumulator = GAME_FIXED_STEP * 0.5;
+    view = game_timing_render_view(&gs, 54);
+    CHECK(view.cam_x == 52 && NEAR(view.player_x, 102.0f) && NEAR(view.player_y, 199.0f));
+    gs.screen.loop.accumulator = GAME_FIXED_STEP * 0.25;
+    view = game_timing_render_view(&gs, 54);
+    CHECK(view.cam_x == 51 && NEAR(view.player_x, 101.0f));
+    gs.screen.loop.accumulator = GAME_FIXED_STEP * 3.0;    /* clamped to the latest step */
+    view = game_timing_render_view(&gs, 54);
+    CHECK(view.cam_x == 54 && view.player_x == 104.0f);
+
+    /* A respawn-sized jump is shown where it lands, not swept across. */
+    gs.screen.loop.accumulator = GAME_FIXED_STEP * 0.5;
+    gs.world.player.x = 900.0f; gs.world.camera.x = 700.0f;
+    view = game_timing_render_view(&gs, 700);
+    CHECK(view.cam_x == 700 && view.player_x == 900.0f && view.player_y == 198.0f);
+    gs.world.player.x = 104.0f; gs.world.camera.x = 54.0f;
+
+    /* Debug, replay and smoke runs draw the latest step itself. */
+    gs.screen.debug_mode = 1;
+    view = game_timing_render_view(&gs, 54);
+    CHECK(view.cam_x == 54 && view.player_x == 104.0f);
+    gs.screen.debug_mode = 0;
+    strcpy(gs.screen.replay_script_path, "x.replay");
+    CHECK(game_timing_render_view(&gs, 54).player_x == 104.0f);
+    gs.screen.replay_script_path[0] = '\0';
+    gs.screen.smoke_test_frames = 3;
+    CHECK(game_timing_render_view(&gs, 54).cam_x == 54);
+    gs.screen.smoke_test_frames = 0;
+
+    /* Noting each step changes nothing the simulation keeps. */
+    GameState a = {0}, b = {0};
+    stand_player_on_floor(&a, 100.0f);
+    stand_player_on_floor(&b, 100.0f);
+    for (int step = 0; step < 90; step++) {
+        a.screen.replay_input_mask = b.screen.replay_input_mask =
+            (step < 40 ? PLAYER_INPUT_RIGHT : 0) | (step % 30 < 3 ? PLAYER_INPUT_JUMP : 0);
+        game_timing_note_step(&a);
+        (void)game_timing_render_view(&a, (int)a.world.camera.x);
+        game_player_step(&a, GAME_FIXED_STEP);
+        game_player_step(&b, GAME_FIXED_STEP);
+    }
+    CHECK(memcmp(&a.world, &b.world, sizeof(a.world)) == 0);
+    CHECK(a.world.player.x != 100.0f);   /* the run did move */
+done:
+    return failed;
+}
+
 int game_simulation_contract_test(void)
 {
     int failures = inspection_and_replay();
@@ -656,5 +714,7 @@ int game_simulation_contract_test(void)
     printf("simulation: hazard and coin collision %s\n", collide ? "FAIL" : "PASS");
     int streak = coin_streak_raises_the_chime();
     printf("simulation: coin streak pitch %s\n", streak ? "FAIL" : "PASS");
-    return failures + scenario + jump + tunnel + collide + streak;
+    int interp = render_view_interpolates_without_touching_the_run();
+    printf("simulation: render view between steps %s\n", interp ? "FAIL" : "PASS");
+    return failures + scenario + jump + tunnel + collide + streak + interp;
 }

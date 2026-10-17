@@ -17,6 +17,7 @@
  */
 
 #include "game_render.h"
+#include "../core/game_timing.h"      /* game_timing_render_view */
 #include "../core/game_checkpoint.h"  /* game_checkpoint_clock_ms */
 #include "../screens/settings_menu.h"
 
@@ -462,9 +463,24 @@ static void render_ghost(GameState *gs, int cam_x)
 
 /* Layer 30: the player, after every enemy and hazard, so nothing in the
  * level hides them. */
+/* This frame's view between the last two steps (game_timing_render_view),
+ * set by game_render_frame before the layers run. Render-only. */
+static GameRenderView s_view;
+
+/* The player as this frame draws it: a copy at the view's position, so
+ * drawing never writes to the simulated player. */
+static Player shown_player(const GameState *gs)
+{
+    Player shown = gs->world.player;
+    shown.x = s_view.player_x;
+    shown.y = s_view.player_y;
+    return shown;
+}
+
 static void render_player(GameState *gs, int cam_x)
 {
-    player_render(&gs->world.player, cam_x, reduced_motion(gs));
+    Player shown = shown_player(gs);
+    player_render(&shown, cam_x, reduced_motion(gs));
 }
 
 /*
@@ -485,7 +501,8 @@ static void render_fog(GameState *gs, int cam_x)
 static void draw_high_contrast_aids(GameState *gs, int cam_x)
 {
     if (gs->screen.profile && gs->screen.profile->data.settings.high_contrast) {
-        IntRect hit = player_get_hitbox(&gs->world.player);
+        Player shown = shown_player(gs);  /* the outline follows the sprite */
+        IntRect hit = player_get_hitbox(&shown);
         hit.x -= cam_x;
         DrawRectangleLines(hit.x-1,hit.y-1,hit.w+2,hit.h+2,BLACK);
         DrawRectangleLines(hit.x,hit.y,hit.w,hit.h,WHITE);
@@ -617,6 +634,10 @@ static void draw_overlay(GameState *gs)
 
 int game_render_frame(GameState *gs, int cam_x, float dt)
 {
+    /* Between the last two fixed steps on a fast display; the latest step
+     * itself in debug, smoke, replay and experiment runs. */
+    s_view = game_timing_render_view(gs, cam_x);
+    cam_x = s_view.cam_x;
     /*
      * Update the debug overlay even while paused so the FPS counter
      * keeps measuring render frames and log entries age correctly.
