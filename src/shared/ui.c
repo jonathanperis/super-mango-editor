@@ -27,6 +27,7 @@
 
 #include "ui.h"
 #include "utf8.h"    /* utf8_sequence_length */
+#include "geometry.h" /* float_same_value */
 
 /* ------------------------------------------------------------------ */
 /* Internal helper — forward declarations                              */
@@ -348,7 +349,7 @@ static void step_number(UIState *ui, int direction, int big)
         int value;
         long long step = ui->edit_int_step > 1 ? ui->edit_int_step : 1;
         if (!parse_int_value(ui->edit_buf, &value)) value = *(const int *)ui->edit_target;
-        long long next = (long long)value + direction * times * step;
+        long long next = (long long)value + (long long)direction * times * step;
         if (ui->edit_int_min <= ui->edit_int_max) {
             if (next < ui->edit_int_min) next = ui->edit_int_min;
             if (next > ui->edit_int_max) next = ui->edit_int_max;
@@ -372,7 +373,7 @@ static void step_number(UIState *ui, int direction, int big)
          * the "0.300000012" that %.9g prints for it, so steps of 0.1 do
          * not show float error piling up. */
         snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.6g", stored);
-        if (!parse_float_value(ui->edit_buf, &value) || value != stored)
+        if (!parse_float_value(ui->edit_buf, &value) || !float_same_value(value, stored))
             snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.9g", stored);
     } else {
         return;   /* text and dropdowns: nothing to step */
