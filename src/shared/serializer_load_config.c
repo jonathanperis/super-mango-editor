@@ -21,6 +21,11 @@ static void copy_config_string(char *dst, size_t dst_size, const char *src) {
  * names, and only those, are read as their QOA replacements: the level
  * keeps its music, and the editor saves the new name. Any other .wav path
  * is the level's own sound and is left alone.
+ *
+ * The bundled levels still name the old files on purpose: ghosts and
+ * Continue points are keyed by a hash of the level file's bytes
+ * (serializer_fingerprint_utf8), so renaming them would orphan every
+ * player's records.  tools/validate_levels.py mirrors this mapping.
  */
 static void rename_shipped_wav_loop(char *path) {
     static const char dir[] = "assets/sounds/levels/";
