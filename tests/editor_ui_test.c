@@ -1883,6 +1883,27 @@ done:
     return failed;
 }
 
+/*
+ * A shipped level still names its old WAV loop: its bytes key players'
+ * ghosts and Continue points.  The editor opens it with the QOA file the
+ * game plays and without unsaved changes, so nothing asks to save it and
+ * the file only changes (to the .qoa name) when someone edits and saves.
+ */
+static int shipped_wav_loop_opens_unmodified(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(editor_load_level(&es, "levels/01_lugio_01.toml") == 0);
+    CHECK(strcmp(es.level.music_path, "assets/sounds/levels/lava.qoa") == 0);
+    CHECK(!es.modified);
+    editor_refresh_dirty(&es);
+    CHECK(!es.modified);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 /* A second level dropped while the unsaved-changes prompt is up, then
  * Discard chosen in that prompt (Left from Save, Enter). */
 static void drop_bravo_during_the_prompt(void)
@@ -4052,6 +4073,7 @@ int main(void)
         CASE(text_fields_select_copy_cut_and_paste),
         CASE(dropped_level_opens_like_a_recent_file),
         CASE(drop_during_the_prompt_waits_its_turn),
+        CASE(shipped_wav_loop_opens_unmodified),
         CASE(campaign_view_reorders_renames_and_saves),
         CASE(campaign_undo_and_redo_replay_each_edit),
         CASE(campaign_rename_is_one_undo_step),

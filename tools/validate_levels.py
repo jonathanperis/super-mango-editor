@@ -80,6 +80,21 @@ PATH_KEYS = {"music_path", "floor_tile_path", "tile_path", "path", "next_phase"}
 
 ASSET_LITERAL_RE = re.compile(r'"(assets/[^"\n]+\.(?:png|qoa|wav|ttf))"')
 
+# Mirrors rename_shipped_wav_loop() in src/shared/serializer_load_config.c:
+# the ambient loops shipped as WAV before they became QOA, and the loader
+# reads those three old names as the QOA files.  The shipped levels keep the
+# old names on purpose (their bytes key players' ghosts and Continue points),
+# so the checks follow the file the game actually loads.
+SHIPPED_WAV_LOOPS = {
+    f"assets/sounds/levels/{name}.wav": f"assets/sounds/levels/{name}.qoa"
+    for name in ("water", "lava", "winds")
+}
+
+
+def loaded_music_path(value: str) -> str:
+    """The music file the game loads for a level's music_path."""
+    return SHIPPED_WAV_LOOPS.get(value, value)
+
 
 # These schemas mirror serializer_parse.c for docs-drift's TOML snippet check
 # (see the module docstring); levels are validated by the C loader.  Fields
@@ -615,6 +630,8 @@ def validate_asset_reference(
     if repo_path is None:
         return errors
 
+    if field == "music_path":
+        repo_path = loaded_music_path(repo_path)
     if repo_path not in asset_manifest:
         errors.append(f"{level_path.relative_to(ROOT)}: {field} not in asset manifest: {value}")
 
