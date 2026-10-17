@@ -359,6 +359,15 @@ int input_first_gamepad(void)
     return 0;
 }
 
+const char *input_gamepad_name(int controller)
+{
+    /* GetGamepadName indexes raylib's table without a bounds check, and
+     * IsGamepadAvailable rejects an index outside it. */
+    if (controller <= 0 || !IsWindowReady() || !IsGamepadAvailable(controller-1)) return NULL;
+    const char *name = GetGamepadName(controller-1);
+    return name ? name : "";
+}
+
 void input_collect(void)
 {
     if (!ready || !IsWindowReady()) return;

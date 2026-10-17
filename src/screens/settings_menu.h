@@ -17,8 +17,10 @@ void settings_menu_open(SettingsMenu *menu);
 /* Returns 1 only for events consumed by settings; quit/hot-plug still propagate. */
 int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
                          const InputEvent *event, int open_button);
+/* controller is the screen's adopted gamepad (device index + 1, 0 = none);
+ * the controls page names it. */
 void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
-                           TextFont *font);
+                           TextFont *font, int controller);
 void settings_menu_cleanup(SettingsMenu *menu);
 
 /* The style the game's menus draw with: their own palette, or

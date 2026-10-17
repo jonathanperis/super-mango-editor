@@ -19,6 +19,7 @@ static GLFWscrollfun scroll_handler;
 static int joystick_present[4], joystick_mapped[4];
 bool test_input_gamepad_available(int index) { return index >= 0 && index < 4 && joystick_present[index]; }
 int test_input_joystick_is_gamepad(int index) { return index >= 0 && index < 4 && joystick_mapped[index]; }
+const char *test_input_gamepad_name(int index) { return index == 2 ? "Test Pad" : NULL; }
 
 bool test_input_window_ready(void) { return window_ready != 0; }
 int test_input_screen_width(void) { return screen_w; }
@@ -214,10 +215,15 @@ int input_gamepad_mapping_test(void)
     if (input_first_gamepad() != 3) failed = 1;
     joystick_mapped[0] = 1;                        /* the first one gains a mapping */
     if (input_first_gamepad() != 1) failed = 1;
+    /* The settings page names the controller in use, or says there is none. */
+    const char *name = input_gamepad_name(3);
+    if (!name || strcmp(name, "Test Pad") != 0) failed = 1;
+    if (!input_gamepad_name(1) || input_gamepad_name(1)[0]) failed = 1;  /* no name: "" */
+    if (input_gamepad_name(0) || input_gamepad_name(2) || input_gamepad_name(9)) failed = 1;
     memset(joystick_present, 0, sizeof(joystick_present));
     memset(joystick_mapped, 0, sizeof(joystick_mapped));
     input_close();
     window_ready = 0;
-    if (failed) fprintf(stderr, "input backend: unmapped joystick chosen as the controller\n");
+    if (failed) fprintf(stderr, "input backend: unmapped joystick chosen, or controller misnamed\n");
     return failed;
 }

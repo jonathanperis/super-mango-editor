@@ -219,8 +219,23 @@ int settings_menu_event(SettingsMenu *menu, GameProfile *profile,
     return 1;
 }
 
+/* The controls page's note of which gamepad its Pad rows apply to: the
+ * screen's own controller, the one gameplay reads. */
+static void render_controller_name(SettingsMenu *menu, int controller)
+{
+    const char *name = input_gamepad_name(controller);
+    char line[160];
+    if (!name) snprintf(line, sizeof(line), "No controller");
+    else if (!name[0]) snprintf(line, sizeof(line), "Controller %d", controller);
+    else snprintf(line, sizeof(line), "Controller: %s", name);
+    /* A long system name is cut to the room right of the title. */
+    while (line[0] && ui_text_width(&menu->ui, line) > 270) shorten_utf8(line);
+    ui_label_color(&menu->ui, 382 - ui_text_width(&menu->ui, line), 12, line,
+                   ui_color(&menu->ui, UI_COLOR_TEXT_DIM));
+}
+
 void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
-                           TextFont *font)
+                           TextFont *font, int controller)
 {
     if (!menu || !profile) return;
     int unavailable = game_settings_has_unavailable_binding(&profile->data.settings);
@@ -236,6 +251,7 @@ void settings_menu_render(SettingsMenu *menu, const GameProfile *profile,
     }
     DrawRectangle(8, 4, 384, 292, ui_color(&menu->ui, UI_COLOR_PANEL));
     ui_label(&menu->ui, 18, 12, menu->page ? "CONTROLS" : "SETTINGS");
+    if (menu->page) render_controller_name(menu, controller);
     const GameSettings *s = &profile->data.settings;
     int rows = menu->page ? 13 : 12;
     for (int row = 0; row < rows; row++) {
