@@ -508,6 +508,52 @@ fail:
     free(menu); free(profile); return 1;
 }
 
+/* A click on a value row's left half lowers it and on the right half raises
+ * it; the wheel over a row changes that row, in whole notches. */
+static int settings_mouse_changes_values(void)
+{
+    GameProfile *profile = calloc(1,sizeof(*profile));
+    SettingsMenu *menu = calloc(1,sizeof(*menu));
+    CHECK(profile && menu);
+    game_profile_init(profile);
+    settings_menu_open(menu);
+    /* Mid-range values, so neither direction stops at a limit. */
+    profile->data.settings.music_volume = profile->data.settings.effects_volume = 64;
+    int music = profile->data.settings.music_volume;
+    int row_y = 36 + 16 * 0 + 4;  /* the music volume row */
+    InputEvent event = {.type=INPUT_MOUSE_DOWN,.button=MOUSE_BUTTON_LEFT,.x=40,.y=row_y};
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(profile->data.settings.music_volume == music - 8);
+    event.x = 360;
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(profile->data.settings.music_volume == music + 8);
+    /* The effects row, by wheel: two half notches make one step down. */
+    int effects = profile->data.settings.effects_volume;
+    event = (InputEvent){.type=INPUT_WHEEL,.x=100,.y=36 + 16 * 1 + 4,.wheel=-0.5f};
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(profile->data.settings.effects_volume == effects && menu->selected == 1);
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(profile->data.settings.effects_volume == effects - 8);
+    event.wheel = 2.0f;
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(profile->data.settings.effects_volume == effects + 8);
+    /* Off the value rows the wheel changes nothing, and a click on an
+     * action row still activates it (Configure controls opens its page). */
+    GameSettings before = profile->data.settings;
+    event.y = 36 + 16 * 9 + 4;
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(memcmp(&before,&profile->data.settings,sizeof(before)) == 0);
+    event = (InputEvent){.type=INPUT_MOUSE_DOWN,.button=MOUSE_BUTTON_LEFT,.x=40,.y=36 + 16 * 9 + 4};
+    settings_menu_event(menu,profile,&event,PAD_BACK);
+    CHECK(menu->page == 1 && menu->selected == 0);
+    settings_menu_cleanup(menu); free(menu); free(profile);
+    return 0;
+fail:
+    if (menu) settings_menu_cleanup(menu);
+    free(menu); free(profile); return 1;
+}
+
 static int persistent_session(void)
 {
     char path[160];
@@ -1200,6 +1246,7 @@ int game_profile_contract_test(void)
     if (result_cap_and_record_failure()) return 1;
     puts("profile: settings/bindings");
     if (settings_and_bindings()) return 1;
+    if (settings_mouse_changes_values()) return 1;
     puts("profile: session integration");
     if (persistent_session()) return 1;
     puts("profile: continue round trip");
