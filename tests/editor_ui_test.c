@@ -882,6 +882,47 @@ done:
 /* Canvas                                                              */
 /* ------------------------------------------------------------------ */
 
+/* Undo and Redo say what they did in the status bar, and bring the entity
+ * they changed back into view when the canvas has scrolled away from it. */
+static int history_reports_and_reveals_the_step(void)
+{
+    int failed = 0;
+    EditorState es;
+    EditorRect r;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 8;
+    es.palette_type = ENT_COIN;
+    key_frame(&es, KEY_TWO, 0);
+    ui_frame(&es, 300, 300);
+    click_frame(&es, 300, 300);
+    CHECK(es.level.coin_count == 1);
+    CHECK(editor_entity_bounds(&es.level, ENT_COIN, 0, &r) && canvas_shows(&es, &r));
+
+    es.camera.x = 2000.0f;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(!canvas_shows(&es, &r));
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    /* The coin is gone, so there is nothing to scroll to. */
+    CHECK(es.level.coin_count == 0 && es.camera.x == 2000.0f);
+    CHECK(strcmp(es.status_message, "Undid: placed Coin") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(strcmp(es.status_message, "Nothing to undo") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);
+    CHECK(es.level.coin_count == 1);
+    CHECK(strcmp(es.status_message, "Redid: placed Coin") == 0);
+    CHECK(editor_entity_bounds(&es.level, ENT_COIN, 0, &r) && canvas_shows(&es, &r));
+    /* Already in view: a step leaves the scroll alone. */
+    float shown_x = es.camera.x;
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);
+    CHECK(es.camera.x == shown_x);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);
+    CHECK(strcmp(es.status_message, "Nothing to redo") == 0);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int canvas_place_select_drag_delete_and_undo(void)
 {
     int failed = 0;
@@ -4120,6 +4161,7 @@ int main(void)
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
         CASE(canvas_place_select_drag_delete_and_undo),
+        CASE(history_reports_and_reveals_the_step),
         CASE(properties_panel_handles_every_entity_type),
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),

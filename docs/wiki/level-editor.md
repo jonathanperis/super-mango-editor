@@ -294,6 +294,8 @@ The editor keeps an undo stack for placement, movement, deletion, property and L
 
 The undo stack is in-memory only — it is cleared when a new file is opened or created. Undoing back to the saved contents clears the modified marker.
 
+Each undo or redo names the step in the status bar, in the Campaign view's words: `Undid: moved Coin`, `Redid: placed Coin (3)` for a group of one type, `Undid: deleted 4 entities` for a mixed group, `Undid: changed level settings` for Level Config. With nothing left it says `Nothing to undo` (or `Nothing to redo`). When the entity the step changed last is off the canvas, the view scrolls to centre it, as clicking a validation message does (keeping the zoom); an entity the step removed has nothing to show, so the view stays put, and so it does when the entity is already in view.
+
 The [Campaign View](#campaign-view) keeps a separate, smaller history for its own edits. While it is open, `Ctrl+Z` and `Ctrl+Y` act on that history and leave this one alone.
 
 The editor keeps recent files (the last 5), its settings (`editor_settings.txt`: the Contrast toggle) and recovery snapshots for modified levels in its OS preference directory, retaining the `Super Mango/Editor/` organization/application suffix. Autosave runs every 30 seconds while the level is modified. Recovery snapshots must load through the same validation as any level, so while the current level has validation errors autosave writes the most recent valid version of the document instead ("Autosaved last valid version"); if nothing newer than the saved file is valid, it skips that round. Every attempt, successful or not, restarts the 30-second timer, so a failing autosave reports `Autosave failed; retrying in 30 s` at most once per interval.

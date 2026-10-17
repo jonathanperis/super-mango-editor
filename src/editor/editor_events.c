@@ -204,6 +204,43 @@ static void note_redone_place(Selection *placed, int *count, const Command *comm
     (*count)++;
 }
 
+/* The status bar's account of one history step, in the Campaign view's
+ * words ("Undid: moved levels/c.toml"): "moved Coin", "placed Coin (3)"
+ * for a group of one type, "deleted 4 entities" for a mixed one, or
+ * "changed level settings". */
+static void describe_step(char *out, size_t size, const Command *last,
+                          int entries, int one_type)
+{
+    static const char *const verbs[] = {
+        [CMD_PLACE] = "placed", [CMD_DELETE] = "deleted",
+        [CMD_MOVE] = "moved", [CMD_PROPERTY] = "changed", [CMD_CONFIG] = "changed"
+    };
+    const char *verb = verbs[last->type];
+    if (last->type == CMD_CONFIG) snprintf(out, size, "%s level settings", verb);
+    else if (last->entity_type < 0 || last->entity_type >= ENT_COUNT) snprintf(out, size, "%s an entity", verb);
+    else if (entries == 1)
+        snprintf(out, size, "%s %s", verb, editor_entity_type_name((EntityType)last->entity_type));
+    else if (one_type)
+        snprintf(out, size, "%s %s (%d)", verb, editor_entity_type_name((EntityType)last->entity_type), entries);
+    else snprintf(out, size, "%s %d entities", verb, entries);
+}
+
+/* After a step, bring the entity it changed last into view when it is
+ * off the canvas, centred as a validation message's Show does. An entity
+ * the step took away has nothing left to show. Within a step that entry
+ * was applied last, so its index is still the one it names. */
+static void reveal_step(EditorState *es, const Command *last, int redo)
+{
+    EditorRect r;
+    if (last->type == CMD_CONFIG || last->entity_type < 0 || last->entity_type >= ENT_COUNT) return;
+    EntityType type = (EntityType)last->entity_type;
+    int singleton = editor_entity_type_is_singleton(type);
+    int removed = (last->type == CMD_PLACE && !redo) || (last->type == CMD_DELETE && redo);
+    if (removed && !singleton) return;
+    if (!editor_entity_bounds(&es->level, type, singleton ? 0 : last->entity_index, &r)) return;
+    if (!canvas_shows(es, &r)) canvas_center_on(es, &r);
+}
+
 static void editor_history(EditorState *es, int redo)
 {
     /* Finish the staged field edit before moving history. Otherwise Undo could
@@ -214,8 +251,10 @@ static void editor_history(EditorState *es, int redo)
     int group;
     if (es->dragging) return;  /* editor_key already explained why */
     if (!editor_finish_field_edit(es)) return;
-    if (!(redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command)))
+    if (!(redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command))) {
+        editor_set_status(es, "Nothing to %s", redo ? "redo" : "undo");
         return;
+    }
     /*
      * One step may be a group of entries (a multi-entity move, delete or
      * paste; see undo.h).  Keep popping while the next entry belongs to the
@@ -223,6 +262,7 @@ static void editor_history(EditorState *es, int redo)
      * first, so array positions shift back exactly as they shifted forward.
      */
     group = command.group;
+    int entries = 1, one_type = 1, first_type = command.entity_type;
     editor_apply_undo_command(es, &command, redo ? 0 : 1);
     if (redo) note_redone_place(placed, &placed_count, &command);
     while (group != 0 &&
@@ -230,10 +270,16 @@ static void editor_history(EditorState *es, int redo)
            (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command))) {
         editor_apply_undo_command(es, &command, redo ? 0 : 1);
         if (redo) note_redone_place(placed, &placed_count, &command);
+        entries++;
+        one_type &= command.entity_type == first_type;
     }
     /* A redone group paste or duplicate selects every copy again. */
     if (placed_count > 1) (void)editor_select_items(es, placed, placed_count);
     editor_refresh_dirty(es);
+    reveal_step(es, &command, redo);
+    char what[96];
+    describe_step(what, sizeof(what), &command, entries, one_type);
+    editor_set_status(es, "%s: %s", redo ? "Redid" : "Undid", what);
 }
 
 static void editor_key(EditorState *es, const InputEvent *event)
