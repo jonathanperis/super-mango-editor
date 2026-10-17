@@ -252,22 +252,9 @@ jobs:
         if: matrix.target == 'wasm'
         run: emcc --version
 
-      # The Web raylib tree (out/raylib-web) is cached the same way, keyed on
-      # the Emscripten SDK instead of a native compiler.
-      - name: Fingerprint the raylib toolchain (WebAssembly)
-        id: toolchain-web
-        if: matrix.target == 'wasm'
-        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; emcc --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache compiled Web raylib
-        if: matrix.target == 'wasm'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            out/raylib-web
-            !out/raylib-web/raylib-*/examples
-            !out/raylib-web/raylib-*/projects
-          key: raylib-build-web-${{ steps.toolchain-web.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+      # The Web raylib tree is not cached: setup-emsdk installs the SDK under
+      # a new temporary folder on every run, so a restored CMake build tree
+      # names an emcc that no longer exists and its reconfigure fails.
 
       - name: Install Node.js for host contracts and WebAssembly smoke
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
