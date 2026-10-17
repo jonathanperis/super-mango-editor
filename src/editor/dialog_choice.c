@@ -38,8 +38,11 @@ static DialogLayout s_last_layout;   /* the last prompt's, for tests */
 #endif
 
 #ifdef MANGO_TESTING
+static void (*s_poll_hook)(void);
+
 int dialog_choice_test_frames(void) { return s_frames; }
 const DialogLayout *dialog_choice_test_layout(void) { return &s_last_layout; }
+void dialog_choice_test_set_poll_hook(void (*hook)(void)) { s_poll_hook = hook; }
 #endif
 
 void dialog_choice_attach(EditorState *es)
@@ -310,6 +313,10 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
 
         draw_prompt(es, target, title, message, labels, &layout, focus, input_mouse());
         input_collect();
+#ifdef MANGO_TESTING
+        /* Where the window's events arrive: a test can act as one would. */
+        if (s_poll_hook) s_poll_hook();
+#endif
         while (answer < 0 && input_poll(&event)) {
             got = 1;
             switch (event.type) {

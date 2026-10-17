@@ -1883,6 +1883,56 @@ done:
     return failed;
 }
 
+/* A second level dropped while the unsaved-changes prompt is up, then
+ * Discard chosen in that prompt (Left from Save, Enter). */
+static void drop_bravo_during_the_prompt(void)
+{
+    const char *bravo[] = {"levels/b.toml"};
+    editor_test_drop_files(bravo, 1);
+    push_key(KEY_LEFT, 0);
+    push_key(KEY_ENTER, 0);
+    dialog_choice_test_set_poll_hook(NULL);
+}
+
+/*
+ * raylib lends its own list of dropped paths, and the next drop frees and
+ * replaces it.  The unsaved-changes prompt polls the window every frame,
+ * so a drop can land while it is up: the level dropped first still opens,
+ * the list is not released twice, and the later drop opens next frame.
+ */
+static int drop_during_the_prompt_waits_its_turn(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    int misuses = editor_test_drop_misuses();
+    const char *delta[] = {"levels/d.toml"};
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+    CHECK(editor_load_level(&es, "levels/a.toml") == 0);
+
+    es.level.screen_count = 5;
+    editor_refresh_dirty(&es);
+    CHECK(es.modified);
+    editor_test_set_discard_choice(-1);   /* the real prompt answers */
+    dialog_choice_test_set_poll_hook(drop_bravo_during_the_prompt);
+    drop_frame(&es, delta, 1);
+    CHECK(strcmp(es.file_path, "levels/d.toml") == 0 && !es.modified);
+    CHECK(editor_test_drop_misuses() == misuses);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(strcmp(es.file_path, "levels/b.toml") == 0);
+    CHECK(editor_test_drop_misuses() == misuses);
+done:
+    dialog_choice_test_set_poll_hook(NULL);
+    editor_test_drop_files(NULL, 0);
+    input_clear();
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    close_editor(&es);
+    return failed;
+}
+
 /* Click button `index` (a CampaignButton) of the Campaign view's bottom row. */
 static void click_campaign_button(EditorState *es, int index)
 {
@@ -4001,6 +4051,7 @@ int main(void)
         CASE(validation_rows_scroll_and_copy),
         CASE(text_fields_select_copy_cut_and_paste),
         CASE(dropped_level_opens_like_a_recent_file),
+        CASE(drop_during_the_prompt_waits_its_turn),
         CASE(campaign_view_reorders_renames_and_saves),
         CASE(campaign_undo_and_redo_replay_each_edit),
         CASE(campaign_rename_is_one_undo_step),
