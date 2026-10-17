@@ -77,6 +77,24 @@ the ten standard shapes once and reuses it; `glfwTerminate` frees them, and
 `ClosePlatform` forgets them so a later window in the same process creates
 fresh ones.
 
+### QOA decoder bounds
+
+raylib 6.0's bundled `src/external/qoa.h` predates two upstream bounds fixes,
+so a crafted `.qoa` file passed to `LoadSound`/`LoadWave` (the shipped sounds
+are QOA) could write out of bounds: a header with more than eight channels
+overran `qoa_desc`'s decoder-state array on the stack, and a frame declaring
+more samples than the file header overran the heap sample buffer
+([raysan5/raylib#6161](https://github.com/raysan5/raylib/issues/6161)). The
+patch applies the
+[raysan5/raylib#6162](https://github.com/raysan5/raylib/pull/6162) re-vendor of
+phoboslab/qoa `f73b4a36` hunk by hunk: the patched file equals raylib 6.2's
+`qoa.h` apart from the marker comments. The header rejects more than
+`QOA_MAX_CHANNELS`, each frame bounds its slices by its own data and by
+`QOA_SLICES_PER_FRAME`, and the sample buffer is sized in whole frames with an
+overflow guard. Valid files decode to the same samples; the encoder is
+unchanged, so `tools/qoa.py` still matches it. The session test feeds both
+crafted files to `LoadWaveFromMemory`.
+
 These fixes retain the 6.0 public API, formats and playback behavior. Source
 modifications are marked in the affected files. The session/audio regressions
 exercise the real library, and Linux CI keeps leak detection enabled.

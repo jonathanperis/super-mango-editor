@@ -30,5 +30,31 @@
       "before": "void ClosePlatform(void)\n{\n    glfwDestroyWindow(platform.handle);\n    glfwTerminate();\n",
       "after": "void ClosePlatform(void)\n{\n    glfwDestroyWindow(platform.handle);\n    glfwTerminate();\n    // Super Mango: glfwTerminate destroyed the cached standard cursors.\n    for (int i = 0; i < 11; i++) superMangoStandardCursors[i] = NULL;\n"
     }
+  ],
+  "src/external/qoa.h": [
+    {
+      "before": "\n\tif (qoa->channels == 0 || qoa->samples == 0 || qoa->samplerate == 0) {\n\t\treturn 0;",
+      "after": "\n\t/* Super Mango: raylib PR #6162 (phoboslab/qoa f73b4a36) bounds the channel\n\t   count by QOA_MAX_CHANNELS, the size of qoa_desc's lms array. */\n\tif (\n\t\tqoa->channels == 0 || qoa->samples == 0 || qoa->samplerate == 0 ||\n\t\tqoa->channels > QOA_MAX_CHANNELS\n\t) {\n\t\treturn 0;"
+    },
+    {
+      "before": "\tunsigned int p = 0;\n\t*frame_len = 0;\n",
+      "after": "\tunsigned int p = 0;\n\tif (frame_len) {\n\t\t*frame_len = 0;\n\t}\n"
+    },
+    {
+      "before": "\n\tunsigned int data_size = frame_size - 8 - QOA_LMS_LEN * 4 * channels;\n\tunsigned int num_slices = data_size / 8;\n\tunsigned int max_total_samples = num_slices * QOA_SLICE_LEN;\n\n\tif (\n\t\tchannels != qoa->channels || \n\t\tsamplerate != qoa->samplerate ||\n\t\tframe_size > size ||\n\t\tsamples * channels > max_total_samples\n\t) {",
+      "after": "\n\t/* Super Mango: raylib PR #6162 bounds the decoded slices by the frame's\n\t   data and by QOA_SLICES_PER_FRAME, whatever the headers claim. */\n\tunsigned int header_size = 8 + QOA_LMS_LEN * 4 * channels;\n\tunsigned int data_size = frame_size - header_size;\n\tunsigned int max_total_slices = data_size / 8;\n\tunsigned int num_slices = (samples + QOA_SLICE_LEN - 1) / QOA_SLICE_LEN;\n\t\n\tif (\n\t\tchannels != qoa->channels || \n\t\tsamplerate != qoa->samplerate ||\n\t\tframe_size < header_size ||\n\t\tframe_size > size ||\n\t\tnum_slices > QOA_SLICES_PER_FRAME ||\n\t\tnum_slices * channels > max_total_slices\n\t) {"
+    },
+    {
+      "before": "\n\t*frame_len = samples;\n\treturn p;",
+      "after": "\n\tif (frame_len) {\n\t\t*frame_len = samples;\n\t}\n\treturn p;"
+    },
+    {
+      "before": "\n\t/* Calculate the required size of the sample buffer and allocate */\n\tint total_samples = qoa->samples * qoa->channels;\n\tshort *sample_data = QOA_MALLOC(total_samples * sizeof(short));\n",
+      "after": "\n\t/* Super Mango: raylib PR #6162 sizes the buffer in whole frames, so the\n\t   last frame decodes inside it even when the file header undercounts. */\n\t/* Calculate the required size of the sample buffer and allocate, round up to full frames */\n\tunsigned long long num_frames = ((unsigned long long)qoa->samples + QOA_FRAME_LEN - 1) / QOA_FRAME_LEN;\n\tunsigned long long total_samples_ull = num_frames * QOA_FRAME_LEN * (unsigned long long)qoa->channels;\n\n\tif (total_samples_ull > 0x7fffffff) { return NULL; }\n\n\tunsigned int total_samples = (unsigned int)total_samples_ull;\n\tshort *sample_data = QOA_MALLOC(total_samples * sizeof(short));\n\tif (!sample_data) { return NULL; }\n"
+    },
+    {
+      "before": "\t\tsample_index += frame_len;\n\t} while (frame_size && sample_index < qoa->samples);\n",
+      "after": "\t\tsample_index += frame_len;\n\t} while (frame_len == QOA_FRAME_LEN && sample_index < qoa->samples);\n"
+    }
   ]
 }

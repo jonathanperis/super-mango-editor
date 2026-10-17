@@ -1680,6 +1680,7 @@ static int phase_resets_transient_state(void)
 int game_profile_contract_test(void);
 int game_simulation_contract_test(void);
 int audio_contract_test(void);
+int qoa_bounds_contract_test(void);
 int web_frame_pacing_contract_test(void);
 /* tests/asset_cache_test.c */
 int asset_cache_contract_test(void);
@@ -1701,7 +1702,7 @@ int main(void)
     setvbuf(stdout, NULL, _IONBF, 0);
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
-        CASE(audio_contract_test),
+        CASE(audio_contract_test), CASE(qoa_bounds_contract_test),
         CASE(web_frame_pacing_contract_test),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),

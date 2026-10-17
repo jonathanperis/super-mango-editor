@@ -63,3 +63,40 @@ int audio_contract_test(void)
     if (failed) fprintf(stderr, "audio: overlap, per-voice volume or sample ownership failed\n");
     return failed;
 }
+
+/* Writes a big-endian integer of `bytes` bytes, as QOA headers store them. */
+static unsigned char *qoa_put(unsigned char *at, unsigned long long value, int bytes)
+{
+    for (int i = bytes - 1; i >= 0; i--) *at++ = (unsigned char)(value >> (8 * i));
+    return at;
+}
+
+/* Crafted QOA files whose headers disagree with their contents. raylib's
+ * bundled qoa.h trusted them before the raylib PR #6162 bounds checks, which
+ * the build applies through vendor/raylib/patches.json:
+ * - a nine-channel file wrote decoder state past qoa_desc's eight-channel
+ *   array (a stack write), and is now refused;
+ * - a file header promising one sample, followed by a frame of twenty, wrote
+ *   twenty samples into a one-sample buffer (a heap write). The buffer now
+ *   covers whole frames, so the frame decodes inside it.
+ * The sanitizer build turns either write back into a hard failure. */
+int qoa_bounds_contract_test(void)
+{
+    unsigned char nine[8 + 8 + 9 * 16] = {0}, *at = nine;
+    at = qoa_put(at, 0x716f6166, 4);                 /* "qoaf" */
+    at = qoa_put(at, 1, 4);                          /* one sample per channel */
+    at = qoa_put(at, (9ull << 56) | (44100ull << 32) | (0ull << 16) | (sizeof(nine) - 8), 8);
+    Wave refused = LoadWaveFromMemory(".qoa", nine, (int)sizeof(nine));
+    int failed = refused.data != NULL;
+    UnloadWave(refused);
+
+    unsigned char longer[8 + 8 + 16 + 8] = {0};
+    at = qoa_put(longer, 0x716f6166, 4);
+    at = qoa_put(at, 1, 4);
+    at = qoa_put(at, (1ull << 56) | (44100ull << 32) | (20ull << 16) | (sizeof(longer) - 8), 8);
+    Wave bounded = LoadWaveFromMemory(".qoa", longer, (int)sizeof(longer));
+    failed |= bounded.data != NULL && bounded.frameCount > 20;
+    UnloadWave(bounded);
+    if (failed) fprintf(stderr, "audio: a crafted QOA header was trusted past its buffer\n");
+    return failed;
+}
