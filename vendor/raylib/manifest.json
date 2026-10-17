@@ -1,8 +1,8 @@
 {
-  "version": "6.0",
-  "commit": "dbc56a87da87d973a9c5baa4e7438a9d20121d28",
-  "url": "https://codeload.github.com/raysan5/raylib/tar.gz/dbc56a87da87d973a9c5baa4e7438a9d20121d28",
-  "sha256": "81b06ce7c19cf3b634b0271c23c361ba6ad8bf45fb8b036abbfeb4260ec1e126",
+  "version": "6.2",
+  "commit": "02566453880e06bec97f5b8160fa6fe1e98397ca",
+  "url": "https://codeload.github.com/raysan5/raylib/tar.gz/02566453880e06bec97f5b8160fa6fe1e98397ca",
+  "sha256": "46d2b8ab1960480d197d84e6d01620c1d920603c2970169c8964d5e6f7a1085a",
   "gamecontrollerdb": {
     "commit": "c1d5289a1f713b30a2c121e9fe6529d39360be0f",
     "url": "https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/c1d5289a1f713b30a2c121e9fe6529d39360be0f/gamecontrollerdb.txt",

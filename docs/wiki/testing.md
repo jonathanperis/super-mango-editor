@@ -210,7 +210,7 @@ make smoke OUTDIR=out/headless RAYLIB_PLATFORM=memory
 Memory tests render assets and exercise lifecycle/model/input-injection contracts
 with null audio. They verify requested window sizes at the API boundary; only the
 desktop suite additionally checks actual OS resize. The context-lifetime test
-normalizes raylib 6.0 Memory's bottom-origin/BGRA framebuffer readback. Software
+normalizes raylib 6.2 Memory's bottom-origin/BGRA framebuffer readback. Software
 tests do not prove GPU presentation, clipboard/dialog behavior, audible output
 or physical input devices. They are explicit builds, never a runtime fallback.
 

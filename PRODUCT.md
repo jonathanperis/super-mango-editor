@@ -50,7 +50,7 @@ simulation inspector with reproducible experiment capture.
 
 Source-backed facts for design and copy:
 
-- Language and stack: C11, pinned raylib 6.0, vendored tomlc17, Emscripten/WebAssembly.
+- Language and stack: C11, pinned raylib 6.2, vendored tomlc17, Emscripten/WebAssembly.
 - Rendering: 400x300 logical resolution scaled to an 800x600 native window for chunky pixel rendering.
 - Browser payload callout: generated raw playable-asset size plus engine overhead; not an unmeasured compressed-transfer claim.
 - Campaign: the ordered v1 `levels/campaigns/main.toml`; separate focused examples live in `levels/labs/`.
