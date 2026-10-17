@@ -207,15 +207,16 @@ static void note_redone_place(Selection *placed, int *count, const Command *comm
 /* The status bar's account of one history step, in the Campaign view's
  * words ("Undid: moved levels/c.toml"): "moved Coin", "placed Coin (3)"
  * for a group of one type, "deleted 4 entities" for a mixed one, or
- * "changed level settings". */
+ * "changed level settings". A step whose entries did different things (a
+ * paste that moves the one Last Star and places the rest) says "changed". */
 static void describe_step(char *out, size_t size, const Command *last,
-                          int entries, int one_type)
+                          int entries, int one_type, int one_verb)
 {
     static const char *const verbs[] = {
         [CMD_PLACE] = "placed", [CMD_DELETE] = "deleted",
         [CMD_MOVE] = "moved", [CMD_PROPERTY] = "changed", [CMD_CONFIG] = "changed"
     };
-    const char *verb = verbs[last->type];
+    const char *verb = one_verb ? verbs[last->type] : "changed";
     if (last->type == CMD_CONFIG) snprintf(out, size, "%s level settings", verb);
     else if (last->entity_type < 0 || last->entity_type >= ENT_COUNT) snprintf(out, size, "%s an entity", verb);
     else if (entries == 1)
@@ -225,18 +226,29 @@ static void describe_step(char *out, size_t size, const Command *last,
     else snprintf(out, size, "%s %d entities", verb, entries);
 }
 
-/* After a step, bring the entity it changed last into view when it is
- * off the canvas, centred as a validation message's Show does. An entity
- * the step took away has nothing left to show. Within a step that entry
- * was applied last, so its index is still the one it names. */
-static void reveal_step(EditorState *es, const Command *last, int redo)
+/* Whether applying this entry (forward for redo, backward for undo) took
+ * its entity away. A one-of-a-kind entity (Last Star, Player Spawn) only
+ * ever moves, so it always survives. */
+static int entry_removes(const Command *c, int redo)
+{
+    if (c->type == CMD_CONFIG || c->entity_type < 0 || c->entity_type >= ENT_COUNT) return 1;
+    if (editor_entity_type_is_singleton((EntityType)c->entity_type)) return 0;
+    return (c->type == CMD_PLACE && !redo) || (c->type == CMD_DELETE && redo);
+}
+
+/* After a step, bring an entity it changed into view when it is off the
+ * canvas, centred as a validation message's Show does: the last one the
+ * step left in the level (an entity it took away has nothing to show).
+ * Its index still names it: a step that both removes and keeps entities
+ * is a paste or its undo, where only one-of-a-kind entities (index 0) are
+ * kept, and every other kind of step keeps all of its entities. */
+static void reveal_step(EditorState *es, const Command *shown, int redo)
 {
     EditorRect r;
-    if (last->type == CMD_CONFIG || last->entity_type < 0 || last->entity_type >= ENT_COUNT) return;
-    EntityType type = (EntityType)last->entity_type;
+    if (!shown || entry_removes(shown, redo)) return;
+    EntityType type = (EntityType)shown->entity_type;
     int singleton = editor_entity_type_is_singleton(type);
-    int removed = (last->type == CMD_PLACE && !redo) || (last->type == CMD_DELETE && redo);
-    if (removed && !singleton) return;
+    const Command *last = shown;
     if (!editor_entity_bounds(&es->level, type, singleton ? 0 : last->entity_index, &r)) return;
     if (!canvas_shows(es, &r)) canvas_center_on(es, &r);
 }
@@ -263,8 +275,14 @@ static void editor_history(EditorState *es, int redo)
      */
     group = command.group;
     int entries = 1, one_type = 1, first_type = command.entity_type;
+    int one_verb = 1;
+    CommandType first_verb = command.type;
+    /* The entity to show afterwards: the last one this step left in place. */
+    Command shown = {0};
+    int have_shown = 0;
     editor_apply_undo_command(es, &command, redo ? 0 : 1);
     if (redo) note_redone_place(placed, &placed_count, &command);
+    if (!entry_removes(&command, redo)) { shown = command; have_shown = 1; }
     while (group != 0 &&
            (redo ? redo_top_group(es->undo) : undo_top_group(es->undo)) == group &&
            (redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command))) {
@@ -272,13 +290,15 @@ static void editor_history(EditorState *es, int redo)
         if (redo) note_redone_place(placed, &placed_count, &command);
         entries++;
         one_type &= command.entity_type == first_type;
+        one_verb &= command.type == first_verb;
+        if (!entry_removes(&command, redo)) { shown = command; have_shown = 1; }
     }
     /* A redone group paste or duplicate selects every copy again. */
     if (placed_count > 1) (void)editor_select_items(es, placed, placed_count);
     editor_refresh_dirty(es);
-    reveal_step(es, &command, redo);
+    reveal_step(es, have_shown ? &shown : NULL, redo);
     char what[96];
-    describe_step(what, sizeof(what), &command, entries, one_type);
+    describe_step(what, sizeof(what), &command, entries, one_type, one_verb);
     editor_set_status(es, "%s: %s", redo ? "Redid" : "Undid", what);
 }
 
