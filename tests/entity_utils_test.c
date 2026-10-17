@@ -126,9 +126,23 @@ static int computes_sound_falloff(void)
     return 0;
 }
 
+/* A sound pans toward the side of the screen its source is drawn on,
+ * never past SOUND_PAN_MAX; raylib 6 puts -1 on the left. */
+static int pans_with_screen_position(void)
+{
+    if (expect_float("centre pan", sound_pan_for_screen_x(1200.0f, 1000, 400.0f), 0.0f) != 0) return 1;
+    if (expect_float("left edge pan", sound_pan_for_screen_x(1000.0f, 1000, 400.0f), -SOUND_PAN_MAX) != 0) return 1;
+    if (expect_float("right edge pan", sound_pan_for_screen_x(1400.0f, 1000, 400.0f), SOUND_PAN_MAX) != 0) return 1;
+    if (expect_float("quarter pan", sound_pan_for_screen_x(1100.0f, 1000, 400.0f), -SOUND_PAN_MAX / 2.0f) != 0) return 1;
+    if (expect_float("off-screen left clamps", sound_pan_for_screen_x(900.0f, 1000, 400.0f), -SOUND_PAN_MAX) != 0) return 1;
+    if (expect_float("off-screen right clamps", sound_pan_for_screen_x(1500.0f, 1000, 400.0f), SOUND_PAN_MAX) != 0) return 1;
+    return 0;
+}
+
 int main(void)
 {
     if (advances_animation_and_preserves_leftover_time() != 0) return 1;
+    if (pans_with_screen_position() != 0) return 1;
     if (fixed_steps_keep_fractional_milliseconds() != 0) return 1;
     if (reverses_patrol_at_boundaries() != 0) return 1;
     if (reverses_at_floor_gaps() != 0) return 1;

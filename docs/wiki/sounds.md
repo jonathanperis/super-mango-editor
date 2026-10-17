@@ -157,6 +157,17 @@ If all eight voices are busy, a new effect is dropped rather than interrupting
 one already playing. `sound_set_volume` updates a sample's multiplier and its
 live aliases; the per-play multiplier remains independent.
 
+A sound with a source somewhere in the level plays with `sound_play_at(sound,
+volume, pan)` instead. The axe trap's whoosh, the bird's (and faster bird's)
+wing flap and the jumping spider's attack fade with the player's distance
+(`sound_volume_for_distance`) and pan toward the side of the screen their
+source is drawn on: `sound_pan_for_screen_x(source_x, cam_x, GAME_W)` maps the
+screen's left edge to `-SOUND_PAN_MAX` and its right edge to `SOUND_PAN_MAX`
+(0.75), so an edge sound still reaches the other ear a little. raylib 6 pans
+from -1 (left) through 0 (centre) to 1 (right); `sound_play` is
+`sound_play_at` at 0. The pan only reads the camera and the source, so it
+never changes a run.
+
 The pinned dependency includes three documented audio fixes: alias converter
 cache release, WAV decoder release, and miniaudio's zero-allocation passthrough
 initialization. They are applied on every platform by `tools/build_raylib.py`;

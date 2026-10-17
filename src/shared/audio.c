@@ -97,6 +97,11 @@ void sound_unload(SoundEffect *sound)
 
 void sound_play(SoundEffect *sound, int volume)
 {
+    sound_play_at(sound, volume, 0.0f);
+}
+
+void sound_play_at(SoundEffect *sound, int volume, float pan)
+{
     if (!sound) return;
     for (int i = 0; i < EFFECT_VOICES; i++) {
         EffectVoice *voice = &voices[i];
@@ -110,6 +115,9 @@ void sound_play(SoundEffect *sound, int volume)
         /* Multiplication combines user/sample loudness with this play's
          * distance attenuation. Dividing by 128 maps saved units to 0..1. */
         SetSoundVolume(alias, sound->volume * voice->volume);
+        /* Set on every play: a fresh alias starts centred, and a source on
+         * one side of the screen should sound from that side. */
+        SetSoundPan(alias, pan);
         PlaySound(alias);
         return;
     }
