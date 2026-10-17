@@ -64,9 +64,14 @@ def main() -> None:
         original = text = path.read_text(encoding="utf-8")
         for replacement in replacements:
             before, after = replacement["before"], replacement["after"]
+            # A tree extracted by an earlier run is already patched. Look for
+            # the result first: an "after" that keeps its "before" (a hunk
+            # that only appends lines) would otherwise apply again each run.
+            if text.count(after) == 1:
+                continue
             if text.count(before) == 1:
                 text = text.replace(before, after, 1)
-            elif text.count(after) != 1:
+            else:
                 raise SystemExit(f"raylib patch does not match pinned source: {name}")
         if text != original:
             path.write_text(text, encoding="utf-8", newline="\n")
