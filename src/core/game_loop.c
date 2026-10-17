@@ -4,7 +4,8 @@
  * One call to game_frame renders one picture, but the simulation inside it
  * advances in fixed steps (game_timing.h explains why). On a 60 Hz display
  * that is one step per frame; on 144 Hz most frames run zero steps and only
- * redraw; after a slow frame several steps run before the next picture.
+ * redraw (drawn between the last two steps, see game_timing_render_view);
+ * after a slow frame several steps run before the next picture.
  */
 
 #include "../game.h"
@@ -57,6 +58,8 @@ int game_frame(GameState *gs)
          * experiment returns 0 once its tape has ended. */
         float step_dt = game_experiment_dt(gs, GAME_FIXED_STEP);
         if (step_dt <= 0.0f) break;
+        /* Render-only: where the player and camera were, to draw between. */
+        game_timing_note_step(gs);
         cam_x = game_update_active(gs, step_dt, cam_x);
         /* Time trial: record where Mango is after this step and move the
          * ghost of the best run on by one step (game_ghost.c). */
