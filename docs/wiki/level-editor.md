@@ -41,7 +41,7 @@ make run-editor    # build game + editor, then launch editor
 | Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, Campaign (lit while the [Campaign View](#campaign-view) is open; clicking it then closes the view), Contrast (lit while on: every panel, button and field switches to a high-contrast style, black with white outlines and text at 7:1 or more; the level canvas keeps its colours; remembered for the next session), file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs). The current tool and every toggle that is on (Grid, Debug, Campaign, Contrast) are drawn in the selected colour, with a yellow outline in high contrast |
 | Canvas | 896 × 656 px | Scrollable level view with zoom. All entity types drawn at game-accurate sizes |
 | Panel | 384 × 656 px | Entity palette, properties inspector, level config (collapsible sections) |
-| Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message |
+| Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message; under the canvas, in its bottom rows, the [minimap](#minimap) |
 
 The window opens at 1280 × 720 and can be resized or maximised, but not made
 smaller than that. The layout does not reflow: the editor always draws this
@@ -60,6 +60,22 @@ they time themselves by the clock, not by frames. A hidden window (the
 `--smoke-test` render) keeps its own pacing.
 
 The mouse pointer changes with what it is over: an I-beam on a field you can type in, four-way arrows while entities are being dragged, and up-down arrows while a scrollbar's thumb is held.
+
+### Minimap
+
+A 7-pixel strip in the status bar's bottom rows, under the canvas (`editor_minimap.c`), shows the whole level squeezed to the canvas's width: the floor with its gaps cut out, one flat rectangle per entity, and a frame (the UI style's accent colour) around the part the canvas shows. It sits in rows the status text leaves empty, so it covers nothing of the level or the panels; an overlay on the canvas would hide the level's floor, where much of the editing happens. Click the strip to centre the canvas there, or hold and drag to slide the view along the level; the zoom and the vertical scroll stay as they were. It is hidden while the Campaign view is open.
+
+Entity colours are by palette category and stay the same in the high-contrast style, since they stand for level content rather than UI (the strip's background and the frame follow the UI style):
+
+| Category | Colour |
+|----------|--------|
+| World (rails, checkpoints, the player spawn) | grey-blue `#96A0B9` |
+| Collectibles (coins, stars, the Last Star) | gold `#F0C85A` |
+| Enemies | red `#EB5555` |
+| Hazards | orange `#FF9628` |
+| Surfaces (platforms, bridges, float platforms, bouncepads) | cyan `#50BEC8` |
+| Decorations (vines, ladders, ropes) | green `#5AAA46` |
+| Floor | brown `#785A3C`, with floor gaps in the background colour |
 
 Resting the pointer on a toolbar control for half a second shows a tooltip saying what it does and its shortcut, if it has one (`Save (Ctrl+S)`, `Show the grid (G)`). Clicking the control hides the tip until the pointer moves to another one.
 
@@ -427,6 +443,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor.c` / `editor.h` | Core state struct, init/loop/cleanup, `EntityType` enum (31 types), `EditorTool`, `EditorCamera`, `Selection` |
 | `editor_frame.c`, `editor_events.c` | One frame (validation, autosave, drawing) and keyboard/mouse/wheel event routing, including every shortcut |
 | `editor_chrome.c`, `editor_panels.c`, `editor_layout.c` | Toolbar, status bar and side-panel layout |
+| `editor_minimap.c` | The [minimap](#minimap) strip in the status bar: drawing and click/drag scrolling |
 | `editor_files.c`, `editor_session.c` | Open/save/Save As, playtest copies and recent files; dirty tracking, document hash and confirmation prompts; the focus-dependent frame cap (`editor_pace_frames`, called by the editor's frame and a prompt's) |
 | `editor_recovery.c` | Autosave every 30 s while dirty, and crash recovery: finding leftover snapshots, the Recover picker, loading and retiring them |
 | `editor_playtest.c` | Launching, stopping and reaping the playtest game process |
