@@ -631,13 +631,15 @@ restore the pinned raylib source archive from `actions/cache` via
 `RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Every job that
 compiles raylib caches the compiled tree: each native build leg (Linux, macOS
 and Windows) its debug trees (`out/raylib`, plus `out/headless/raylib` for the
-Memory-backend tests), the WebAssembly leg `out/raylib-web`, and the
-sanitizers, coverage, Windows Clang, Desktop backend and CodeQL C/C++ jobs
-their own trees. The release tree that ships (`dist-native`) is never cached.
+Memory-backend tests), and the sanitizers, coverage, Windows Clang, Desktop
+backend and CodeQL C/C++ jobs their own trees. The release tree that ships
+(`dist-native`) is never cached, and neither is the WebAssembly leg's
+`out/raylib-web`: the Emscripten SDK is installed under a new temporary folder
+on every run, so a restored CMake tree would name an `emcc` that is gone.
 CMake records absolute paths and per-compiler settings, so the key must match
 exactly: it covers the pin, patches, `tools/build_raylib.py`, the Makefile's
 raylib option definitions (printed by `make raylib-options`), runner image,
-workspace path and the job's compiler (or Emscripten) and CMake versions.
+workspace path and the job's compiler and CMake versions.
 Hashing only the option definitions, not the whole `Makefile`, keeps the caches
 across unrelated Makefile edits. `make` still runs `build_raylib.py` on a
 restored tree, which re-verifies the archive and re-runs CMake; CMake then
