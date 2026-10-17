@@ -47,8 +47,14 @@ void game_music_sync(const GameState *gs);
  * (from the profile borrowed in gs->screen.profile) to the sound effects and the
  * level music. Does nothing without a profile.
  *
- * Call it after anything that reloads the level music: loading the music
- * starts it at the level's own music_volume, which ignores a player who
- * muted or turned the music down.
+ * level_resources_apply already starts a level's music at
+ * game_music_volume; call this when the settings change.
  */
 void game_audio_apply_settings(const GameState *gs);
+
+/*
+ * game_music_volume — The volume (0-128) a level's music plays at: its
+ * authored music_volume scaled by the player's music slider, or 0 when
+ * muted.  Without a profile, the authored volume.
+ */
+int game_music_volume(const GameState *gs, int authored_volume);

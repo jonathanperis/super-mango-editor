@@ -1692,6 +1692,45 @@ static int phase_resets_transient_state(void)
     return result;
 }
 
+/*
+ * A level's music starts at the player's mute and music slider, not at its
+ * authored volume until the settings are next applied (which happens only
+ * when they change).
+ */
+static int level_music_starts_at_the_player_volume(void)
+{
+    static GameProfile profile;
+    GameState gs = {0};
+    int result = 1;
+    strcpy(gs.world.level_path, "levels/00_sandbox_01.toml");
+    if (game_init(&gs)) return 1;
+    game_profile_init(&profile);
+    gs.screen.profile = &profile;
+    LevelDef *active = gs.world.level_def;
+    active->music_volume = 100;
+    profile.data.settings.music_volume = 64;
+    profile.data.settings.muted = 0;
+    test_last_music_volume = -1;
+    level_resources_apply(&gs, active);
+    if (expect_int("level has music", gs.world.music != NULL, 1) ||
+        expect_float("slider scales the starting volume", test_last_music_volume, 50 / 128.0f))
+        goto done;
+    profile.data.settings.muted = 1;
+    test_last_music_volume = -1;
+    level_resources_apply(&gs, active);
+    if (expect_float("mute holds from the start", test_last_music_volume, 0)) goto done;
+    /* Without a profile (a bare test game) the authored volume plays. */
+    gs.screen.profile = NULL;
+    level_resources_apply(&gs, active);
+    if (expect_float("no profile plays the authored volume", test_last_music_volume, 100 / 128.0f))
+        goto done;
+    result = 0;
+done:
+    gs.screen.profile = NULL;
+    game_cleanup(&gs);
+    return result;
+}
+
 int game_profile_contract_test(void);
 int game_simulation_contract_test(void);
 int audio_contract_test(void);
@@ -1730,6 +1769,7 @@ int main(void)
         CASE(coins_stay_collected_across_life_loss), CASE(settings_keep_music_paused_after_refocus),
         CASE(fixed_step_accumulator_contract), CASE(bouncepad_lists_select_the_landed_pad),
         CASE(nearest_surface_is_order_independent), CASE(phase_resets_transient_state),
+        CASE(level_music_starts_at_the_player_volume),
         CASE(failed_next_phase_keeps_the_current_level),
         CASE(campaign_manifest_is_ordered_and_transactional),
         CASE(campaign_manifest_nul_fixtures_reject_transactionally),

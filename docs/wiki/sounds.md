@@ -195,6 +195,7 @@ asset_cache_music_release(gs->cache, gs->world.music);
 gs->world.music = NULL;
 ```
 
-The normal session applies authored `music_volume` scaled by the player's saved
-volume/mute preferences. Prefer that path to a hard-coded global music volume.
+The normal session plays authored `music_volume` scaled by the player's saved
+volume/mute preferences (`game_music_volume`), from the moment a level starts its
+music. Prefer that path to a hard-coded global music volume.
 Media licenses are documented separately in [Asset Provenance](../asset-provenance/).

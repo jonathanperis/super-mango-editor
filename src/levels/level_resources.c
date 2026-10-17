@@ -18,6 +18,7 @@
 #include "../game.h"  /* GameState: this file reads its fields */
 #include "level_loader.h"        /* level_release_platform_tiles */
 #include "../core/game_resources.h"  /* DEFAULT_FLOOR_TILE_PATH */
+#include "../core/game_overlay.h"    /* game_music_volume */
 #include "../shared/platform.h"  /* str_copy */
 
 #include <stdio.h>
@@ -111,7 +112,11 @@ void level_resources_apply(GameState *gs, const LevelDef *def)
             fprintf(stderr, "Warning: failed to load %s\n", def->music_path);
         } else {
             music_play(gs->world.music);
-            music_set_volume(def->music_volume); /* zero is an authored mute */
+            /* At the player's mute and slider from the start: the settings
+             * are applied again only when they change, so the authored
+             * volume would otherwise play until then.  Zero is an authored
+             * mute. */
+            music_set_volume(game_music_volume(gs, def->music_volume));
         }
     }
 }
