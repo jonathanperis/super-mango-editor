@@ -32,9 +32,10 @@
 
 static EditorState *s_host;
 static int s_open;           /* a prompt is showing: never stack another */
+#ifdef MANGO_TESTING
 static int s_frames;
-
 static DialogLayout s_last_layout;   /* the last prompt's, for tests */
+#endif
 
 #ifdef MANGO_TESTING
 int dialog_choice_test_frames(void) { return s_frames; }
@@ -232,7 +233,9 @@ static void draw_prompt(EditorState *es, RenderTexture2D target, const char *tit
         (void)ui_toggle(ui, layout->button_x[i], layout->button_y, layout->button_w[i],
                         layout->button_h, labels[i], i == focus);
     display_present(target);   /* ends texture mode, presents, EndDrawing */
+#ifdef MANGO_TESTING
     s_frames++;
+#endif
 }
 
 /* ------------------------------------------------------------------ */
@@ -279,7 +282,9 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
         s_open = 0;
         return -1;
     }
+#ifdef MANGO_TESTING
     s_last_layout = layout;
+#endif
 
     /* Leave the frame being drawn, if any, remembering how to get back. */
     clip = es->ui.clip_active;
