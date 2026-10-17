@@ -62,6 +62,20 @@ typedef enum {
 /* Ask how to handle a source changed on disk. */
 EditorExternalChoice editor_confirm_external_change(EditorState *es);
 
+/* Frame rates for the editor's window with and without focus. */
+#define EDITOR_FPS_FOCUSED   60
+#define EDITOR_FPS_UNFOCUSED 10
+
+/* The frame cap a shown window should have: EDITOR_FPS_FOCUSED while it
+ * has focus, EDITOR_FPS_UNFOCUSED while another window does. 0 for a
+ * hidden window, whose own pacing (none, for smoke runs) stays as it is. */
+int editor_frame_rate_for(int hidden, int focused);
+
+/* Apply editor_frame_rate_for to the real window, calling SetTargetFPS only
+ * when the rate changes. Both frame loops call it: the editor's and a
+ * prompt's. A Memory-backend build has no real focus and skips it. */
+void editor_pace_frames(EditorState *es);
+
 #ifdef MANGO_TESTING
 /* Native-dialog seams used by focused editor state tests.  Only test builds
  * define MANGO_TESTING (see TEST_CFLAGS in the Makefile), so the shipped
