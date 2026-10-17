@@ -244,13 +244,14 @@ SANITIZE_ENV        = UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1$${UBSAN_
 all: $(OUTDIR) $(TARGET) ## Build: Compile the game into OUTDIR (default target)
 
 # raylib is rebuilt only when something that shapes it changes: the pin, the
-# patches, the build script, or the options below (kept in a flags stamp; see
+# patches, the gamepad database, the build script, or the options below (kept in a flags stamp; see
 # "Flag stamps" further down). build_raylib.py always re-runs CMake, and CMake
 # leaves libraylib.a untouched when nothing needed recompiling, so objects
 # that depend on the library rebuild only when the library really changed.
 # The rule therefore builds a separate "done" file, touched after every
 # successful run; a deleted library forces a run even when that file is fresh.
-RAYLIB_INPUTS = vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py
+RAYLIB_INPUTS = vendor/raylib/manifest.json vendor/raylib/patches.json tools/build_raylib.py \
+                vendor/raylib/gamecontrollerdb/gamecontrollerdb.txt
 RAYLIB_OPTIONS = --platform $(RAYLIB_PLATFORM) --cc "$(CC)" --mode $(BUILD_MODE) \
                  $(if $(findstring -fsanitize,$(CFLAGS)),--sanitize,) $(if $(filter null,$(RAYLIB_AUDIO)),--null-audio,)
 WEB_RAYLIB_OPTIONS = --platform web --mode release

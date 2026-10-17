@@ -72,6 +72,8 @@ def main():
             assert "super-mango-wasm/THIRD_PARTY_NOTICES.md" in bundle.namelist()
             assert b"raylib" in bundle.read("super-mango-wasm/licenses/raylib.txt")
             assert b"codec" in bundle.read("super-mango-wasm/licenses/raylib-dependencies/codec.h")
+            assert b"Sam Lantinga" in bundle.read(
+                "super-mango-wasm/licenses/raylib-dependencies/sdl-gamecontrollerdb.txt")
         check_reproducible_zips(root)
         (root / "super-mango-debug.html").unlink()
         try:
@@ -90,7 +92,9 @@ def main():
         (fixture / "levels/labs/example.toml").write_text("format_version = 1\n", encoding="utf-8")
         (fixture / "vendor/tomlc17").mkdir(parents=True)
         (fixture / "vendor/raylib").mkdir(parents=True)
-        for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "vendor/tomlc17/LICENSE", "vendor/raylib/manifest.json"):
+        (fixture / "vendor/raylib/gamecontrollerdb").mkdir(parents=True)
+        for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "vendor/tomlc17/LICENSE", "vendor/raylib/manifest.json",
+                     "vendor/raylib/gamecontrollerdb/LICENSE"):
             shutil.copy2(ROOT / name, fixture / name)
         windows = sys.platform == "win32"
         platform = "super-mango-windows-x86_64" if windows else "super-mango-native"
