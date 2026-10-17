@@ -365,6 +365,32 @@ done:
     return failed;
 }
 
+/* A scrolled panel still draws its fields scrolled out of view; those must
+ * not show the I-beam over whatever is under the pointer there. */
+static int scrolled_out_field_wants_no_ibeam(void)
+{
+    int failed = 0;
+    UIState ui;
+    UIScroll scroll = {0};
+    int value = 5;
+    ui_init(&ui, NULL);
+    ui_begin_frame(&ui);
+    ui.mouse_x = 20; ui.mouse_y = 150;   /* below the 100 px view */
+    int top = ui_scroll_begin(&scroll, 0, 0, 200, 100, 400);
+    (void)ui_int_field(&ui, 1, 10, top + 145, 80, &value);
+    ui_scroll_end();
+    CHECK(ui.cursor_wish != MOUSE_CURSOR_IBEAM);
+    /* The same field inside the view does want it. */
+    ui_begin_frame(&ui);
+    ui.mouse_x = 20; ui.mouse_y = 50;
+    top = ui_scroll_begin(&scroll, 0, 0, 200, 100, 400);
+    (void)ui_int_field(&ui, 1, 10, top + 45, 80, &value);
+    ui_scroll_end();
+    CHECK(ui.cursor_wish == MOUSE_CURSOR_IBEAM);
+done:
+    return failed;
+}
+
 /* WCAG relative luminance of an sRGB colour. */
 static double luminance(Color c)
 {
@@ -3842,6 +3868,7 @@ int main(void)
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
         CASE(ui_scroll_keeps_fractions_and_stays_in_range),
+        CASE(scrolled_out_field_wants_no_ibeam),
         CASE(ui_scrollbar_pages_drags_and_uses_its_clicks),
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
