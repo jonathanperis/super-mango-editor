@@ -210,7 +210,7 @@ TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validati
                    editor_playtest file_dialog dialog_choice undo)
 # The editor's own window, chrome and frame, for editor-ui-test.
 TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \
-                   editor_frame editor_textures)
+                   editor_frame editor_minimap editor_textures)
 TEST_AUDIO_OBJ     = $(TEST_OBJDIR)/$(SHARED_DIR)/audio.o
 TEST_TEXTURE_OBJ   = $(TEST_OBJDIR)/$(SHARED_DIR)/texture.o
 TEST_TEXT_OBJ      = $(TEST_OBJDIR)/$(SHARED_DIR)/text.o
