@@ -875,9 +875,12 @@ static int camera_jumps_to_the_respawn_point(void)
     gs.world.respawn_y = 252.0f;
     gs.world.hearts = 1;
     gs.world.player.hurt_timer = 0.0f;
+    gs.screen.coin_streak = (CoinStreak){.count = 5, .last_step = gs.world.sim_steps};
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
     CHECK(NEAR(gs.world.player.x, 48.0f + (TILE_SIZE - gs.world.player.w) / 2.0f, 0.01f));
     CHECK(gs.world.camera.x == 0.0f);
+    /* A new life's first coin plays the chime at its own pitch. */
+    CHECK(gs.screen.coin_streak.count == 0);
 
     /* Retry after game over does the same. */
     gs.world.camera.x = 1000.0f;
@@ -885,8 +888,12 @@ static int camera_jumps_to_the_respawn_point(void)
     gs.world.hearts = 1;
     apply_damage(&gs, 1, 0, 0.0f, 0.0f);
     CHECK(gs.screen.game_over);
+    /* The overlay holds the step clock, so only a reset ends the streak. */
+    gs.screen.coin_streak = (CoinStreak){.count = 5, .last_step = gs.world.sim_steps};
     game_restart_after_game_over(&gs);
     CHECK(!gs.screen.game_over && gs.world.camera.x == 0.0f);
+    CHECK(gs.screen.coin_streak.count == 0 &&
+          coin_streak_pitch(&gs.screen.coin_streak, gs.world.sim_steps) == 1.0f);
 done:
     game_cleanup(&gs);
     return failed;

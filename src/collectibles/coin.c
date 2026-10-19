@@ -14,8 +14,9 @@ static const float s_semitones[COIN_STREAK_MAX_RISE + 1] = {
 
 float coin_streak_pitch(CoinStreak *streak, uint32_t step)
 {
-    /* Unsigned subtraction: a step clock that restarted (a new level or
-     * attempt) is "before" the last pickup, a huge gap, so a new streak. */
+    /* Unsigned subtraction: a step clock that went back is "before" the
+     * last pickup, a huge gap, so a new streak. Level loads and respawns
+     * also clear the streak (level_loader.c). */
     if (streak->count > 0 && step - streak->last_step <= COIN_STREAK_GAP_STEPS) streak->count++;
     else streak->count = 1;
     streak->last_step = step;
