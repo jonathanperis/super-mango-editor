@@ -1063,8 +1063,11 @@ static int ghost_records_and_races_the_best_run(void)
     game_ghost_set_best(&gs, &run);
     CHECK(run.samples == NULL && gs.screen.ghost->best.count == 40);
     CHECK(game_ghost_current(&gs) == &gs.screen.ghost->best.samples[0]);
+    CHECK(game_ghost_previous(&gs) == &gs.screen.ghost->best.samples[0]);
     CHECK(mechanics_frames(&gs, 10) == 10);
     CHECK(game_ghost_current(&gs) == &gs.screen.ghost->best.samples[9]);
+    /* Drawn between this sample and the one before, like the player. */
+    CHECK(game_ghost_previous(&gs) == &gs.screen.ghost->best.samples[8]);
     profile.data.settings.ghost = 0;
     CHECK(game_ghost_current(&gs) == NULL);  /* Ghost: Off */
     profile.data.settings.ghost = 1;

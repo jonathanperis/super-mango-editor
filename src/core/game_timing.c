@@ -65,7 +65,7 @@ static float blend(float from, float to, float t)
 
 GameRenderView game_timing_render_view(const GameState *gs, int cam_x)
 {
-    GameRenderView view = {cam_x, gs->world.player.x, gs->world.player.y};
+    GameRenderView view = {cam_x, gs->world.player.x, gs->world.player.y, 1.0f};
     const GameLoopState *loop = &gs->screen.loop;
     if (!loop->has_prev || gs->screen.debug_mode || gs->screen.replay_script_path[0] ||
         gs->screen.smoke_test_frames > 0 || loop->smoke_frames_run > 0 || gs->screen.experiment)
@@ -73,16 +73,22 @@ GameRenderView game_timing_render_view(const GameState *gs, int cam_x)
     float t = (float)(loop->accumulator / GAME_FIXED_STEP);
     if (t < 0.0f) t = 0.0f;
     if (t > 1.0f) t = 1.0f;
+    view.t = t;
     view.cam_x = (int)blend(loop->prev_camera_x, gs->world.camera.x, t);
+    game_timing_view_point(&view, loop->prev_player_x, loop->prev_player_y, &view.player_x, &view.player_y);
+    return view;
+}
+
+void game_timing_view_point(const GameRenderView *view, float from_x, float from_y, float *x, float *y)
+{
     /* A respawn may move one axis far and not the other; both belong to
-     * the same jump, so either one snaps the player to where it is now. */
-    float dx = gs->world.player.x - loop->prev_player_x, dy = gs->world.player.y - loop->prev_player_y;
+     * the same jump, so either one shows the point where it is now. */
+    float dx = *x - from_x, dy = *y - from_y;
     if (dx <= GAME_INTERP_MAX_JUMP && dx >= -GAME_INTERP_MAX_JUMP &&
         dy <= GAME_INTERP_MAX_JUMP && dy >= -GAME_INTERP_MAX_JUMP) {
-        view.player_x = loop->prev_player_x + dx * t;
-        view.player_y = loop->prev_player_y + dy * t;
+        *x = from_x + dx * view->t;
+        *y = from_y + dy * view->t;
     }
-    return view;
 }
 
 void game_timing_tick_smoke(GameState *gs)
