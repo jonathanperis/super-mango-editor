@@ -777,6 +777,8 @@ void level_apply(GameState *gs, const LevelDef *def)
     /* A new level, or F8's restart of this one, starts its simulated clock
      * at 0, so a restarted run counts the same steps as the first one. */
     world->sim_steps = 0;
+    /* The coin chime's streak belongs to one attempt, not to the clock. */
+    gs->screen.coin_streak = (CoinStreak){0};
     world->player.spawn_x = world->respawn_x;
     world->player.spawn_y = world->respawn_y;
     world->player.x = world->respawn_x + (TILE_SIZE - world->player.w) / 2.0f;
@@ -828,6 +830,10 @@ void level_apply(GameState *gs, const LevelDef *def)
 void level_reset(GameState *gs, const LevelDef *def)
 {
     player_reset(&gs->world.player);
+    /* A respawn or a Retry is a new run at the coins: the chime starts low.
+     * Retry keeps sim_steps (the overlay held it), so the step gap alone
+     * would carry the last attempt's streak over. */
+    gs->screen.coin_streak = (CoinStreak){0};
 
     for (int i = 0; i < ARRAY_LEN(s_level_loaders); i++)
         if (s_level_loaders[i].when == LOAD_EVERY_LIFE)
