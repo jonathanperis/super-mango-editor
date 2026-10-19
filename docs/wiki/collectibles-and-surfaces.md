@@ -14,7 +14,7 @@ Collectibles are items the player can pick up. Surfaces are interactive terrain 
 
 **File:** `src/collectibles/coin.c` / `coin.h`  
 **Sprite:** `assets/sprites/collectibles/coin.png` — 16×16 px display size  
-**Pickup:** AABB overlap with player. Plays `gs->assets.audio.coin` on collection. A coin picked up within 0.75 s (`COIN_STREAK_GAP_STEPS`, 45 fixed steps) of the previous one plays its chime a semitone higher, up to eight semitones (`COIN_STREAK_MAX_RISE`); a longer gap, or a new attempt, starts again at the recorded pitch. The streak (`CoinStreak` in `GameScreen`, `coin_streak_pitch` in `coin.c`) reads only the world's step clock and nothing in the simulation reads it, so it is the same in every replay and never changes one.
+**Pickup:** AABB overlap with player. Plays `gs->assets.audio.coin` on collection. A coin picked up within 0.75 s (`COIN_STREAK_GAP_STEPS`, 45 fixed steps) of the previous one plays its chime a semitone higher, up to eight semitones (`COIN_STREAK_MAX_RISE`); a longer gap, a lost life, a Retry or a new level starts again at the recorded pitch (`level_reset` and `level_apply` clear the streak). The streak (`CoinStreak` in `GameScreen`, `coin_streak_pitch` in `coin.c`) reads only the world's step clock and nothing in the simulation reads it, so it is the same in every replay and never changes one.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
