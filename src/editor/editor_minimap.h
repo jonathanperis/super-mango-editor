@@ -28,6 +28,11 @@ float editor_minimap_world_x(const EditorState *es, int sx);
 /* Centre the canvas on the world x under strip column sx (zoom kept). */
 void editor_minimap_jump(EditorState *es, int sx);
 
+/* Where a world rectangle lands on the strip, clipped to it: 1 and the
+ * screen rectangle when any of it shows, 0 otherwise. */
+int editor_minimap_strip_rect(float world_w, float x, float y, float w, float h,
+                              int *left, int *top, int *width, int *height);
+
 /* Draw the strip, and scroll the canvas while a press that began on it is
  * held. Called by the status bar; nothing while the Campaign view is open. */
 void editor_minimap_render(EditorState *es);
