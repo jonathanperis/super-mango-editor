@@ -670,6 +670,24 @@ static int render_view_interpolates_without_touching_the_run(void)
     CHECK(game_timing_render_view(&gs, 54).cam_x == 54);
     gs.screen.smoke_test_frames = 0;
 
+    /* The ghost goes through the same blend: a ghost on the player's last
+     * two steps is drawn exactly where the player is. A latest-step view
+     * (t = 1) leaves it on its latest sample, and a jump snaps it there. */
+    gs.screen.loop.accumulator = GAME_FIXED_STEP * 0.5;
+    view = game_timing_render_view(&gs, 54);
+    float gx = 104.0f, gy = 198.0f;
+    game_timing_view_point(&view, 100.0f, 200.0f, &gx, &gy);
+    CHECK(view.t == 0.5f && gx == view.player_x && gy == view.player_y);
+    gx = 900.0f; gy = 198.0f;
+    game_timing_view_point(&view, 100.0f, 200.0f, &gx, &gy);
+    CHECK(gx == 900.0f && gy == 198.0f);
+    gs.screen.debug_mode = 1;
+    view = game_timing_render_view(&gs, 54);
+    gx = 104.0f; gy = 198.0f;
+    game_timing_view_point(&view, 100.0f, 200.0f, &gx, &gy);
+    CHECK(view.t == 1.0f && gx == 104.0f && gy == 198.0f);
+    gs.screen.debug_mode = 0;
+
     /* Noting each step changes nothing the simulation keeps. */
     GameState a = {0}, b = {0};
     stand_player_on_floor(&a, 100.0f);

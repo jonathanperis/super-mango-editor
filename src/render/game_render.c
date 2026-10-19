@@ -17,7 +17,7 @@
  */
 
 #include "game_render.h"
-#include "../core/game_timing.h"      /* game_timing_render_view */
+#include "../core/game_timing.h"      /* game_timing_render_view, game_timing_view_point */
 #include "../core/game_checkpoint.h"  /* game_checkpoint_clock_ms */
 #include "../screens/settings_menu.h"
 
@@ -427,6 +427,10 @@ static void render_faster_birds(GameState *gs, int cam_x)
 /* Layers 29-33: ghost, player, fog, HUD and debug                     */
 /* ------------------------------------------------------------------ */
 
+/* This frame's view between the last two steps (game_timing_render_view),
+ * set by game_render_frame before the layers run. Render-only. */
+static GameRenderView s_view;
+
 /*
  * Layer 29: the time-trial ghost. Mango as he was at this moment of the
  * best run (game_ghost.c picks the sample), drawn just behind the real one.
@@ -447,9 +451,13 @@ static void render_ghost(GameState *gs, int cam_x)
     IntRect source = {(cell % GHOST_SHEET_COLS) * GHOST_SHEET_FRAME,
                       (cell / GHOST_SHEET_COLS) * GHOST_SHEET_FRAME,
                       GHOST_SHEET_FRAME, GHOST_SHEET_FRAME};
-    /* Stored positions carry GHOST_COORD_OFFSET; take it off again. */
-    IntRect dest = {(int)sample->x - GHOST_COORD_OFFSET - cam_x, (int)sample->y - GHOST_COORD_OFFSET,
-                    gs->world.player.w, gs->world.player.h};
+    /* Stored positions carry GHOST_COORD_OFFSET; take it off again. Drawn
+     * between its last two samples like the player between its last two
+     * steps, so a run that matches the best one shows them together. */
+    const GhostSample *prev = game_ghost_previous(gs);
+    float x = (float)sample->x - GHOST_COORD_OFFSET, y = (float)sample->y - GHOST_COORD_OFFSET;
+    game_timing_view_point(&s_view, (float)prev->x - GHOST_COORD_OFFSET, (float)prev->y - GHOST_COORD_OFFSET, &x, &y);
+    IntRect dest = {(int)x - cam_x, (int)y, gs->world.player.w, gs->world.player.h};
     int flip = (sample->cell & GHOST_CELL_FACING_LEFT) ? SPRITE_FLIP_X : SPRITE_NORMAL;
     Color tint = {255, 255, 255, (unsigned char)(high_contrast ? 170 : 120)};
     sprite_draw(gs->world.player.texture, &source, &dest, 0, flip, tint);
@@ -463,10 +471,6 @@ static void render_ghost(GameState *gs, int cam_x)
 
 /* Layer 30: the player, after every enemy and hazard, so nothing in the
  * level hides them. */
-/* This frame's view between the last two steps (game_timing_render_view),
- * set by game_render_frame before the layers run. Render-only. */
-static GameRenderView s_view;
-
 /* The player as this frame draws it: a copy at the view's position, so
  * drawing never writes to the simulated player. */
 static Player shown_player(const GameState *gs)
