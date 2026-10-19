@@ -98,6 +98,11 @@ void game_ghost_step(GameState *gs);
  * already reached its star. game_render.c draws it. */
 const GhostSample *game_ghost_current(const GameState *gs);
 
+/* The best run's sample one step before game_ghost_current (the same one
+ * at its first sample; NULL when there is no ghost to draw). Drawing
+ * blends the two, as it does the player's last two steps. */
+const GhostSample *game_ghost_previous(const GameState *gs);
+
 /* Copy this finished attempt into out (owned; free with
  * game_ghost_track_free). Returns -1 when the attempt cannot be a ghost:
  * it continued from a saved point or a start point, ran too long, or

@@ -93,6 +93,14 @@ const GhostSample *game_ghost_current(const GameState *gs)
     return &ghost->best.samples[index];
 }
 
+const GhostSample *game_ghost_previous(const GameState *gs)
+{
+    const GhostSample *sample = game_ghost_current(gs);
+    /* The first sample has none before it: the ghost stands there. */
+    if (!sample || sample == gs->screen.ghost->best.samples) return sample;
+    return sample - 1;
+}
+
 int game_ghost_take_run(const GameState *gs, GameGhostTrack *out)
 {
     const GameGhost *ghost = gs->screen.ghost;

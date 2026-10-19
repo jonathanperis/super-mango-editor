@@ -95,6 +95,8 @@ void game_timing_tick_smoke(GameState *gs);
 typedef struct {
     int   cam_x;            /* camera left edge to draw with              */
     float player_x, player_y; /* where to draw the player sprite           */
+    float t;                /* share of a step past the previous one; 1
+                               draws the latest step itself               */
 } GameRenderView;
 
 /* Remember the player and camera as they are before the next fixed step. */
@@ -106,3 +108,10 @@ void game_timing_note_step(GameState *gs);
  * pictures must not depend on frame timing; otherwise between the last two
  * steps by the accumulator's fraction of a step. */
 GameRenderView game_timing_render_view(const GameState *gs, int cam_x);
+
+/* Move (*x, *y), a position after the latest step, back toward (from_x,
+ * from_y), where it was one step earlier, as the view draws the player:
+ * by the view's t, and not at all when either axis moved more than
+ * GAME_INTERP_MAX_JUMP. The time-trial ghost goes through it too, so a run
+ * that matches the best one draws both in the same place. */
+void game_timing_view_point(const GameRenderView *view, float from_x, float from_y, float *x, float *y);
