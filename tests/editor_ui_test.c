@@ -1001,6 +1001,20 @@ static int minimap_jumps_and_drags_the_view(void)
     es.camera.x = 0.0f;
     click_frame(&es, mid, y);
     CHECK(es.camera.x > 0.0f && !es.minimap_dragging);
+    /* A hand-edited level can hold any number: the strip clips it as a
+     * float, before it becomes a pixel, and draws nothing outside itself. */
+    int l, t, w, h;
+    CHECK(editor_minimap_strip_rect(world_w, 0.0f, 0.0f, 1e30f, 1e30f, &l, &t, &w, &h) &&
+          l == EDITOR_MINIMAP_X && t == EDITOR_MINIMAP_Y &&
+          w == EDITOR_MINIMAP_WIDTH && h == EDITOR_MINIMAP_HEIGHT);
+    CHECK(!editor_minimap_strip_rect(world_w, 1e30f, 1e30f, 16.0f, 16.0f, &l, &t, &w, &h));
+    CHECK(!editor_minimap_strip_rect(world_w, -1e30f, -1e30f, 16.0f, 16.0f, &l, &t, &w, &h));
+    CHECK(editor_minimap_strip_rect(world_w, -1e30f, -1e30f, INFINITY, INFINITY, &l, &t, &w, &h) &&
+          l == EDITOR_MINIMAP_X && w == EDITOR_MINIMAP_WIDTH);
+    CHECK(!editor_minimap_strip_rect(world_w, NAN, NAN, 16.0f, 16.0f, &l, &t, &w, &h));
+    /* Inside the level, a small entity is still a pixel where it stands. */
+    CHECK(editor_minimap_strip_rect(world_w, world_w / 2.0f, 0.0f, 1.0f, 1.0f, &l, &t, &w, &h) &&
+          l == EDITOR_MINIMAP_X + EDITOR_MINIMAP_WIDTH / 2 && w == 1 && h == 1);
 done:
     close_editor(&es);
     return failed;

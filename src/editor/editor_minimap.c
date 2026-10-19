@@ -7,6 +7,9 @@
  */
 
 #include "editor_minimap.h"
+
+#include <math.h> /* floorf, truncf */
+
 #include "canvas.h"      /* canvas_clamp_camera */
 #include "entity_meta.h" /* editor_entity_count, editor_entity_category, editor_world_width */
 #include "hit_test.h"    /* editor_entity_bounds */
@@ -50,19 +53,39 @@ void editor_minimap_jump(EditorState *es, int sx)
 
 /* World rectangle to strip pixels: x by the level's width, y by the
  * world's 300 px height, never thinner than one pixel so a coin shows. */
-static void draw_world_rect(float world_w, float x, float y, float w, float h, Color color)
+/* A strip coordinate, clipped to [0, max] while still a float: converting
+ * an out-of-range float to int is undefined, and a hand-edited level can
+ * hold any number. NaN counts as 0. */
+static float strip_clamp(float v, int max)
+{
+    if (!(v > 0.0f)) return 0.0f;
+    return v > (float)max ? (float)max : v;
+}
+
+int editor_minimap_strip_rect(float world_w, float x, float y, float w, float h,
+                              int *left, int *top, int *width, int *height)
 {
     float sx = (float)EDITOR_MINIMAP_WIDTH / world_w, sy = (float)EDITOR_MINIMAP_HEIGHT / (float)GAME_H;
-    int left = EDITOR_MINIMAP_X + (int)(x * sx), top = EDITOR_MINIMAP_Y + (int)(y * sy);
-    int width = (int)(w * sx), height = (int)(h * sy);
-    if (width < 1) width = 1;
-    if (height < 1) height = 1;
+    /* At least a pixel each way, so the smallest entity still shows. */
+    float pw = w * sx, ph = h * sy;
+    pw = pw >= 1.0f ? floorf(pw) : 1.0f;
+    ph = ph >= 1.0f ? floorf(ph) : 1.0f;
+    float x0 = truncf(x * sx), y0 = truncf(y * sy);
     /* Keep everything inside the strip, whatever a hand-edited level says. */
-    if (left < EDITOR_MINIMAP_X) { width -= EDITOR_MINIMAP_X - left; left = EDITOR_MINIMAP_X; }
-    if (top < EDITOR_MINIMAP_Y) { height -= EDITOR_MINIMAP_Y - top; top = EDITOR_MINIMAP_Y; }
-    if (left + width > EDITOR_MINIMAP_X + EDITOR_MINIMAP_WIDTH) width = EDITOR_MINIMAP_X + EDITOR_MINIMAP_WIDTH - left;
-    if (top + height > EDITOR_MINIMAP_Y + EDITOR_MINIMAP_HEIGHT) height = EDITOR_MINIMAP_Y + EDITOR_MINIMAP_HEIGHT - top;
-    if (width > 0 && height > 0) DrawRectangle(left, top, width, height, color);
+    int l = (int)strip_clamp(x0, EDITOR_MINIMAP_WIDTH), r = (int)strip_clamp(x0 + pw, EDITOR_MINIMAP_WIDTH);
+    int t = (int)strip_clamp(y0, EDITOR_MINIMAP_HEIGHT), b = (int)strip_clamp(y0 + ph, EDITOR_MINIMAP_HEIGHT);
+    *left = EDITOR_MINIMAP_X + l;
+    *top = EDITOR_MINIMAP_Y + t;
+    *width = r - l;
+    *height = b - t;
+    return *width > 0 && *height > 0;
+}
+
+static void draw_world_rect(float world_w, float x, float y, float w, float h, Color color)
+{
+    int left, top, width, height;
+    if (editor_minimap_strip_rect(world_w, x, y, w, h, &left, &top, &width, &height))
+        DrawRectangle(left, top, width, height, color);
 }
 
 void editor_minimap_render(EditorState *es)
