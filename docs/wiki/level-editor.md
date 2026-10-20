@@ -229,7 +229,11 @@ clicked last stays highlighted, and `Ctrl+C` copies its text until you click
 somewhere else, even when the click put the caret in the field it names. The
 level-wide fields are:
 
-- `name`, `description`, `generated_by`
+- `name`, `description`, `generated_by`. The description may span several
+  lines: `Shift+Enter` starts a new one. A field shows a line break as `¶`
+  and keeps to its own row; text too wide for it ends in `...` until you
+  click it. An empty field shows a dim hint, such as `(none: the last level)`
+  for the next-phase path.
 - `screen_count` (1–99; world width = screen_count × 400 px)
 - `next_phase` path (saved under `[last_star]` in TOML; it must follow the [level-reference rule](../level-design/#level-references))
 - `music_path` (dropdown: none, water, lava, winds) and `music_volume` (0–128)

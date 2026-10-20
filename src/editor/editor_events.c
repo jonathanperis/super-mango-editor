@@ -354,7 +354,12 @@ static void editor_key(EditorState *es, const InputEvent *event)
         case KEY_UP:        ui_edit_key(&es->ui, UI_KEY_UP, shift);    break;
         case KEY_DOWN:      ui_edit_key(&es->ui, UI_KEY_DOWN, shift);  break;
         case KEY_TAB:       ui_focus_next(&es->ui, shift ? -1 : 1); break;
-        case KEY_ENTER: case KEY_KP_ENTER: es->ui.key_return = 1;  break;
+        case KEY_ENTER: case KEY_KP_ENTER:
+            /* Shift+Enter starts a new line in a field that keeps them
+             * (the level description); Enter alone confirms. */
+            if (shift && es->ui.edit_multiline) ui_queue_text_input(&es->ui, "\n");
+            else es->ui.key_return = 1;
+            break;
         default: break;
         }
         return;

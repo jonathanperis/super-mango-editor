@@ -165,6 +165,7 @@ static void clear_active_edit(UIState *ui)
 {
     ui->active_id = 0;
     ui->edit_type = UI_EDIT_NONE;
+    ui->edit_multiline = 0;
     ui->edit_target = NULL;
     ui->edit_target_size = 0;
     ui->edit_int_min = INT_MIN;
@@ -227,7 +228,7 @@ static void apply_pending_text_input(UIState *ui)
 
     for (i = 0; i < ui->pending_text_length;) {
         unsigned char ch = (unsigned char)ui->pending_text_input[i];
-        int accepted = ch >= ' ';
+        int accepted = ch >= ' ' || (ch == '\n' && ui->edit_multiline);
         size_t bytes = 1;
         if (ui->edit_type == UI_EDIT_TEXT) {
             /* Take one whole character.  Pasted text, or a lone surrogate
@@ -667,16 +668,67 @@ static void draw_field_border(UIState *ui, int x, int y, int w, int h, int is_ac
 }
 
 /*
+ * field_display_copy — Copy up to `length` bytes of a field's text into
+ * out as it is shown: each line break becomes a pilcrow (U+00B6, in the
+ * default font), since DrawTextEx would start a new line and draw over the
+ * fields below.  Stops early rather than split a pilcrow; returns the
+ * number of source bytes copied.
+ */
+#define FIELD_PILCROW "\xC2\xB6"
+static int text_width_of(UIState *ui, const char *text, size_t from, size_t to);
+static size_t field_display_copy(char *out, size_t out_size, const char *text, size_t length)
+{
+    size_t used = 0, i = 0;
+
+    if (out_size == 0) return 0;
+    for (; i < length && text[i] != '\0'; i++) {
+        if (text[i] == '\n') {
+            if (used + 2 >= out_size) break;
+            memcpy(out + used, FIELD_PILCROW, 2);
+            used += 2;
+        } else {
+            if (used + 1 >= out_size) break;
+            out[used++] = text[i];
+        }
+    }
+    out[used] = '\0';
+    return i;
+}
+
+/*
+ * draw_field_text — Draw a field's idle text from x: line breaks shown as
+ * pilcrows, and text wider than max_width cut at a character boundary and
+ * ended with "..." so it never runs past the field.
+ */
+static void draw_field_text(UIState *ui, int x, int y, int max_width,
+                            const char *text, Color color)
+{
+    char shown[UI_EDIT_BUFFER_SIZE * 2];
+    size_t length = strlen(text);
+
+    (void)field_display_copy(shown, sizeof(shown), text, length);
+    if (ui_text_width(ui, shown) > max_width) {
+        int room = max_width - ui_text_width(ui, "...");
+        size_t keep = length;
+        while (keep > 0) {
+            keep--;
+            while (keep > 0 && is_continuation_byte(text[keep])) keep--;
+            if (text_width_of(ui, text, 0, keep) <= room) break;
+        }
+        (void)field_display_copy(shown, sizeof(shown) - 3, text, keep);
+        strcat(shown, "...");
+    }
+    draw_text(ui, x, y, shown, color);
+}
+
+/*
  * text_width_of — Width in pixels of the bytes [from, to) of text.
  */
 static int text_width_of(UIState *ui, const char *text, size_t from, size_t to)
 {
-    char part[UI_EDIT_BUFFER_SIZE];
-    size_t length = to > from ? to - from : 0;
+    char part[UI_EDIT_BUFFER_SIZE * 2];
 
-    if (length >= sizeof(part)) length = sizeof(part) - 1;
-    memcpy(part, text + from, length);
-    part[length] = '\0';
+    (void)field_display_copy(part, sizeof(part), text + from, to > from ? to - from : 0);
     return ui_text_width(ui, part);
 }
 
@@ -767,7 +819,7 @@ static void edit_mouse(UIState *ui, int x, int y, int w, int h, int activated)
 
 static void draw_active_edit(UIState *ui, int x, int y, int w)
 {
-    char display[UI_EDIT_BUFFER_SIZE];
+    char display[UI_EDIT_BUFFER_SIZE * 2];
     const char *text = ui->edit_buf;
     const size_t length = strlen(text);
     const int max_width = w - 8;             /* 4 px padding on each side */
@@ -797,8 +849,7 @@ static void draw_active_edit(UIState *ui, int x, int y, int w)
         int left = x + 4 + text_width_of(ui, text, start, lo);
         draw_rect(left, y + 2, text_width_of(ui, text, lo, hi), 16, ui_color(ui, UI_COLOR_SELECTED));
     }
-    memcpy(display, text + start, end - start);
-    display[end - start] = '\0';
+    (void)field_display_copy(display, sizeof(display), text + start, end - start);
     draw_text(ui, x + 4, y + 3, display, ui_color(ui, UI_COLOR_TEXT));
 
     /*
@@ -1241,6 +1292,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
          */
         ui->active_id = id;
         ui->edit_type = UI_EDIT_INT;
+        ui->edit_multiline = 0;
         ui->edit_target = value;
         ui->edit_target_size = sizeof(*value);
         ui->edit_int_min = min;
@@ -1364,6 +1416,7 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
         (clicked_on && command_allows_activation(ui, id))) {
         ui->active_id = id;
         ui->edit_type = UI_EDIT_FLOAT;
+        ui->edit_multiline = 0;
         ui->edit_target = value;
         ui->edit_target_size = sizeof(*value);
         ui->edit_float_min = min;
@@ -1441,6 +1494,12 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
 int ui_text_field(UIState *ui, int id, int x, int y, int w,
                   char *buf, int buf_size)
 {
+    return ui_text_field_hint(ui, id, x, y, w, buf, buf_size, NULL, 0);
+}
+
+int ui_text_field_hint(UIState *ui, int id, int x, int y, int w, char *buf, int buf_size,
+                       const char *hint, int multiline)
+{
     int h         = 20;
     int is_active = (ui->active_id == id);
     int changed   = 0;
@@ -1458,6 +1517,7 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
         (clicked_on && command_allows_activation(ui, id))) {
         ui->active_id = id;
         ui->edit_type = UI_EDIT_TEXT;
+        ui->edit_multiline = multiline;
         ui->edit_target = buf;
         ui->edit_target_size = buf_size;
         /*
@@ -1523,9 +1583,10 @@ int ui_text_field(UIState *ui, int id, int x, int y, int w,
     /* --- Draw display text --- */
     if (is_active) {
         draw_active_edit(ui, x, y, w);
-    } else {
-        draw_text(ui, x + 4, y + 3,
-                  buf[0] ? buf : "Untitled", ui_color(ui, UI_COLOR_TEXT_DIM));
+    } else if (buf[0]) {
+        draw_field_text(ui, x + 4, y + 3, w - 8, buf, ui_color(ui, UI_COLOR_TEXT));
+    } else if (hint) {
+        draw_field_text(ui, x + 4, y + 3, w - 8, hint, ui_color(ui, UI_COLOR_TEXT_DIM));
     }
 
     return changed;
@@ -1591,7 +1652,8 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     const char *current = (*selected >= 0 && *selected < count)
                           ? options[*selected]
                           : "---";
-    draw_text(ui, x + 4, y + 3, current, ui_color(ui, UI_COLOR_TEXT));
+    /* Room for the "v" arrow at the right. */
+    draw_field_text(ui, x + 4, y + 3, w - 22, current, ui_color(ui, UI_COLOR_TEXT));
 
     /*
      * Draw a small "▼" indicator on the right side of the header to signal

@@ -130,6 +130,9 @@ typedef struct {
      * mouse_down must be filled in each frame for this (after events). */
     int edit_drag, edit_drag_from;
     UIEditType edit_type;
+    /* The active text field keeps line breaks: Shift+Enter (queued as
+     * "\n" text) and pasted newlines go in instead of being dropped. */
+    int edit_multiline;
     void *edit_target;          /* borrowed destination, interpreted by edit_type */
     int edit_target_size;
     /* Limits of the active integer field. Every commit path (Return, or the
@@ -333,6 +336,12 @@ int ui_float_field_nonzero(UIState *ui, int id, int x, int y, int w,
                            float *value, float limit);
 /* buf_size includes the final NUL byte. Paste/backspace preserve UTF-8 units. */
 int ui_text_field(UIState *ui, int id, int x, int y, int w, char *buf, int buf_size);
+/* ui_text_field showing `hint` (dimmed) while the text is empty.  With
+ * multiline, Shift+Enter starts a new line.  Either way a line break is
+ * shown as a pilcrow, so the text stays on the field's one row, and text
+ * wider than the field ends in "..." until the field is clicked. */
+int ui_text_field_hint(UIState *ui, int id, int x, int y, int w, char *buf, int buf_size,
+                       const char *hint, int multiline);
 /* Open/close the option list on click; update *selected and return 1 only
  * when the choice changes. Labels are borrowed from the caller's array.
  * A *selected outside [0, count) means "not one of these options" (a

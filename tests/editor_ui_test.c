@@ -3740,6 +3740,78 @@ done:
     return failed;
 }
 
+/* Does the side panel, drawn alone, use the text colour anywhere in the
+ * rectangle?  (Memory readback is bottom-origin BGRA, see toolbar_pixel.) */
+static int panel_has_text_in(EditorState *es, int x, int y, int w, int h)
+{
+    Color ink = ui_color(&es->ui, UI_COLOR_TEXT);
+    int found = 0;
+    es->ui.mouse_x = NEUTRAL_X;
+    es->ui.mouse_y = NEUTRAL_Y;
+    BeginDrawing();
+    ClearBackground(BLACK);
+    editor_render_side_panels(es);
+    rlDrawRenderBatchActive();
+    Image shot = LoadImageFromScreen();
+    EndDrawing();
+    if (!IsImageValid(shot)) return -1;
+    for (int py = y; py < y + h && !found; py++) {
+        for (int px = x; px < x + w && !found; px++) {
+#ifdef MANGO_MEMORY_TESTS
+            Color c = GetImageColor(shot, px, shot.height - 1 - py);
+            unsigned char red = c.r;
+            c.r = c.b;
+            c.b = red;
+#else
+            Color c = GetImageColor(shot, px, py);
+#endif
+            found = same_color(c, ink);
+        }
+    }
+    UnloadImage(shot);
+    return found;
+}
+
+/*
+ * A field shows its text on its own row: a line break is a pilcrow rather
+ * than a second line drawn over the field below, and text wider than the
+ * field stops at "..." inside it.  Shift+Enter adds a line break to the
+ * description, the one field that keeps them; elsewhere it is dropped.
+ */
+static int text_fields_keep_line_breaks_on_one_row(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int desc_y = CFG_NAME_Y - 4 + 24, field_x = CANVAS_W + 55;
+    CHECK(open_editor(&es, NULL) == 0);
+    snprintf(es.level.description, sizeof(es.level.description),
+             "Line one of a description far too long for its field\nLine two");
+    /* Under the field (the gap above By) and right of it: no text. */
+    CHECK(panel_has_text_in(&es, field_x, desc_y + 3, 300, 12) == 1);
+    CHECK(panel_has_text_in(&es, field_x, desc_y + 20, 310, 4) == 0);
+    CHECK(panel_has_text_in(&es, field_x + 310, desc_y, PANEL_W - 55 - 310, 20) == 0);
+
+    snprintf(es.level.description, sizeof(es.level.description), "ab");
+    click_frame(&es, field_x + 100, desc_y + 4);
+    CHECK(es.ui.active_id == 9001 && es.ui.edit_multiline);
+    key_frame(&es, KEY_END, 0);
+    key_frame(&es, KEY_LEFT, 0);
+    key_frame(&es, KEY_ENTER, INPUT_SHIFT);
+    CHECK(es.ui.active_id == 9001);
+    text_frame(&es, "c");
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.ui.active_id == 0 && strcmp(es.level.description, "a\ncb") == 0);
+
+    click_frame(&es, field_x + 100, CFG_NAME_Y);
+    CHECK(es.ui.active_id == 9000 && !es.ui.edit_multiline);
+    key_frame(&es, KEY_END, 0);
+    key_frame(&es, KEY_ENTER, INPUT_SHIFT);
+    CHECK(es.ui.active_id == 0 && strcmp(es.level.name, "Untitled") == 0);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int text_fields_select_copy_cut_and_paste(void)
 {
     int failed = 0;
@@ -4367,6 +4439,7 @@ int main(void)
         CASE(box_and_shift_select_act_on_the_group),
         CASE(validation_rows_scroll_and_copy),
         CASE(text_fields_select_copy_cut_and_paste),
+        CASE(text_fields_keep_line_breaks_on_one_row),
         CASE(dropped_level_opens_like_a_recent_file),
         CASE(drop_during_the_prompt_waits_its_turn),
         CASE(shipped_wav_loop_opens_unmodified),
