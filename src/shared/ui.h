@@ -324,6 +324,9 @@ void ui_label_color(UIState *ui, int x, int y, const char *text, Color color);
  * the whole text as a tooltip (text is borrowed until ui_draw_overlays).
  * Returns 1 when the text was cut. */
 int ui_label_fit(UIState *ui, int x, int y, int max_w, const char *text, Color color);
+/* A label that explains itself: resting the pointer on it shows `tip`
+ * (borrowed until ui_draw_overlays), like a widget's ui_tooltip. */
+void ui_label_tip(UIState *ui, int x, int y, const char *text, const char *tip);
 /* Decorative background only: panels do not own widgets or handle input. */
 void ui_panel(UIState *ui, int x, int y, int w, int h);
 

@@ -5142,15 +5142,16 @@ static int field_limits_apply_on_every_commit_path(void)
     if (expect_int("applied screens clamp", es.level.screen_count, 1) != 0 ||
         expect_int("applied screens undo", es.undo->top, 1) != 0) goto done;
 
-    /* Hearts: the same through the finish dialog... */
-    es.level.initial_hearts = 3;
+    /* Hearts: the same through the finish dialog, capped at MAX_HEARTS
+     * (0 is allowed: it means the default)... */
+    es.level.initial_hearts = 2;
     config_frame(&es, NULL, 1, CFG_X + 80, CFG_HEARTS_Y + 4);
     if (expect_int("hearts active", es.ui.active_id, 9006) != 0) goto done;
-    strcpy(es.ui.edit_buf, "0");
+    strcpy(es.ui.edit_buf, "7");
     es.ui.edit_cursor = 1;
     editor_test_set_finish_field_choice(1);
     editor_handle_event(&es, &event);
-    if (expect_int("applied hearts clamp", es.level.initial_hearts, 1) != 0) goto done;
+    if (expect_int("applied hearts clamp", es.level.initial_hearts, 3) != 0) goto done;
 
     /* Music volume accepts the whole 0..128 range the format allows (it
      * used to stop at 99). */

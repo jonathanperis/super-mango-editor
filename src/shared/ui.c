@@ -1270,6 +1270,14 @@ int ui_label_fit(UIState *ui, int x, int y, int max_w, const char *text, Color c
     return 1;
 }
 
+void ui_label_tip(UIState *ui, int x, int y, const char *text, const char *tip)
+{
+    ui_label(ui, x, y, text);
+    if (!text || !text[0]) return;
+    note_widget(ui, x, y - 2, ui_text_width(ui, text), 16);
+    ui_tooltip(ui, tip);
+}
+
 /* ------------------------------------------------------------------ */
 
 /*
