@@ -4,6 +4,7 @@
 
 #include "editor_clipboard.h"
 
+#include "../levels/level_validate.h" /* level_validate_preview */
 #include "../levels/level_loader.h" /* level_validate_runtime */
 #include "../surfaces/rail.h" /* RAIL_TILE_W */
 #include "editor_session.h" /* editor_set_status */
@@ -294,7 +295,7 @@ void editor_duplicate_selection(EditorState *es)
     int added;
 
     if (!es) return;
-    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+    if (level_validate_preview(&es->level, error, sizeof(error)) != 0) {
         editor_set_status(es, "Duplicate blocked: fix level errors first (%s)", error);
         return;
     }
@@ -342,7 +343,7 @@ void editor_paste_clipboard(EditorState *es)
         editor_set_status(es, "Nothing to paste: copy an entity with Ctrl+C first");
         return;
     }
-    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+    if (level_validate_preview(&es->level, error, sizeof(error)) != 0) {
         editor_set_status(es, "Paste blocked: fix level errors first (%s)", error);
         return;
     }

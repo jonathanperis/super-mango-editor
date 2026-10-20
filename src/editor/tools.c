@@ -24,22 +24,46 @@
 #include "hit_test.h"    /* editor_hit_test                                */
 #include "undo.h"    /* Command, PlacementData, undo_push                 */
 #include "../levels/level_loader.h" /* level_validate_runtime            */
+#include "../levels/level_validate.h" /* level_validate_preview, _each   */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
                                    FLOOR_GAP_W; MAX_* via level.h           */
 #include "../surfaces/rail.h" /* MAX_RAIL_SPEED                            */
 
+static void ignore_issue(void *context, const char *message, const LevelIssueLocation *where)
+{
+    (void)context;
+    (void)message;
+    (void)where;
+}
+
+int editor_level_issue_count(const LevelDef *level)
+{
+    return level_validate_runtime_each(level, ignore_issue, NULL);
+}
+
+int editor_edit_kept_level(const LevelDef *level, int issues_before,
+                           char *err, size_t err_size)
+{
+    if (level_validate_preview(level, err, err_size) != 0) return -1;
+    if (editor_level_issue_count(level) <= issues_before) return 0;
+    (void)level_validate_runtime(level, err, err_size);
+    return -1;
+}
+
 /*
- * tools_can_hit_test --- Canvas clicks need a level that passes validation.
+ * tools_can_hit_test --- Canvas clicks need a level the canvas can draw.
  *
- * The canvas stops drawing an invalid level (a hand-edited tile count could
- * make its loops enormous), so clicking would act on invisible entities.
- * The editor's own actions never produce such a level; it only arrives via
- * a hand-edited file or a property field.  Tell the designer how to recover.
+ * The canvas stops drawing a level whose counts or tile sizes it cannot
+ * trust (a hand-edited tile count could make its loops enormous), so
+ * clicking would act on invisible entities.  The editor's own actions
+ * never produce such a level; it only arrives via a hand-edited file or a
+ * property field.  Tell the designer how to recover.  Other mistakes (a
+ * bad next_phase) leave the level drawn and editable.
  */
 static int tools_can_hit_test(EditorState *es)
 {
     char error[128];
-    if (level_validate_runtime(&es->level, error, sizeof(error)) == 0) return 1;
+    if (level_validate_preview(&es->level, error, sizeof(error)) == 0) return 1;
     editor_set_status(es, "Canvas paused: %s. Fix it in the side panel or press Ctrl+Z",
                       error);
     return 0;
@@ -462,7 +486,7 @@ static int delete_entity(EditorState *es, EntityType type, int index)
 
     /* Snapshot entity data before deletion for undo */
     before = editor_snapshot_entity(level, type, index);
-    int was_valid = level_validate_runtime(level, NULL, 0) == 0;
+    int issues_before = editor_level_issue_count(level);
 
     if (editor_entity_type_is_singleton(type)) {
         /*
@@ -478,13 +502,13 @@ static int delete_entity(EditorState *es, EntityType type, int index)
     }
 
     /*
-     * A delete must not turn a valid level into one the canvas refuses to
-     * draw (e.g. removing the player spawn moves the effective start past a
-     * checkpoint).  Put the entity back and explain instead.
+     * A delete must not add an error (e.g. removing the player spawn moves
+     * the effective start past a checkpoint).  Put the entity back and
+     * explain instead.
      */
     {
         char error[128];
-        if (was_valid && level_validate_runtime(level, error, sizeof(error)) != 0) {
+        if (editor_edit_kept_level(level, issues_before, error, sizeof(error)) != 0) {
             if (editor_entity_type_is_singleton(type))
                 (void)editor_entity_write(level, type, 0, &before);
             else
@@ -745,6 +769,7 @@ int editor_insert_checked(LevelDef *level, EntityType type,
         return -1;
     }
 
+    int issues_before = editor_level_issue_count(level);
     memset(before, 0, sizeof(*before));
     if (singleton) {
         index = 0;
@@ -762,9 +787,9 @@ int editor_insert_checked(LevelDef *level, EntityType type,
      * Callers clamp positions into the world, but some rules involve other
      * entities (a checkpoint must be after the player start and must not
      * share an x with another checkpoint).  Undo the change rather than
-     * leave a level the canvas refuses to draw.
+     * add an error to the level.
      */
-    if (level_validate_runtime(level, error, sizeof(error)) != 0) {
+    if (editor_edit_kept_level(level, issues_before, error, sizeof(error)) != 0) {
         if (singleton) (void)editor_entity_write(level, type, 0, before);
         else (void)editor_entity_remove(level, type, index);
         snprintf(why, why_size, "Cannot %s %s here: %s", action,
@@ -1009,6 +1034,7 @@ static void arm_drag(EditorState *es, Selection grabbed, const Selection *items,
     if (count > EDITOR_MAX_SELECTION) count = EDITOR_MAX_SELECTION;
     es->dragging     = 1;
     es->drag_moved   = 0;
+    es->drag_issues_before = editor_level_issue_count(&es->level);
     es->drag_type    = grabbed.type;
     es->drag_index   = grabbed.index;
     es->drag_count   = count;
@@ -1237,7 +1263,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
      * broken it while the button was held.  Never leave an unrecorded
      * change behind: put the entities back where the drag started.
      */
-    if (level_validate_runtime(&es->level, NULL, 0) != 0) {
+    if (editor_edit_kept_level(&es->level, es->drag_issues_before, NULL, 0) != 0) {
         restore_drag(es);
         editor_set_status(es, "Move cancelled: level has errors");
         return;
@@ -1337,9 +1363,9 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
         previous[i] = editor_snapshot_entity(&es->level, item->type, item->index);
         (void)editor_entity_write(&es->level, item->type, item->index, &moved);
     }
-    /* Drags only start on a valid level (tools_can_hit_test), so a step
-     * that would make it invalid is reverted to the last valid position. */
-    if (level_validate_runtime(&es->level, NULL, 0) != 0) {
+    /* A step that would add an error is reverted to the last position
+     * that did not. */
+    if (editor_edit_kept_level(&es->level, es->drag_issues_before, NULL, 0) != 0) {
         for (int i = 0; i < es->drag_count; i++)
             (void)editor_entity_write(&es->level, es->drag_items[i].type,
                                       es->drag_items[i].index, &previous[i]);
@@ -1395,6 +1421,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
     editor_selection_reconcile(es);
     count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
     if (count == 0) return;
+    int issues_before = editor_level_issue_count(&es->level);
 
     /* Move every selected entity, exactly as a drag by (dx, dy) would. */
     for (int i = 0; i < count; i++) {
@@ -1404,7 +1431,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
         (void)editor_entity_write(&es->level, items[i].type, items[i].index, &after[i]);
         if (memcmp(&before[i], &after[i], sizeof(after[i])) != 0) changed++;
     }
-    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+    if (editor_edit_kept_level(&es->level, issues_before, error, sizeof(error)) != 0) {
         for (int i = 0; i < count; i++)
             (void)editor_entity_write(&es->level, items[i].type, items[i].index, &before[i]);
         editor_set_status(es, "Cannot move here: %s", error);

@@ -32,6 +32,7 @@
 #include "hit_test.h"    /* editor_entity_bounds for the selection outline      */
 #include "tools.h"       /* editor_snap_point for the placement ghost           */
 #include "../levels/level_loader.h"
+#include "../levels/level_validate.h" /* level_validate_preview */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                                    FLOOR_GAP_W, GRAVITY; MAX_* via level.h */
 
@@ -170,12 +171,15 @@ void canvas_render(EditorState *es) {
         return;
     }
     /* Properties and Undo stay available while an invalid draft is corrected.
-     * Never feed rejected counts/dimensions into the preview's tile loops. */
-    if (level_validate_runtime(&es->level, error, sizeof(error)) != 0) {
+     * Never feed rejected counts/dimensions into the preview's tile loops;
+     * any other mistake (a path, a speed, a coin outside the world) leaves
+     * the level drawn, with a banner naming it. */
+    if (level_validate_preview(&es->level, error, sizeof(error)) != 0) {
         ui_label(&es->ui, 12, TOOLBAR_H + 12, "Preview paused: fix the field named below in the side panel, or press Ctrl+Z");
         ui_label(&es->ui, 12, TOOLBAR_H + 32, error);
         return;
     }
+    int has_error = level_validate_runtime(&es->level, error, sizeof(error)) != 0;
     /*
      * Set a clip rectangle so that nothing we draw bleeds outside the canvas
      * area into the toolbar, status bar, or side panel.
@@ -246,6 +250,16 @@ void canvas_render(EditorState *es) {
     /* ---- Layer 8: Grid overlay (if enabled) ---- */
     if (es->show_grid) {
         render_grid(es);
+    }
+
+    /* ---- Layer 9: what keeps the level from loading in the game ---- */
+    if (has_error) {
+        char banner[192];
+        Color shade = ui_color(&es->ui, UI_COLOR_PANEL);
+        shade.a = 230;
+        snprintf(banner, sizeof(banner), "The game cannot load this level yet: %s", error);
+        DrawRectangle(0, TOOLBAR_H, CANVAS_W, 20, shade);
+        ui_label_color(&es->ui, 8, TOOLBAR_H + 5, banner, ui_color(&es->ui, UI_COLOR_ERROR));
     }
 
     /* Remove the clip rectangle so other UI elements can draw freely */
