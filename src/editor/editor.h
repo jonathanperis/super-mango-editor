@@ -553,6 +553,12 @@ typedef struct {
      * so a plain click selects without changing anything.
      */
     int            dragging;      /* 1 while a drag operation is in progress   */
+    /* Place tool: while the button is held, dragging paints a row of the
+     * palette's entity, one step apart, as one undo step (tools.c). */
+    int            painting;
+    int            paint_grouped;  /* an undo group is open for the row       */
+    int            paint_count;    /* entities placed by this press            */
+    float          paint_x, paint_y; /* where the last one went (world px)    */
     int            drag_moved;    /* 1 once the cursor passed the threshold    */
     EntityType     drag_type;     /* entity grabbed (its corner snaps)          */
     int            drag_index;

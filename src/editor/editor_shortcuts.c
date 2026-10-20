@@ -11,7 +11,7 @@
  * Command on macOS there. */
 static const EditorShortcut s_shortcuts[EDITOR_SHORTCUT_COUNT] = {
     [EDITOR_SHORTCUT_SELECT_TOOL]   = {"1", "Select tool: select, box-select and drag entities", "Select and move entities", NULL},
-    [EDITOR_SHORTCUT_PLACE_TOOL]    = {"2", "Place tool: stamp the palette's entity", "Place the palette's entity", NULL},
+    [EDITOR_SHORTCUT_PLACE_TOOL]    = {"2", "Place tool: stamp the palette's entity (drag: a row)", "Place the palette's entity", NULL},
     [EDITOR_SHORTCUT_DELETE_TOOL]   = {"3", "Delete tool: delete what you click", "Delete what you click", NULL},
     [EDITOR_SHORTCUT_ESCAPE]        = {"Esc", "Cancel a field edit, a box or a drag; back to Select; clear the selection", NULL, NULL},
     [EDITOR_SHORTCUT_DELETE]        = {"Delete / Backspace", "Delete the selection (Backspace once the canvas has the focus)", NULL, NULL},
