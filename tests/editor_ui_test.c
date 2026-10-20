@@ -1209,6 +1209,18 @@ static int canvas_navigates_like_a_level_editor(void)
     ui_frame(&es, 400, 300);
     CHECK(es.camera.x == 200.0f && es.level.coin_count == coins && !es.space_held);
 
+    /* With the F1 list open, the releases still end Space and a pan. */
+    push_event(INPUT_KEY_DOWN, KEY_SPACE, 0, 0, 0);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
+    ui_frame(&es, 400, 300);
+    CHECK(es.space_held && es.panning);
+    es.shortcut_sheet_open = 1;
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
+    push_event(INPUT_KEY_UP, KEY_SPACE, 0, 0, 0);
+    ui_frame(&es, 400, 300);
+    CHECK(!es.space_held && !es.panning);
+    es.shortcut_sheet_open = 0;
+
     /* Eight screens (3200 px) fit at a quarter. */
     key_frame(&es, KEY_F, 0);
     CHECK(es.camera.zoom == 0.25f && es.camera.x == 0.0f);
