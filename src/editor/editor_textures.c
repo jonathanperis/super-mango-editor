@@ -4,6 +4,7 @@
 
 #include "editor_textures.h"
 
+#include <stddef.h>    /* offsetof */
 #include <stdio.h>     /* fprintf, stderr */
 
 #include "../shared/graphics.h" /* DESTROY_TEX */
@@ -15,10 +16,31 @@
  * non-fatal: missing sprites print warnings and leave NULL pointers so canvas
  * and palette rendering can fall back to placeholders.
  */
+/* Every slot's file, filled as editor_textures_load runs. */
+typedef struct { size_t offset; const char *path; } TexturePath;
+static TexturePath s_paths[64];
+static int s_path_count;
+
+const char *editor_texture_path(size_t texture_offset)
+{
+    for (int i = 0; i < s_path_count; i++)
+        if (s_paths[i].offset == texture_offset) return s_paths[i].path;
+    return NULL;
+}
+
+static void remember_path(size_t offset, const char *path)
+{
+    for (int i = 0; i < s_path_count; i++)
+        if (s_paths[i].offset == offset) return;
+    if (s_path_count < (int)(sizeof(s_paths) / sizeof(s_paths[0])))
+        s_paths[s_path_count++] = (TexturePath){offset, path};
+}
+
 void editor_textures_load(EditorState *es)
 {
     #define LOAD_TEX(field, path) \
         do { \
+            remember_path(offsetof(EntityTextures, field), path); \
             es->textures.field = texture_load(path); \
             if (!es->textures.field) { \
                 fprintf(stderr, "Warning: could not load %s\n", path); \

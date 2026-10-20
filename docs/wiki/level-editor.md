@@ -41,7 +41,7 @@ make run-editor    # build game + editor, then launch editor
 | Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, Campaign (lit while the [Campaign View](#campaign-view) is open; clicking it then closes the view), Contrast (lit while on: every panel, button and field switches to a high-contrast style, black with white outlines and text at 7:1 or more; the level canvas keeps its colours; remembered for the next session), file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs). The current tool and every toggle that is on (Grid, Debug, Campaign, Contrast) are drawn in the selected colour, with a yellow outline in high contrast |
 | Canvas | 896 × 656 px | Scrollable level view with zoom. All entity types drawn at game-accurate sizes |
 | Panel | 384 × 656 px | Level config (at most half the column), entity palette and properties inspector, as collapsible sections that follow the tool: with an entity selected and the Select or Delete tool, the palette folds to its title (clicking it takes up Place) and the selection's properties fill the rest of the column, scrolling when they are taller; with Place, the palette fills the column above a 200 px properties panel |
-| Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message; under the canvas, in its bottom rows, the [minimap](#minimap) |
+| Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool (`Place: Coin` while placing: what a click adds), validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message; under the canvas, in its bottom rows, the [minimap](#minimap) |
 
 The window opens at 1280 × 720 and can be resized or maximised, but not made
 smaller than that. The layout does not reflow: the editor always draws this
@@ -458,7 +458,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor_clipboard.c`, `editor_undo_apply.c` | Copy/paste, and applying undo/redo commands to the level |
 | `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save, autosave, and playtest |
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |
-| `palette.c` / `palette.h` | Entity palette panel — category rows, type selection |
+| `palette.c` / `palette.h` | Entity palette panel — category rows, type selection, a thumbnail of each entity's sprite (its first frame, trimmed to the art); a new type to place opens its category and scrolls into view |
 | `properties.c` / `properties.h` | Property inspector panel — one `draw_<type>_properties()` function per entity type, chosen from the `s_property_panels` table, plus Level Config drawn by one `config_*` helper per settings group |
 | `asset_choices.c` / `asset_choices.h` | The files each asset dropdown offers. `editor_ui_test` fails when a file in `assets/sprites/backgrounds`, `foregrounds`, `levels` or `assets/sounds/levels` is missing from its list; a level path no list names shows its file name in the dropdown |
 | `tools.c` / `tools.h` | Mouse interaction for Select / Place / Delete tools |
