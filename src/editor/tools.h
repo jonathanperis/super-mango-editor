@@ -93,6 +93,23 @@ PlacementData editor_move_placement(EntityType type, const PlacementData *from,
                                     float dx, float dy);
 
 /*
+ * editor_level_issue_count --- How many errors the full runtime check finds
+ * in level (0 = the game can load it).
+ */
+int editor_level_issue_count(const LevelDef *level);
+
+/*
+ * editor_edit_kept_level --- Whether an edit left level as sound as it was:
+ * still drawable by the canvas (level_validate_preview) and with no more
+ * errors than issues_before, its editor_level_issue_count before the edit.
+ * So a level that already has a mistake elsewhere (a bad next_phase, say)
+ * can still be edited, but no edit adds a mistake.  Returns 0 when kept;
+ * otherwise -1 with the reason in err.
+ */
+int editor_edit_kept_level(const LevelDef *level, int issues_before,
+                           char *err, size_t err_size);
+
+/*
  * editor_insert_checked --- The part of editor_add_placement that touches
  * only `level`: check there is room (and a rail or floor gap when the type
  * needs one), append pd (or move a singleton, whose old data goes in
