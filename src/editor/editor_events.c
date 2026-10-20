@@ -639,6 +639,12 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         es->input_mods = event->mods;
     }
 
+    /* A release always ends a pan, even when an overlay below (a running
+     * playtest, the F1 list) takes the event: otherwise Space or a pan
+     * started before it would stay armed afterwards. */
+    if (event->type == INPUT_KEY_UP && event->key == KEY_SPACE) es->space_held = 0;
+    if (event->type == INPUT_MOUSE_UP && (es->playing || es->shortcut_sheet_open)) es->panning = 0;
+
     /*
      * While a playtest runs the editor shows only the "Playing" overlay and
      * the game is running a snapshot of this level.  Edits now would change
