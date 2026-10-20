@@ -72,22 +72,19 @@ void editor_render_toolbar(EditorState *es)
     ui_tooltip(&es->ui, "Playtest with the game's --debug overlay");
 
     bx += 60;
-    static const char *zoom_opts[] = {
-        "Zoom: 1x", "Zoom: 2x", "Zoom: 3x", "Zoom: 5x"
-    };
-    /* Zoom is always one of these whole numbers (startup, this dropdown and
-     * Ctrl+wheel assign them; nothing accumulates), so compare integers. */
-    static const int zoom_vals[] = { 1, 2, 3, 5 };
-    static const int zoom_count = 4;
-
-    int sel = 1;
-    for (int zi = 0; zi < zoom_count; zi++) {
-        if ((int)es->camera.zoom == zoom_vals[zi]) { sel = zi; break; }
-    }
+    /* The canvas's zoom presets, then Fit (the whole level in view). */
+    static const char *zoom_opts[CANVAS_ZOOM_COUNT + 1];
+    for (int zi = 0; zi < CANVAS_ZOOM_COUNT; zi++) zoom_opts[zi] = canvas_zoom_label(zi);
+    zoom_opts[CANVAS_ZOOM_COUNT] = "Zoom: Fit";
+    int sel = canvas_zoom_index(es->camera.zoom);
+    if (sel < 0) sel = canvas_zoom_index(1.0f);
     if (ui_dropdown(&es->ui, 8888, bx, by + 2, 80,
-                    zoom_opts, zoom_count, &sel)) {
-        /* Zoom around the canvas centre so the view stays on the same area. */
-        canvas_set_zoom(es, (float)zoom_vals[sel], CANVAS_W / 2, TOOLBAR_H + CANVAS_H / 2);
+                    zoom_opts, CANVAS_ZOOM_COUNT + 1, &sel)) {
+        if (sel == CANVAS_ZOOM_COUNT)
+            canvas_zoom_to_fit(es);
+        else
+            /* Zoom around the canvas centre so the view stays on the same area. */
+            canvas_set_zoom(es, canvas_zoom_preset(sel), CANVAS_W / 2, TOOLBAR_H + CANVAS_H / 2);
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_ZOOM));
 

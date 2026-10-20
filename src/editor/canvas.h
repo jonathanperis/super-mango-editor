@@ -64,6 +64,20 @@ void canvas_clamp_camera(EditorState *es);
 void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy);
 
 /*
+ * The zoom levels the toolbar list, Ctrl+wheel and Fit choose from, from
+ * a quarter (a whole long level in view) to 5x.  canvas_zoom_index is the
+ * preset equal to zoom, or -1.
+ */
+#define CANVAS_ZOOM_COUNT 6
+float canvas_zoom_preset(int index);
+const char *canvas_zoom_label(int index);
+int canvas_zoom_index(float zoom);
+
+/* Zoom to the largest preset that shows the whole level (its width and
+ * height), and scroll to its start. */
+void canvas_zoom_to_fit(EditorState *es);
+
+/*
  * canvas_contains — Test whether a screen point is inside the canvas area.
  *
  * Returns 1 if (sx, sy) falls within the canvas rectangle

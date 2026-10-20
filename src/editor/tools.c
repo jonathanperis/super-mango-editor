@@ -1617,3 +1617,28 @@ void tools_delete_selected(EditorState *es)
         editor_set_status(es, "Deleted %d of %d entities; the rest could not go",
                           deleted, count);
 }
+
+/*
+ * editor_select_all --- Ctrl+A on the canvas: select every entity in the
+ * level, as many as a selection holds (EDITOR_MAX_SELECTION), and say how
+ * many in the status bar.  Returns the number selected.
+ */
+int editor_select_all(EditorState *es)
+{
+    static Selection items[EDITOR_MAX_SELECTION];
+    int count = 0, total = 0;
+
+    if (!es) return 0;
+    for (int type = 0; type < ENT_COUNT; type++) {
+        int n = editor_entity_count(&es->level, (EntityType)type);
+        for (int i = 0; i < n; i++, total++)
+            if (count < EDITOR_MAX_SELECTION) items[count++] = (Selection){(EntityType)type, i};
+    }
+    count = editor_select_items(es, items, count);
+    if (total > count)
+        editor_set_status(es, "Selected %d of %d entities: a selection holds %d at most",
+                          count, total, EDITOR_MAX_SELECTION);
+    else
+        editor_set_status(es, count == 1 ? "Selected %d entity" : "Selected %d entities", count);
+    return count;
+}

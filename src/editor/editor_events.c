@@ -469,6 +469,16 @@ static void editor_key(EditorState *es, const InputEvent *event)
         case KEY_C:
             editor_copy_selected(es);
             break;
+        case KEY_X:
+            /* Cut: copy, then delete the selection. */
+            if (es->selection.index >= 0 && editor_finish_field_edit(es)) {
+                editor_copy_selected(es);
+                tools_delete_selected(es);
+            }
+            break;
+        case KEY_A:
+            if (editor_finish_field_edit(es)) editor_select_all(es);
+            break;
         case KEY_V:
             if (editor_finish_field_edit(es)) editor_paste_clipboard(es);
             break;
@@ -499,6 +509,15 @@ static void editor_key(EditorState *es, const InputEvent *event)
         break;
     case KEY_G:
         if (editor_finish_field_edit(es)) es->show_grid ^= 1;
+        break;
+    case KEY_F:
+        /* Frame the whole level. */
+        canvas_zoom_to_fit(es);
+        editor_set_status(es, "Zoom to fit: %s", canvas_zoom_label(canvas_zoom_index(es->camera.zoom)));
+        break;
+    case KEY_SPACE:
+        /* Held, a left drag on the canvas slides the view (see below). */
+        es->space_held = 1;
         break;
     case KEY_S:
         if (editor_finish_field_edit(es)) {
@@ -559,7 +578,7 @@ static void editor_key(EditorState *es, const InputEvent *event)
  *   Shift+wheel  : pan up/down (needed at 3x/5x, where the floor is
  *                  below the visible area).  macOS delivers Shift+wheel
  *                  as horizontal scrolling, so either axis counts here.
- *   Ctrl+wheel   : step through the zoom presets (1x, 2x, 3x, 5x, stopping
+ *   Ctrl+wheel   : step through the zoom presets (1/4x to 5x, stopping
  *                  at either end), keeping the point under the cursor in
  *                  place
  */
@@ -570,17 +589,11 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
     float step = event->wheel * 48.0f / zoom;
 
     if (event->mods & INPUT_CTRL) {
-        /* These whole-number presets are assigned by startup, the
-         * toolbar and this wheel handler; zoom itself is never a fraction,
-         * so the current preset is found by comparing integers. */
-        static const int zooms[] = {1, 2, 3, 5};
-        const int last = (int)(sizeof(zooms) / sizeof(zooms[0])) - 1;
-        int index = 1;
-        for (int i = 0; i <= last; i++)
-            if ((int)es->camera.zoom == zooms[i]) {
-                index = i;
-                break;
-            }
+        /* Zoom is only ever one of the canvas's presets (startup, the
+         * toolbar, Fit and this handler set it), so step through them. */
+        const int last = CANVAS_ZOOM_COUNT - 1;
+        int index = canvas_zoom_index(es->camera.zoom);
+        if (index < 0) index = canvas_zoom_index(1.0f);
         /*
          * A mouse wheel reports whole notches (1.0), but a trackpad or a
          * pinch reports many small fractions.  Add them up and step one
@@ -598,11 +611,11 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
             es->zoom_wheel_accum = 0.0f;
         }
         /* Stop at the ends instead of wrapping: scrolling past 5x must
-         * not suddenly jump back to 1x. */
+         * not suddenly jump back to a quarter. */
         if (index < 0) index = 0;
         if (index > last) index = last;
-        if (!float_same_value((float)zooms[index], es->camera.zoom))
-            canvas_set_zoom(es, (float)zooms[index], event->x, event->y);
+        if (!float_same_value(canvas_zoom_preset(index), es->camera.zoom))
+            canvas_set_zoom(es, canvas_zoom_preset(index), event->x, event->y);
     } else if (event->mods & INPUT_SHIFT) {
         float amount = event->wheel != 0.0f ? event->wheel : event->wheel_x;
         es->camera.y -= amount * 48.0f / zoom;
@@ -659,6 +672,9 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
     case INPUT_KEY_DOWN:
         editor_key(es, event);
         break;
+    case INPUT_KEY_UP:
+        if (event->key == KEY_SPACE) es->space_held = 0;
+        break;
     case INPUT_TEXT:
         ui_queue_text_input(&es->ui, event->text);
         break;
@@ -673,6 +689,14 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
                 if (editor_finish_field_edit(es)) (void)editor_focus_validation_issue(es, 0);
                 break;
             }
+            /* Space+drag slides the view instead of using the tool. */
+            if (es->space_held && !es->campaign && canvas_contains(event->x, event->y) &&
+                es->ui.active_id == 0) {
+                es->panning = 1;
+                es->pan_x = event->x;
+                es->pan_y = event->y;
+                break;
+            }
             es->mouse_down = 1;
             es->focus_area = canvas_contains(event->x, event->y) && !es->campaign
                            ? EDITOR_FOCUS_CANVAS : EDITOR_FOCUS_PANEL;
@@ -681,6 +705,13 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
             if (canvas_contains(event->x, event->y) && !es->campaign &&
                 editor_finish_field_edit(es))
                 tools_mouse_down(es, wx, wy);
+        } else if (event->button == MOUSE_BUTTON_MIDDLE) {
+            /* Middle-drag slides the view, in any tool. */
+            if (!es->campaign && canvas_contains(event->x, event->y)) {
+                es->panning = 1;
+                es->pan_x = event->x;
+                es->pan_y = event->y;
+            }
         } else if (event->button == MOUSE_BUTTON_RIGHT) {
             es->mouse_right_down = 1;
             /* Right-click deletes. During a left-button drag that would shift
@@ -694,6 +725,11 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         }
         break;
     case INPUT_MOUSE_UP:
+        if (es->panning && (event->button == MOUSE_BUTTON_MIDDLE ||
+                            event->button == MOUSE_BUTTON_LEFT)) {
+            es->panning = 0;
+            break;
+        }
         if (event->button == MOUSE_BUTTON_LEFT) {
             es->mouse_down = 0;
             tools_mouse_up(es, wx, wy);
@@ -701,6 +737,16 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         else if (event->button == MOUSE_BUTTON_RIGHT) es->mouse_right_down = 0;
         break;
     case INPUT_MOUSE_MOVE:
+        if (es->panning) {
+            /* The level follows the pointer: the view moves the other way. */
+            float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+            es->camera.x -= (float)(event->x - es->pan_x) / zoom;
+            es->camera.y -= (float)(event->y - es->pan_y) / zoom;
+            es->pan_x = event->x;
+            es->pan_y = event->y;
+            canvas_clamp_camera(es);
+            break;
+        }
         if (es->mouse_down) tools_mouse_drag(es,wx,wy);
         break;
     case INPUT_WHEEL:
