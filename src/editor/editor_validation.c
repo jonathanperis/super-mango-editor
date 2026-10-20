@@ -208,7 +208,16 @@ const char *editor_validation_summary(const EditorValidationReport *report)
         return "Validation: OK";
     }
 
-    snprintf(summary, sizeof(summary), "Validation: %d error(s), %d warning(s)",
-             report->error_count, report->warning_count);
+    /* "2 errors", "1 warning", "1 error, 3 warnings": a zero count is left
+     * out, which also keeps the summary short enough for its place in the
+     * status bar (before the entity count). */
+    int e = report->error_count, w = report->warning_count;
+    if (e > 0 && w > 0)
+        snprintf(summary, sizeof(summary), "Validation: %d error%s, %d warning%s",
+                 e, e == 1 ? "" : "s", w, w == 1 ? "" : "s");
+    else if (e > 0)
+        snprintf(summary, sizeof(summary), "Validation: %d error%s", e, e == 1 ? "" : "s");
+    else
+        snprintf(summary, sizeof(summary), "Validation: %d warning%s", w, w == 1 ? "" : "s");
     return summary;
 }

@@ -224,7 +224,7 @@ void editor_render_status_bar(EditorState *es)
         snprintf(info_text, sizeof(info_text), "Entities: %d  |  (untitled)%s",
                  total, es->modified ? " *" : "");
     }
-    ui_label(&es->ui, 600, bar_y + 8, info_text);
+    ui_label(&es->ui, STATUS_ENTITIES_X, bar_y + 8, info_text);
     if (es->status_message[0] != '\0') {
         ui_label_color(&es->ui, 920, bar_y + 8,
                        es->status_message, ui_color(&es->ui, UI_COLOR_TEXT_DIM));

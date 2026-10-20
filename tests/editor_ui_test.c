@@ -1841,6 +1841,19 @@ static int snap_toggle_applies_to_placing_and_dragging(void)
     CHECK(150 + ui_text_width(&es.ui, "Snap: off") < 228);
     CHECK(228 + ui_text_width(&es.ui, "Tool: Delete") < STATUS_SUMMARY_X);
     CHECK(228 + ui_text_width(&es.ui, "Place: Bouncepad Medium") < STATUS_SUMMARY_X);
+    /* The longest summary (the report keeps 256 messages) ends before the
+     * entity count. */
+    CHECK(STATUS_SUMMARY_X + ui_text_width(&es.ui, "Validation: 256 errors, 256 warnings") <
+          STATUS_ENTITIES_X);
+    {
+        EditorValidationReport report = {0};
+        report.error_count = 1;
+        CHECK(strcmp(editor_validation_summary(&report), "Validation: 1 error") == 0);
+        report.warning_count = 2;
+        CHECK(strcmp(editor_validation_summary(&report), "Validation: 1 error, 2 warnings") == 0);
+        report.error_count = 0;
+        CHECK(strcmp(editor_validation_summary(&report), "Validation: 2 warnings") == 0);
+    }
 
     CHECK(es.snap_to_grid == 0);
     key_frame(&es, KEY_S, 0);

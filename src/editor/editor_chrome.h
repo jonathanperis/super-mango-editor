@@ -8,8 +8,10 @@
 #include <stddef.h> /* size_t */
 #include "editor.h" /* EditorState */
 
-/* Where the status bar's validation summary starts (it is a link). */
-#define STATUS_SUMMARY_X 380
+/* Where the status bar's validation summary starts (it is a link) and
+ * where the entity count after it starts. */
+#define STATUS_SUMMARY_X  380
+#define STATUS_ENTITIES_X 600
 
 void editor_render_toolbar(EditorState *es);
 void editor_render_status_bar(EditorState *es);
