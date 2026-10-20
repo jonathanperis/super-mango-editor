@@ -545,7 +545,6 @@ typedef struct {
     /* Everything the drag moves (the grabbed entity alone, or the whole
      * multi-selection) and each one's placement at mouse-down. */
     int            drag_count;
-    int            drag_issues_before; /* editor_level_issue_count when the drag began */
     Selection      drag_items[EDITOR_MAX_SELECTION];
     PlacementData  drag_befores[EDITOR_MAX_SELECTION];
     float          drag_start_x;  /* entity top-left (world) at mouse-down     */
