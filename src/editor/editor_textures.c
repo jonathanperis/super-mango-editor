@@ -113,6 +113,14 @@ void editor_textures_load(EditorState *es)
 void editor_textures_cleanup(EditorState *es)
 {
     DESTROY_TEX(es->textures.sky);
+    for (int i = 0; i < MAX_BACKGROUND_LAYERS; i++) {
+        DESTROY_TEX(es->preview_layers[i]);
+        es->preview_layer_paths[i][0] = '\0';
+    }
+    for (int i = 0; i < MAX_FOG_TEXTURES; i++) {
+        DESTROY_TEX(es->preview_fog[i]);
+        es->preview_fog_paths[i][0] = '\0';
+    }
     DESTROY_TEX(es->textures.floor_tile);
     DESTROY_TEX(es->textures.water);
     DESTROY_TEX(es->textures.platform);

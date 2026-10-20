@@ -359,10 +359,21 @@ static void editor_replace_texture(Texture2D **slot, char *loaded_path,
 void editor_sync_config_resources(EditorState *es)
 {
     if (!es) return;
+    int layers = es->level.background_layer_count;
+    int fogs = es->level.fog_layer_count;
+    if (layers < 0 || layers > MAX_BACKGROUND_LAYERS) layers = 0;
+    if (fogs < 0 || fogs > MAX_FOG_TEXTURES) fogs = 0;
     editor_replace_texture(&es->textures.sky, es->preview_sky_path,
                            sizeof(es->preview_sky_path),
-                           es->level.background_layer_count > 0
-                           ? es->level.background_layers[0].path : NULL);
+                           layers > 0 ? es->level.background_layers[0].path : NULL);
+    for (int i = 1; i < MAX_BACKGROUND_LAYERS; i++)
+        editor_replace_texture(&es->preview_layers[i], es->preview_layer_paths[i],
+                               sizeof(es->preview_layer_paths[i]),
+                               i < layers ? es->level.background_layers[i].path : NULL);
+    for (int i = 0; i < MAX_FOG_TEXTURES; i++)
+        editor_replace_texture(&es->preview_fog[i], es->preview_fog_paths[i],
+                               sizeof(es->preview_fog_paths[i]),
+                               i < fogs ? es->level.fog_layers[i].path : NULL);
     editor_replace_texture(&es->textures.floor_tile, es->preview_floor_path,
                            sizeof(es->preview_floor_path),
                            es->level.floor_tile_path);
