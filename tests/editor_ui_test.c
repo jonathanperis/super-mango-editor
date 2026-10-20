@@ -636,6 +636,10 @@ static int ui_styles_keep_the_default_look_and_high_contrast(void)
     CHECK(same_color(d->color[UI_COLOR_HOT], UI_BTN_HOT) && same_color(d->color[UI_COLOR_SELECTED], UI_BTN_ACTIVE));
     CHECK(same_color(d->color[UI_COLOR_TEXT], UI_TEXT) && same_color(d->color[UI_COLOR_TEXT_DIM], UI_TEXT_DIM));
     CHECK(same_color(d->color[UI_COLOR_ACCENT], UI_ACCENT) && d->border_width == 0);
+    /* Dim text stays readable on the faces it is drawn on (WCAG AA). */
+    CHECK(contrast(d->color[UI_COLOR_TEXT_DIM], d->color[UI_COLOR_PANEL]) >= 4.5);
+    CHECK(contrast(d->color[UI_COLOR_TEXT_DIM], d->color[UI_COLOR_TITLE]) >= 4.5);
+    CHECK(contrast(d->color[UI_COLOR_TEXT_DIM], d->color[UI_COLOR_INPUT]) >= 4.5);
     CHECK(h->border_width > 0);
     const UIColorRole faces[] = {UI_COLOR_PANEL, UI_COLOR_TITLE, UI_COLOR_INPUT,
                                  UI_COLOR_BUTTON, UI_COLOR_HOT, UI_COLOR_SELECTED};
