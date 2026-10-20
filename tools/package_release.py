@@ -49,6 +49,7 @@ def copy_notices(bundle: Path, source: Path, dlls: list[Path] | None = None) -> 
     licenses = bundle / "licenses"
     licenses.mkdir()
     shutil.copy2(ROOT / "vendor/tomlc17/LICENSE", licenses / "tomlc17.txt")
+    shutil.copy2(ROOT / "vendor/raygui/LICENSE", licenses / "raygui.txt")
     shutil.copy2(source / "LICENSE", licenses / "raylib.txt")
     dependencies = licenses / "raylib-dependencies"
     dependencies.mkdir()

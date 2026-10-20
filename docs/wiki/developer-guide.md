@@ -262,6 +262,14 @@ Campaign, Contrast): while on it draws `UI_COLOR_SELECTED`, outlined in
 `UI_COLOR_ACCENT` when the style has outlines, instead of a label that
 changes.
 
+`ui_button_icon` and `ui_toggle_icon` put one of raygui's 16 × 16 icons before
+the label, the two centred together; the editor toolbar uses them for every
+button. The icons are raygui's own bitmaps, generated into
+`vendor/raygui/raygui_icons.h` by `tools/import_raygui_icons.py` (see
+`vendor/raygui/README.md`), and `ui_draw_icon` draws them in the label's
+colour, so they follow the style like the text does. Only the icons come from
+raygui; the widgets stay in `ui.c`.
+
 `ui_tooltip(ui, text)`, called right after a widget, gives that widget a
 tooltip: once the pointer has rested on it for `UI_TOOLTIP_DELAY_MS` (500 ms),
 `ui_draw_overlays` draws the text in a `UI_COLOR_TITLE` box by the pointer

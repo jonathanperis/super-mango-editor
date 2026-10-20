@@ -28,6 +28,17 @@ Native OS graphics/audio libraries remain required. Windows packaging resolves
 both executables' non-system runtime dependencies and includes their owning
 MSYS2 packages' available license files under `licenses/msys2/`.
 
+## raygui icons
+
+Copyright (c) 2014–2026 Ramon Santamaria (@raysan5). zlib license.
+Source: https://github.com/raysan5/raygui/releases/tag/5.0
+
+The editor's toolbar icons are raygui's icon bitmaps, copied unchanged into
+`vendor/raygui/raygui_icons.h` by `tools/import_raygui_icons.py` from the
+`raygui.h` pinned in `vendor/raygui/manifest.json`. raygui's widgets are not
+included. The complete notice is in `vendor/raygui/LICENSE` in the source
+checkout and `licenses/raygui.txt` in release archives.
+
 ## SDL_GameControllerDB
 
 Copyright (C) 1997-2025 Sam Lantinga. zlib license.

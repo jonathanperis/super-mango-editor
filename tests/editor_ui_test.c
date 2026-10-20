@@ -755,6 +755,44 @@ done:
     return failed;
 }
 
+/*
+ * Every toolbar icon is drawn pixel for pixel from raygui's bitmap: a set
+ * bit is the given colour and a clear bit leaves the background.
+ */
+static int raygui_icons_draw_their_bits(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    for (int icon = UI_ICON_NONE + 1; icon < UI_ICON_COUNT; icon++) {
+        BeginDrawing();
+        ClearBackground(BLACK);
+        ui_draw_icon((UIIcon)icon, 3, 5, WHITE);
+        rlDrawRenderBatchActive();
+        Image shot = LoadImageFromScreen();
+        EndDrawing();
+        CHECK(IsImageValid(shot));
+        int lit = 0, wrong = 0;
+        for (int y = 0; y < UI_ICON_SIZE; y++) {
+            for (int x = 0; x < UI_ICON_SIZE; x++) {
+                int bit = (int)(raygui_icon_bits[icon][y / 2] >> (y % 2 * 16 + x) & 1u);
+#ifdef MANGO_MEMORY_TESTS
+                Color c = GetImageColor(shot, 3 + x, shot.height - 1 - (5 + y));
+#else
+                Color c = GetImageColor(shot, 3 + x, 5 + y);
+#endif
+                if (bit) lit++;
+                if (c.r != (bit ? 255 : 0)) wrong++;
+            }
+        }
+        UnloadImage(shot);
+        CHECK(wrong == 0 && lit > 0);
+    }
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -4304,6 +4342,7 @@ int main(void)
         CASE(ui_styles_keep_the_default_look_and_high_contrast),
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(toolbar_toggles_show_what_is_on),
+        CASE(raygui_icons_draw_their_bits),
         CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
