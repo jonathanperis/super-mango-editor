@@ -814,7 +814,10 @@ static int folder_files_offered(const char *folder, const char *suffix,
     int seen = 0, missing = 0;
     size_t suffix_len = strlen(suffix);
     for (unsigned int i = 0; i < files.count; i++) {
-        const char *path = files.paths[i];
+        /* raylib joins folder and name with '\\' on Windows. */
+        char path[512];
+        snprintf(path, sizeof(path), "%s", files.paths[i]);
+        for (char *c = path; *c; c++) if (*c == '\\') *c = '/';
         size_t len = strlen(path);
         if (len < suffix_len || strcmp(path + len - suffix_len, suffix) != 0) continue;
         seen++;
@@ -859,6 +862,17 @@ static int asset_dropdowns_offer_every_asset_file(void)
     CHECK(strcmp(editor_asset_unlisted_name("mine\\custom.png"), "custom.png") == 0);
     CHECK(strcmp(editor_asset_unlisted_name("plain.png"), "plain.png") == 0);
     CHECK(strcmp(editor_asset_unlisted_name(""), "---") == 0);
+
+    /* The canvas has a texture for every platform tile it offers. */
+    {
+        EditorState es;
+        CHECK(open_editor(&es, NULL) == 0);
+        int loaded = es.textures.platform && es.textures.platform_stone &&
+                     es.textures.platform_leaf && es.textures.platform_brick &&
+                     es.textures.platform_grass_rock;
+        close_editor(&es);
+        CHECK(loaded && plat->count == 6);
+    }
 done:
     return failed;
 }

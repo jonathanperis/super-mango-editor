@@ -396,6 +396,10 @@ static void render_platforms(EditorState *es) {
                 tex = es->textures.platform_stone;
             } else if (strcmp(pp->tile_path, "assets/sprites/levels/leaf_platform.png") == 0) {
                 tex = es->textures.platform_leaf;
+            } else if (strcmp(pp->tile_path, "assets/sprites/levels/brick_platform.png") == 0) {
+                tex = es->textures.platform_brick;
+            } else if (strcmp(pp->tile_path, "assets/sprites/levels/grass_rock_platform.png") == 0) {
+                tex = es->textures.platform_grass_rock;
             } else {
                 tex = es->textures.platform;  /* fallback to default */
             }

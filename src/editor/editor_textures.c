@@ -33,6 +33,8 @@ void editor_textures_load(EditorState *es)
     LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");
     LOAD_TEX(platform_stone,   "assets/sprites/levels/stone_platform.png");
     LOAD_TEX(platform_leaf,    "assets/sprites/levels/leaf_platform.png");
+    LOAD_TEX(platform_brick,   "assets/sprites/levels/brick_platform.png");
+    LOAD_TEX(platform_grass_rock, "assets/sprites/levels/grass_rock_platform.png");
 
     /* Enemies — ground, air, and water patrol types. */
     LOAD_TEX(spider,           "assets/sprites/entities/spider.png");
@@ -94,6 +96,8 @@ void editor_textures_cleanup(EditorState *es)
     DESTROY_TEX(es->textures.platform);
     DESTROY_TEX(es->textures.platform_stone);
     DESTROY_TEX(es->textures.platform_leaf);
+    DESTROY_TEX(es->textures.platform_brick);
+    DESTROY_TEX(es->textures.platform_grass_rock);
     DESTROY_TEX(es->textures.spider);
     DESTROY_TEX(es->textures.jumping_spider);
     DESTROY_TEX(es->textures.bird);
