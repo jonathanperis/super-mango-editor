@@ -903,6 +903,10 @@ static int side_column_follows_the_tool(void)
     EditorState es;
     EditorSideLayout layout;
     CHECK(open_editor(&es, "levels/02_lugio_02.toml") == 0);
+    /* Long Level Config content: its later headers and lists lie below its
+     * view, under the panels drawn there. */
+    g_plx_open = g_fg_open = g_fog_open = 1;
+    g_phys_open = 0;
 
     editor_side_panel_layout(&es, &layout);
     CHECK(layout.props_h == 0 && !layout.palette_folded && layout.palette_h > 200);
@@ -918,12 +922,18 @@ static int side_column_follows_the_tool(void)
 
     /* Under Level Config's view, the click reaches the rail's first field
      * (its layout list), not a layer list scrolled out of sight there. */
+    int plx_open = g_plx_open, fg_open = g_fg_open, fog_open = g_fog_open, phys_open = g_phys_open;
     click_frame(&es, PANEL_FIELD_X, layout.props_y + 36);
     CHECK(es.ui.dropdown_open_id == (int)ENT_RAIL * 100 + 1);
+    /* ...and no Level Config header scrolled out of sight toggles. */
+    CHECK(g_plx_open == plx_open && g_fg_open == fg_open && g_fog_open == fog_open && g_phys_open == phys_open);
     click_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(es.ui.dropdown_open_id == 0);
 
-    /* The folded title brings the palette back with the Place tool. */
+    /* The folded title brings the palette back with the Place tool, even
+     * when the designer had closed it. */
+    es.palette_open = 0;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     click_frame(&es, PANEL_LABEL_X, layout.palette_y + 10);
     CHECK(es.tool == TOOL_PLACE && es.palette_open);
     editor_side_panel_layout(&es, &layout);
@@ -945,6 +955,7 @@ static int side_column_follows_the_tool(void)
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(es.props_scroll.offset == 0);
 done:
+    g_plx_open = g_fg_open = g_fog_open = 0;
     close_editor(&es);
     return failed;
 }
