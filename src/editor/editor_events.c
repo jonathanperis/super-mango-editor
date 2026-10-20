@@ -312,8 +312,11 @@ static void editor_key(EditorState *es, const InputEvent *event)
      * Delete or Paste would shift array slots under it.  Only Esc (cancel
      * the move) acts until the button is released.  Modifier keys stay
      * silent because Shift is how a drag snaps to the grid. */
-    if (es->dragging) {
-        if (key == KEY_ESCAPE) tools_cancel_drag(es);
+    if (es->dragging || es->painting) {
+        if (key == KEY_ESCAPE) {
+            if (es->painting) tools_end_paint(es);
+            else tools_cancel_drag(es);
+        }
         else if (key != KEY_LEFT_SHIFT && key != KEY_RIGHT_SHIFT &&
                  key != KEY_LEFT_CONTROL && key != KEY_RIGHT_CONTROL &&
                  key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&

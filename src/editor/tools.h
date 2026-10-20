@@ -206,3 +206,7 @@ void tools_delete_selected(EditorState *es);
 
 /* Ctrl+A: select every entity (up to EDITOR_MAX_SELECTION); returns how many. */
 int editor_select_all(EditorState *es);
+
+/* Close a row the Place tool is painting (release or Esc): its entities
+ * stay, as one undo step. */
+void tools_end_paint(EditorState *es);

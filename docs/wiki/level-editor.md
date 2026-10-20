@@ -90,7 +90,7 @@ Three interaction modes are available via the toolbar or keyboard shortcuts:
 | Tool | Key | Behaviour |
 |------|-----|-----------|
 | **Select** | `1` | Click an entity on the canvas to select it. Drag to reposition. Selected entity appears in the Properties panel. Clicking empty space clears the selection; dragging from empty space draws a selection box. |
-| **Place** | `2` | Click the canvas to stamp a new entity of the type chosen in the palette. For the two singletons (Player Spawn, Last Star) the click moves the existing one. A new spike block attaches to the rail nearest the click. |
+| **Place** | `2` | Click the canvas to stamp a new entity of the type chosen in the palette; hold the button and drag to paint a row, one entity each time the pointer has moved the entity's own width or height (on the grid when snapping), up to 64, as one undo step (`Esc` stops the row early). For the two singletons (Player Spawn, Last Star) the click moves the existing one. A new spike block attaches to the rail nearest the click. |
 | **Delete** | `3` | Click an entity to remove it from the level immediately. Clicking a member of a multi-selection removes the whole selection. |
 
 ### Selecting Several Entities
