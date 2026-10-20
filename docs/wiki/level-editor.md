@@ -184,7 +184,7 @@ Palette rows are text labels; clicking one selects that type and switches to the
 
 ## Properties Inspector
 
-When one entity is selected with the Select tool, the Properties panel displays its editable fields (with several selected it shows how many of each type instead). All fields match the TOML schema exactly — what you see in the inspector is what gets written to the file.
+When one entity is selected with the Select tool, the Properties panel displays its editable fields (with several selected it shows how many of each type instead). All fields match the TOML schema exactly — what you see in the inspector is what gets written to the file. The labels read as words (`Patrol left:` for `patrol_x0`, `Start frame:` for `frame_index`); resting the pointer on one shows what the value means, its unit and the TOML key, for example `Left end of the patrol, in pixels (patrol_x0)`.
 
 **Example — Spider:**
 - `x`, `vx`, `patrol_x0`, `patrol_x1`, `frame_index`
@@ -244,8 +244,8 @@ level-wide fields are:
 - `next_phase` path (saved under `[last_star]` in TOML; it must follow the [level-reference rule](../level-design/#level-references))
 - `music_path` (dropdown: none, water, lava, winds) and `music_volume` (0–128)
 - `floor_tile_path` (dropdown)
-- `initial_hearts` (1–3), `initial_lives`
-- `score_per_life`, `coin_score`
+- `initial_hearts` (0–3), `initial_lives` (0 in either means the game's default of 3)
+- `score_per_life`, `coin_score` (0 = the defaults, 1000 and 100)
 - A collapsible Movement Physics group for the optional `[physics]` overrides
 
 The player start and the floor gaps are canvas entities: move the Player Spawn

@@ -1270,6 +1270,41 @@ done:
     return failed;
 }
 
+/*
+ * Property labels read as words ("Patrol left:", not "patrol_x0:") and
+ * explain themselves: resting on one shows its meaning, its unit and the
+ * TOML key.  The hearts field takes 0, which means the default.
+ */
+static int property_labels_explain_themselves(void)
+{
+    int failed = 0;
+    EditorState es;
+    const char *found = NULL;
+    uint32_t t = 1000;
+    CHECK(open_editor(&es, "levels/01_lugio_01.toml") == 0);
+    CHECK(es.level.spider_count > 0);
+    es.tool = TOOL_SELECT;
+    editor_select_only(&es, ENT_SPIDER, 0);
+    es.panel_open = 1;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    /* Scan down the label column for the patrol label's tooltip. */
+    for (int y = TOOLBAR_H; y < EDITOR_H - STATUS_H && !found; y += 4) {
+        hover_frame(&es, CANVAS_W + 20, y, t);
+        t += UI_TOOLTIP_DELAY_MS;
+        hover_frame(&es, CANVAS_W + 20, y, t);
+        t += 10;
+        if (es.ui.tooltip_shown && es.ui.tooltip_text &&
+            strstr(es.ui.tooltip_text, "(patrol_x0)")) found = es.ui.tooltip_text;
+    }
+    CHECK(found && strstr(found, "Left end of the patrol, in pixels") == found);
+
+    es.level.initial_hearts = 0;
+    CHECK(level_is_valid(&es));
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -4939,6 +4974,7 @@ int main(void)
         CASE(raygui_icons_draw_their_bits),
         CASE(canvas_draws_the_level_layers_and_its_edges),
         CASE(canvas_navigates_like_a_level_editor),
+        CASE(property_labels_explain_themselves),
         CASE(asset_dropdowns_offer_every_asset_file),
         CASE(side_column_follows_the_tool),
         CASE(palette_shows_what_place_will_add),
