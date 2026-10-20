@@ -1266,10 +1266,24 @@ void properties_render(EditorState *es, int start_y, int available_h)
     es->ui.before_change = editor_before_change;
     es->ui.before_change_context = es;
 
-    /* Clip content below the title bar */
-    ui_clip_begin(&es->ui, prop_x, prop_y+ROW_H+4, PROP_W, prop_h-ROW_H-4);
-
-    int y = prop_y + ROW_H + 8;
+    /* The fields scroll below the title bar when they need more room than
+     * the panel has.  Their height is measured as they are drawn (the
+     * lowest widget), so the scroll uses last frame's measure; another
+     * selection starts again at the top. */
+    long long key = (long long)es->selection.type * 100000 + es->selection.index;
+    if (key != es->props_scroll_key) {
+        es->props_scroll_key = key;
+        es->props_scroll.offset = 0;
+        es->props_content_h = 0;
+    }
+    int content_top = prop_y + ROW_H + 4;
+    int view_h = prop_h - ROW_H - 4;
+    (void)ui_scrollbar_input(&es->ui, &es->props_scroll, prop_x + PROP_W - SCROLLBAR_W,
+                             content_top, SCROLLBAR_W, view_h, view_h, es->props_content_h);
+    int y = ui_scroll_begin(&es->ui, &es->props_scroll, prop_x, content_top, PROP_W,
+                            view_h, es->props_content_h) + 4;
+    int top = y;
+    es->ui.widgets_bottom = 0;
 
     /* ---- Per-type field rendering ----------------------------------- */
 
@@ -1287,7 +1301,10 @@ void properties_render(EditorState *es, int start_y, int available_h)
      * entity has no field for (or another entity) must not linger. */
     s_focus_key[0] = '\0';
 
-    ui_clip_end(&es->ui);
+    if (es->ui.widgets_bottom > top) es->props_content_h = es->ui.widgets_bottom - top + 12;
+    ui_scroll_end(&es->ui);
+    ui_scrollbar_draw(&es->ui, &es->props_scroll, prop_x + PROP_W - SCROLLBAR_W,
+                      content_top, SCROLLBAR_W, view_h, view_h, es->props_content_h);
     editor_end_change_tracking(es);
 }
 
