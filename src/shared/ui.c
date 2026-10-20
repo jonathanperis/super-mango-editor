@@ -97,6 +97,24 @@ static int parse_float_value(const char *text, float *value)
 }
 
 /*
+ * format_float — The shortest text that reads back as exactly this float:
+ * "0.08", not the "0.0799999982" that %.9g prints for the nearest float.
+ * Exponent forms are passed over ("100", not "1e+02") unless the value
+ * needs one; nine significant digits always read back, so the search
+ * stops there.
+ */
+static void format_float(char *out, size_t out_size, float value)
+{
+    for (int digits = 1; digits <= 9; digits++) {
+        float back;
+        snprintf(out, out_size, "%.*g", digits, value);
+        if (strchr(out, 'e')) continue;
+        if (parse_float_value(out, &back) && float_same_value(back, value)) return;
+    }
+    snprintf(out, out_size, "%.9g", value);
+}
+
+/*
  * limit_float_edit — Apply the active float field's limits to a typed value.
  *
  * The float twin of limit_int_edit below, without the step: a value outside
@@ -107,15 +125,21 @@ static float limit_float_edit(UIState *ui, float value)
 {
     if (ui->edit_float_min > ui->edit_float_max) return value;   /* no usable limits */
     if (value < ui->edit_float_min) {
+        char typed[32], limit[32];
+        format_float(typed, sizeof(typed), value);
+        format_float(limit, sizeof(limit), ui->edit_float_min);
         snprintf(ui->edit_note, sizeof(ui->edit_note),
-                 "%.9g is below %.9g, the smallest this field takes; it was limited",
-                 value, ui->edit_float_min);
+                 "%s is below %s, the smallest this field takes; it was limited",
+                 typed, limit);
         return ui->edit_float_min;
     }
     if (value > ui->edit_float_max) {
+        char typed[32], limit[32];
+        format_float(typed, sizeof(typed), value);
+        format_float(limit, sizeof(limit), ui->edit_float_max);
         snprintf(ui->edit_note, sizeof(ui->edit_note),
-                 "%.9g is above %.9g, the largest this field takes; it was limited",
-                 value, ui->edit_float_max);
+                 "%s is above %s, the largest this field takes; it was limited",
+                 typed, limit);
         return ui->edit_float_max;
     }
     return value;
@@ -371,12 +395,9 @@ static void step_number(UIState *ui, int direction, int big)
             if (next > ui->edit_float_max) next = ui->edit_float_max;
         }
         float stored = (float)next;
-        /* The shortest text that reads back as the same float: "0.3", not
-         * the "0.300000012" that %.9g prints for it, so steps of 0.1 do
-         * not show float error piling up. */
-        snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.6g", stored);
-        if (!parse_float_value(ui->edit_buf, &value) || !float_same_value(value, stored))
-            snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.9g", stored);
+        /* "0.3", not "0.300000012", so steps of 0.1 do not show float
+         * error piling up. */
+        format_float(ui->edit_buf, sizeof(ui->edit_buf), stored);
     } else {
         return;   /* text and dropdowns: nothing to step */
     }
@@ -1372,7 +1393,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
  *
  * Identical interaction model to ui_int_field, but:
  *   - Accepts '.' (decimal point) in addition to digits and '-'.
- *   - Displays the value with nine significant digits ("%.9g").
+ *   - Shows the shortest text that reads back as the same float ("0.08").
  *   - Parses the edit buffer with complete-input validation.
  */
 static int float_field(UIState *ui, int id, int x, int y, int w,
@@ -1426,7 +1447,7 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
          * Keep enough significant digits for a float to survive activation
          * and a no-op Return unchanged.
          */
-        snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%.9g", *value);
+        format_float(ui->edit_buf, sizeof(ui->edit_buf), *value);
         ui->edit_cursor = (int)strlen(ui->edit_buf);
         ui->edit_anchor = -1;
         is_active = 1;
@@ -1472,7 +1493,7 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
         draw_active_edit(ui, x, y, w);
     } else {
         char display[32];
-        snprintf(display, sizeof(display), "%.9g", *value);
+        format_float(display, sizeof(display), *value);
         draw_text(ui, x + 4, y + 3, display, ui_color(ui, UI_COLOR_TEXT));
     }
 
