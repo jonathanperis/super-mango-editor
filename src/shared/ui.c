@@ -1255,6 +1255,16 @@ void ui_label_color(UIState *ui, int x, int y, const char *text,
     draw_text(ui, x, y, text, color);
 }
 
+int ui_label_fit(UIState *ui, int x, int y, int max_w, const char *text, Color color)
+{
+    if (!text || !text[0]) return 0;
+    draw_field_text(ui, x, y, max_w, text, color);
+    if (ui_text_width(ui, text) <= max_w && !strchr(text, '\n')) return 0;
+    note_widget(ui, x, y, max_w, 14);
+    ui_tooltip(ui, text);
+    return 1;
+}
+
 /* ------------------------------------------------------------------ */
 
 /*

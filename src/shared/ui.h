@@ -319,6 +319,11 @@ void ui_tooltip(UIState *ui, const char *text);
  * measurements are logical canvas pixels. */
 void ui_label(UIState *ui, int x, int y, const char *text);
 void ui_label_color(UIState *ui, int x, int y, const char *text, Color color);
+/* ui_label_color kept to max_w pixels: text that does not fit is cut at a
+ * character boundary and ends in "...", and resting the pointer on it shows
+ * the whole text as a tooltip (text is borrowed until ui_draw_overlays).
+ * Returns 1 when the text was cut. */
+int ui_label_fit(UIState *ui, int x, int y, int max_w, const char *text, Color color);
 /* Decorative background only: panels do not own widgets or handle input. */
 void ui_panel(UIState *ui, int x, int y, int w, int h);
 

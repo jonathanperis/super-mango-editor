@@ -226,8 +226,9 @@ void editor_render_status_bar(EditorState *es)
     }
     ui_label(&es->ui, STATUS_ENTITIES_X, bar_y + 8, info_text);
     if (es->status_message[0] != '\0') {
-        ui_label_color(&es->ui, 920, bar_y + 8,
-                       es->status_message, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+        /* Cut to the window's edge; the whole message is the tooltip. */
+        (void)ui_label_fit(&es->ui, 920, bar_y + 8, EDITOR_W - 920 - 8,
+                           es->status_message, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
     }
     /* Last, in the rows under the text: the level overview strip. */
     editor_minimap_render(es);
