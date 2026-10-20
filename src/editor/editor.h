@@ -371,6 +371,13 @@ typedef struct {
     char           preview_sky_path[64];
     char           preview_floor_path[64];
     char           preview_water_path[64];
+    /* The other background layers (textures.sky is layer 0) and the fog
+     * layers, loaded the same way so the canvas can draw them as the game
+     * does; slot 0 of preview_layers is unused. */
+    Texture2D     *preview_layers[MAX_BACKGROUND_LAYERS];
+    char           preview_layer_paths[MAX_BACKGROUND_LAYERS][64];
+    Texture2D     *preview_fog[MAX_FOG_TEXTURES];
+    char           preview_fog_paths[MAX_FOG_TEXTURES][64];
 
     /* ---- Viewport ---------------------------------------------------- */
     EditorCamera   camera;
@@ -486,6 +493,7 @@ typedef struct {
 
     /* ---- UI toggles --------------------------------------------------- */
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
+    int            show_fog;      /* 1 = draw the level's fog over the canvas  */
     int            high_contrast; /* 1 = ui.style is UI_STYLE_HIGH_CONTRAST     */
     /* 1 = placing and dragging snap to the TILE_SIZE grid (key S).  Holding
      * Shift inverts it for one click or drag.  input_mods are the modifier
