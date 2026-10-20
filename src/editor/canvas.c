@@ -369,12 +369,6 @@ void canvas_center_on(EditorState *es, const EditorRect *r) {
 /* ---- Sky --------------------------------------------------------- */
 
 /*
- * render_sky — Draw the first background layer as the sky backdrop.
- *
- * If a sky texture is loaded (from the level's first background_layer),
- * tile it across the canvas.  Otherwise fall back to a flat blue fill.
- */
-/*
  * draw_parallax_layer — One background layer as the game draws it
  * (parallax_render): tiles at the image's own width, stretched to the
  * level's height, shifted by the camera times the layer's speed.  The
@@ -393,6 +387,12 @@ static void draw_parallax_layer(EditorState *es, Texture2D *tex, float speed) {
     }
 }
 
+/*
+ * render_sky — The backdrop: a flat blue fill (all a level without layers
+ * shows), then every background layer in order, each with
+ * draw_parallax_layer.  Layer 0 is textures.sky; the others are
+ * preview_layers[i].
+ */
 static void render_sky(EditorState *es) {
     int layers = es->level.background_layer_count;
     if (layers > MAX_BACKGROUND_LAYERS) layers = MAX_BACKGROUND_LAYERS;
