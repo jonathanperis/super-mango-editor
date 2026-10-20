@@ -1323,13 +1323,16 @@ void properties_render(EditorState *es, int start_y, int available_h)
  * so moving a field between helpers cannot change which ID it has.
  */
 
-/* Is the mouse over the 18-px header row of a subsection at y? */
+/* Is the mouse over the 18-px header row of a subsection at y, on the part
+ * of Level Config that shows?  A header scrolled out of the panel's view
+ * must not take a click meant for the panel drawn there. */
 static int config_row_hovered(const EditorState *es, int x, int y)
 {
     return es->ui.mouse_x >= x &&
            es->ui.mouse_x < x + PROP_W &&
            es->ui.mouse_y >= y &&
-           es->ui.mouse_y < y + 18;
+           es->ui.mouse_y < y + 18 &&
+           es->ui.mouse_y >= cfg_clip_top && es->ui.mouse_y < cfg_clip_bottom;
 }
 
 /*
@@ -1851,7 +1854,8 @@ static int config_fog_layers(EditorState *es, int x, int y)
     int hovered = (es->ui.mouse_x >= x &&
                    es->ui.mouse_x <= x + 200 &&
                    es->ui.mouse_y >= y &&
-                   es->ui.mouse_y <= y + 18);
+                   es->ui.mouse_y <= y + 18 &&
+                   es->ui.mouse_y >= cfg_clip_top && es->ui.mouse_y < cfg_clip_bottom);
     snprintf(label, sizeof(label), " Fog Layers (%d)", level->fog_layer_count);
     config_subsection_header(es, x, y, label, &g_fog_open, hovered);
     y += 18;

@@ -147,8 +147,12 @@ static void palette_title_bar(EditorState *es, int panel_x, int panel_y, int fol
     /* Folded for a selection, a click brings the palette back by taking
      * up the Place tool; otherwise it opens or closes the palette. */
     if (hdr_hovered && ui->mouse_clicked) {
-        if (folded) es->tool = TOOL_PLACE;
-        else es->palette_open = !es->palette_open;
+        if (folded) {
+            es->tool = TOOL_PLACE;
+            es->palette_open = 1;
+        } else {
+            es->palette_open = !es->palette_open;
+        }
     }
 
     const char *pal_sym = shown ? "v" : ">";
@@ -266,9 +270,10 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     ui_panel(&es->ui, panel_x, panel_y, PANEL_W, panel_h);
 
-    /* Folded when the layout leaves it only its title (a selection is
-     * being edited); collapsed when the designer closed it. */
-    int folded = es->palette_open && panel_h <= TITLE_H;
+    /* Folded when the layout leaves it only its title because a selection
+     * is being edited (whether or not the designer had it open): its title
+     * then takes up Place.  Otherwise a lone title means it was closed. */
+    int folded = panel_h <= TITLE_H && es->selection.index >= 0 && es->tool != TOOL_PLACE;
     palette_title_bar(es, panel_x, panel_y, folded);
 
     /* If collapsed or folded, just show the header bar */
