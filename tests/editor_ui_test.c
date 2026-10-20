@@ -644,6 +644,21 @@ static int long_status_messages_show_whole_in_a_tooltip(void)
     hover_frame(&es, 930, bar_y, 2000 + UI_TOOLTIP_DELAY_MS);
     CHECK(es.ui.tooltip_shown && es.ui.tooltip_text == es.status_message);
     CHECK(es.ui.tip_box[0] + es.ui.tip_box[2] <= EDITOR_W);
+
+    /* A cut label outside the active clip (a row scrolled out of a panel's
+     * view) gives no tooltip there. */
+    {
+        static const char long_text[] = "A message far too long for the eighty pixels it is given here";
+        ui_begin_frame(&es.ui);
+        es.ui.mouse_x = 20;
+        es.ui.mouse_y = 105;
+        ui_clip_begin(&es.ui, 0, 0, 200, 50);
+        CHECK(ui_label_fit(&es.ui, 10, 100, 80, long_text, WHITE) == 1);
+        ui_clip_end(&es.ui);
+        CHECK(es.ui.tooltip_text != long_text);
+        CHECK(ui_label_fit(&es.ui, 10, 100, 80, long_text, WHITE) == 1);
+        CHECK(es.ui.tooltip_text == long_text);
+    }
 done:
     close_editor(&es);
     return failed;
