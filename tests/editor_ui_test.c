@@ -3689,6 +3689,31 @@ done:
     return failed;
 }
 
+/*
+ * A float field shows the shortest text that reads back as its value: a
+ * parallax speed of 0.08 is "0.08", not the "0.0799999982" of %.9g, and a
+ * value that needs every digit keeps them.
+ */
+static int float_fields_show_the_shortest_text(void)
+{
+    int failed = 0;
+    UIState ui;
+    float values[] = {0.08f, 0.15f, 0.38f, 100.0f, -2.5f, 1.0f / 3.0f, 16777217.0f, 1e20f};
+    const char *texts[] = {"0.08", "0.15", "0.38", "100", "-2.5", "0.33333334", "16777216", "1.00000002e+20"};
+    ui_init(&ui, NULL);
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+        ui_begin_frame(&ui);
+        ui.mouse_x = ui.mouse_y = 5;
+        ui.mouse_clicked = 1;
+        (void)ui_float_field(&ui, 1, 0, 0, 100, &values[i]);
+        CHECK(ui.active_id == 1 && strcmp(ui.edit_buf, texts[i]) == 0);
+        ui_cancel_active_edit(&ui);
+    }
+done:
+    ui_cleanup(&ui);
+    return failed;
+}
+
 /* Float fields step by 1 from 10 up and by 0.1 below, without float
  * error showing, step over 0 when 0 is refused, and keep to the limits;
  * an int field with a step uses it. */
@@ -4429,6 +4454,7 @@ int main(void)
         CASE(text_fields_move_the_caret_and_tab_between_fields),
         CASE(up_and_down_step_number_fields),
         CASE(number_field_steps_suit_the_field),
+        CASE(float_fields_show_the_shortest_text),
         CASE(arrow_keys_nudge_and_backspace_deletes),
         CASE(mouse_cursor_follows_fields_and_drags),
         CASE(ctrl_d_duplicates_with_a_stepping_offset),

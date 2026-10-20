@@ -319,7 +319,7 @@ void ui_panel(UIState *ui, int x, int y, int w, int h);
 
 /* Editable fields: click activates, Return confirms, Escape discards.
  * Each returns 1 only when a valid commit changes the caller-owned value.
- * Float display uses nine significant digits for round-trip-safe editing. */
+ * A float shows the shortest text that reads back as the same value ("0.08"). */
 int ui_int_field(UIState *ui, int id, int x, int y, int w, int *value);
 /* Like ui_int_field, but a committed value is clamped to [min, max] and, when
  * step > 1, rounded to the nearest multiple of step (from 0) inside them. */
