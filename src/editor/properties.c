@@ -21,7 +21,8 @@
 #include <string.h>     /* strrchr for filename extraction       */
 
 #include "properties.h"
-#include "asset_choices.h" /* the files each asset dropdown offers */
+#include "asset_choices.h"
+#include "../screens/hud.h" /* MAX_HEARTS */ /* the files each asset dropdown offers */
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "editor_files.h"  /* editor_path_for_display for recent entries   */
@@ -187,18 +188,64 @@ static EntityType s_focus_type;
 static int        s_focus_index = -1;
 
 /*
- * field_label — Draw a property's "key:" label at row y, and when a
- * validation message asked for this key, give the field the focus: the
- * widget `id` drawn right after the label then activates (a text field
- * takes the caret, a dropdown opens).  Using the TOML key as the label is
- * what lets a message name the field.
+ * field_label — Draw a property's label at row y ("Patrol left:", with a
+ * tooltip giving the meaning, the unit and the TOML key; see
+ * s_field_labels), and when a validation message asked for this key, give
+ * the field the focus: the widget `id` drawn right after the label then
+ * activates (a text field takes the caret, a dropdown opens).  Messages
+ * name fields by TOML key, which is why the key, not the label, is what
+ * is matched.
  */
+/*
+ * What each property key reads as in the panel, and what its tooltip says:
+ * the meaning and the unit, then the TOML key in brackets.  Keys missing
+ * here show as they are.  Labels stay within LABEL_W.
+ */
+static const struct { const char *key, *label, *tip; } s_field_labels[] = {
+    {"x",           "X",            "Horizontal position, in pixels from the level's left edge"},
+    {"y",           "Y",            "Vertical position, in pixels from the top"},
+    {"patrol_x0",   "Patrol left",  "Left end of the patrol, in pixels"},
+    {"patrol_x1",   "Patrol right", "Right end of the patrol, in pixels"},
+    {"vx",          "Speed",        "Speed in pixels per second; negative starts it moving left"},
+    {"tile_count",  "Length",       "Width in 16 px pieces"},
+    {"count",       "Length",       "Length in 16 px tiles"},
+    {"brick_count", "Bricks",       "Length in 16 px bricks"},
+    {"launch_vy",   "Launch",       "Upward speed the pad gives, in pixels per second"},
+    {"frame_index", "Start frame",  "Animation frame it starts on (0-2), so neighbours do not move in step"},
+    {"t_offset",    "Rail start",   "Where it starts along its rail, in tiles"},
+    {"speed",       "Speed",        "Speed along the rail, in tiles per second"},
+    {"rail_index",  "Rail",         "Which rail it rides (the number in the rail's title)"},
+    {"mode",        "Mode",         "How it moves"},
+    {"base_y",      "Flight y",     "Height of the middle of its wavy flight, in pixels"},
+    {"w",           "Width",        "Width, in rail tiles"},
+    {"h",           "Height",       "Height, in rail tiles (Rect rails only)"},
+    {"vine_type",   "Colour",       "0 = green, 1 = brown"},
+    {"tile_width",  "Width",        "Width in 48 px tiles (0 or 1 = one tile)"},
+    {"tile_height", "Height",       "Height in 48 px tiles"},
+    {"tile_path",   "Tile image",   "The platform's tile image; (default) is grass"},
+    {"pillar_x",    "Pillar x",     "Left edge of the pillar the axe hangs from, in pixels"},
+    {"layout",      "Shape",        "Rect: a closed loop; Horiz: a straight line"},
+    {"end_cap",     "End cap",      "Horiz rails: 1 = a cap at the right end (riders bounce back), 0 = riders fall off"},
+    {"direction",   "Direction",    "+1 starts moving right, -1 left"},
+};
+
 static void field_label(EditorState *es, int y, const char *key, int id)
 {
+    static char tips[sizeof(s_field_labels) / sizeof(s_field_labels[0])][160];
     char text[40];
+    size_t n = sizeof(s_field_labels) / sizeof(s_field_labels[0]);
+    size_t i = 0;
 
-    snprintf(text, sizeof(text), "%s:", key);
-    ui_label(&es->ui, CONTENT_X, y, text);
+    while (i < n && strcmp(s_field_labels[i].key, key) != 0) i++;
+    if (i < n) {
+        if (!tips[i][0])
+            snprintf(tips[i], sizeof(tips[i]), "%s (%s)", s_field_labels[i].tip, key);
+        snprintf(text, sizeof(text), "%s:", s_field_labels[i].label);
+        ui_label_tip(&es->ui, CONTENT_X, y, text, tips[i]);
+    } else {
+        snprintf(text, sizeof(text), "%s:", key);
+        ui_label(&es->ui, CONTENT_X, y, text);
+    }
     if (s_focus_key[0] != '\0' && strcmp(s_focus_key, key) == 0 &&
         es->selection.type == s_focus_type && es->selection.index == s_focus_index) {
         ui_focus_field(&es->ui, id);
@@ -1574,7 +1621,7 @@ static int config_music(EditorState *es, int x, int y)
         }
     }
     y += 22;
-    ui_label(&es->ui, x + 8, y, "vol:");
+    ui_label_tip(&es->ui, x + 8, y, "Vol:", "Music volume, 0-128");
     /* The same 0..128 range the validator and the TOML format accept. */
     if (ui_int_field_limited(&es->ui, 9003, x + 50, y, 80,
                              &es->level.music_volume, 0,
@@ -1609,19 +1656,20 @@ static int config_lives_and_score(EditorState *es, int x, int y)
 {
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
-    ui_label(&es->ui, x + 8, y, "hearts:");
+    /* 0 in each of these means the game's default; the tooltips say so. */
+    ui_label_tip(&es->ui, x + 8, y, "Hearts:", "Hearts the player starts with, 1-3; 0 = the default (3)");
     if (ui_int_field_limited(&es->ui, 9006, x + 70, y, 60,
-                             &es->level.initial_hearts, 1, 3, 1))
+                             &es->level.initial_hearts, 0, MAX_HEARTS, 1))
         editor_commit_change(es);
-    ui_label(&es->ui, x + 150, y, "lives:");
+    ui_label_tip(&es->ui, x + 150, y, "Lives:", "Extra lives the player starts with; 0 = the default (3)");
     if (ui_int_field_limited(&es->ui, 9007, x + 205, y, 60,
                              &es->level.initial_lives, 0, 99, 1))
         editor_commit_change(es);
     y += 22;
-    ui_label(&es->ui, x + 8, y, "pts/life:");
+    ui_label_tip(&es->ui, x + 8, y, "Extra life:", "Score that earns an extra life; 0 = the default (1000)");
     if (ui_int_field(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life))
         editor_commit_change(es);
-    ui_label(&es->ui, x + 180, y, "coin pts:");
+    ui_label_tip(&es->ui, x + 180, y, "Per coin:", "Points a coin is worth; 0 = the default (100)");
     if (ui_int_field(&es->ui, 9012, x + 240, y, 60, &es->level.coin_score))
         editor_commit_change(es);
     return y + 24;
@@ -1742,7 +1790,7 @@ static int config_layer_row(EditorState *es, int x, int y, int i,
         strncpy(path, assets->paths[sel], path_size - 1);
         editor_commit_change(es);
     }
-    ui_label(&es->ui, x + 236, y, "spd:");
+    ui_label_tip(&es->ui, x + 236, y, "Spd:", "How fast the layer scrolls with the view: 0 = still, 1 = with the level");
     if (ui_float_field(&es->ui, choices->speed_id + i, x + 265, y, 60, speed))
         editor_commit_change(es);
     return y + 20;
