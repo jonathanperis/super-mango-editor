@@ -1001,8 +1001,8 @@ void ui_queue_text_input(UIState *ui, const char *text)
  * "Click" = mouse_clicked (button-down edge), not mouse_down (held).
  * This prevents repeated firing while the user holds the button.
  */
-static int button_body(UIState *ui, int x, int y, int w, int h, const char *label,
-                       UIColorRole face, UIColorRole border)
+static int button_body(UIState *ui, int x, int y, int w, int h, UIIcon icon,
+                       const char *label, UIColorRole face, UIColorRole border)
 {
     int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
 
@@ -1022,9 +1022,12 @@ static int button_body(UIState *ui, int x, int y, int w, int h, const char *labe
      */
     int tw = 0, th = 0;
     font_measure(ui->font, label, &tw, &th);
-    int tx = x + (w - tw) / 2;   /* horizontal centre */
-    int ty = y + (h - th) / 2;   /* vertical centre   */
-    draw_text(ui, tx, ty, label, ui_color(ui, UI_COLOR_TEXT));
+    /* An icon goes before the label, and the pair is centred as one. */
+    int iw = icon != UI_ICON_NONE ? UI_ICON_SIZE + (tw > 0 ? UI_ICON_GAP : 0) : 0;
+    int tx = x + (w - iw - tw) / 2;   /* horizontal centre */
+    int ty = y + (h - th) / 2;        /* vertical centre   */
+    if (iw > 0) ui_draw_icon(icon, tx, y + (h - UI_ICON_SIZE) / 2, ui_color(ui, UI_COLOR_TEXT));
+    draw_text(ui, tx + iw, ty, label, ui_color(ui, UI_COLOR_TEXT));
 
     /* Return 1 only on the click-down frame while hovering. */
     if (hovered && ui->mouse_clicked) {
@@ -1045,8 +1048,13 @@ static int button_body(UIState *ui, int x, int y, int w, int h, const char *labe
  */
 int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
 {
+    return ui_button_icon(ui, x, y, w, h, UI_ICON_NONE, label);
+}
+
+int ui_button_icon(UIState *ui, int x, int y, int w, int h, UIIcon icon, const char *label)
+{
     int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
-    return button_body(ui, x, y, w, h, label,
+    return button_body(ui, x, y, w, h, icon, label,
                        hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON, UI_COLOR_BORDER);
 }
 
@@ -1060,10 +1068,37 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
  */
 int ui_toggle(UIState *ui, int x, int y, int w, int h, const char *label, int on)
 {
+    return ui_toggle_icon(ui, x, y, w, h, UI_ICON_NONE, label, on);
+}
+
+int ui_toggle_icon(UIState *ui, int x, int y, int w, int h, UIIcon icon,
+                   const char *label, int on)
+{
     int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
     UIColorRole face = on ? UI_COLOR_SELECTED : hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON;
-    return button_body(ui, x, y, w, h, label, face,
+    return button_body(ui, x, y, w, h, icon, label, face,
                        on ? UI_COLOR_ACCENT : UI_COLOR_BORDER);
+}
+
+/*
+ * ui_draw_icon — Draw one raygui icon, a pixel per set bit.
+ *
+ * Bit k of word w is the pixel at (k % 16, 2 * w + k / 16).  Rows of set
+ * bits are drawn as one rectangle each, so a solid icon costs a few dozen
+ * rectangles in the shared batch rather than one per pixel.
+ */
+void ui_draw_icon(UIIcon icon, int x, int y, Color color)
+{
+    if (icon <= UI_ICON_NONE || icon >= UI_ICON_COUNT) return;
+    for (int row = 0; row < UI_ICON_SIZE; row++) {
+        uint32_t bits = raygui_icon_bits[icon][row / 2] >> (row % 2 * 16);
+        for (int col = 0; col < UI_ICON_SIZE;) {
+            if (!(bits >> col & 1u)) { col++; continue; }
+            int start = col;
+            while (col < UI_ICON_SIZE && bits >> col & 1u) col++;
+            draw_rect(x + start, y + row, col - start, 1, color);
+        }
+    }
 }
 
 /* ------------------------------------------------------------------ */

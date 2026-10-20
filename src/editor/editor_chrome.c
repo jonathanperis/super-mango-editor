@@ -16,7 +16,7 @@
 #include "entity_meta.h"       /* editor_placed_entity_total */
 #include "editor_minimap.h"    /* editor_minimap_render */
 #include "editor_shortcuts.h"  /* editor_shortcut_tooltip */
-#include "../shared/ui.h"      /* ui_panel, ui_button, ui_label */
+#include "../shared/ui.h"      /* ui_panel, ui_button_icon, ui_label */
 
 /*
  * editor_render_toolbar — Draw the top toolbar (32 px tall, full width).
@@ -27,6 +27,8 @@
  *
  * The tools and the on/off buttons are ui_toggle: the current tool, a
  * shown grid, an open Campaign view and so on draw in the selected colour.
+ * Every button but the zoom list has a raygui icon before its label
+ * (vendor/raygui/raygui_icons.h).
  *
  * Each control has a tooltip naming its shortcut, when it has one, built
  * from the shortcut table the F1 list shows too (editor_shortcuts.c).
@@ -40,31 +42,31 @@ void editor_render_toolbar(EditorState *es)
     int bw = 64;
     int bh = 24;
 
-    if (ui_toggle(&es->ui, bx, by, bw, bh, "Select", es->tool == TOOL_SELECT)) {
+    if (ui_toggle_icon(&es->ui, bx, by, bw, bh, UI_ICON_SELECT, "Select", es->tool == TOOL_SELECT)) {
         es->tool = TOOL_SELECT;
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_SELECT_TOOL));
 
     bx += bw + 4;
-    if (ui_toggle(&es->ui, bx, by, bw, bh, "Place", es->tool == TOOL_PLACE)) {
+    if (ui_toggle_icon(&es->ui, bx, by, bw, bh, UI_ICON_PLACE, "Place", es->tool == TOOL_PLACE)) {
         es->tool = TOOL_PLACE;
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_PLACE_TOOL));
 
     bx += bw + 4;
-    if (ui_toggle(&es->ui, bx, by, bw, bh, "Delete", es->tool == TOOL_DELETE)) {
+    if (ui_toggle_icon(&es->ui, bx, by, bw, bh, UI_ICON_DELETE, "Delete", es->tool == TOOL_DELETE)) {
         es->tool = TOOL_DELETE;
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_DELETE_TOOL));
 
     bx += bw + 20;
-    if (ui_toggle(&es->ui, bx, by, 56, bh, "Grid", es->show_grid)) {
+    if (ui_toggle_icon(&es->ui, bx, by, 56, bh, UI_ICON_GRID, "Grid", es->show_grid)) {
         es->show_grid ^= 1;
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_GRID));
 
     bx += 60;
-    if (ui_toggle(&es->ui, bx, by, 56, bh, "Debug", es->debug_play)) {
+    if (ui_toggle_icon(&es->ui, bx, by, 56, bh, UI_ICON_DEBUG, "Debug", es->debug_play)) {
         es->debug_play ^= 1;
     }
     ui_tooltip(&es->ui, "Playtest with the game's --debug overlay");
@@ -92,7 +94,7 @@ void editor_render_toolbar(EditorState *es)
     /* The Campaign view (Ctrl+M) covers the canvas; the button closes it
      * again (asking first about unsaved campaign edits). */
     bx += 88;
-    if (ui_toggle(&es->ui, bx, by, 84, bh, "Campaign", es->campaign != NULL)) {
+    if (ui_toggle_icon(&es->ui, bx, by, 84, bh, UI_ICON_CAMPAIGN, "Campaign", es->campaign != NULL)) {
         if (es->campaign) (void)editor_campaign_close(es, 0);
         else (void)editor_campaign_open(es, NULL);
     }
@@ -102,7 +104,7 @@ void editor_render_toolbar(EditorState *es)
      * black faces, white outlines, text at 7:1 or more). The level canvas
      * keeps its own colours. */
     bx += 88;
-    if (ui_toggle(&es->ui, bx, by, 84, bh, "Contrast", es->high_contrast)) {
+    if (ui_toggle_icon(&es->ui, bx, by, 84, bh, UI_ICON_CONTRAST, "Contrast", es->high_contrast)) {
         editor_set_high_contrast(es, !es->high_contrast);
         /* Remembered for the next session; without a preference folder
          * (render smoke) it simply stays for this one. */
@@ -113,31 +115,31 @@ void editor_render_toolbar(EditorState *es)
 
     int rx = EDITOR_W - 4 - 52;
     if (es->playing) {
-        if (ui_button(&es->ui, rx, by, 52, bh, "Stop")) {
+        if (ui_button_icon(&es->ui, rx, by, 52, bh, UI_ICON_STOP, "Stop")) {
             editor_stop_play(es);
         }
         ui_tooltip(&es->ui, "Stop the playtest");
     } else {
-        if (ui_button(&es->ui, rx, by, 52, bh, "Play")) {
+        if (ui_button_icon(&es->ui, rx, by, 52, bh, UI_ICON_PLAY, "Play")) {
             editor_play_test(es);
         }
         ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_PLAYTEST));
     }
 
     rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Save")) {
+    if (ui_button_icon(&es->ui, rx, by, 64, bh, UI_ICON_SAVE, "Save")) {
         (void)editor_save_current_level(es);
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_SAVE));
 
     rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Save As")) {
+    if (ui_button_icon(&es->ui, rx, by, 64, bh, UI_ICON_SAVE_AS, "Save As")) {
         (void)editor_save_current_level_as(es);
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_SAVE_AS));
 
     rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "Open")) {
+    if (ui_button_icon(&es->ui, rx, by, 64, bh, UI_ICON_OPEN, "Open")) {
         if (editor_confirm_discard_changes(es, "open another level")) {
             editor_open_level_file(es);
         }
@@ -145,7 +147,7 @@ void editor_render_toolbar(EditorState *es)
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_OPEN));
 
     rx -= 64 + 4;
-    if (ui_button(&es->ui, rx, by, 64, bh, "New")) {
+    if (ui_button_icon(&es->ui, rx, by, 64, bh, UI_ICON_NEW, "New")) {
         if (editor_confirm_discard_changes(es, "create a new level")) {
             editor_reset_new_level(es);
         }
