@@ -181,7 +181,8 @@ static int option_index(const char *value, const char *const *paths,
 /*
  * A field a validation message asked to focus ("spiders[2].vx" -> the vx
  * field of spider 2), until the properties panel draws that entity.
- * focus_key is the TOML key, which is also the field's label; "" = none.
+ * focus_key is the TOML key (field_label matches on it, not on the label
+ * shown); "" = none.
  */
 static char       s_focus_key[32];
 static EntityType s_focus_type;
