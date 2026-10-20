@@ -189,6 +189,9 @@ typedef struct {
     uint32_t time_ms;
     int view_w, view_h;
     int last_x, last_y, last_w, last_h;
+    /* The lowest widget edge (y + h) drawn since an owner last set this to
+     * 0: how tall a panel's content turned out, for scrolling it. */
+    int widgets_bottom;
     const char *tooltip_text;   /* borrowed until ui_draw_overlays */
     int tooltip_x, tooltip_y, tooltip_w, tooltip_h;
     uint32_t tooltip_since_ms;

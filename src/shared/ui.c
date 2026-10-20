@@ -60,6 +60,7 @@ static void draw_text(UIState *ui, int x, int y,
 static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh);
 static void note_widget(UIState *ui, int x, int y, int w, int h);
 static void field_cursor(UIState *ui, int x, int y, int w, int h, int is_active);
+static int pointer_over(const UIState *ui, int x, int y, int w, int h);
 
 static void notify_before_change(UIState *ui, int id)
 {
@@ -824,7 +825,7 @@ static int edit_offset_at(UIState *ui, int x, size_t start, int px)
 static void edit_mouse(UIState *ui, int x, int y, int w, int h, int activated)
 {
     if (activated) return;
-    if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
+    if (ui->mouse_clicked && pointer_over(ui, x, y, w, h)) {
         apply_pending_text_input(ui);
         ui->edit_cursor = edit_offset_at(ui, x, edit_window_start(ui, w), ui->mouse_x);
         ui->edit_anchor = -1;
@@ -889,6 +890,20 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
            py >= ry && py < ry + rh;
 }
 
+/*
+ * pointer_over — Is the pointer on (x, y, w, h) and, inside a clipped
+ * (scrolled) panel, on the part of the panel that shows?  A panel still
+ * calls the widgets it has scrolled out of view; they must not take a
+ * click or a hover meant for what is drawn there instead.
+ */
+static int pointer_over(const UIState *ui, int x, int y, int w, int h)
+{
+    if (!point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) return 0;
+    return !ui->clip_active ||
+           point_in_rect(ui->mouse_x, ui->mouse_y, ui->clip_x, ui->clip_y,
+                         ui->clip_w, ui->clip_h);
+}
+
 /* An editable field shows the I-beam while the pointer is on it (and on
  * the visible part of its scrolled panel), or while a press in it drags out
  * a selection; not under an open list, which takes the next press itself. */
@@ -897,10 +912,7 @@ static void field_cursor(UIState *ui, int x, int y, int w, int h, int is_active)
     if (ui->dropdown_open_id != 0) return;
     /* A clipped (scrolled) panel still calls fields scrolled out of its
      * view; they must not claim the pointer over what is drawn there. */
-    int visible = !ui->clip_active ||
-                  point_in_rect(ui->mouse_x, ui->mouse_y, ui->clip_x, ui->clip_y,
-                                ui->clip_w, ui->clip_h);
-    if ((visible && point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) ||
+    if (pointer_over(ui, x, y, w, h) ||
         (is_active && ui->edit_drag && ui->mouse_down))
         ui->cursor_wish = MOUSE_CURSOR_IBEAM;
 }
@@ -912,6 +924,7 @@ static void note_widget(UIState *ui, int x, int y, int w, int h)
     ui->last_y = y;
     ui->last_w = w;
     ui->last_h = h;
+    if (y + h > ui->widgets_bottom) ui->widgets_bottom = y + h;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1076,7 +1089,7 @@ void ui_queue_text_input(UIState *ui, const char *text)
 static int button_body(UIState *ui, int x, int y, int w, int h, UIIcon icon,
                        const char *label, UIColorRole face, UIColorRole border)
 {
-    int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+    int hovered = pointer_over(ui, x, y, w, h);
 
     note_widget(ui, x, y, w, h);
     draw_rect(x, y, w, h, ui_color(ui, face));
@@ -1125,7 +1138,7 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label)
 
 int ui_button_icon(UIState *ui, int x, int y, int w, int h, UIIcon icon, const char *label)
 {
-    int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+    int hovered = pointer_over(ui, x, y, w, h);
     return button_body(ui, x, y, w, h, icon, label,
                        hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON, UI_COLOR_BORDER);
 }
@@ -1146,7 +1159,7 @@ int ui_toggle(UIState *ui, int x, int y, int w, int h, const char *label, int on
 int ui_toggle_icon(UIState *ui, int x, int y, int w, int h, UIIcon icon,
                    const char *label, int on)
 {
-    int hovered = point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+    int hovered = pointer_over(ui, x, y, w, h);
     UIColorRole face = on ? UI_COLOR_SELECTED : hovered ? UI_COLOR_HOT : UI_COLOR_BUTTON;
     return button_body(ui, x, y, w, h, icon, label, face,
                        on ? UI_COLOR_ACCENT : UI_COLOR_BORDER);
@@ -1303,7 +1316,7 @@ int ui_int_field_limited(UIState *ui, int id, int x, int y, int w, int *value,
 
     /* --- Activation on click, or by Tab from the previous field --- */
     int clicked_on = !is_active && ui->mouse_clicked &&
-                     point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+                     pointer_over(ui, x, y, w, h);
     if (field_drawn(ui, id, y) ||
         (clicked_on && command_allows_activation(ui, id))) {
         /*
@@ -1432,7 +1445,7 @@ static int float_field(UIState *ui, int id, int x, int y, int w,
 
     /* --- Activation on click, or by Tab from the previous field --- */
     int clicked_on = !is_active && ui->mouse_clicked &&
-                     point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+                     pointer_over(ui, x, y, w, h);
     if (field_drawn(ui, id, y) ||
         (clicked_on && command_allows_activation(ui, id))) {
         ui->active_id = id;
@@ -1533,7 +1546,7 @@ int ui_text_field_hint(UIState *ui, int id, int x, int y, int w, char *buf, int 
 
     /* --- Activation on click, or by Tab from the previous field --- */
     int clicked_on = !is_active && ui->mouse_clicked &&
-                     point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h);
+                     pointer_over(ui, x, y, w, h);
     if (field_drawn(ui, id, y) ||
         (clicked_on && command_allows_activation(ui, id))) {
         ui->active_id = id;
@@ -1670,7 +1683,7 @@ int ui_dropdown_unlisted(UIState *ui, int id, int x, int y, int w,
 
     /* --- Draw the header (always visible) --- */
     note_widget(ui, x, y, w, h);
-    int hovered_header = point_in_rect(ui->mouse_x, ui->mouse_y,
+    int hovered_header = pointer_over(ui,
                                        x, y, w, h);
     Color header_bg = ui_color(ui, hovered_header ? UI_COLOR_HOT : UI_COLOR_BUTTON);
     draw_rect(x, y, w, h, header_bg);
@@ -1785,8 +1798,7 @@ int ui_dropdown_unlisted(UIState *ui, int id, int x, int y, int w,
 void ui_tooltip(UIState *ui, const char *text)
 {
     if (!ui || !text || !text[0] || ui->last_w <= 0 || ui->last_h <= 0) return;
-    if (!point_in_rect(ui->mouse_x, ui->mouse_y, ui->last_x, ui->last_y,
-                       ui->last_w, ui->last_h)) return;
+    if (!pointer_over(ui, ui->last_x, ui->last_y, ui->last_w, ui->last_h)) return;
     /* A new widget under the pointer starts the delay again. */
     if (ui->tooltip_x != ui->last_x || ui->tooltip_y != ui->last_y ||
         ui->tooltip_w != ui->last_w || ui->tooltip_h != ui->last_h) {
@@ -2000,7 +2012,7 @@ int ui_scrollbar_input(UIState *ui, UIScroll *scroll, int x, int y, int w, int h
             scroll->offset = travel > 0
                 ? (int)(((int64_t)top * (content - view) * 2 + travel) / (2 * (int64_t)travel)) : 0;
         }
-    } else if (ui->mouse_clicked && point_in_rect(ui->mouse_x, ui->mouse_y, x, y, w, h)) {
+    } else if (ui->mouse_clicked && pointer_over(ui, x, y, w, h)) {
         if (ui->mouse_y >= thumb_y && ui->mouse_y < thumb_y + thumb_h) {
             ui->scroll_drag = scroll;
             ui->scroll_grab = ui->mouse_y - thumb_y;

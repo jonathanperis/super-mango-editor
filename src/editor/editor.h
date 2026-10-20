@@ -506,6 +506,12 @@ typedef struct {
     /* Side panels scrolled in pixels; each keeps its own trackpad remainder. */
     UIScroll       config_scroll;
     UIScroll       palette_scroll;
+    /* The selection's properties, when taller than their panel: the
+     * offset, the content height the last frame measured, and which
+     * selection that was (a new one starts at the top). */
+    UIScroll       props_scroll;
+    int            props_content_h;
+    long long      props_scroll_key;
     /* Trackpads report the wheel in fractions of a notch: Ctrl+wheel zoom
      * waits until they add up to one whole notch. */
     float          zoom_wheel_accum;
