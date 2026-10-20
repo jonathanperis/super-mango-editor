@@ -21,6 +21,7 @@
 #include <string.h>     /* strrchr for filename extraction       */
 
 #include "properties.h"
+#include "asset_choices.h" /* the files each asset dropdown offers */
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "editor_files.h"  /* editor_path_for_display for recent entries   */
@@ -361,28 +362,17 @@ static void draw_platform_properties(EditorState *es, int y)
 
     /* Tile path dropdown — select platform texture override */
     {
-        static const char *platform_tile_names[] = {
-            "(default)",
-            "stone_platform.png",
-            "leaf_platform.png"
-        };
-        static const char *platform_tile_paths[] = {
-            "",
-            "assets/sprites/levels/stone_platform.png",
-            "assets/sprites/levels/leaf_platform.png"
-        };
-        static const int platform_tile_count = 3;
+        const AssetChoices *tiles = editor_asset_choices(ASSET_CHOICES_PLATFORM_TILES);
 
-        int sel = option_index(p->tile_path, platform_tile_paths,
-                               platform_tile_count);
+        int sel = option_index(p->tile_path, tiles->paths, tiles->count);
         field_label(es, y, "tile_path", FIELD_ID(ENT_PLATFORM, 3));
-        if (ui_dropdown(&es->ui, FIELD_ID(ENT_PLATFORM, 3),
-                        FIELD_X, y, FIELD_W,
-                        platform_tile_names, platform_tile_count, &sel)) {
+        if (ui_dropdown_unlisted(&es->ui, FIELD_ID(ENT_PLATFORM, 3),
+                                 FIELD_X, y, FIELD_W, tiles->names, tiles->count, &sel,
+                                 editor_asset_unlisted_name(p->tile_path))) {
             if (sel == 0) {
                 p->tile_path[0] = '\0';  /* Clear to use default */
             } else {
-                strncpy(p->tile_path, platform_tile_paths[sel],
+                strncpy(p->tile_path, tiles->paths[sel],
                         sizeof(p->tile_path) - 1);
                 p->tile_path[sizeof(p->tile_path) - 1] = '\0';
             }
@@ -1546,25 +1536,16 @@ static int config_level_fields(EditorState *es, int x, int y)
 /* Background sound: which loop plays, and how loud. */
 static int config_music(EditorState *es, int x, int y)
 {
-    static const char *music_names[] = {
-        "(none)", "water.qoa", "lava.qoa", "winds.qoa"
-    };
-    static const char *music_paths[] = {
-        "",
-        "assets/sounds/levels/water.qoa",
-        "assets/sounds/levels/lava.qoa",
-        "assets/sounds/levels/winds.qoa"
-    };
-    static const int music_count = 4;
+    const AssetChoices *music = editor_asset_choices(ASSET_CHOICES_MUSIC);
 
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     ui_label(&es->ui, x + 8, y, "Background Sound:");
     {
-        int sel = option_index(es->level.music_path, music_paths, music_count);
-        if (ui_dropdown(&es->ui, 9009, x + 160, y, 210,
-                         music_names, music_count, &sel)) {
-            strncpy(es->level.music_path, music_paths[sel],
+        int sel = option_index(es->level.music_path, music->paths, music->count);
+        if (ui_dropdown_unlisted(&es->ui, 9009, x + 160, y, 210, music->names, music->count,
+                                 &sel, editor_asset_unlisted_name(es->level.music_path))) {
+            strncpy(es->level.music_path, music->paths[sel],
                     sizeof(es->level.music_path) - 1);
             es->level.music_path[sizeof(es->level.music_path) - 1] = '\0';
             editor_commit_change(es);
@@ -1583,34 +1564,16 @@ static int config_music(EditorState *es, int x, int y)
 /* The floor's tileset. */
 static int config_floor_tile(EditorState *es, int x, int y)
 {
-    /* Display names (shown in dropdown) */
-    static const char *floor_tile_names[] = {
-        "grass_tileset.png",
-        "brick_tileset.png",
-        "cloud_tileset.png",
-        "grass_rock_tileset.png",
-        "leaf_tileset.png",
-        "stone_tileset.png"
-    };
-    static const char *floor_tile_paths[] = {
-        "assets/sprites/levels/grass_tileset.png",
-        "assets/sprites/levels/brick_tileset.png",
-        "assets/sprites/levels/cloud_tileset.png",
-        "assets/sprites/levels/grass_rock_tileset.png",
-        "assets/sprites/levels/leaf_tileset.png",
-        "assets/sprites/levels/stone_tileset.png"
-    };
-    static const int floor_tile_count = 6;
+    const AssetChoices *tiles = editor_asset_choices(ASSET_CHOICES_FLOOR_TILES);
 
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     ui_label(&es->ui, x + 8, y, "Floor Tile:");
     {
-        int sel = option_index(es->level.floor_tile_path, floor_tile_paths,
-                               floor_tile_count);
-        if (ui_dropdown(&es->ui, 9010, x + 100, y, 270,
-                         floor_tile_names, floor_tile_count, &sel)) {
-            strncpy(es->level.floor_tile_path, floor_tile_paths[sel],
+        int sel = option_index(es->level.floor_tile_path, tiles->paths, tiles->count);
+        if (ui_dropdown_unlisted(&es->ui, 9010, x + 100, y, 270, tiles->names, tiles->count,
+                                 &sel, editor_asset_unlisted_name(es->level.floor_tile_path))) {
+            strncpy(es->level.floor_tile_path, tiles->paths[sel],
                     sizeof(es->level.floor_tile_path) - 1);
             es->level.floor_tile_path[sizeof(es->level.floor_tile_path) - 1] = '\0';
             editor_commit_change(es);
@@ -1735,11 +1698,9 @@ static int config_physics(EditorState *es, int x, int y)
  * dropdown_id + i and its speed field speed_id + i.
  */
 typedef struct {
-    const char **names;   /* dropdown labels                */
-    const char **paths;   /* the asset path for each label  */
-    int          count;
-    int          dropdown_id;
-    int          speed_id;
+    AssetChoicesKind assets;   /* the files offered (asset_choices.c) */
+    int              dropdown_id;
+    int              speed_id;
 } LayerChoices;
 
 /* One "i: [asset] spd: [speed]" row of a layer list. */
@@ -1751,10 +1712,12 @@ static int config_layer_row(EditorState *es, int x, int y, int i,
     snprintf(label, sizeof(label), "%d:", i);
     ui_label(&es->ui, x + 8, y, label);
 
-    int sel = option_index(path, choices->paths, choices->count);
-    if (ui_dropdown(&es->ui, choices->dropdown_id + i, x + 28, y, 200,
-                     choices->names, choices->count, &sel)) {
-        strncpy(path, choices->paths[sel], path_size - 1);
+    const AssetChoices *assets = editor_asset_choices(choices->assets);
+    int sel = option_index(path, assets->paths, assets->count);
+    if (ui_dropdown_unlisted(&es->ui, choices->dropdown_id + i, x + 28, y, 200,
+                             assets->names, assets->count, &sel,
+                             editor_asset_unlisted_name(path))) {
+        strncpy(path, assets->paths[sel], path_size - 1);
         editor_commit_change(es);
     }
     ui_label(&es->ui, x + 236, y, "spd:");
@@ -1798,35 +1761,7 @@ static int config_layer_buttons(EditorState *es, int x, int y,
 /* Parallax background layers — a collapsible list. */
 static int config_background_layers(EditorState *es, int x, int y)
 {
-    static const char *bg_names[] = {
-        "sky_blue.png",
-        "sky_blue_lightened.png",
-        "castle_pillars.png",
-        "forest_leafs.png",
-        "clouds_bg.png",
-        "glacial_mountains.png",
-        "glacial_mountains_lightened.png",
-        "clouds_mg_3.png",
-        "clouds_mg_2.png",
-        "clouds_lonely.png",
-        "clouds_mg_1.png",
-        "clouds_mg_1_lightened.png"
-    };
-    static const char *bg_paths[] = {
-        "assets/sprites/backgrounds/sky_blue.png",
-        "assets/sprites/backgrounds/sky_blue_lightened.png",
-        "assets/sprites/backgrounds/castle_pillars.png",
-        "assets/sprites/backgrounds/forest_leafs.png",
-        "assets/sprites/backgrounds/clouds_bg.png",
-        "assets/sprites/backgrounds/glacial_mountains.png",
-        "assets/sprites/backgrounds/glacial_mountains_lightened.png",
-        "assets/sprites/backgrounds/clouds_mg_3.png",
-        "assets/sprites/backgrounds/clouds_mg_2.png",
-        "assets/sprites/backgrounds/clouds_lonely.png",
-        "assets/sprites/backgrounds/clouds_mg_1.png",
-        "assets/sprites/backgrounds/clouds_mg_1_lightened.png"
-    };
-    static const LayerChoices choices = { bg_names, bg_paths, 12, 9200, 9100 };
+    static const LayerChoices choices = { ASSET_CHOICES_BACKGROUNDS, 9200, 9100 };
     LevelDef *level = &es->level;
     char label[48];
 
@@ -1858,21 +1793,7 @@ static int config_background_layers(EditorState *es, int x, int y)
 /* Foreground strips (water, lava, clouds) drawn over the floor. */
 static int config_foreground_layers(EditorState *es, int x, int y)
 {
-    static const char *fg_names[] = {
-        "fog_1.png",
-        "fog_2.png",
-        "water.png",
-        "clouds.png",
-        "lava.png"
-    };
-    static const char *fg_paths[] = {
-        "assets/sprites/foregrounds/fog_1.png",
-        "assets/sprites/foregrounds/fog_2.png",
-        "assets/sprites/foregrounds/water.png",
-        "assets/sprites/foregrounds/clouds.png",
-        "assets/sprites/foregrounds/lava.png"
-    };
-    static const LayerChoices choices = { fg_names, fg_paths, 5, 9300, 9400 };
+    static const LayerChoices choices = { ASSET_CHOICES_FOREGROUNDS, 9300, 9400 };
     LevelDef *level = &es->level;
     char label[48];
 
@@ -1904,22 +1825,7 @@ static int config_foreground_layers(EditorState *es, int x, int y)
 /* Fog overlays that drift across the screen. */
 static int config_fog_layers(EditorState *es, int x, int y)
 {
-    /* Fog asset dropdown options — includes original + fire/volcanic variants */
-    static const char *fog_names[] = {
-        "fog_1.png",
-        "fog_2.png",
-        "fog_fire_1.png",
-        "fog_fire_2.png",
-        "smoke.png",
-    };
-    static const char *fog_paths[] = {
-        "assets/sprites/foregrounds/fog_1.png",
-        "assets/sprites/foregrounds/fog_2.png",
-        "assets/sprites/foregrounds/fog_fire_1.png",
-        "assets/sprites/foregrounds/fog_fire_2.png",
-        "assets/sprites/foregrounds/smoke.png",
-    };
-    static const LayerChoices choices = { fog_names, fog_paths, 5, 9600, 9700 };
+    static const LayerChoices choices = { ASSET_CHOICES_FOG, 9600, 9700 };
     LevelDef *level = &es->level;
     char label[48];
 
