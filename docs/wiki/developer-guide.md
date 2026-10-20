@@ -254,8 +254,9 @@ disabled), and panels an owner draws itself should ask `ui_color(ui, role)` rath
 than use a fixed colour, so a style change reaches them too. `UI_STYLE_DEFAULT`
 is the editor look; `UI_STYLE_HIGH_CONTRAST` is used by the editor's Contrast
 toggle and by the game's settings menu when the high-contrast setting is on.
-`editor_ui_test` checks that the default still matches the `UI_*` colours and
-that every high-contrast text colour keeps 7:1 on every face.
+`editor_ui_test` checks that the default still matches the `UI_*` colours, that
+its dim text keeps 4.5:1 (WCAG AA) on the panel, title and input faces, and that
+every high-contrast text colour keeps 7:1 on every face.
 
 `ui_toggle` is a button for something on or off (the editor's tools, Grid,
 Campaign, Contrast): while on it draws `UI_COLOR_SELECTED`, outlined in
