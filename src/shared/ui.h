@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include "text.h"
 #include "../levels/level.h"
+#include "../../vendor/raygui/raygui_icons.h" /* UIIcon */
 
 typedef void (*UIBeforeChangeFn)(void *context, int widget_id);
 typedef int (*UIBeforeCommandFn)(void *context);
@@ -284,6 +285,16 @@ int ui_button(UIState *ui, int x, int y, int w, int h, const char *label);
  * has outlines.  Returns 1 on its click frame, like ui_button; the caller
  * flips the state. */
 int ui_toggle(UIState *ui, int x, int y, int w, int h, const char *label, int on);
+/* ui_button and ui_toggle with one of raygui's 16 x 16 icons before the
+ * label, the two centred together.  UI_ICON_NONE draws the label alone. */
+int ui_button_icon(UIState *ui, int x, int y, int w, int h, UIIcon icon, const char *label);
+int ui_toggle_icon(UIState *ui, int x, int y, int w, int h, UIIcon icon, const char *label, int on);
+/* Width of the icon and the gap after it, before a button's label. */
+#define UI_ICON_SIZE 16
+#define UI_ICON_GAP  4
+/* Draw `icon` with its top-left pixel at (x, y), one window pixel per icon
+ * pixel, like raygui's GuiDrawIcon at pixelSize 1. */
+void ui_draw_icon(UIIcon icon, int x, int y, Color color);
 /* The same button while its command has nothing to act on: drawn darker with
  * a dim label, without a hover highlight, and it never takes a click. */
 void ui_button_disabled(UIState *ui, int x, int y, int w, int h, const char *label);

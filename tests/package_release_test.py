@@ -91,9 +91,10 @@ def main():
         (fixture / "levels/labs").mkdir(parents=True)
         (fixture / "levels/labs/example.toml").write_text("format_version = 1\n", encoding="utf-8")
         (fixture / "vendor/tomlc17").mkdir(parents=True)
+        (fixture / "vendor/raygui").mkdir(parents=True)
         (fixture / "vendor/raylib").mkdir(parents=True)
         (fixture / "vendor/raylib/gamecontrollerdb").mkdir(parents=True)
-        for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "vendor/tomlc17/LICENSE", "vendor/raylib/manifest.json",
+        for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "vendor/tomlc17/LICENSE", "vendor/raygui/LICENSE", "vendor/raylib/manifest.json",
                      "vendor/raylib/gamecontrollerdb/LICENSE"):
             shutil.copy2(ROOT / name, fixture / name)
         windows = sys.platform == "win32"
@@ -118,6 +119,7 @@ def main():
             assert f"{platform}/assets/sounds/used.wav" in names
             assert not any("/unused/" in name for name in names)
             assert b"CK Tan" in bundle.read(f"{platform}/licenses/tomlc17.txt")
+            assert b"raysan5" in bundle.read(f"{platform}/licenses/raygui.txt")
             assert b"raylib" in bundle.read(f"{platform}/licenses/raylib.txt")
         dll_dir = root / "dlls"
         dll_dir.mkdir()
