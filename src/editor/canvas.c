@@ -38,6 +38,7 @@
 #include "tools.h"       /* editor_snap_point for the placement ghost           */
 #include "../levels/level_loader.h"
 #include "../levels/level_validate.h" /* level_validate_preview */
+#include "../shared/geometry.h" /* float_same_value */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                                    FLOOR_GAP_W, GRAVITY; MAX_* via level.h */
 
@@ -347,6 +348,42 @@ void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy) 
 /* ------------------------------------------------------------------ */
 /* canvas_contains — Hit test for the canvas rectangle                 */
 /* ------------------------------------------------------------------ */
+
+static const float s_zoom_presets[CANVAS_ZOOM_COUNT] = { 0.25f, 0.5f, 1.0f, 2.0f, 3.0f, 5.0f };
+static const char *s_zoom_labels[CANVAS_ZOOM_COUNT] = {
+    "Zoom: 1/4x", "Zoom: 1/2x", "Zoom: 1x", "Zoom: 2x", "Zoom: 3x", "Zoom: 5x"
+};
+
+float canvas_zoom_preset(int index)
+{
+    return index >= 0 && index < CANVAS_ZOOM_COUNT ? s_zoom_presets[index] : 1.0f;
+}
+
+const char *canvas_zoom_label(int index)
+{
+    return index >= 0 && index < CANVAS_ZOOM_COUNT ? s_zoom_labels[index] : "Zoom";
+}
+
+int canvas_zoom_index(float zoom)
+{
+    /* Zoom is only ever set from this table, so compare exactly. */
+    for (int i = 0; i < CANVAS_ZOOM_COUNT; i++)
+        if (float_same_value(s_zoom_presets[i], zoom)) return i;
+    return -1;
+}
+
+void canvas_zoom_to_fit(EditorState *es)
+{
+    float world_w = editor_world_width(&es->level);
+    int best = 0;
+    for (int i = 0; i < CANVAS_ZOOM_COUNT; i++)
+        if (world_w * s_zoom_presets[i] <= (float)CANVAS_W &&
+            (float)GAME_H * s_zoom_presets[i] <= (float)CANVAS_H) best = i;
+    es->camera.zoom = s_zoom_presets[best];
+    es->camera.x = 0.0f;
+    es->camera.y = 0.0f;
+    canvas_clamp_camera(es);
+}
 
 int canvas_contains(int sx, int sy) {
     return sx >= 0 && sx < CANVAS_W &&
@@ -1493,6 +1530,10 @@ static void render_grid(EditorState *es) {
         if (sx < -2 || sx > CANVAS_W + 2) continue;
 
         DrawRectangle(sx,TOOLBAR_H,2,CANVAS_H,ui_color(&es->ui, UI_COLOR_ACCENT));
+        /* Each screen's number by its left edge, as the game counts them. */
+        char number[8];
+        snprintf(number, sizeof(number), "%d", screen + 1);
+        ui_label_color(&es->ui, sx + 5, TOOLBAR_H + 4, number, ui_color(&es->ui, UI_COLOR_ACCENT));
     }
 
     /* ---- FLOOR_Y line (red, 2 px wide) ---- */

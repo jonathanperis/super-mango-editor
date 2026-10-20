@@ -302,10 +302,14 @@ it never reaches the canvas or the fields under the list.
 |--------|-------|
 | Pan left / right | Mouse wheel over the canvas, or a trackpad's sideways swipe |
 | Pan up / down | `Shift + Mouse Wheel` over the canvas (at 3× and 5× the 300 px world is taller than the canvas); macOS reports Shift+wheel as horizontal scroll, which also pans up/down here |
-| Change zoom | Toolbar dropdown (zooms around the canvas centre) or `Ctrl + Mouse Wheel` (zooms around the cursor; 1×, 2×, 3×, 5×, stopping at 1× and 5×) |
+| Drag the view | Hold the middle mouse button, or `Space` with the left button, and drag over the canvas (the level follows the pointer; nothing is placed or selected) |
+| Change zoom | Toolbar dropdown (zooms around the canvas centre) or `Ctrl + Mouse Wheel` (zooms around the cursor; ¼×, ½×, 1×, 2×, 3×, 5×, stopping at ¼× and 5×) |
+| Zoom to fit | `F`, or **Zoom: Fit** in the toolbar list: the largest zoom that shows the whole level, scrolled to its start |
+| Select everything | `Ctrl+A` on the canvas (up to 64 entities, the most a selection holds; the status bar says when there are more) |
+| Cut | `Ctrl+X`: copy the selection, then delete it (`Ctrl+V` pastes it back) |
 | Snap to grid on / off | `S` (status bar shows `Snap: on` / `Snap: off`). Placing and dragging then put the entity's corner on the 48 px grid |
 | Snap just this once (or not) | `Shift` does the opposite of the `S` setting, read at each mouse event. **Place**: hold it as you click; the entity lands the other way. **Select**: press it only once the drag has started (`Shift` at the press adds to or takes from the selection instead of dragging); while it is held the move snaps the other way, letting go mid-drag switches back, the entity follows at the next mouse movement, and where it is when the button comes up is where it stays |
-| Toggle grid | `G` |
+| Toggle grid | `G` (each screen's number shows at its left boundary) |
 
 The canvas renders the level in WYSIWYG — entity positions and sizes match the game exactly at zoom 1.0 (logical pixel = 1 canvas pixel). At zoom 2.0 each logical pixel maps to 2 canvas pixels. One wheel notch pans 48 canvas pixels and scrolls a side panel 20 px. A side panel or the Campaign view's list that holds more than it shows has a scrollbar at its right edge: drag its thumb, or click above or below the thumb to move one view. Trackpads report fractions of a notch; the editor adds them up, so small swipes scroll the side panels, the validation list and the Campaign view's rows too, and a `Ctrl` pinch or swipe changes zoom once per whole notch.
 
