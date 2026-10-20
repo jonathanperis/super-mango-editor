@@ -460,6 +460,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |
 | `palette.c` / `palette.h` | Entity palette panel — category rows, type selection |
 | `properties.c` / `properties.h` | Property inspector panel — one `draw_<type>_properties()` function per entity type, chosen from the `s_property_panels` table, plus Level Config drawn by one `config_*` helper per settings group |
+| `asset_choices.c` / `asset_choices.h` | The files each asset dropdown offers. `editor_ui_test` fails when a file in `assets/sprites/backgrounds`, `foregrounds`, `levels` or `assets/sounds/levels` is missing from its list; a level path no list names shows its file name in the dropdown |
 | `tools.c` / `tools.h` | Mouse interaction for Select / Place / Delete tools |
 | `hit_test.c` / `hit_test.h` | Entity rectangles shared by click hit-testing and the selection outline; reverse-draw-order hit test |
 | `entity_meta.c` / `entity_meta.h` | The per-type table (names, category, capacity, where the placements live in `LevelDef`, the placement-ghost sprite) and the shared read/insert/remove helpers used by tools, undo and paste |

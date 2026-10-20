@@ -1653,6 +1653,13 @@ int ui_text_field_hint(UIState *ui, int id, int x, int y, int w, char *buf, int 
 int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                 const char **options, int count, int *selected)
 {
+    return ui_dropdown_unlisted(ui, id, x, y, w, options, count, selected, "---");
+}
+
+int ui_dropdown_unlisted(UIState *ui, int id, int x, int y, int w,
+                         const char **options, int count, int *selected,
+                         const char *unlisted)
+{
     int h       = 20;              /* height of the header row             */
     int is_open = (ui->dropdown_open_id == id);
     int changed = 0;
@@ -1669,10 +1676,10 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     draw_rect(x, y, w, h, header_bg);
     draw_control_border(ui, x, y, w, h);
 
-    /* Show the currently selected option text (or "---" if out of range). */
+    /* Show the currently selected option text (or `unlisted` if out of range). */
     const char *current = (*selected >= 0 && *selected < count)
                           ? options[*selected]
-                          : "---";
+                          : unlisted ? unlisted : "---";
     /* Room for the "v" arrow at the right. */
     draw_field_text(ui, x + 4, y + 3, w - 22, current, ui_color(ui, UI_COLOR_TEXT));
 

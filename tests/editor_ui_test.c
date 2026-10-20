@@ -34,6 +34,7 @@
 #include <unistd.h>
 #endif
 
+#include "editor/asset_choices.h"
 #include "editor/canvas.h"
 #include "editor/dialog_choice.h"
 #include "editor/editor_campaign.h"
@@ -790,6 +791,75 @@ static int raygui_icons_draw_their_bits(void)
     }
 done:
     close_editor(&es);
+    return failed;
+}
+
+/* Is path one of the choice list's paths? */
+static int asset_offered(const AssetChoices *list, const char *path)
+{
+    for (int i = 0; i < list->count; i++)
+        if (strcmp(list->paths[i], path) == 0) return 1;
+    return 0;
+}
+
+/*
+ * Every file in folder whose name ends in suffix is offered by one of the
+ * lists a or b (b may be NULL); returns how many files it saw, or -1 when
+ * one is missing.
+ */
+static int folder_files_offered(const char *folder, const char *suffix,
+                                const AssetChoices *a, const AssetChoices *b)
+{
+    FilePathList files = LoadDirectoryFiles(folder);
+    int seen = 0, missing = 0;
+    size_t suffix_len = strlen(suffix);
+    for (unsigned int i = 0; i < files.count; i++) {
+        const char *path = files.paths[i];
+        size_t len = strlen(path);
+        if (len < suffix_len || strcmp(path + len - suffix_len, suffix) != 0) continue;
+        seen++;
+        if (!asset_offered(a, path) && !(b && asset_offered(b, path))) {
+            fprintf(stderr, "editor_ui_test: no dropdown offers %s\n", path);
+            missing = 1;
+        }
+    }
+    UnloadDirectoryFiles(files);
+    return missing ? -1 : seen;
+}
+
+/*
+ * The asset dropdowns offer every file in their folders (the volcanic and
+ * smoke backgrounds were once left out), every file they offer exists,
+ * and a path none of them names shows its own file name.
+ */
+static int asset_dropdowns_offer_every_asset_file(void)
+{
+    int failed = 0;
+    const AssetChoices *bg = editor_asset_choices(ASSET_CHOICES_BACKGROUNDS);
+    const AssetChoices *fg = editor_asset_choices(ASSET_CHOICES_FOREGROUNDS);
+    const AssetChoices *fog = editor_asset_choices(ASSET_CHOICES_FOG);
+    const AssetChoices *floor = editor_asset_choices(ASSET_CHOICES_FLOOR_TILES);
+    const AssetChoices *plat = editor_asset_choices(ASSET_CHOICES_PLATFORM_TILES);
+    const AssetChoices *music = editor_asset_choices(ASSET_CHOICES_MUSIC);
+
+    CHECK(folder_files_offered("assets/sprites/backgrounds", ".png", bg, NULL) == bg->count);
+    CHECK(folder_files_offered("assets/sprites/foregrounds", ".png", fg, fog) > 0);
+    CHECK(folder_files_offered("assets/sprites/levels", "_tileset.png", floor, NULL) == floor->count);
+    /* The platform and music lists also have an empty "(default)"/"(none)". */
+    CHECK(folder_files_offered("assets/sprites/levels", "_platform.png", plat, NULL) == plat->count - 1);
+    CHECK(folder_files_offered("assets/sounds/levels", ".qoa", music, NULL) == music->count - 1);
+    for (int k = 0; k < ASSET_CHOICES_COUNT; k++) {
+        const AssetChoices *list = editor_asset_choices((AssetChoicesKind)k);
+        for (int i = 0; i < list->count; i++)
+            CHECK(list->paths[i][0] == '\0' || FileExists(list->paths[i]));
+    }
+    CHECK(editor_asset_choices(ASSET_CHOICES_COUNT) == NULL);
+
+    CHECK(strcmp(editor_asset_unlisted_name("assets/sprites/backgrounds/old.png"), "old.png") == 0);
+    CHECK(strcmp(editor_asset_unlisted_name("mine\\custom.png"), "custom.png") == 0);
+    CHECK(strcmp(editor_asset_unlisted_name("plain.png"), "plain.png") == 0);
+    CHECK(strcmp(editor_asset_unlisted_name(""), "---") == 0);
+done:
     return failed;
 }
 
@@ -4440,6 +4510,7 @@ int main(void)
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(toolbar_toggles_show_what_is_on),
         CASE(raygui_icons_draw_their_bits),
+        CASE(asset_dropdowns_offer_every_asset_file),
         CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),

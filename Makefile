@@ -206,7 +206,7 @@ TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validati
                    editor_recovery editor_session editor_undo_apply entity_meta editor_campaign) \
                    $(TEST_EDITOR_UI_OBJ) \
                    $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,tools hit_test editor_clipboard \
-                   editor_events canvas editor_panels editor_layout palette properties \
+                   editor_events canvas editor_panels editor_layout palette properties asset_choices \
                    editor_playtest editor_shortcuts file_dialog dialog_choice undo)
 # The editor's own window, chrome and frame, for editor-ui-test.
 TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \

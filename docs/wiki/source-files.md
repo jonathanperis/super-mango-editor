@@ -64,6 +64,7 @@ src/
 │   ├── canvas.h / .c             Zoomable editing canvas with horizontal and vertical camera scrolling
 │   ├── palette.h / .c            Entity palette
 │   ├── properties.h / .c         Property panels: one draw_<type>_properties function per entity type (picked from a table), plus level config
+│   ├── asset_choices.h / .c      The files each asset dropdown offers (layer images, floor/platform tiles, music); a test checks them against the folders
 │   ├── tools.h / .c              Selection and placement tools
 │   ├── hit_test.h / .c           Entity rectangles and click hit-testing
 │   ├── entity_meta.h / .c        One table row per entity type (names, capacity, LevelDef storage, placement preview) plus shared read/insert/remove of placements
