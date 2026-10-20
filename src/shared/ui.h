@@ -44,7 +44,9 @@ typedef enum {
 #define UI_BTN_ACTIVE (Color){0x4A,0x90,0xD9,0xFF}
 #define UI_ACCENT     (Color){0x4A,0x90,0xD9,0xFF}
 #define UI_TEXT       (Color){0xE0,0xE0,0xE0,0xFF}
-#define UI_TEXT_DIM   (Color){0x80,0x80,0x80,0xFF}
+/* Secondary text (hints, notes, "Validation: OK"): 4.5:1 or more (WCAG
+ * AA) on the panel, title and input faces it is drawn on. */
+#define UI_TEXT_DIM   (Color){0xA8,0xA8,0xA8,0xFF}
 #define UI_INPUT_BG   (Color){0x1D,0x1D,0x1D,0xFF}
 
 /*
