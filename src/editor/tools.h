@@ -203,3 +203,6 @@ void tools_right_click(EditorState *es, float world_x, float world_y);
  * es->selection; does nothing if nothing is selected (index == -1).
  */
 void tools_delete_selected(EditorState *es);
+
+/* Ctrl+A: select every entity (up to EDITOR_MAX_SELECTION); returns how many. */
+int editor_select_all(EditorState *es);

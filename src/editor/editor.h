@@ -533,6 +533,11 @@ typedef struct {
     int            mouse_y;       /* current cursor y in window pixels         */
     int            mouse_down;    /* 1 while left mouse button is held         */
     int            mouse_right_down; /* 1 while right mouse button is held     */
+    /* Panning: middle-drag, or a left drag with Space held, slides the
+     * view; pan_x/pan_y is where the pointer was at the last move. */
+    int            panning;
+    int            pan_x, pan_y;
+    int            space_held;    /* Space is down (and no field is typing) */
 
     /* ---- Drag state (moving one entity with the Select tool) ---------- */
     /*

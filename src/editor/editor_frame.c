@@ -20,6 +20,10 @@ void editor_update_cursor(EditorState *es)
 {
     /* Moving entities: the four-way arrows, whatever is under them. */
     if (es->dragging && !es->playing) ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
+    /* Sliding the view, or ready to (Space over the canvas): the same. */
+    if ((es->panning || (es->space_held && canvas_contains(es->mouse_x, es->mouse_y))) &&
+        !es->playing)
+        ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
     ui_apply_cursor(&es->ui);
 }
 

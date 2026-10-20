@@ -1177,6 +1177,61 @@ done:
     return failed;
 }
 
+/*
+ * Navigation: the middle button, or Space with the left button, drags the
+ * view (and places nothing); F zooms to the whole level; Ctrl+A selects
+ * every entity, up to a selection's size; Ctrl+X cuts.
+ */
+static int canvas_navigates_like_a_level_editor(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, "levels/01_lugio_01.toml") == 0);
+    es.camera.zoom = 2.0f;
+    es.camera.x = 200.0f;
+    es.camera.y = 0.0f;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, 300, 300);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_MIDDLE, 0, 300, 300);
+    ui_frame(&es, 300, 300);
+    CHECK(es.camera.x == 250.0f && !es.panning);
+
+    int coins = es.level.coin_count;
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+    push_event(INPUT_KEY_DOWN, KEY_SPACE, 0, 0, 0);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 300, 300);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, 400, 300);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 400, 300);
+    push_event(INPUT_KEY_UP, KEY_SPACE, 0, 0, 0);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.x == 200.0f && es.level.coin_count == coins && !es.space_held);
+
+    /* Eight screens (3200 px) fit at a quarter. */
+    key_frame(&es, KEY_F, 0);
+    CHECK(es.camera.zoom == 0.25f && es.camera.x == 0.0f);
+    CHECK(canvas_zoom_index(es.camera.zoom) == 0);
+
+    es.tool = TOOL_SELECT;
+    int total = editor_placed_entity_total(&es.level);
+    CHECK(total > EDITOR_MAX_SELECTION);
+    key_frame(&es, KEY_A, INPUT_CTRL);
+    CHECK(editor_selection_count(&es) == EDITOR_MAX_SELECTION);
+    CHECK(strstr(es.status_message, "Selected 64 of") != NULL);
+
+    editor_select_only(&es, ENT_COIN, 0);
+    coins = es.level.coin_count;
+    key_frame(&es, KEY_X, INPUT_CTRL);
+    CHECK(es.level.coin_count == coins - 1 && es.clipboard_count == 1);
+    key_frame(&es, KEY_V, INPUT_CTRL);
+    CHECK(es.level.coin_count == coins);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -1592,19 +1647,25 @@ static int canvas_place_select_drag_delete_and_undo(void)
     push_wheel(400, 300, 100.0f, 0);
     ui_frame(&es, 400, 300);
     CHECK(es.camera.x == 0.0f);
-    /* Zoom stops at 5x and at 1x: it used to wrap from 5x to 1x. */
+    /* Zoom stops at 5x and at a quarter: it used to wrap from 5x to 1x. */
     static const float up[] = {3.0f, 5.0f, 5.0f};
     for (int i = 0; i < 3; i++) {
         push_wheel(400, 300, 1.0f, INPUT_CTRL);
         ui_frame(&es, 400, 300);
         CHECK(es.camera.zoom == up[i]);
     }
-    static const float down[] = {3.0f, 2.0f, 1.0f, 1.0f};
-    for (int i = 0; i < 4; i++) {
+    /* Down through every preset to a quarter, where it stops; then back
+     * up to 1x. */
+    static const float down[] = {3.0f, 2.0f, 1.0f, 0.5f, 0.25f, 0.25f};
+    for (int i = 0; i < 6; i++) {
         push_wheel(400, 300, -1.0f, INPUT_CTRL);
         ui_frame(&es, 400, 300);
         CHECK(es.camera.zoom == down[i]);
     }
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 1.0f);
     /* A trackpad pinch sends fractions: four quarter notches make one step. */
     for (int i = 0; i < 3; i++) push_wheel(400, 300, 0.25f, INPUT_CTRL);
     ui_frame(&es, 400, 300);
@@ -4839,6 +4900,7 @@ int main(void)
         CASE(toolbar_toggles_show_what_is_on),
         CASE(raygui_icons_draw_their_bits),
         CASE(canvas_draws_the_level_layers_and_its_edges),
+        CASE(canvas_navigates_like_a_level_editor),
         CASE(asset_dropdowns_offer_every_asset_file),
         CASE(side_column_follows_the_tool),
         CASE(palette_shows_what_place_will_add),
