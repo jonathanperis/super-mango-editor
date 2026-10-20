@@ -32,6 +32,8 @@
 #include "editor.h"    /* EditorState, EntityType, EditorTool, CANVAS_W, etc.  */
 #include "entity_meta.h" /* shared palette names/categories                    */
 #include "../shared/ui.h" /* UIState and shared widgets */
+#include "../shared/graphics.h" /* sprite_draw for the thumbnails */
+#include "editor_textures.h" /* editor_texture_path */
 
 /* ------------------------------------------------------------------ */
 /* Layout constants                                                    */
@@ -101,6 +103,27 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
 /* ------------------------------------------------------------------ */
 /* Pieces of the palette, top to bottom                                */
 /* ------------------------------------------------------------------ */
+
+/*
+ * palette_row_offset — How far below the title the row for `type` is, with
+ * the categories open as they are now; -1 if its category is closed.
+ */
+static int palette_row_offset(EntityType type)
+{
+    int y = 0;
+    for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
+        y += CATEGORY_H;
+        if (!category_open[cat]) continue;
+        int entry_count = editor_entity_palette_entry_count();
+        for (int i = 0; i < entry_count; i++) {
+            EntityType t = editor_entity_palette_entry_type(i);
+            if ((int)editor_entity_category(t) != cat) continue;
+            if (t == type) return y;
+            y += ROW_H;
+        }
+    }
+    return -1;
+}
 
 /*
  * palette_content_height — Height of everything below and including the
@@ -198,6 +221,77 @@ static void palette_category_header(UIState *ui, int cat, int panel_x, int row_y
  * tool is active) has an accent background; a hovered row gets the button
  * hover colour.  Clicking a row picks that type and switches to Place.
  */
+/*
+ * palette_thumbnail — The entity's own picture, fitted into a THUMB_SIZE
+ * square at (x, y): the frame the canvas draws for it, shrunk (never
+ * enlarged) to fit and centred.  Types without a sprite (floor gaps,
+ * rails, checkpoints) get a swatch in their canvas colour.
+ */
+#define THUMB_SIZE 18
+
+/*
+ * thumbnail_source — The part of tex a thumbnail shows: the entity's first
+ * frame (its preview crop, or preview w x h from the sheet's top-left),
+ * trimmed to its opaque pixels so the padding around the art does not
+ * shrink it.  The trim reads the image file once per type.
+ */
+static IntRect thumbnail_source(EntityType type, const EditorEntityPreview *preview,
+                                const Texture2D *tex)
+{
+    static IntRect trimmed[ENT_COUNT];
+    static unsigned char ready[ENT_COUNT];
+    IntRect frame = preview->crop ? preview->src
+                  : (IntRect){0, 0, preview->w < tex->width ? preview->w : tex->width,
+                              preview->h < tex->height ? preview->h : tex->height};
+
+    if ((int)type < 0 || type >= ENT_COUNT) return frame;
+    if (ready[type]) return trimmed[type];
+    trimmed[type] = frame;
+    ready[type] = 1;
+    const char *path = editor_texture_path(preview->texture);
+    if (!path) return frame;
+    Image image = LoadImage(path);
+    if (!IsImageValid(image)) return frame;
+    ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    const unsigned char *px = image.data;
+    int x0 = frame.x + frame.w, y0 = frame.y + frame.h, x1 = frame.x - 1, y1 = frame.y - 1;
+    for (int y = frame.y; y < frame.y + frame.h && y < image.height; y++)
+        for (int x = frame.x; x < frame.x + frame.w && x < image.width; x++)
+            if (px[((size_t)y * (size_t)image.width + (size_t)x) * 4 + 3] > 0) {
+                if (x < x0) x0 = x;
+                if (x > x1) x1 = x;
+                if (y < y0) y0 = y;
+                if (y > y1) y1 = y;
+            }
+    UnloadImage(image);
+    if (x1 >= x0 && y1 >= y0) trimmed[type] = (IntRect){x0, y0, x1 - x0 + 1, y1 - y0 + 1};
+    return trimmed[type];
+}
+
+static void palette_thumbnail(EditorState *es, EntityType type, int x, int y)
+{
+    const EditorEntityPreview *preview = editor_entity_preview(type);
+    Texture2D *tex = editor_entity_texture(&es->textures, type);
+
+    if (!preview) return;
+    if (!tex) {
+        Color swatch = type == ENT_FLOOR_GAP  ? (Color){0x1A, 0x6B, 0xA0, 255}
+                     : type == ENT_CHECKPOINT ? (Color){225, 169, 65, 255}
+                                              : (Color){0x00, 0xAA, 0x00, 255};
+        DrawRectangle(x + 3, y + 3, THUMB_SIZE - 6, THUMB_SIZE - 6, swatch);
+        return;
+    }
+    IntRect src = thumbnail_source(type, preview, tex);
+    if (src.w <= 0 || src.h <= 0) return;
+    float scale = (float)THUMB_SIZE / (float)(src.w > src.h ? src.w : src.h);
+    if (scale > 1.0f) scale = 1.0f;
+    int dw = (int)((float)src.w * scale + 0.5f), dh = (int)((float)src.h * scale + 0.5f);
+    if (dw < 1) dw = 1;
+    if (dh < 1) dh = 1;
+    IntRect dst = { x + (THUMB_SIZE - dw) / 2, y + (THUMB_SIZE - dh) / 2, dw, dh };
+    sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
+}
+
 static void palette_entry_row(EditorState *es, EntityType type,
                               int panel_x, int row_y)
 {
@@ -223,8 +317,9 @@ static void palette_entry_row(EditorState *es, EntityType type,
      * would be hard to read.  The +4 vertical offset centres the 13-px
      * font within the 22-px row height: (22 - 13) / 2 ~ 4.
      */
+    palette_thumbnail(es, type, panel_x + PAD_X + 8, row_y + (ROW_H - THUMB_SIZE) / 2);
     ui_label_color(ui,
-                   panel_x + PAD_X + 8,  /* extra indent under category */
+                   panel_x + PAD_X + 8 + THUMB_SIZE + 6,  /* after the thumbnail */
                    row_y + 4,
                    editor_entity_palette_name(type),
                    ui_color(ui, UI_COLOR_TEXT));
@@ -285,6 +380,29 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     int content_top = panel_y + TITLE_H;
 
+    /* When the type to place changes (or Place is taken up), show it: open
+     * its category and scroll its row into view.  Only on the change, so
+     * the designer can still close that category afterwards. */
+    {
+        static int shown_type = -1, shown_place = 0;
+        int placing = es->tool == TOOL_PLACE;
+        if (placing && (!shown_place || (int)es->palette_type != shown_type) &&
+            es->palette_type >= 0 && es->palette_type < ENT_COUNT) {
+            int cat = (int)editor_entity_category(es->palette_type);
+            if (cat >= 0 && cat < EDITOR_ENTITY_CATEGORY_COUNT) {
+                category_open[cat] = 1;
+                int row = palette_row_offset(es->palette_type);
+                if (row >= 0) {
+                    int top = content_top - es->palette_scroll.offset + row;
+                    ui_scroll_reveal(&es->palette_scroll, top, top + ROW_H,
+                                     content_top, panel_y + panel_h, 4);
+                }
+            }
+        }
+        shown_type = (int)es->palette_type;
+        shown_place = placing;
+    }
+
     /*
      * Only the content below the title scrolls (es->palette_scroll, moved by
      * the wheel in editor_panels.c). ui_scroll_begin keeps the offset within
@@ -334,4 +452,9 @@ void palette_render(EditorState *es, int start_y, int available_h)
     ui_scroll_end(&es->ui);
     ui_scrollbar_draw(&es->ui, &es->palette_scroll, panel_x + PANEL_W - SCROLLBAR_W,
                       content_top, SCROLLBAR_W, view_h, view_h, content_h);
+}
+
+int palette_category_is_open(int category)
+{
+    return category >= 0 && category < EDITOR_ENTITY_CATEGORY_COUNT && category_open[category];
 }

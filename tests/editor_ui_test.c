@@ -51,6 +51,7 @@
 #include "editor/editor_shortcuts.h"
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
+#include "editor/palette.h"
 #include "editor/properties.h"
 #include "editor/tools.h"
 #include "levels/level_loader.h"
@@ -960,6 +961,36 @@ done:
     return failed;
 }
 
+/*
+ * Placing names what a click adds in the status bar; a new type to place
+ * opens its category; each row shows the entity's thumbnail.
+ */
+static int palette_shows_what_place_will_add(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    int cat = (int)editor_entity_category(ENT_CIRCULAR_SAW);
+    CHECK(!palette_category_is_open(cat));
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_CIRCULAR_SAW;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(palette_category_is_open(cat));
+    CHECK(strcmp(editor_entity_palette_name(ENT_CIRCULAR_SAW), "Circular Saw") == 0);
+
+    {
+        char label[64];
+        editor_status_tool_text(&es, label, sizeof(label));
+        CHECK(strcmp(label, "Place: Circular Saw") == 0);
+        es.tool = TOOL_SELECT;
+        editor_status_tool_text(&es, label, sizeof(label));
+        CHECK(strcmp(label, "Tool: Select") == 0);
+    }
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -1808,7 +1839,8 @@ static int snap_toggle_applies_to_placing_and_dragging(void)
     /* The status-bar labels around the indicator do not overlap. */
     CHECK(8 + ui_text_width(&es.ui, "Mouse: (1600, 300)") < 150);
     CHECK(150 + ui_text_width(&es.ui, "Snap: off") < 228);
-    CHECK(228 + ui_text_width(&es.ui, "Tool: Delete") < 330);
+    CHECK(228 + ui_text_width(&es.ui, "Tool: Delete") < STATUS_SUMMARY_X);
+    CHECK(228 + ui_text_width(&es.ui, "Place: Bouncepad Medium") < STATUS_SUMMARY_X);
 
     CHECK(es.snap_to_grid == 0);
     key_frame(&es, KEY_S, 0);
@@ -1973,7 +2005,7 @@ static int validation_messages_take_you_to_the_problem(void)
     es.level.coins[2].y = 9999.0f;
     es.selection.index = -1;
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    click_frame(&es, 335, EDITOR_H - STATUS_H / 2);
+    click_frame(&es, STATUS_SUMMARY_X + 5, EDITOR_H - STATUS_H / 2);
     CHECK(es.selection.type == ENT_COIN && es.selection.index == 2);
     /* The next frame draws the coin's fields with y holding the caret. */
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
@@ -4609,6 +4641,7 @@ int main(void)
         CASE(raygui_icons_draw_their_bits),
         CASE(asset_dropdowns_offer_every_asset_file),
         CASE(side_column_follows_the_tool),
+        CASE(palette_shows_what_place_will_add),
         CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),

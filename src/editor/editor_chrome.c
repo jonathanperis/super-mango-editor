@@ -155,6 +155,17 @@ void editor_render_toolbar(EditorState *es)
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_NEW));
 }
 
+void editor_status_tool_text(const EditorState *es, char *out, size_t out_size)
+{
+    static const char *tool_names[] = { "Select", "Place", "Delete" };
+    /* Placing, the bar names what a click adds. */
+    if (es->tool == TOOL_PLACE)
+        snprintf(out, out_size, "Place: %s", editor_entity_palette_name(es->palette_type));
+    else
+        snprintf(out, out_size, "Tool: %s",
+                 (es->tool >= 0 && es->tool < 3) ? tool_names[es->tool] : "Unknown");
+}
+
 /*
  * editor_render_status_bar — Draw mouse, tool, validation, and file status.
  */
@@ -175,13 +186,8 @@ void editor_render_status_bar(EditorState *es)
                    es->snap_to_grid ? "Snap: on" : "Snap: off",
                    es->snap_to_grid ? ui_color(&es->ui, UI_COLOR_ACCENT) : ui_color(&es->ui, UI_COLOR_TEXT_DIM));
 
-    const char *tool_names[] = { "Select", "Place", "Delete" };
-    const char *tool_name = (es->tool >= 0 && es->tool < 3)
-                            ? tool_names[es->tool]
-                            : "Unknown";
-
     char tool_text[64];
-    snprintf(tool_text, sizeof(tool_text), "Tool: %s", tool_name);
+    editor_status_tool_text(es, tool_text, sizeof(tool_text));
     ui_label(&es->ui, 228, bar_y + 8, tool_text);
 
     /* The validation summary is a link: clicking it goes to the first
@@ -192,12 +198,12 @@ void editor_render_status_bar(EditorState *es)
         int clickable = es->validation_report.message_count > 0;
         /* Above the overview strip, whose rows take their own clicks. */
         int hovered = clickable &&
-                      es->ui.mouse_x >= 330 && es->ui.mouse_x < 330 + width &&
+                      es->ui.mouse_x >= STATUS_SUMMARY_X && es->ui.mouse_x < STATUS_SUMMARY_X + width &&
                       es->ui.mouse_y >= bar_y && es->ui.mouse_y < EDITOR_MINIMAP_Y;
-        ui_label_color(&es->ui, 330, bar_y + 8, summary,
+        ui_label_color(&es->ui, STATUS_SUMMARY_X, bar_y + 8, summary,
                        es->validation_report.error_count > 0 ?
                        ui_color(&es->ui, UI_COLOR_ERROR) : ui_color(&es->ui, UI_COLOR_TEXT_DIM));
-        if (hovered) DrawRectangle(330, bar_y + 22, width, 1, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+        if (hovered) DrawRectangle(STATUS_SUMMARY_X, bar_y + 22, width, 1, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
         if (hovered && es->ui.mouse_clicked) {
             es->ui.mouse_clicked = 0;
             (void)editor_focus_validation_issue(es, 0);
