@@ -621,6 +621,34 @@ done:
     return failed;
 }
 
+/*
+ * A status message too long for the room left of the window's edge ends in
+ * "..." there, and resting the pointer on it shows the whole message; a
+ * short one needs no tooltip.
+ */
+static int long_status_messages_show_whole_in_a_tooltip(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int bar_y = EDITOR_H - STATUS_H + 10;
+    CHECK(open_editor(&es, NULL) == 0);
+
+    editor_set_status(&es, "Saved");
+    hover_frame(&es, 930, bar_y, 1000);
+    hover_frame(&es, 930, bar_y, 1000 + UI_TOOLTIP_DELAY_MS);
+    CHECK(!es.ui.tooltip_shown);
+
+    editor_set_status(&es, "Campaign view: Esc returns to the level, and every edit here "
+                           "is kept in its own history until you save the campaign");
+    hover_frame(&es, 930, bar_y, 2000);
+    hover_frame(&es, 930, bar_y, 2000 + UI_TOOLTIP_DELAY_MS);
+    CHECK(es.ui.tooltip_shown && es.ui.tooltip_text == es.status_message);
+    CHECK(es.ui.tip_box[0] + es.ui.tip_box[2] <= EDITOR_W);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 /* The default style is the editor look the UI_* colours describe, with no
  * control outlines; the high-contrast style keeps every text colour at the
  * WCAG AAA ratio (7:1) or more on every face it is drawn on. */
@@ -4719,6 +4747,7 @@ int main(void)
         CASE(side_column_follows_the_tool),
         CASE(palette_shows_what_place_will_add),
         CASE(a_drawable_mistake_keeps_the_canvas_editable),
+        CASE(long_status_messages_show_whole_in_a_tooltip),
         CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),

@@ -1379,7 +1379,9 @@ static int message_row(EditorState *es, int x, int y, const char *text, Color co
 
     if (selected) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, ui_color(&es->ui, UI_COLOR_SELECTED));
     else if (hovered) DrawRectangle(x + 4, y - 1, PROP_W - 8, 18, ui_color(&es->ui, UI_COLOR_HOT));
-    ui_label_color(&es->ui, x + 16, y, text, color);
+    /* A long message ends in "..." at the panel's edge; resting the
+     * pointer on it shows all of it. */
+    (void)ui_label_fit(&es->ui, x + 16, y, PROP_W - 24, text, color);
     if (!hovered || !es->ui.mouse_clicked) return 0;
     es->ui.mouse_clicked = 0;
     snprintf(es->selected_message, sizeof(es->selected_message), "%s", text);

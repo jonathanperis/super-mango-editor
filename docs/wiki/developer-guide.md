@@ -271,6 +271,11 @@ button. The icons are raygui's own bitmaps, generated into
 colour, so they follow the style like the text does. Only the icons come from
 raygui; the widgets stay in `ui.c`.
 
+`ui_label_fit(ui, x, y, max_w, text, colour)` draws a label cut to `max_w`
+with `...`, and when it had to cut, registers itself so the full text shows as
+its tooltip; the editor's status message and validation rows use it. Text
+fields and dropdown headers cut their text the same way.
+
 `ui_tooltip(ui, text)`, called right after a widget, gives that widget a
 tooltip: once the pointer has rested on it for `UI_TOOLTIP_DELAY_MS` (500 ms),
 `ui_draw_overlays` draws the text in a `UI_COLOR_TITLE` box by the pointer
