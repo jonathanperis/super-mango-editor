@@ -29,6 +29,61 @@ static int expect_valid_level(void)
     return 0;
 }
 
+/*
+ * The editor's preview check stops only what its drawing loops depend on:
+ * a bad next_phase or a coin outside the world fails the full check but
+ * leaves the level drawable; an oversized rail, a missing rail or a bad
+ * count fails both.
+ */
+static int expect_preview_check_keeps_drawable_levels(void)
+{
+    LevelDef def;
+    char err[128];
+
+    level_def_init_defaults(&def);
+    snprintf(def.next_phase, sizeof(def.next_phase), "levels/../oops.toml");
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        level_validate_preview(&def, err, sizeof(err)) != 0 || err[0] != '\0') {
+        fprintf(stderr, "level_validate_test: a bad next_phase should leave the preview drawn\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.coin_count = 1;
+    def.coins[0].x = -500.0f;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        level_validate_preview(&def, err, sizeof(err)) != 0) {
+        fprintf(stderr, "level_validate_test: a stray coin should leave the preview drawn\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.rail_count = 1;
+    def.rails[0].layout = RAIL_LAYOUT_RECT;
+    def.rails[0].w = MAX_RAIL_TILES;
+    def.rails[0].h = MAX_RAIL_TILES;
+    if (level_validate_preview(&def, err, sizeof(err)) == 0 || strncmp(err, "rails[0]", 8) != 0) {
+        fprintf(stderr, "level_validate_test: an oversized rail should pause the preview\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.spike_block_count = 1;
+    def.spike_blocks[0].rail_index = 0;
+    if (level_validate_preview(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: a missing rail should pause the preview\n");
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.coin_count = MAX_COINS + 1;
+    if (level_validate_preview(&def, err, sizeof(err)) == 0) {
+        fprintf(stderr, "level_validate_test: a bad count should pause the preview\n");
+        return 1;
+    }
+    return 0;
+}
+
 static int expect_rejected_level(void)
 {
     LevelDef def;
@@ -1085,6 +1140,7 @@ int main(void)
     if (expect_rejected_nonfinite_values() != 0) return 1;
     if (expect_rejected_bad_enum_values() != 0) return 1;
     if (expect_rejected_flame_gap_outside_world() != 0) return 1;
+    if (expect_preview_check_keeps_drawable_levels() != 0) return 1;
     if (expect_flames_on_floor_gaps() != 0) return 1;
     if (expect_rejected_climbable_extents() != 0) return 1;
     if (expect_bouncepads_launch_upward() != 0) return 1;

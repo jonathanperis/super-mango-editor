@@ -73,6 +73,15 @@ int level_validate_runtime_at(const LevelDef *def, char *err, size_t err_size,
                               LevelIssueLocation *where);
 
 /*
+ * level_validate_preview — The part of level_validate_runtime the editor's
+ * canvas needs before drawing a level (counts, size, tile dimensions,
+ * rails and the links of what rides them).  0 = safe to draw, even if
+ * level_validate_runtime still fails on something else; -1 writes the
+ * first such problem into err.
+ */
+int level_validate_preview(const LevelDef *def, char *err, size_t err_size);
+
+/*
  * LevelIssueFn — receives one validation error: its message (the same text
  * level_validate_runtime would write) and where it is.  Both are only valid
  * during the call; copy what you keep.

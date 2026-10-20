@@ -154,8 +154,13 @@ is active; Ctrl+C / Ctrl+X / Ctrl+V inside a text field copy, cut and paste the 
 shortcuts accept Command on macOS as well as Ctrl.
 
 If a hand-edited file or a property field leaves the level invalid, the canvas
-pauses: clicks report `Canvas paused: <error>` in the status bar until you fix
-the field in the side panel or press Ctrl+Z.
+keeps drawing it with a red banner, `The game cannot load this level yet:
+<error>`, and stays editable; an edit is refused only when it would add an
+error the level did not have. Only a problem the preview cannot draw past (an
+array count, the screen count, or the size of a platform, rail, spike strip,
+bridge, pad, ladder or rope: `level_validate_preview`) pauses the canvas:
+clicks then report `Canvas paused: <error>` in the status bar until you fix the
+field in the side panel or press Ctrl+Z.
 
 ---
 

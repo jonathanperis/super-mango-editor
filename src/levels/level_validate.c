@@ -1478,6 +1478,38 @@ int level_validate_runtime(const LevelDef *def, char *err, size_t err_size)
     return 0;
 }
 
+/*
+ * level_validate_preview — The subset of level_validate_runtime that the
+ * editor's canvas needs before it draws: array counts, the level size, and
+ * the sizes and links of everything drawn from tiles or along a rail
+ * (floor gaps, rails, platforms, spikes, rail riders, bridges, pads,
+ * ladders and ropes).  Paths, physics, speeds, the player start,
+ * checkpoints and where coins, enemies and flames stand do not change what
+ * the preview's loops do, so a mistake there leaves the level drawn.
+ */
+int level_validate_preview(const LevelDef *def, char *err, size_t err_size)
+{
+    IssueSink first_only = { NULL, NULL, 0 };
+    IssueSink *sink = &first_only;
+    float world_w;
+
+    if (level_validate_counts(def, err, err_size) != 0) return -1;
+    if (validate_level_settings(def, err, err_size, sink) != 0) return -1;
+    world_w = (float)((def->screen_count > 0) ? def->screen_count : 4) * (float)GAME_W;
+    if (validate_floor_gaps(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_rails(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_platforms(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_spike_strips(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_spike_blocks(def, err, err_size, sink) != 0) return -1;
+    if (validate_float_platforms(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_bridges(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_blades(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_all_bouncepads(def, err, err_size, world_w, sink) != 0) return -1;
+    if (validate_climbables(def, err, err_size, world_w, sink) != 0) return -1;
+    if (err && err_size > 0) err[0] = '\0';
+    return 0;
+}
+
 int level_validate_runtime_each(const LevelDef *def, LevelIssueFn report,
                                 void *context)
 {

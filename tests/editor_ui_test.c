@@ -999,6 +999,44 @@ done:
     return failed;
 }
 
+/*
+ * A mistake the canvas can draw past (a bad next_phase) leaves the level
+ * on screen and editable: a click still places a coin.  An edit is only
+ * refused when it adds an error or breaks what the canvas needs.
+ */
+static int a_drawable_mistake_keeps_the_canvas_editable(void)
+{
+    int failed = 0;
+    EditorState es;
+    char err[128];
+    CHECK(open_editor(&es, NULL) == 0);
+    snprintf(es.level.next_phase, sizeof(es.level.next_phase), "levels/../oops.toml");
+    int issues = editor_level_issue_count(&es.level);
+    CHECK(issues == 1);
+
+    es.palette_type = ENT_COIN;
+    es.tool = TOOL_PLACE;
+    ui_frame(&es, 300, 250);
+    click_frame(&es, 300, 250);
+    CHECK(es.level.coin_count == 1);
+    CHECK(strstr(es.status_message, "Canvas paused") == NULL);
+    CHECK(editor_level_issue_count(&es.level) == issues);
+
+    /* The same coin moved out of the world would be a second error. */
+    CHECK(editor_edit_kept_level(&es.level, issues, err, sizeof(err)) == 0);
+    es.level.coins[0].x = -500.0f;
+    CHECK(editor_edit_kept_level(&es.level, issues, err, sizeof(err)) != 0);
+    CHECK(strncmp(err, "next_phase", 10) == 0 || strncmp(err, "coins[0]", 8) == 0);
+    es.level.coins[0].x = 100.0f;
+    /* Breaking what the canvas draws from is refused whatever came before. */
+    es.level.coin_count = MAX_COINS + 1;
+    CHECK(editor_edit_kept_level(&es.level, 99, err, sizeof(err)) != 0);
+    es.level.coin_count = 1;
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -4663,6 +4701,7 @@ int main(void)
         CASE(asset_dropdowns_offer_every_asset_file),
         CASE(side_column_follows_the_tool),
         CASE(palette_shows_what_place_will_add),
+        CASE(a_drawable_mistake_keeps_the_canvas_editable),
         CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
