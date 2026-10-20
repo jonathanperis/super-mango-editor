@@ -132,9 +132,10 @@ static int palette_content_height(void)
  * (UI_COLOR_TITLE) than the content below.  Clicking it collapses or expands
  * the whole palette.
  */
-static void palette_title_bar(EditorState *es, int panel_x, int panel_y)
+static void palette_title_bar(EditorState *es, int panel_x, int panel_y, int folded)
 {
     UIState *ui = &es->ui;
+    int shown = es->palette_open && !folded;
 
     DrawRectangle(panel_x, panel_y, PANEL_W, TITLE_H, ui_color(ui, UI_COLOR_TITLE));
 
@@ -143,10 +144,14 @@ static void palette_title_bar(EditorState *es, int panel_x, int panel_y)
                        ui->mouse_x < panel_x + PANEL_W &&
                        ui->mouse_y >= panel_y &&
                        ui->mouse_y < panel_y + TITLE_H);
-    if (hdr_hovered && ui->mouse_clicked)
-        es->palette_open = !es->palette_open;
+    /* Folded for a selection, a click brings the palette back by taking
+     * up the Place tool; otherwise it opens or closes the palette. */
+    if (hdr_hovered && ui->mouse_clicked) {
+        if (folded) es->tool = TOOL_PLACE;
+        else es->palette_open = !es->palette_open;
+    }
 
-    const char *pal_sym = es->palette_open ? "v" : ">";
+    const char *pal_sym = shown ? "v" : ">";
     int pal_sym_w = ui_text_width(ui, pal_sym);
     ui_label_color(ui, panel_x + PAD_X, panel_y + 6, pal_sym, ui_color(ui, UI_COLOR_ACCENT));
     ui_label_color(ui, panel_x + PAD_X + pal_sym_w, panel_y + 6,
@@ -261,10 +266,13 @@ void palette_render(EditorState *es, int start_y, int available_h)
 
     ui_panel(&es->ui, panel_x, panel_y, PANEL_W, panel_h);
 
-    palette_title_bar(es, panel_x, panel_y);
+    /* Folded when the layout leaves it only its title (a selection is
+     * being edited); collapsed when the designer closed it. */
+    int folded = es->palette_open && panel_h <= TITLE_H;
+    palette_title_bar(es, panel_x, panel_y, folded);
 
-    /* If collapsed, just show the header bar */
-    if (!es->palette_open) {
+    /* If collapsed or folded, just show the header bar */
+    if (!es->palette_open || folded) {
         return;
     }
 

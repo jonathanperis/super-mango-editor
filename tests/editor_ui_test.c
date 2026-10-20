@@ -158,6 +158,14 @@ static void clear_dialog_seams(void)
     file_dialog_test_set_save_result(-1, NULL);
 }
 
+/* Where the selection's properties panel starts this frame. */
+static int props_top(const EditorState *es)
+{
+    EditorSideLayout layout;
+    editor_side_panel_layout(es, &layout);
+    return layout.props_y;
+}
+
 /*
  * One editor frame with the pointer at (mx, my): queued events, hover and
  * drawing in editor_run_frame's order, into the tiny target.
@@ -881,6 +889,66 @@ done:
     return failed;
 }
 
+/*
+ * The side column follows the tool.  Selecting with Select folds the
+ * palette to its title and gives the properties the rest of the column;
+ * Place opens the palette again above a 200 px properties panel; a click
+ * on the folded palette's title takes up Place.  Fields taller than the
+ * panel scroll under the wheel, and a widget scrolled out of Level
+ * Config's view takes no click meant for the panel drawn there.
+ */
+static int side_column_follows_the_tool(void)
+{
+    int failed = 0;
+    EditorState es;
+    EditorSideLayout layout;
+    CHECK(open_editor(&es, "levels/02_lugio_02.toml") == 0);
+
+    editor_side_panel_layout(&es, &layout);
+    CHECK(layout.props_h == 0 && !layout.palette_folded && layout.palette_h > 200);
+
+    CHECK(es.level.rail_count > 0);
+    es.tool = TOOL_SELECT;
+    editor_select_only(&es, ENT_RAIL, 0);
+    es.panel_open = 1;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    editor_side_panel_layout(&es, &layout);
+    CHECK(layout.palette_folded && layout.palette_h == 28);
+    CHECK(layout.props_y + layout.props_h == EDITOR_H - STATUS_H && layout.props_h >= 300);
+
+    /* Under Level Config's view, the click reaches the rail's first field
+     * (its layout list), not a layer list scrolled out of sight there. */
+    click_frame(&es, PANEL_FIELD_X, layout.props_y + 36);
+    CHECK(es.ui.dropdown_open_id == (int)ENT_RAIL * 100 + 1);
+    click_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.ui.dropdown_open_id == 0);
+
+    /* The folded title brings the palette back with the Place tool. */
+    click_frame(&es, PANEL_LABEL_X, layout.palette_y + 10);
+    CHECK(es.tool == TOOL_PLACE && es.palette_open);
+    editor_side_panel_layout(&es, &layout);
+    CHECK(!layout.palette_folded && layout.props_h == 200);
+
+    /* A float platform's fields need more than 200 px: the wheel scrolls
+     * them. */
+    CHECK(es.level.float_platform_count > 0);
+    editor_select_only(&es, ENT_FLOAT_PLATFORM, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    editor_side_panel_layout(&es, &layout);
+    CHECK(es.props_content_h > layout.props_h - 32);
+    push_wheel(PANEL_FIELD_X, layout.props_y + 100, -3.0f, 0);
+    ui_frame(&es, PANEL_FIELD_X, layout.props_y + 100);
+    CHECK(es.props_scroll.offset > 0);
+    /* Another selection starts at the top. */
+    editor_select_only(&es, ENT_RAIL, 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(es.props_scroll.offset == 0);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -1343,7 +1411,7 @@ static int canvas_place_select_drag_delete_and_undo(void)
     click_frame(&es, sx, sy);
     CHECK(es.selection.type == ENT_COIN && es.selection.index == 0);
     int field_y = -1;
-    for (int y = EDITOR_H - STATUS_H - 200 + 30; y < EDITOR_H - STATUS_H && field_y < 0; y += 6) {
+    for (int y = props_top(&es) + 30; y < EDITOR_H - STATUS_H && field_y < 0; y += 6) {
         click_frame(&es, PANEL_FIELD_X, y);
         if (es.ui.active_id) field_y = y;
     }
@@ -1360,12 +1428,13 @@ static int canvas_place_select_drag_delete_and_undo(void)
     CHECK(es.level.coins[0].x == x0 && es.level.coins[0].y == y0);
 
     /* The properties header folds the panel; the canvas keeps the selection. */
-    for (int y = EDITOR_H - STATUS_H - 200; y < EDITOR_H - STATUS_H - 200 + 24; y += 6) {
+    const int header_y = props_top(&es);
+    for (int y = header_y; y < header_y + 24; y += 6) {
         click_frame(&es, PANEL_LABEL_X, y);
         if (!es.panel_open) break;
     }
     CHECK(es.panel_open == 0 && es.selection.index == 0);
-    for (int y = EDITOR_H - STATUS_H - 30; y < EDITOR_H - STATUS_H; y += 4) {
+    for (int y = props_top(&es); y < props_top(&es) + 24; y += 4) {
         click_frame(&es, PANEL_LABEL_X, y);
         if (es.panel_open) break;
     }
@@ -1397,7 +1466,6 @@ static int probe_properties_of_every_type(const char *level_path, int seen[ENT_C
     int failed = 0;
     EditorState es;
     CHECK(open_editor(&es, level_path) == 0);
-    const int panel_top = EDITOR_H - STATUS_H - 200;
     for (int type = 0; type < ENT_COUNT; type++) {
         if (editor_entity_count(&es.level, (EntityType)type) == 0) continue;
         es.selection.type = (EntityType)type;
@@ -1406,15 +1474,15 @@ static int probe_properties_of_every_type(const char *level_path, int seen[ENT_C
         ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
         CHECK(es.selection.index == 0);
         if (seen[type]) continue;   /* already probed in an earlier level */
-        for (int y = panel_top + 36; y < EDITOR_H - STATUS_H; y += 24) {
+        for (int y = props_top(&es) + 36; y < EDITOR_H - STATUS_H; y += 24) {
             uint64_t before = doc_hash(&es);
             int undo_before = es.undo->top;
             click_frame(&es, PANEL_FIELD_X, y);
             CHECK(level_is_valid(&es));
             if (settle_probe(&es, PANEL_FIELD_X, y, before, undo_before, changes) != 0 ||
                 !level_is_valid(&es)) {
-                fprintf(stderr, "editor_ui_test: %s probe at y=%d broke undo\n",
-                        level_path, y);
+                fprintf(stderr, "editor_ui_test: %s probe of %s at y=%d broke undo\n",
+                        level_path, editor_entity_type_name((EntityType)type), y);
                 CHECK(0);
             }
             es.selection.type = (EntityType)type;
@@ -4529,6 +4597,7 @@ int main(void)
         CASE(toolbar_toggles_show_what_is_on),
         CASE(raygui_icons_draw_their_bits),
         CASE(asset_dropdowns_offer_every_asset_file),
+        CASE(side_column_follows_the_tool),
         CASE(toolbar_tooltips_wait_then_name_the_shortcut),
         CASE(floor_reaches_both_canvas_edges_at_any_scroll),
         CASE(palette_clicks_choose_what_the_place_tool_adds),
