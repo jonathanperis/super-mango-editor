@@ -1011,8 +1011,9 @@ static int a_drawable_mistake_keeps_the_canvas_editable(void)
     char err[128];
     CHECK(open_editor(&es, NULL) == 0);
     snprintf(es.level.next_phase, sizeof(es.level.next_phase), "levels/../oops.toml");
-    int issues = editor_level_issue_count(&es.level);
-    CHECK(issues == 1);
+    EditorIssueSnapshot issues;
+    editor_level_issue_snapshot(&es.level, &issues);
+    CHECK(issues.count == 1);
 
     es.palette_type = ENT_COIN;
     es.tool = TOOL_PLACE;
@@ -1020,17 +1021,22 @@ static int a_drawable_mistake_keeps_the_canvas_editable(void)
     click_frame(&es, 300, 250);
     CHECK(es.level.coin_count == 1);
     CHECK(strstr(es.status_message, "Canvas paused") == NULL);
-    CHECK(editor_level_issue_count(&es.level) == issues);
+    {
+        EditorIssueSnapshot now;
+        editor_level_issue_snapshot(&es.level, &now);
+        CHECK(now.count == issues.count);
+    }
 
-    /* The same coin moved out of the world would be a second error. */
-    CHECK(editor_edit_kept_level(&es.level, issues, err, sizeof(err)) == 0);
+    /* The same coin moved out of the world would be a second error, and
+     * the refusal names it rather than the next_phase mistake. */
+    CHECK(editor_edit_kept_level(&es.level, &issues, err, sizeof(err)) == 0);
     es.level.coins[0].x = -500.0f;
-    CHECK(editor_edit_kept_level(&es.level, issues, err, sizeof(err)) != 0);
-    CHECK(strncmp(err, "next_phase", 10) == 0 || strncmp(err, "coins[0]", 8) == 0);
+    CHECK(editor_edit_kept_level(&es.level, &issues, err, sizeof(err)) != 0);
+    CHECK(strncmp(err, "coins[0]", 8) == 0);
     es.level.coins[0].x = 100.0f;
     /* Breaking what the canvas draws from is refused whatever came before. */
     es.level.coin_count = MAX_COINS + 1;
-    CHECK(editor_edit_kept_level(&es.level, 99, err, sizeof(err)) != 0);
+    CHECK(editor_edit_kept_level(&es.level, &issues, err, sizeof(err)) != 0);
     es.level.coin_count = 1;
 done:
     close_editor(&es);
