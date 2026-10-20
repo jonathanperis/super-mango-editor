@@ -348,6 +348,12 @@ int ui_text_field_hint(UIState *ui, int id, int x, int y, int w, char *buf, int 
  * hand-edited path, say): the header shows "---" and any choice applies. */
 int ui_dropdown(UIState *ui, int id, int x, int y, int w,
                 const char **options, int count, int *selected);
+/* ui_dropdown whose header shows `unlisted` instead of "---" while
+ * *selected is none of the options: the file a level names that the list
+ * does not offer, say, so the user sees what is set before changing it. */
+int ui_dropdown_unlisted(UIState *ui, int id, int x, int y, int w,
+                         const char **options, int count, int *selected,
+                         const char *unlisted);
 /* A horizontal divider, drawn in logical pixels. */
 void ui_separator(UIState *ui, int x, int y, int w);
 
