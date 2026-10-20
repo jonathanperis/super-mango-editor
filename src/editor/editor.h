@@ -260,6 +260,8 @@ typedef struct {
     Texture2D *platform;
     Texture2D *platform_stone;
     Texture2D *platform_leaf;
+    Texture2D *platform_brick;
+    Texture2D *platform_grass_rock;
     Texture2D *spider;
     Texture2D *jumping_spider;
     Texture2D *bird;
