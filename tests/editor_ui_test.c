@@ -1111,6 +1111,72 @@ done:
     return failed;
 }
 
+/* The colour at (x, y) of the canvas alone (see toolbar_pixel). */
+static Color canvas_pixel(EditorState *es, int x, int y)
+{
+    Color c = {0};
+    BeginDrawing();
+    ClearBackground(BLACK);
+    canvas_render(es);
+    rlDrawRenderBatchActive();
+    Image shot = LoadImageFromScreen();
+    EndDrawing();
+    if (!IsImageValid(shot)) return c;
+#ifdef MANGO_MEMORY_TESTS
+    c = GetImageColor(shot, x, shot.height - 1 - y);
+    unsigned char red = c.r;
+    c.r = c.b;
+    c.b = red;
+#else
+    c = GetImageColor(shot, x, y);
+#endif
+    UnloadImage(shot);
+    return c;
+}
+
+/*
+ * The canvas draws a level's background layers and, with Fog on, its fog,
+ * as the game does; each layer image follows the level's list.  Outside
+ * the level (below its height) the canvas is darkened.
+ */
+static int canvas_draws_the_level_layers_and_its_edges(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, "levels/01_lugio_01.toml") == 0);
+    CHECK(es.level.background_layer_count > 2 && es.level.fog_layer_count > 0);
+    CHECK(es.textures.sky != NULL);
+    for (int i = 1; i < es.level.background_layer_count; i++) CHECK(es.preview_layers[i] != NULL);
+    for (int i = 0; i < es.level.fog_layer_count; i++) CHECK(es.preview_fog[i] != NULL);
+    /* Fewer layers drop the images they no longer name. */
+    int last = es.level.background_layer_count - 1;
+    es.level.background_layer_count = 1;
+    es.level.fog_layer_count = 0;
+    editor_sync_config_resources(&es);
+    CHECK(es.preview_layers[last] == NULL && es.preview_fog[0] == NULL);
+    close_editor(&es);
+
+    /* A new level: flat sky above its floor line, darker below the level. */
+    CHECK(open_editor(&es, NULL) == 0);
+    es.camera.zoom = 1.0f;
+    es.camera.x = es.camera.y = 0.0f;
+    es.show_grid = 0;
+    Color inside = canvas_pixel(&es, 5, TOOLBAR_H + 40);
+    Color outside = canvas_pixel(&es, 5, TOOLBAR_H + GAME_H + 40);
+    CHECK(inside.r == 0x87 && inside.g == 0xCE && inside.b == 0xEB);
+    CHECK(outside.r < inside.r && outside.g < inside.g && outside.b < inside.b);
+
+    /* The Fog toggle sits after Contrast. */
+    CHECK(es.show_fog == 0);
+    click_frame(&es, 608 + 28, 16);
+    CHECK(es.show_fog == 1);
+    click_frame(&es, 608 + 28, 16);
+    CHECK(es.show_fog == 0);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -4772,6 +4838,7 @@ int main(void)
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(toolbar_toggles_show_what_is_on),
         CASE(raygui_icons_draw_their_bits),
+        CASE(canvas_draws_the_level_layers_and_its_edges),
         CASE(asset_dropdowns_offer_every_asset_file),
         CASE(side_column_follows_the_tool),
         CASE(palette_shows_what_place_will_add),

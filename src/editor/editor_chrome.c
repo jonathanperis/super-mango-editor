@@ -23,7 +23,7 @@
  *
  * Layout from left to right:
  *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | [Campaign] |
- *   [Contrast] | file buttons
+ *   [Contrast] | [Fog] | file buttons
  *
  * The tools and the on/off buttons are ui_toggle: the current tool, a
  * shown grid, an open Campaign view and so on draw in the selected colour.
@@ -112,6 +112,13 @@ void editor_render_toolbar(EditorState *es)
             editor_set_status(es, "Could not save the Contrast setting");
     }
     ui_tooltip(&es->ui, "High-contrast colours");
+
+    /* The level's fog over the canvas, as the game draws it (held still). */
+    bx += 88;
+    if (ui_toggle_icon(&es->ui, bx, by, 56, bh, UI_ICON_FOG, "Fog", es->show_fog)) {
+        es->show_fog ^= 1;
+    }
+    ui_tooltip(&es->ui, "Show the level's fog layers");
 
     int rx = EDITOR_W - 4 - 52;
     if (es->playing) {

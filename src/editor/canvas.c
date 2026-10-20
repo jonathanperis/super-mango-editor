@@ -23,6 +23,7 @@
 
 #include "canvas.h"
 
+#include <math.h>       /* floorf for the fog tiles                       */
 #include <stdio.h>      /* snprintf for debug labels                      */
 #include <string.h>    /* strcmp for platform texture selection          */
 
@@ -87,6 +88,8 @@ static inline int w2s_h(const EditorState *es, int h) {
 /* ------------------------------------------------------------------ */
 
 static void render_sky(EditorState *es);
+static void render_fog(EditorState *es);
+static void render_outside_world(EditorState *es);
 static void render_platforms(EditorState *es);
 static void render_floor(EditorState *es);
 static void render_water(EditorState *es);
@@ -249,6 +252,10 @@ void canvas_render(EditorState *es) {
     render_birds(es);
     render_faster_birds(es);
 
+    /* Fog over the level, when asked for; then the space outside it. */
+    if (es->show_fog) render_fog(es);
+    render_outside_world(es);
+
     /* ---- Layer 6: Selection highlight ---- */
     render_selection(es);
 
@@ -367,20 +374,77 @@ void canvas_center_on(EditorState *es, const EditorRect *r) {
  * If a sky texture is loaded (from the level's first background_layer),
  * tile it across the canvas.  Otherwise fall back to a flat blue fill.
  */
+/*
+ * draw_parallax_layer — One background layer as the game draws it
+ * (parallax_render): tiles at the image's own width, stretched to the
+ * level's height, shifted by the camera times the layer's speed.  The
+ * editor's camera stands in for the game's, so scrolling the canvas moves
+ * each layer at its own rate, as playing does.
+ */
+static void draw_parallax_layer(EditorState *es, Texture2D *tex, float speed) {
+    if (!tex || tex->width <= 0 || tex->height <= 0) return;
+    int tex_w = tex->width;
+    int offset = (((int)(es->camera.x * speed)) % tex_w + tex_w) % tex_w;
+    float view_w = (float)CANVAS_W / es->camera.zoom;
+    for (float dx = (float)-offset; dx < view_w; dx += (float)tex_w) {
+        IntRect dst = { (int)(dx * es->camera.zoom), w2s_y(es, 0.0f),
+                        w2s_w(es, tex_w), w2s_h(es, GAME_H) };
+        sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
+    }
+}
+
 static void render_sky(EditorState *es) {
-    if (es->textures.sky) {
-        int tex_w = es->textures.sky->width, tex_h = es->textures.sky->height;
-        if (tex_w > 0 && tex_h > 0) {
-            /* Tile the sky texture across the canvas area */
-            for (int tx = 0; tx < CANVAS_W; tx += tex_w) {
-                IntRect dst = { tx, TOOLBAR_H, tex_w, CANVAS_H };
-                sprite_draw(es->textures.sky, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
-            }
-            return;
+    int layers = es->level.background_layer_count;
+    if (layers > MAX_BACKGROUND_LAYERS) layers = MAX_BACKGROUND_LAYERS;
+    /* Flat blue under everything: a level without layers, or a layer
+     * image that did not load. */
+    DrawRectangle(0, TOOLBAR_H, CANVAS_W, CANVAS_H, (Color){0x87,0xCE,0xEB,255});
+    for (int i = 0; i < layers; i++)
+        draw_parallax_layer(es, i == 0 ? es->textures.sky : es->preview_layers[i],
+                            es->level.background_layers[i].speed);
+}
+
+/*
+ * render_fog — The level's fog layers, when the toolbar's Fog toggle is
+ * on: each image tiled at the game's fog width (two screens) across the
+ * level's height, at the fog's full opacity (FOG_ALPHA_MAX in fog.c).  The
+ * game drifts and fades them; the preview holds them still.
+ */
+#define PREVIEW_FOG_W     (GAME_W * 2)
+#define PREVIEW_FOG_ALPHA 120
+static void render_fog(EditorState *es) {
+    int fogs = es->level.fog_layer_count;
+    if (fogs > MAX_FOG_TEXTURES) fogs = MAX_FOG_TEXTURES;
+    for (int i = 0; i < fogs; i++) {
+        Texture2D *tex = es->preview_fog[i];
+        if (!tex) continue;
+        float start = floorf(es->camera.x / PREVIEW_FOG_W) * PREVIEW_FOG_W;
+        float end = es->camera.x + (float)CANVAS_W / es->camera.zoom;
+        for (float wx = start; wx < end; wx += PREVIEW_FOG_W) {
+            IntRect dst = { w2s_x(es, wx), w2s_y(es, 0.0f),
+                            w2s_w(es, PREVIEW_FOG_W), w2s_h(es, GAME_H) };
+            sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, (Color){255, 255, 255, PREVIEW_FOG_ALPHA});
         }
     }
-    /* Fallback: flat blue */
-    DrawRectangle(0, TOOLBAR_H, CANVAS_W, CANVAS_H, (Color){0x87,0xCE,0xEB,255});
+}
+
+/*
+ * render_outside_world — Darken the canvas beyond the level: left of x 0,
+ * right of its last screen and below its height, so the level's edges
+ * read at a glance at any zoom.
+ */
+static void render_outside_world(EditorState *es) {
+    const Color shade = {0, 0, 0, 110};
+    int left = w2s_x(es, 0.0f);
+    int right = w2s_x(es, editor_world_width(&es->level));
+    int top = w2s_y(es, 0.0f);
+    int bottom = w2s_y(es, (float)GAME_H);
+    if (left > 0) DrawRectangle(0, TOOLBAR_H, left, CANVAS_H, shade);
+    if (right < CANVAS_W) DrawRectangle(right, TOOLBAR_H, CANVAS_W - right, CANVAS_H, shade);
+    int l = left > 0 ? left : 0, r = right < CANVAS_W ? right : CANVAS_W;
+    if (r > l && top > TOOLBAR_H) DrawRectangle(l, TOOLBAR_H, r - l, top - TOOLBAR_H, shade);
+    if (r > l && bottom < TOOLBAR_H + CANVAS_H)
+        DrawRectangle(l, bottom, r - l, TOOLBAR_H + CANVAS_H - bottom, shade);
 }
 
 /* ---- Platforms (pillars) ----------------------------------------- */
