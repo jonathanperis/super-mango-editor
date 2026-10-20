@@ -1260,6 +1260,11 @@ int ui_label_fit(UIState *ui, int x, int y, int max_w, const char *text, Color c
     if (!text || !text[0]) return 0;
     draw_field_text(ui, x, y, max_w, text, color);
     if (ui_text_width(ui, text) <= max_w && !strchr(text, '\n')) return 0;
+    /* In a scrolled panel, a row moved out of the view (under the panel's
+     * title, say) is not what the pointer is on. */
+    if (ui->clip_active &&
+        !point_in_rect(ui->mouse_x, ui->mouse_y, ui->clip_x, ui->clip_y, ui->clip_w, ui->clip_h))
+        return 1;
     note_widget(ui, x, y, max_w, 14);
     ui_tooltip(ui, text);
     return 1;
