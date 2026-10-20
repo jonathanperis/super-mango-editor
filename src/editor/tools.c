@@ -29,24 +29,65 @@
                                    FLOOR_GAP_W; MAX_* via level.h           */
 #include "../surfaces/rail.h" /* MAX_RAIL_SPEED                            */
 
-static void ignore_issue(void *context, const char *message, const LevelIssueLocation *where)
+static uint64_t message_hash(const char *text)
 {
-    (void)context;
-    (void)message;
+    uint64_t h = UINT64_C(1469598103934665603);   /* FNV-1a */
+    for (; *text; text++) h = (h ^ (unsigned char)*text) * UINT64_C(1099511628211);
+    return h;
+}
+
+static void record_issue(void *context, const char *message, const LevelIssueLocation *where)
+{
+    EditorIssueSnapshot *snap = context;
     (void)where;
+    if (snap->count < EDITOR_ISSUE_SNAPSHOT) snap->hash[snap->count] = message_hash(message);
+    snap->count++;
 }
 
-int editor_level_issue_count(const LevelDef *level)
+void editor_level_issue_snapshot(const LevelDef *level, EditorIssueSnapshot *out)
 {
-    return level_validate_runtime_each(level, ignore_issue, NULL);
+    memset(out, 0, sizeof(*out));
+    (void)level_validate_runtime_each(level, record_issue, out);
 }
 
-int editor_edit_kept_level(const LevelDef *level, int issues_before,
+/* The errors the level had when the current drag began (one drag at a
+ * time): every step and the drop are measured against them. */
+static EditorIssueSnapshot drag_issues;
+
+typedef struct {
+    const EditorIssueSnapshot *before;
+    char  *err;
+    size_t err_size;
+    int    found;
+} NewIssueSearch;
+
+static void find_new_issue(void *context, const char *message, const LevelIssueLocation *where)
+{
+    NewIssueSearch *search = context;
+    uint64_t h = message_hash(message);
+    (void)where;
+    if (search->found) return;
+    for (int i = 0; i < search->before->count && i < EDITOR_ISSUE_SNAPSHOT; i++)
+        if (search->before->hash[i] == h) return;
+    search->found = 1;
+    if (search->err && search->err_size > 0) {
+        size_t n = strlen(message);
+        if (n >= search->err_size) n = search->err_size - 1;
+        memcpy(search->err, message, n);
+        search->err[n] = '\0';
+    }
+}
+
+int editor_edit_kept_level(const LevelDef *level, const EditorIssueSnapshot *before,
                            char *err, size_t err_size)
 {
+    NewIssueSearch search = { before, err, err_size, 0 };
+
     if (level_validate_preview(level, err, err_size) != 0) return -1;
-    if (editor_level_issue_count(level) <= issues_before) return 0;
-    (void)level_validate_runtime(level, err, err_size);
+    if (level_validate_runtime_each(level, find_new_issue, &search) <= before->count) return 0;
+    /* More errors than before, but each message matches an old one (the
+     * same mistake twice): name the first. */
+    if (!search.found) (void)level_validate_runtime(level, err, err_size);
     return -1;
 }
 
@@ -486,7 +527,8 @@ static int delete_entity(EditorState *es, EntityType type, int index)
 
     /* Snapshot entity data before deletion for undo */
     before = editor_snapshot_entity(level, type, index);
-    int issues_before = editor_level_issue_count(level);
+    EditorIssueSnapshot issues_before;
+    editor_level_issue_snapshot(level, &issues_before);
 
     if (editor_entity_type_is_singleton(type)) {
         /*
@@ -508,7 +550,7 @@ static int delete_entity(EditorState *es, EntityType type, int index)
      */
     {
         char error[128];
-        if (editor_edit_kept_level(level, issues_before, error, sizeof(error)) != 0) {
+        if (editor_edit_kept_level(level, &issues_before, error, sizeof(error)) != 0) {
             if (editor_entity_type_is_singleton(type))
                 (void)editor_entity_write(level, type, 0, &before);
             else
@@ -769,7 +811,8 @@ int editor_insert_checked(LevelDef *level, EntityType type,
         return -1;
     }
 
-    int issues_before = editor_level_issue_count(level);
+    EditorIssueSnapshot issues_before;
+    editor_level_issue_snapshot(level, &issues_before);
     memset(before, 0, sizeof(*before));
     if (singleton) {
         index = 0;
@@ -789,7 +832,7 @@ int editor_insert_checked(LevelDef *level, EntityType type,
      * share an x with another checkpoint).  Undo the change rather than
      * add an error to the level.
      */
-    if (editor_edit_kept_level(level, issues_before, error, sizeof(error)) != 0) {
+    if (editor_edit_kept_level(level, &issues_before, error, sizeof(error)) != 0) {
         if (singleton) (void)editor_entity_write(level, type, 0, before);
         else (void)editor_entity_remove(level, type, index);
         snprintf(why, why_size, "Cannot %s %s here: %s", action,
@@ -1034,7 +1077,7 @@ static void arm_drag(EditorState *es, Selection grabbed, const Selection *items,
     if (count > EDITOR_MAX_SELECTION) count = EDITOR_MAX_SELECTION;
     es->dragging     = 1;
     es->drag_moved   = 0;
-    es->drag_issues_before = editor_level_issue_count(&es->level);
+    editor_level_issue_snapshot(&es->level, &drag_issues);
     es->drag_type    = grabbed.type;
     es->drag_index   = grabbed.index;
     es->drag_count   = count;
@@ -1263,7 +1306,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
      * broken it while the button was held.  Never leave an unrecorded
      * change behind: put the entities back where the drag started.
      */
-    if (editor_edit_kept_level(&es->level, es->drag_issues_before, NULL, 0) != 0) {
+    if (editor_edit_kept_level(&es->level, &drag_issues, NULL, 0) != 0) {
         restore_drag(es);
         editor_set_status(es, "Move cancelled: level has errors");
         return;
@@ -1365,7 +1408,7 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
     }
     /* A step that would add an error is reverted to the last position
      * that did not. */
-    if (editor_edit_kept_level(&es->level, es->drag_issues_before, NULL, 0) != 0) {
+    if (editor_edit_kept_level(&es->level, &drag_issues, NULL, 0) != 0) {
         for (int i = 0; i < es->drag_count; i++)
             (void)editor_entity_write(&es->level, es->drag_items[i].type,
                                       es->drag_items[i].index, &previous[i]);
@@ -1421,7 +1464,8 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
     editor_selection_reconcile(es);
     count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
     if (count == 0) return;
-    int issues_before = editor_level_issue_count(&es->level);
+    EditorIssueSnapshot issues_before;
+    editor_level_issue_snapshot(&es->level, &issues_before);
 
     /* Move every selected entity, exactly as a drag by (dx, dy) would. */
     for (int i = 0; i < count; i++) {
@@ -1431,7 +1475,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
         (void)editor_entity_write(&es->level, items[i].type, items[i].index, &after[i]);
         if (memcmp(&before[i], &after[i], sizeof(after[i])) != 0) changed++;
     }
-    if (editor_edit_kept_level(&es->level, issues_before, error, sizeof(error)) != 0) {
+    if (editor_edit_kept_level(&es->level, &issues_before, error, sizeof(error)) != 0) {
         for (int i = 0; i < count; i++)
             (void)editor_entity_write(&es->level, items[i].type, items[i].index, &before[i]);
         editor_set_status(es, "Cannot move here: %s", error);

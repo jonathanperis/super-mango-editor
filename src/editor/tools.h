@@ -16,6 +16,7 @@
  */
 #pragma once
 
+#include <stdint.h> /* uint64_t */
 #include "editor.h"   /* EditorState, EditorTool, EntityType, Selection */
 
 /*
@@ -93,20 +94,28 @@ PlacementData editor_move_placement(EntityType type, const PlacementData *from,
                                     float dx, float dy);
 
 /*
- * editor_level_issue_count --- How many errors the full runtime check finds
- * in level (0 = the game can load it).
+ * EditorIssueSnapshot --- The errors a level had before an edit: how many,
+ * and a hash of each message (the first EDITOR_ISSUE_SNAPSHOT of them),
+ * so editor_edit_kept_level can name the one an edit adds.
  */
-int editor_level_issue_count(const LevelDef *level);
+#define EDITOR_ISSUE_SNAPSHOT 64
+typedef struct {
+    int      count;
+    uint64_t hash[EDITOR_ISSUE_SNAPSHOT];
+} EditorIssueSnapshot;
+
+/* Record level's current errors (count 0 = the game can load it). */
+void editor_level_issue_snapshot(const LevelDef *level, EditorIssueSnapshot *out);
 
 /*
  * editor_edit_kept_level --- Whether an edit left level as sound as it was:
  * still drawable by the canvas (level_validate_preview) and with no more
- * errors than issues_before, its editor_level_issue_count before the edit.
- * So a level that already has a mistake elsewhere (a bad next_phase, say)
- * can still be edited, but no edit adds a mistake.  Returns 0 when kept;
- * otherwise -1 with the reason in err.
+ * errors than *before.  So a level that already has a mistake elsewhere (a
+ * bad next_phase, say) can still be edited, but no edit adds a mistake.
+ * Returns 0 when kept; otherwise -1 with the reason in err: the first
+ * error that was not there before.
  */
-int editor_edit_kept_level(const LevelDef *level, int issues_before,
+int editor_edit_kept_level(const LevelDef *level, const EditorIssueSnapshot *before,
                            char *err, size_t err_size);
 
 /*
