@@ -972,7 +972,7 @@ void editor_snap_point(const EditorState *es, float *x, float *y)
  * clamps the result into the world, and hands it to editor_add_placement,
  * which checks capacity and validation and records the undo command.
  */
-static void place_entity(EditorState *es, float world_x, float world_y)
+static int place_entity(EditorState *es, float world_x, float world_y)
 {
     EntityType type = es->palette_type;
     PlacementData pd;
@@ -980,14 +980,62 @@ static void place_entity(EditorState *es, float world_x, float world_y)
     /* With snapping on, the click lands on the grid cell's corner, the same
      * point the placement ghost was drawn at. */
     editor_snap_point(es, &world_x, &world_y);
-    if (!default_placement(type, world_x, world_y, &pd)) return;
+    es->paint_x = world_x;
+    es->paint_y = world_y;
+    if (!default_placement(type, world_x, world_y, &pd)) return -1;
     if (type == ENT_SPIKE_BLOCK) {
         int rail = editor_nearest_rail(&es->level, world_x, world_y);
         /* With no rail at all, editor_add_placement explains the refusal. */
         pd.spike_block.rail_index = rail >= 0 ? rail : 0;
     }
     editor_clamp_placement(&es->level, type, &pd);
-    (void)editor_add_placement(es, type, &pd, "place");
+    return editor_add_placement(es, type, &pd, "place");
+}
+
+/*
+ * Painting a row: a press with the Place tool places one entity and opens
+ * an undo group; each time the pointer then moves at least the entity's
+ * own width or height from the last one placed, another goes there (on
+ * the grid when snapping), up to UNDO_GROUP_MAX.  Release (or Esc) closes
+ * the group, so the whole row is one undo step.  Singletons (the player
+ * spawn, the Last Star) move instead and do not paint.
+ */
+static void begin_paint(EditorState *es, float world_x, float world_y)
+{
+    es->painting = 0;
+    es->paint_count = 0;
+    es->paint_grouped = 0;
+    if (!editor_entity_type_is_singleton(es->palette_type))
+        es->paint_grouped = undo_group_begin(es->undo, UNDO_GROUP_MAX) != 0;
+    if (place_entity(es, world_x, world_y) == 0) es->paint_count = 1;
+    /* Without the room to keep the row as one step, the press places one. */
+    es->painting = es->paint_grouped;
+}
+
+static void paint_step(EditorState *es, float world_x, float world_y)
+{
+    const EditorEntityPreview *preview = editor_entity_preview(es->palette_type);
+    float step_w = preview && preview->w > 0 ? (float)preview->w : (float)TILE_SIZE;
+    float step_h = preview && preview->h > 0 ? (float)preview->h : (float)TILE_SIZE;
+    float x = world_x, y = world_y;
+    float last_x = es->paint_x, last_y = es->paint_y;
+
+    if (es->paint_count >= UNDO_GROUP_MAX) return;
+    editor_snap_point(es, &x, &y);
+    if (fabsf(x - last_x) < step_w && fabsf(y - last_y) < step_h) return;
+    if (place_entity(es, world_x, world_y) == 0) es->paint_count++;
+    else { es->paint_x = last_x; es->paint_y = last_y; }
+}
+
+void tools_end_paint(EditorState *es)
+{
+    if (!es || !es->painting) return;
+    if (es->paint_grouped) undo_group_end(es->undo);
+    es->painting = 0;
+    es->paint_grouped = 0;
+    if (es->paint_count > 1)
+        editor_set_status(es, "Placed %d %s", es->paint_count,
+                          editor_entity_type_name(es->palette_type));
 }
 
 /* ================================================================== */
@@ -1183,6 +1231,8 @@ static void delete_at(EditorState *es, float world_x, float world_y)
 void tools_mouse_down(EditorState *es, float world_x, float world_y)
 {
     if (!es) return;
+    /* A row still open (its release never came) ends before a new press. */
+    tools_end_paint(es);
     if (!tools_can_hit_test(es)) return;
     editor_selection_reconcile(es);
 
@@ -1193,7 +1243,7 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
         break;
 
     case TOOL_PLACE:
-        place_entity(es, world_x, world_y);
+        begin_paint(es, world_x, world_y);
         break;
 
     case TOOL_DELETE:
@@ -1288,6 +1338,10 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
     (void)world_y;
 
     if (!es) return;
+    if (es->painting) {
+        tools_end_paint(es);
+        return;
+    }
     if (es->box_selecting) {
         finish_box(es);
         return;
@@ -1367,6 +1421,10 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
     float dx, dy;
 
     if (!es) return;
+    if (es->painting) {
+        paint_step(es, world_x, world_y);
+        return;
+    }
     if (es->box_selecting) {
         es->box_x1 = world_x;
         es->box_y1 = world_y;

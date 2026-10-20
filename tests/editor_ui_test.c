@@ -1305,6 +1305,45 @@ done:
     return failed;
 }
 
+/*
+ * Dragging with the Place tool paints a row, one entity per step of its
+ * own width, and the whole row is one undo step.  The player spawn (one
+ * per level) moves instead and paints nothing.
+ */
+static int place_drag_paints_a_row(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.camera.zoom = 2.0f;
+    es.camera.x = es.camera.y = 0.0f;
+    es.tool = TOOL_PLACE;
+    es.palette_type = ENT_COIN;
+    int undo_top = es.undo->top;
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 100, 300);
+    for (int x = 110; x <= 420; x += 10) push_event(INPUT_MOUSE_MOVE, 0, 0, x, 300);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 420, 300);
+    ui_frame(&es, 420, 300);
+    /* 320 canvas px at 2x is 160 world px: about ten 16 px coins. */
+    CHECK(es.level.coin_count >= 8 && es.level.coin_count <= 11);
+    CHECK(!es.painting && es.undo->top == undo_top + 1);
+    CHECK(strstr(es.status_message, "Placed") != NULL);
+    for (int i = 1; i < es.level.coin_count; i++)
+        CHECK(es.level.coins[i].x - es.level.coins[i - 1].x >= 16.0f);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 0);
+
+    es.palette_type = ENT_PLAYER_SPAWN;
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 100, 300);
+    push_event(INPUT_MOUSE_MOVE, 0, 0, 300, 300);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 300, 300);
+    ui_frame(&es, 300, 300);
+    CHECK(!es.painting && es.level.coin_count == 0);
+done:
+    close_editor(&es);
+    return failed;
+}
+
 static int palette_clicks_choose_what_the_place_tool_adds(void)
 {
     int failed = 0;
@@ -4972,6 +5011,7 @@ int main(void)
         CASE(toolbar_contrast_toggles_the_high_contrast_style),
         CASE(toolbar_toggles_show_what_is_on),
         CASE(raygui_icons_draw_their_bits),
+        CASE(place_drag_paints_a_row),
         CASE(canvas_draws_the_level_layers_and_its_edges),
         CASE(canvas_navigates_like_a_level_editor),
         CASE(property_labels_explain_themselves),
