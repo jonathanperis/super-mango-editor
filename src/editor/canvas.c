@@ -128,6 +128,7 @@ static void render_faster_birds(EditorState *es);
 static void render_selection(EditorState *es);
 static void render_ghost(EditorState *es);
 static void render_grid(EditorState *es);
+static void render_screens(EditorState *es);
 
 /* ------------------------------------------------------------------ */
 /* Helper — draw an outlined rectangle (selection / ghost highlight)    */
@@ -271,6 +272,7 @@ void canvas_render(EditorState *es) {
     if (es->show_grid) {
         render_grid(es);
     }
+    render_screens(es);
 
     /* ---- Layer 9: what keeps the level from loading in the game ---- */
     if (has_error) {
@@ -375,11 +377,14 @@ int canvas_zoom_index(float zoom)
 void canvas_zoom_to_fit(EditorState *es)
 {
     float world_w = editor_world_width(&es->level);
-    int best = 0;
+    float fit_w = (float)CANVAS_W / world_w, fit_h = (float)CANVAS_H / (float)GAME_H;
+    float fit = fit_w < fit_h ? fit_w : fit_h;
+    /* The largest preset that shows it all; a level too long even for the
+     * smallest preset gets the exact zoom that fits it. */
+    float zoom = fit;
     for (int i = 0; i < CANVAS_ZOOM_COUNT; i++)
-        if (world_w * s_zoom_presets[i] <= (float)CANVAS_W &&
-            (float)GAME_H * s_zoom_presets[i] <= (float)CANVAS_H) best = i;
-    es->camera.zoom = s_zoom_presets[best];
+        if (s_zoom_presets[i] <= fit) zoom = s_zoom_presets[i];
+    es->camera.zoom = zoom;
     es->camera.x = 0.0f;
     es->camera.y = 0.0f;
     canvas_clamp_camera(es);
@@ -1502,44 +1507,68 @@ static void render_ghost(EditorState *es) {
  *   Horizontal line at FLOOR_Y in red (#D94A4A), 2 px wide.
  *   Shows the top edge of the ground floor.
  */
+/* The part of the canvas the level covers, in screen pixels: lines drawn
+ * over the level stop at its edges instead of crossing the darkened space
+ * around it. */
+static void level_screen_rect(const EditorState *es, int *x0, int *y0, int *x1, int *y1) {
+    *x0 = w2s_x(es, 0.0f);
+    *x1 = w2s_x(es, (float)EDITOR_WORLD_W(es));
+    *y0 = w2s_y(es, 0.0f);
+    *y1 = w2s_y(es, (float)GAME_H);
+    if (*x0 < 0) *x0 = 0;
+    if (*x1 > CANVAS_W) *x1 = CANVAS_W;
+    if (*y0 < TOOLBAR_H) *y0 = TOOLBAR_H;
+    if (*y1 > TOOLBAR_H + CANVAS_H) *y1 = TOOLBAR_H + CANVAS_H;
+}
+
 static void render_grid(EditorState *es) {
-    /* ---- TILE_SIZE grid ---- */
+    /* ---- TILE_SIZE grid, inside the level ---- */
     Color grid = {0x40,0x40,0x40,0x40};
+    int x0, y0, x1, y1;
+    level_screen_rect(es, &x0, &y0, &x1, &y1);
+    if (x1 <= x0 || y1 <= y0) return;
 
     /* Vertical grid lines */
     for (int wx = 0; wx <= EDITOR_WORLD_W(es); wx += TILE_SIZE) {
         int sx = w2s_x(es, (float)wx);
-        if (sx < 0 || sx > CANVAS_W) continue;
+        if (sx < x0 || sx > x1) continue;
 
-        DrawRectangle(sx,TOOLBAR_H,1,CANVAS_H,grid);
+        DrawRectangle(sx,y0,1,y1-y0,grid);
     }
 
     /* Horizontal grid lines */
     for (int wy = 0; wy <= GAME_H; wy += TILE_SIZE) {
         int sy = w2s_y(es, (float)wy);
-        if (sy < TOOLBAR_H || sy > TOOLBAR_H + CANVAS_H) continue;
+        if (sy < y0 || sy > y1) continue;
 
-        DrawRectangle(0,sy,CANVAS_W,1,grid);
-    }
-
-    /* ---- Screen boundaries (blue, 2 px wide) ---- */
-
-    for (int screen = 0; screen < EDITOR_WORLD_W(es) / GAME_W; screen++) {
-        int wx = screen * GAME_W;
-        int sx = w2s_x(es, (float)wx);
-        if (sx < -2 || sx > CANVAS_W + 2) continue;
-
-        DrawRectangle(sx,TOOLBAR_H,2,CANVAS_H,ui_color(&es->ui, UI_COLOR_ACCENT));
-        /* Each screen's number by its left edge, as the game counts them. */
-        char number[8];
-        snprintf(number, sizeof(number), "%d", screen + 1);
-        ui_label_color(&es->ui, sx + 5, TOOLBAR_H + 4, number, ui_color(&es->ui, UI_COLOR_ACCENT));
+        DrawRectangle(x0,sy,x1-x0,1,grid);
     }
 
     /* ---- FLOOR_Y line (red, 2 px wide) ---- */
 
     int floor_sy = w2s_y(es, (float)FLOOR_Y);
-    if (floor_sy >= TOOLBAR_H && floor_sy <= TOOLBAR_H + CANVAS_H) {
-        DrawRectangle(0,floor_sy,CANVAS_W,2,(Color){0xD9,0x4A,0x4A,255});
+    if (floor_sy >= y0 && floor_sy <= y1) {
+        DrawRectangle(x0,floor_sy,x1-x0,2,(Color){0xD9,0x4A,0x4A,255});
+    }
+}
+
+/*
+ * render_screens — Each screen's left boundary (blue, 2 px) over the
+ * level's height and its number at the top, as the game counts them.
+ * Drawn with the grid on or off, so the screen in view can always be read.
+ */
+static void render_screens(EditorState *es) {
+    int x0, y0, x1, y1;
+    level_screen_rect(es, &x0, &y0, &x1, &y1);
+    if (y1 <= y0) return;
+    for (int screen = 0; screen < EDITOR_WORLD_W(es) / GAME_W; screen++) {
+        int wx = screen * GAME_W;
+        int sx = w2s_x(es, (float)wx);
+        if (sx < -2 || sx > CANVAS_W + 2) continue;
+
+        DrawRectangle(sx,y0,2,y1-y0,ui_color(&es->ui, UI_COLOR_ACCENT));
+        char number[8];
+        snprintf(number, sizeof(number), "%d", screen + 1);
+        ui_label_color(&es->ui, sx + 5, y0 + 4, number, ui_color(&es->ui, UI_COLOR_ACCENT));
     }
 }
