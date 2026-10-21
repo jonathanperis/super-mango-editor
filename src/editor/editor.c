@@ -69,6 +69,7 @@ int editor_init(EditorState *es, int hidden)
     editor_set_document_save_point(es);
     es->running = 1;
     es->last_autosave_ms = (uint32_t)clock_millis();
+    es->last_input_ms = es->last_autosave_ms;
     editor_set_status(es, es->recovery_entry_count > 1 ? "Recovery copies found: Ctrl+R to choose" :
         es->recovery_entry_count == 1 ? "Recovery copy found: Ctrl+R to recover" : "Ready");
     return 0;
