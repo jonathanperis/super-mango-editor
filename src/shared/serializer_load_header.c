@@ -4,18 +4,10 @@
 
 #include <stddef.h> /* size_t */
 #include <stdio.h>  /* fprintf */
-#include <string.h> /* strncpy */
 
 #include "serializer_load_header.h"
 #include "serializer_parse.h"
 #include "../levels/level.h" /* LevelDef and its MAX_* array limits */
-
-static void copy_header_string(char *dst, size_t dst_size, const char *src) {
-    if (!dst || dst_size == 0) return;
-
-    strncpy(dst, src ? src : "", dst_size - 1);
-    dst[dst_size - 1] = '\0';
-}
 
 int serializer_load_header(toml_datum_t top, LevelDef *def) {
     if (!def) return -1;
@@ -41,19 +33,19 @@ int serializer_load_header(toml_datum_t top, LevelDef *def) {
     /* Name */
     {
         const char *name_str = get_str(top, "name", "Untitled");
-        copy_header_string(def->name, sizeof(def->name), name_str);
+        copy_str(def->name, sizeof(def->name), name_str);
     }
 
     /* Description — multi-line string or single-line */
     {
         const char *desc = get_str(top, "description", "");
-        copy_header_string(def->description, sizeof(def->description), desc);
+        copy_str(def->description, sizeof(def->description), desc);
     }
 
     /* Author attribution */
     {
         const char *gen = get_str(top, "generated_by", "");
-        copy_header_string(def->generated_by, sizeof(def->generated_by), gen);
+        copy_str(def->generated_by, sizeof(def->generated_by), gen);
     }
 
     def->screen_count = get_int(top, "screen_count", 4);

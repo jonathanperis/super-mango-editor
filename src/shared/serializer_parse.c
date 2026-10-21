@@ -11,7 +11,7 @@
 #include <stdarg.h>  /* va_list */
 #include <stdio.h>   /* vsnprintf */
 #include <stdlib.h>  /* strtol */
-#include <string.h>  /* memchr, memcmp, strlen */
+#include <string.h>  /* memchr, memcmp, strlen, strncpy */
 
 #include "serializer_types.h" /* enum validation */
 #include "printf_format.h"    /* PRINTF_FORMAT */
@@ -98,6 +98,14 @@ const char *get_str(toml_datum_t tab, const char *key, const char *fallback)
     toml_datum_t d = toml_table_get_exact(tab, key);
     if (d.type == TOML_STRING) return d.u.str.ptr;
     return fallback;
+}
+
+void copy_str(char *dst, size_t dst_size, const char *src)
+{
+    if (!dst || dst_size == 0) return;
+
+    strncpy(dst, src ? src : "", dst_size - 1);
+    dst[dst_size - 1] = '\0';
 }
 
 /* ------------------------------------------------------------------ */
