@@ -123,6 +123,7 @@ void jumping_spiders_render(const JumpingSpider *spiders, int count,
         /*
          * The base sprite faces left; flip horizontally when walking right.
          */
+        if (!on_screen_x(dst.x, dst.w)) continue;
         int flip = s->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL;
         sprite_draw(tex, &src, &dst, 0, flip, WHITE);
     }

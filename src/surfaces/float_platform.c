@@ -8,6 +8,7 @@
 #include "float_platform.h"
 #include "rail.h"
 #include "game_constants.h" /* GAME_H, GRAVITY */
+#include "../core/entity_utils.h" /* on_screen_x */
 
 /* ------------------------------------------------------------------ */
 
@@ -214,6 +215,7 @@ void float_platform_render(const FloatPlatform *fp,
 
     int n_pieces = fp->w / FLOAT_PLATFORM_PIECE_W;   /* total horizontal pieces */
     int screen_x = (int)fp->x - cam_x;               /* left edge in screen space */
+    if (!on_screen_x(screen_x, fp->w)) return;
 
     for (int i = 0; i < n_pieces; i++) {
         /* Select source slice: 0 = left cap, 2 = right cap, 1 = center fill */

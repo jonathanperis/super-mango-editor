@@ -3,6 +3,7 @@
  */
 
 #include "../shared/graphics.h"
+#include "../core/entity_utils.h" /* on_screen_x */
 #include "../shared/raymath_inline.h" /* Clamp */
 #include <stdio.h>
 #include <math.h>
@@ -240,6 +241,7 @@ void rails_render(const Rail *rails, int count,
              * Tile positions are already in logical pixels; no scaling needed.
              */
             IntRect dst = { t->x - cam_x, t->y, RAIL_TILE_W, RAIL_TILE_H };
+            if (!on_screen_x(dst.x, dst.w)) continue;
 
             sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }

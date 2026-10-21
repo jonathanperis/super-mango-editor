@@ -73,6 +73,7 @@ void spiders_render(const Spider *spiders, int count,
          * The base sprite faces left, so flip horizontally when the spider
          * walks right (vx > 0).
          */
+        if (!on_screen_x(dst.x, dst.w)) continue;
         int flip = s->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL;
         sprite_draw(tex, &src, &dst, 0, flip, WHITE);
     }
