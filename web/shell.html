@@ -9,6 +9,13 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-MANGO_INLINE_SCRIPT_HASHES'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Mango</title>
+    <!-- The .wasm and .data files are most of the download, and
+         super-mango.js asks for them only once it has loaded and run. Start
+         both now. Emscripten fetches them in CORS mode with same-origin
+         credentials, which is what crossorigin gives a preload, so it
+         reuses these responses instead of downloading again. -->
+    <link rel="preload" href="super-mango.wasm" as="fetch" crossorigin>
+    <link rel="preload" href="super-mango.data" as="fetch" crossorigin>
     <style>
         body {
             margin: 0;
