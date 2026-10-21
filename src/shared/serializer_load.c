@@ -96,6 +96,49 @@ static void report_runtime_issue(void *context, const char *message,
 }
 
 /* ================================================================== */
+/* The section loaders                                                 */
+/* ================================================================== */
+
+/*
+ * s_section_loaders — the parts of a level file, in the order they are read.
+ *
+ * Each row is a serializer_load_<section>() function (one per
+ * serializer_load_*.c file) and the name of the section for the error
+ * message.  `load` is a function pointer: the row stores which function to
+ * call, and level_load_toml_explained calls it through the pointer, the
+ * way game_update.c walks s_update_steps and level_loader.c walks
+ * s_level_loaders.  Every loader has the same shape (SectionLoadFn): it
+ * reads its keys from `top`, the parsed TOML root, into `def`, and returns
+ * 0, or -1 when a value cannot be used.
+ *
+ * The rows run top to bottom and the first one that fails ends the load,
+ * so the order decides which problem is reported when several sections
+ * are bad.  Reading a new section means one serializer_load_<section>()
+ * file and one row here.
+ */
+typedef int (*SectionLoadFn)(toml_datum_t top, LevelDef *def);
+
+typedef struct {
+    SectionLoadFn load;  /* the function that reads the section       */
+    const char   *name;  /* "cannot read the level's <name>" on error */
+} SectionLoader;
+
+static const SectionLoader s_section_loaders[] = {
+    /* load                          name            */
+    { serializer_load_header,        "header"        },
+    { serializer_load_geometry,      "geometry"      },
+    { serializer_load_checkpoints,   "checkpoints"   },
+    { serializer_load_collectibles,  "collectibles"  },
+    { serializer_load_enemies,       "enemies"       },
+    { serializer_load_hazards,       "hazards"       },
+    { serializer_load_surfaces,      "surfaces"      },
+    { serializer_load_climbables,    "climbables"    },
+    { serializer_load_layers,        "layers"        },
+};
+
+#define SECTION_LOADER_COUNT (sizeof(s_section_loaders) / sizeof(s_section_loaders[0]))
+
+/* ================================================================== */
 /* level_load_toml — Read a TOML file and populate a LevelDef          */
 /* ================================================================== */
 
@@ -167,69 +210,23 @@ int level_load_toml_explained(const char *path, LevelDef *def,
 
     toml_datum_t top = r.toptab;
 
-    if (serializer_load_header(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's header");
-        free(def);
-        toml_free(r);
-        return -1;
+    /* Read the file one section at a time; the first section that cannot
+     * be read stops the load, and the caller's LevelDef is left untouched. */
+    for (size_t i = 0; i < SECTION_LOADER_COUNT; i++) {
+        const SectionLoader *section = &s_section_loaders[i];
+
+        if (section->load(top, def) != 0) {
+            report_problem(&problems, 0, "cannot read the level's %s",
+                           section->name);
+            free(def);
+            toml_free(r);
+            return -1;
+        }
     }
 
-    if (serializer_load_geometry(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's geometry");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
-    if (serializer_load_checkpoints(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's checkpoints");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
-    if (serializer_load_collectibles(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's collectibles");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
-    if (serializer_load_enemies(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's enemies");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
-    if (serializer_load_hazards(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's hazards");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
-    if (serializer_load_surfaces(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's surfaces");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
-    if (serializer_load_climbables(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's climbables");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
-    if (serializer_load_layers(top, def) != 0) {
-        report_problem(&problems, 0, "cannot read the level's layers");
-        free(def);
-        toml_free(r);
-        return -1;
-    }
-
+    /* The level-wide settings come last.  Their loader cannot fail (it has
+     * no arrays to overflow, and a missing value falls back to a default),
+     * so it returns nothing and is not a row of the table. */
     serializer_load_config(top, def);
 
     {
