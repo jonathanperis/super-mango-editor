@@ -78,31 +78,46 @@ def u64(value):
     return (value & U64_MAX).to_bytes(8, "big")
 
 
-def quantize(residual, scalefactor):
-    """qoa_div + clamp + quant_tab: the 3-bit code for a residual."""
-    n = i32(residual * RECIPROCAL_TAB[scalefactor] + (1 << 15)) >> 16
-    # Round away from zero, so a tiny non-zero residual never becomes 0.
-    n += (residual > 0) - (residual < 0) - ((n > 0) - (n < 0))
-    return QUANT_TAB[(-8 if n < -8 else 8 if n > 8 else n) + 8]
-
-
 def _encode_slice(samples, start, end, history, weights, scalefactor, best_rank):
     """Try one scalefactor on one slice. Returns (rank, slice bits, history,
-    weights); the rank is only exact when it does not exceed best_rank."""
+    weights); the rank is only exact when it does not exceed best_rank.
+
+    This runs 16 times per 20 samples, so i32, quantize and clamp_s16 are
+    written out inline (qoa_div, qoa_clamp and the 32-bit wraps of qoa.h): the
+    same arithmetic without three calls per sample.
+    """
     h0, h1, h2, h3 = history
     w0, w1, w2, w3 = weights
     dequant = DEQUANT_TAB[scalefactor]
+    reciprocal = RECIPROCAL_TAB[scalefactor]
     bits = scalefactor
     rank = 0
     for si in range(start, end):
         sample = samples[si]
-        predicted = i32(w0 * h0 + w1 * h1 + w2 * h2 + w3 * h3) >> 13
+        predicted = w0 * h0 + w1 * h1 + w2 * h2 + w3 * h3
+        if not -0x80000000 <= predicted <= 0x7FFFFFFF:
+            predicted = ((predicted + 0x80000000) & 0xFFFFFFFF) - 0x80000000
+        predicted >>= 13
         residual = sample - predicted
-        quantized = quantize(residual, scalefactor)
+        # qoa_div: the 3-bit code, rounded away from zero so a tiny non-zero
+        # residual never becomes 0.
+        n = residual * reciprocal + 32768
+        if not -0x80000000 <= n <= 0x7FFFFFFF:
+            n = ((n + 0x80000000) & 0xFFFFFFFF) - 0x80000000
+        n >>= 16
+        n += (residual > 0) - (residual < 0) - ((n > 0) - (n < 0))
+        quantized = QUANT_TAB[(-8 if n < -8 else 8 if n > 8 else n) + 8]
         dequantized = dequant[quantized]
-        reconstructed = clamp_s16(predicted + dequantized)
+        reconstructed = predicted + dequantized
+        if reconstructed < -32768:
+            reconstructed = -32768
+        elif reconstructed > 32767:
+            reconstructed = 32767
         # Large weights make the filter ring; qoa.h penalizes them.
-        penalty = (i32(w0 * w0 + w1 * w1 + w2 * w2 + w3 * w3) >> 18) - 0x8FF
+        penalty = w0 * w0 + w1 * w1 + w2 * w2 + w3 * w3
+        if not -0x80000000 <= penalty <= 0x7FFFFFFF:
+            penalty = ((penalty + 0x80000000) & 0xFFFFFFFF) - 0x80000000
+        penalty = (penalty >> 18) - 0x8FF
         if penalty < 0:
             penalty = 0
         error = sample - reconstructed
@@ -179,21 +194,25 @@ def decode(data):
         def s16(packed, i):
             value = (packed >> (48 - 16 * i)) & 0xFFFF
             return value - 0x10000 if value & 0x8000 else value
-        history = [s16(packed_history, i) for i in range(LMS_LEN)]
-        weights = [s16(packed_weights, i) for i in range(LMS_LEN)]
+        h0, h1, h2, h3 = (s16(packed_history, i) for i in range(LMS_LEN))
+        w0, w1, w2, w3 = (s16(packed_weights, i) for i in range(LMS_LEN))
         q = p + 24
         for start in range(0, frame_len, SLICE_LEN):
             bits = int.from_bytes(data[q:q + 8], "big")
             q += 8
             dequant = DEQUANT_TAB[bits >> 60]
+            # The 4-tap filter is unrolled, as in _encode_slice.
             for i in range(min(SLICE_LEN, frame_len - start)):
-                predicted = i32(sum(w * h for w, h in zip(weights, history))) >> 13
+                predicted = i32(w0 * h0 + w1 * h1 + w2 * h2 + w3 * h3) >> 13
                 dequantized = dequant[(bits >> (57 - 3 * i)) & 7]
                 reconstructed = clamp_s16(predicted + dequantized)
                 out.append(reconstructed)
                 delta = dequantized >> 4
-                weights = [w - delta if h < 0 else w + delta for w, h in zip(weights, history)]
-                history = history[1:] + [reconstructed]
+                w0 += -delta if h0 < 0 else delta
+                w1 += -delta if h1 < 0 else delta
+                w2 += -delta if h2 < 0 else delta
+                w3 += -delta if h3 < 0 else delta
+                h0, h1, h2, h3 = h1, h2, h3, reconstructed
         if q - p != frame_size:
             raise ValueError("QOA frame size does not match its slices")
         p = q
