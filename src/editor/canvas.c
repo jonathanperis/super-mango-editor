@@ -34,7 +34,7 @@
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, TOOLBAR_H, etc. */
 #include "editor_campaign.h" /* the Campaign view drawn in the canvas's place  */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers          */
-#include "hit_test.h"    /* editor_entity_bounds for the selection outline      */
+#include "hit_test.h"    /* editor_entity_bounds: sprites, selection outline     */
 #include "tools.h"       /* editor_snap_point for the placement ghost           */
 #include "editor_session.h" /* editor_document_hash */
 #include "../levels/level_loader.h"
@@ -108,24 +108,8 @@ static void render_bouncepads(EditorState *es);
 static void render_vines(EditorState *es);
 static void render_ladders(EditorState *es);
 static void render_ropes(EditorState *es);
-static void render_coins(EditorState *es);
-static void render_star_yellows(EditorState *es);
-static void render_star_greens(EditorState *es);
-static void render_star_reds(EditorState *es);
-static void render_last_star(EditorState *es);
-static void render_player_spawn(EditorState *es);
 static void render_checkpoints(EditorState *es);
-static void render_blue_flames(EditorState *es);
-static void render_fire_flames(EditorState *es);
-static void render_fish(EditorState *es);
-static void render_faster_fish(EditorState *es);
-static void render_spike_blocks(EditorState *es);
-static void render_axe_traps(EditorState *es);
-static void render_circular_saws(EditorState *es);
-static void render_spiders(EditorState *es);
-static void render_jumping_spiders(EditorState *es);
-static void render_birds(EditorState *es);
-static void render_faster_birds(EditorState *es);
+static void render_sprites(EditorState *es, const EntityType *types, int count);
 static void render_selection(EditorState *es);
 static void render_ghost(EditorState *es);
 static void render_grid(EditorState *es);
@@ -168,6 +152,30 @@ static void draw_tex(EditorState *es, Texture2D *tex, const IntRect *src,
     };
     sprite_draw(tex, src, &dst, 0, SPRITE_NORMAL, WHITE);
 }
+
+/* ------------------------------------------------------------------ */
+/* Plain sprites — one picture per placement                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * These types draw one sprite (or one cropped frame of it) in the
+ * rectangle editor_entity_bounds gives, the same box a click tests
+ * against.  render_sprites draws them in the order listed, so each table
+ * is part of the back-to-front order in canvas_render.  Types that tile,
+ * animate or draw a marker (platforms, rails, vines, checkpoints, ...)
+ * keep their own render_* function.
+ */
+#define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
+
+static const EntityType s_pickup_sprites[] = {
+    ENT_COIN, ENT_STAR_YELLOW, ENT_STAR_GREEN, ENT_STAR_RED, ENT_LAST_STAR,
+    ENT_PLAYER_SPAWN,   /* the first frame of the idle sheet */
+};
+
+static const EntityType s_hazard_and_enemy_sprites[] = {
+    ENT_BLUE_FLAME, ENT_FIRE_FLAME, ENT_SPIKE_BLOCK, ENT_AXE_TRAP, ENT_CIRCULAR_SAW,
+    ENT_FISH, ENT_FASTER_FISH, ENT_SPIDER, ENT_JUMPING_SPIDER, ENT_BIRD, ENT_FASTER_BIRD,
+};
 
 /* ------------------------------------------------------------------ */
 /* canvas_render — Main entry point: draw the full level preview        */
@@ -250,31 +258,12 @@ void canvas_render(EditorState *es) {
     render_ladders(es);
     render_ropes(es);
 
-    /* Collectibles */
-    render_coins(es);
-    render_star_yellows(es);
-    render_star_greens(es);
-    render_star_reds(es);
-    render_last_star(es);
-
-    /* Player spawn — draw idle frame at the spawn position */
-    render_player_spawn(es);
+    /* Collectibles and the player spawn, then the checkpoint markers */
+    render_sprites(es, s_pickup_sprites, ARRAY_LEN(s_pickup_sprites));
     render_checkpoints(es);
 
-    /* Hazards */
-    render_blue_flames(es);
-    render_fire_flames(es);
-    render_spike_blocks(es);
-    render_axe_traps(es);
-    render_circular_saws(es);
-
-    /* Enemies (water enemies first, then ground, then air) */
-    render_fish(es);
-    render_faster_fish(es);
-    render_spiders(es);
-    render_jumping_spiders(es);
-    render_birds(es);
-    render_faster_birds(es);
+    /* Hazards, then enemies (water enemies first, then ground, then air) */
+    render_sprites(es, s_hazard_and_enemy_sprites, ARRAY_LEN(s_hazard_and_enemy_sprites));
 
     /* Fog over the level, when asked for; then the space outside it. */
     if (es->show_fog) render_fog(es);
@@ -1053,89 +1042,31 @@ static void render_ropes(EditorState *es) {
     }
 }
 
-/* ---- Coins ------------------------------------------------------- */
+/* ---- Plain sprites ----------------------------------------------- */
 
 /*
- * render_coins — Draw coin collectibles at 16x16 display size.
+ * render_sprites — Draw every placement of each listed type, in order.
  *
- * Uses the full texture (src = NULL) scaled to COIN_DISPLAY_W x _H.
+ * Where and how big each sprite is comes from editor_entity_bounds:
+ * fish sit in the water strip, flames are centred in their gap, a spike
+ * block rides its rail.  Which sprite, and which part of it, comes from
+ * the type's preview row in entity_meta.c (the Place tool's ghost uses
+ * the same row).  A spike block whose rail is missing has no bounds and
+ * is skipped.
  */
-static void render_coins(EditorState *es) {
-    for (int i = 0; i < es->level.coin_count; i++) {
-        draw_tex(es, es->textures.coin, NULL,
-                 es->level.coins[i].x, es->level.coins[i].y,
-                 COIN_DISPLAY_W, COIN_DISPLAY_H);
+static void render_sprites(EditorState *es, const EntityType *types, int count) {
+    for (int t = 0; t < count; t++) {
+        EntityType type = types[t];
+        const EditorEntityPreview *preview = editor_entity_preview(type);
+        Texture2D *tex = editor_entity_texture(&es->textures, type);
+        const IntRect *src = preview->crop ? &preview->src : NULL;
+
+        for (int i = 0; i < editor_entity_count(&es->level, type); i++) {
+            EditorRect r;
+            if (!editor_entity_bounds(&es->level, type, i, &r)) continue;
+            draw_tex(es, tex, src, r.x, r.y, (int)r.w, (int)r.h);
+        }
     }
-}
-
-/* ---- Star yellows ------------------------------------------------ */
-
-/*
- * render_star_yellows — Draw health-restoring star pickups at 16x16.
- */
-static void render_star_yellows(EditorState *es) {
-    for (int i = 0; i < es->level.star_yellow_count; i++) {
-        draw_tex(es, es->textures.star_yellow, NULL,
-                 es->level.star_yellows[i].x,
-                 es->level.star_yellows[i].y,
-                 YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
-    }
-}
-
-/* ---- Star greens ------------------------------------------------- */
-
-/*
- * render_star_greens — Draw green health-restoring star pickups at 16x16.
- */
-static void render_star_greens(EditorState *es) {
-    for (int i = 0; i < es->level.star_green_count; i++) {
-        draw_tex(es, es->textures.star_green, NULL,
-                 es->level.star_greens[i].x,
-                 es->level.star_greens[i].y,
-                 YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
-    }
-}
-
-/* ---- Star reds --------------------------------------------------- */
-
-/*
- * render_star_reds — Draw red health-restoring star pickups at 16x16.
- */
-static void render_star_reds(EditorState *es) {
-    for (int i = 0; i < es->level.star_red_count; i++) {
-        draw_tex(es, es->textures.star_red, NULL,
-                 es->level.star_reds[i].x,
-                 es->level.star_reds[i].y,
-                 YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
-    }
-}
-
-/* ---- Last star --------------------------------------------------- */
-
-/*
- * render_last_star — Draw the end-of-level star at 24x24.
- */
-static void render_last_star(EditorState *es) {
-    draw_tex(es, es->textures.last_star, NULL,
-             es->level.last_star.x, es->level.last_star.y,
-             LSTAR_DISPLAY_W, LSTAR_DISPLAY_H);
-}
-
-/* ---- Player spawn ------------------------------------------------ */
-
-/*
- * render_player_spawn — Draw the player idle frame at the spawn position.
- *
- * Uses row 0, col 0 of the player sprite sheet (48x48) for the idle frame.
- * Rendered at PLAYER_SPAWN_W x PLAYER_SPAWN_H (48x48) in world space.
- */
-static void render_player_spawn(EditorState *es) {
-    if (!es->textures.player) return;
-
-    IntRect src = { 0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H };
-    draw_tex(es, es->textures.player, &src,
-             es->level.player_start_x, es->level.player_start_y,
-             PLAYER_SPAWN_W, PLAYER_SPAWN_H);
 }
 
 /* ---- Authored checkpoints ---------------------------------------- */
@@ -1182,237 +1113,6 @@ static void render_checkpoints(EditorState *es)
             snprintf(label, sizeof(label), "CP %d", i + 1);
             font_draw(es->font,label,w2s_x(es,cp->x)+4,w2s_y(es,cp->y-20.0f),color);
         }
-    }
-}
-
-/* ---- Blue flames ------------------------------------------------- */
-
-/*
- * render_blue_flames — Draw blue flame entities from placement data.
- *
- * Each blue flame is positioned centred within its gap x coordinate.
- * The preview is drawn at FLOOR_Y - BLUE_FLAME_H so designers can see
- * where the flame will erupt from.
- *
- * x = gap_x + (FLOOR_GAP_W - BLUE_FLAME_W) / 2
- * y = FLOOR_Y - BLUE_FLAME_H  (visible preview position above gap)
- */
-static void render_blue_flames(EditorState *es) {
-    if (!es->textures.blue_flame) return;
-
-    for (int i = 0; i < es->level.blue_flame_count; i++) {
-        float gap_x = es->level.blue_flames[i].x;
-        float fx = gap_x + (float)(FLOOR_GAP_W - BLUE_FLAME_W) / 2.0f;
-        float fy = (float)(FLOOR_Y - BLUE_FLAME_H);
-
-        draw_tex(es, es->textures.blue_flame, NULL,
-                 fx, fy, BLUE_FLAME_W, BLUE_FLAME_H);
-    }
-}
-
-/* ---- Fire flames ------------------------------------------------- */
-
-/*
- * render_fire_flames — Draw fire flame entities from placement data.
- *
- * Identical layout to render_blue_flames but uses the fire_flame texture
- * and reads from the fire_flames placement array.
- *
- * x = gap_x + (FLOOR_GAP_W - FIRE_FLAME_W) / 2
- * y = FLOOR_Y - FIRE_FLAME_H  (visible preview position above gap)
- */
-static void render_fire_flames(EditorState *es) {
-    if (!es->textures.fire_flame) return;
-
-    for (int i = 0; i < es->level.fire_flame_count; i++) {
-        float gap_x = es->level.fire_flames[i].x;
-        float fx = gap_x + (float)(FLOOR_GAP_W - FIRE_FLAME_W) / 2.0f;
-        float fy = (float)(FLOOR_Y - FIRE_FLAME_H);
-
-        draw_tex(es, es->textures.fire_flame, NULL,
-                 fx, fy, FIRE_FLAME_W, FIRE_FLAME_H);
-    }
-}
-
-/* ---- Fish -------------------------------------------------------- */
-
-/*
- * render_fish — Draw slow jumping fish in water lanes.
- *
- * Fish y position is derived from the water surface:
- *   water_y = (GAME_H - WATER_ART_H) - FISH_FRAME_H / 2
- *           = (300 - 31) - 24 = 245
- * Rendered at full 48x48 frame size.
- */
-static void render_fish(EditorState *es) {
-    float fish_y = (float)(GAME_H - WATER_ART_H) - FISH_FRAME_H / 2.0f;
-
-    for (int i = 0; i < es->level.fish_count; i++) {
-        draw_tex(es, es->textures.fish, NULL,
-                 es->level.fish[i].x, fish_y,
-                 FISH_FRAME_W, FISH_FRAME_H);
-    }
-}
-
-/* ---- Faster fish ------------------------------------------------- */
-
-/*
- * render_faster_fish — Draw fast jumping fish (same dimensions as slow).
- */
-static void render_faster_fish(EditorState *es) {
-    float fish_y = (float)(GAME_H - WATER_ART_H) - FISH_FRAME_H / 2.0f;
-
-    for (int i = 0; i < es->level.faster_fish_count; i++) {
-        draw_tex(es, es->textures.faster_fish, NULL,
-                 es->level.faster_fish[i].x, fish_y,
-                 FISH_FRAME_W, FISH_FRAME_H);
-    }
-}
-
-/* ---- Spike blocks ------------------------------------------------ */
-
-/*
- * render_spike_blocks — Draw rail-riding spike blocks at 24x24.
- *
- * For v1 of the editor we use a simplified position: the spike block
- * is drawn near its rail's origin.  For RECT rails the block appears
- * at the rail origin.  For HORIZ rails it appears at rail.x + t_offset * 16.
- * This is approximate but sufficient for visual level editing.
- */
-static void render_spike_blocks(EditorState *es) {
-    for (int i = 0; i < es->level.spike_block_count; i++) {
-        const SpikeBlockPlacement *sb = &es->level.spike_blocks[i];
-        int ri = sb->rail_index;
-
-        if (ri < 0 || ri >= es->level.rail_count) continue;
-
-        float sx, sy;
-        editor_rail_placement_position_at(&es->level.rails[ri], sb->t_offset, &sx, &sy);
-        sx -= SPIKE_DISPLAY_W / 2.0f;
-        sy -= SPIKE_DISPLAY_H / 2.0f;
-
-        draw_tex(es, es->textures.spike_block, NULL,
-                 sx, sy, SPIKE_DISPLAY_W, SPIKE_DISPLAY_H);
-    }
-}
-
-/* ---- Axe traps --------------------------------------------------- */
-
-/*
- * render_axe_traps — Draw swinging / spinning axe hazards.
- *
- * The axe hangs from a platform pillar.  Its pivot is at:
- *   x = pillar_x + TILE_SIZE/2 - AXE_FRAME_W/2
- *   y = FLOOR_Y - 3*TILE_SIZE + 16  (top of a 3-tile pillar = 124)
- *
- * Rendered at AXE_FRAME_W x AXE_FRAME_H (48x64).
- */
-static void render_axe_traps(EditorState *es) {
-    for (int i = 0; i < es->level.axe_trap_count; i++) {
-        const AxeTrapPlacement *at = &es->level.axe_traps[i];
-
-        float ax = at->pillar_x;
-        float ay = level_axe_trap_y(at);   /* y = 0 means default height */
-
-        draw_tex(es, es->textures.axe_trap, NULL,
-                 ax, ay, AXE_FRAME_W, AXE_FRAME_H);
-    }
-}
-
-/* ---- Circular saws ----------------------------------------------- */
-
-/*
- * render_circular_saws — Draw fast rotating patrol saws at 32x32.
- *
- * Saw y is derived from the bridge/platform height:
- *   y = FLOOR_Y - 2 * TILE_SIZE + 16 - SAW_DISPLAY_H
- *     = 252 - 96 + 16 - 32 = 140
- */
-static void render_circular_saws(EditorState *es) {
-    for (int i = 0; i < es->level.circular_saw_count; i++) {
-        const CircularSawPlacement *cs = &es->level.circular_saws[i];
-        float sy = level_circular_saw_y(cs);   /* y = 0 means default height */
-        draw_tex(es, es->textures.circular_saw, NULL,
-                 cs->x, sy, SAW_DISPLAY_W, SAW_DISPLAY_H);
-    }
-}
-
-/* ---- Spiders ----------------------------------------------------- */
-
-/*
- * render_spiders — Draw ground-patrol spiders.
- *
- * Spiders sit on the floor: y = FLOOR_Y - SPIDER_ART_H = 252 - 10 = 242.
- * Source rect crops to (0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H)
- * to show only the visible art rows (22..31) of the 64-px frame.
- * Displayed at SPIDER_FRAME_W x SPIDER_ART_H (64x10).
- */
-static void render_spiders(EditorState *es) {
-    float spider_y = (float)(FLOOR_Y - SPIDER_ART_H);
-    IntRect src = { 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
-
-    for (int i = 0; i < es->level.spider_count; i++) {
-        draw_tex(es, es->textures.spider, &src,
-                 es->level.spiders[i].x, spider_y,
-                 SPIDER_FRAME_W, SPIDER_ART_H);
-    }
-}
-
-/* ---- Jumping spiders --------------------------------------------- */
-
-/*
- * render_jumping_spiders — Draw jumping spider variants.
- *
- * Same visual dimensions as regular spiders (same sprite sheet layout).
- * y = FLOOR_Y - SPIDER_ART_H = 242 (on the ground in the editor preview).
- */
-static void render_jumping_spiders(EditorState *es) {
-    float spider_y = (float)(FLOOR_Y - SPIDER_ART_H);
-    IntRect src = { 0, SPIDER_ART_Y, SPIDER_FRAME_W, SPIDER_ART_H };
-
-    for (int i = 0; i < es->level.jumping_spider_count; i++) {
-        draw_tex(es, es->textures.jumping_spider, &src,
-                 es->level.jumping_spiders[i].x, spider_y,
-                 SPIDER_FRAME_W, SPIDER_ART_H);
-    }
-}
-
-/* ---- Birds ------------------------------------------------------- */
-
-/*
- * render_birds — Draw slow sine-wave sky patrol birds.
- *
- * Source rect crops to (0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H)
- * to show only the visible art rows (17..30) of the 48-px frame.
- * y = base_y from the placement data (varies per bird).
- * Displayed at BIRD_FRAME_W x BIRD_ART_H (48x14).
- */
-static void render_birds(EditorState *es) {
-    IntRect src = { 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
-
-    for (int i = 0; i < es->level.bird_count; i++) {
-        draw_tex(es, es->textures.bird, &src,
-                 es->level.birds[i].x,
-                 es->level.birds[i].base_y,
-                 BIRD_FRAME_W, BIRD_ART_H);
-    }
-}
-
-/* ---- Faster birds ------------------------------------------------ */
-
-/*
- * render_faster_birds — Draw fast sine-wave sky patrol birds.
- *
- * Same crop and display dimensions as slow birds.
- */
-static void render_faster_birds(EditorState *es) {
-    IntRect src = { 0, BIRD_ART_Y, BIRD_FRAME_W, BIRD_ART_H };
-
-    for (int i = 0; i < es->level.faster_bird_count; i++) {
-        draw_tex(es, es->textures.faster_bird, &src,
-                 es->level.faster_birds[i].x,
-                 es->level.faster_birds[i].base_y,
-                 BIRD_FRAME_W, BIRD_ART_H);
     }
 }
 
