@@ -980,9 +980,12 @@ void editor_maybe_autosave(EditorState *es)
      * never be recovered.  The safe choice is the newest *valid* version of
      * this document: after a crash the designer loses only the edits made
      * since the level last validated, instead of everything since the last
-     * save.
+     * save.  The frame loop has usually validated this very document
+     * already; only an edit since then needs another pass.
      */
-    editor_validate_level(&es->level, &es->validation_report);
+    if (!es->validation_cache_valid ||
+        es->validated_document_hash != editor_document_hash(&es->level))
+        editor_validate_level(&es->level, &es->validation_report);
     if (es->validation_report.error_count == 0) {
         editor_remember_valid_level(es);
         snapshot = &es->level;

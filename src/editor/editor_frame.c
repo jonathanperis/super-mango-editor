@@ -16,6 +16,9 @@
 #include "editor_session.h"
 #include "editor_shortcuts.h"
 
+/* How often unchanged asset files are checked for again (see above). */
+#define EDITOR_VALIDATION_RECHECK_MS 1000u
+
 void editor_update_cursor(EditorState *es)
 {
     /* Moving entities: the four-way arrows, whatever is under them. */
@@ -64,8 +67,9 @@ void editor_run_frame(EditorState *es)
      * only once per second. Save/playtest still validate synchronously. */
     uint64_t hash = editor_document_hash(&es->level);
     if (!es->validation_cache_valid || hash != es->validated_document_hash ||
-        now - es->last_validation_ms >= 1000u) {
-        editor_validate_level(&es->level, &es->validation_report);
+        now - es->last_validation_ms >= EDITOR_VALIDATION_RECHECK_MS) {
+        editor_validate_level_reusing(&es->level, &es->validation_report,
+                                      EDITOR_VALIDATION_RECHECK_MS);
         es->validated_document_hash = hash;
         es->last_validation_ms = now;
         es->validation_cache_valid = 1;
