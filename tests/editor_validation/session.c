@@ -193,6 +193,36 @@ static int recovery_metadata_keeps_longest_source_path(void)
     return result;
 }
 
+/* A path too long for file_path must leave the open document alone:
+ * replacing only the level would let Ctrl+S save it over the old file. */
+static int apply_loaded_level_rejects_long_path(void)
+{
+    EditorState es;
+    LevelDef other;
+    char long_path[EDITOR_PATH_MAX + 8];
+    int result = 1;
+
+    memset(&es, 0, sizeof(es));
+    editor_level_init_defaults(&es.level);
+    es.level.coin_count = 1;
+    memcpy(es.file_path, "old.toml", sizeof("old.toml"));
+    es.undo = undo_create();
+
+    editor_level_init_defaults(&other);
+    other.coin_count = 0;
+    memset(long_path, 'p', sizeof(long_path) - 1);
+    long_path[sizeof(long_path) - 1] = '\0';
+
+    editor_apply_loaded_level(&es, &other, long_path, 0, 0);
+    if (expect_int("long path keeps the level", es.level.coin_count, 1) != 0) goto done;
+    if (expect_string("long path keeps file_path", es.file_path, "old.toml") != 0) goto done;
+    result = 0;
+
+done:
+    undo_destroy(es.undo);
+    return result;
+}
+
 typedef struct {
     TextFont *font;
     int drawing;

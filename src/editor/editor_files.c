@@ -294,9 +294,13 @@ void editor_apply_loaded_level(EditorState *es, const LevelDef *level,
                                       const char *path, int modified,
                                       int add_recent)
 {
+    /* Check the path first: a path that does not fit leaves the open
+     * document as it was.  Replacing the level but keeping the old
+     * file_path would let Ctrl+S write the new level over the old file. */
+    if (path && !editor_path_fits(path)) return;
+
     es->level = *level;
     if (path) {
-        if (!editor_path_fits(path)) return;
         memcpy(es->file_path, path, strlen(path) + 1);
     } else {
         es->file_path[0] = '\0';
