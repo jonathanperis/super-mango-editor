@@ -686,9 +686,11 @@ done:
 static int unfocused_editor_slows_its_frames(void)
 {
     int failed = 0;
-    CHECK(editor_frame_rate_for(0, 1) == EDITOR_FPS_FOCUSED && EDITOR_FPS_FOCUSED == 60);
-    CHECK(editor_frame_rate_for(0, 0) == EDITOR_FPS_UNFOCUSED && EDITOR_FPS_UNFOCUSED == 10);
-    CHECK(editor_frame_rate_for(1, 0) == 0 && editor_frame_rate_for(1, 1) == 0);
+    CHECK(editor_frame_rate_for(0, 1, 0) == EDITOR_FPS_FOCUSED && EDITOR_FPS_FOCUSED == 60);
+    CHECK(editor_frame_rate_for(0, 1, 1) == EDITOR_FPS_IDLE && EDITOR_FPS_IDLE == 30);
+    CHECK(editor_frame_rate_for(0, 0, 0) == EDITOR_FPS_UNFOCUSED && EDITOR_FPS_UNFOCUSED == 10);
+    CHECK(editor_frame_rate_for(0, 0, 1) == EDITOR_FPS_UNFOCUSED);
+    CHECK(editor_frame_rate_for(1, 0, 0) == 0 && editor_frame_rate_for(1, 1, 1) == 0);
 done:
     return failed;
 }

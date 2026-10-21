@@ -54,7 +54,10 @@ default size already draws at full pixel density.
 
 While another window has focus (the playtest game, a file picker, your
 browser) the editor draws 10 frames a second instead of 60, and goes back to
-60 as soon as it has focus again. It keeps running rather than waiting for
+60 as soon as it has focus again. With focus but no key, click, wheel or
+pointer movement for 2 seconds it draws 30 frames a second, since nothing in
+it animates but the caret's half-second blink; the next input brings back 60
+within one frame. A held mouse button never counts as idle. It keeps running rather than waiting for
 input, so autosave, tooltips and the playtest status check work as before;
 they time themselves by the clock, not by frames. A hidden window (the
 `--smoke-test` render) keeps its own pacing.
