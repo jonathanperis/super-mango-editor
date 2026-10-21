@@ -63,6 +63,10 @@ int game_timing_take_steps(GameState *gs, float seconds);
  * an empty accumulator that jitter flips frames between 0 and 2 steps (a
  * visible stutter). Half a step of slack absorbs it, so each frame runs one.
  *
+ * The positions noted before the last step are forgotten too: after a new
+ * level loads they belong to the previous level's player and movers, and a
+ * frame drawn before the next step would blend from them.
+ *
  * static inline keeps this tiny helper usable without linking game_timing.c.
  */
 static inline void game_timing_restart_clock(GameState *gs)
@@ -70,6 +74,7 @@ static inline void game_timing_restart_clock(GameState *gs)
     gs->screen.loop.prev_time = GetTime();
     gs->screen.loop.clock_started = 1;
     gs->screen.loop.accumulator = GAME_FIXED_STEP * 0.5;
+    gs->screen.loop.has_prev = 0;
 }
 
 /* Count down smoke-test frames and stop the game when the budget reaches zero. */
