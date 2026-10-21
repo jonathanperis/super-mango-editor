@@ -48,7 +48,8 @@ Both applications include `src/shared/serializer_load_checkpoints.c` and the oth
 raylib **6.2** is fetched from the source/checksum pin in `vendor/raylib/manifest.json`.
 `tools/build_raylib.py` verifies the archive, applies the documented replacements
 in `vendor/raylib/patches.json`, and uses CMake for an out-of-source static build.
-The patches avoid miniaudio null-pointer arithmetic, reuse the GLFW
+The patches avoid miniaudio null-pointer arithmetic, wake miniaudio's
+PulseAudio loop on close (exit no longer stalls about 2 s), reuse the GLFW
 backend's standard cursors instead of leaking one per change, and update
 dr_wav to a pinned dr_libs commit with later malformed-file fixes. A macOS-only timing patch gives the existing partial
 busy wait an extra 1 ms wakeup margin to reduce sleep overshoot at 60 FPS; it
