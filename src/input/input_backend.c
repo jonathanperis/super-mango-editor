@@ -28,7 +28,11 @@ EM_JS(void, input_web_scope_close, (void), {
 });
 #endif
 
-#define INPUT_CAPACITY 16384
+/* Events wait here only until the next frame drains them. 4096 holds
+ * several seconds of a 1000 Hz mouse, should a frame stall that long; a
+ * full queue drops new events (input_push returns 0). Each event is about
+ * 56 bytes, so this is about 230 KB. */
+#define INPUT_CAPACITY 4096
 static InputEvent events[INPUT_CAPACITY];
 static unsigned int first, count;
 static int ready, width, height, focused = 1, gamepad;
