@@ -356,6 +356,7 @@ int main(void)
     if (playtest_blocks_editing_and_stop_cleans_up() != 0) return 1;
     if (load_fingerprints_the_bytes_it_parsed() != 0) return 1;
     if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
+    if (apply_loaded_level_rejects_long_path() != 0) return 1;
     if (recent_files_skip_overlong_lines_and_line_breaks() != 0) return 1;
     if (editor_settings_survive_a_restart() != 0) return 1;
     if (dialog_quoting_and_picked_paths_stay_literal() != 0) return 1;

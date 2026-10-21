@@ -84,6 +84,7 @@ void editor_sync_config_resources(EditorState *es);
  * Make `level` the open document.  path becomes file_path (NULL means
  * untitled); modified = 1 marks it unsaved (a recovered snapshot), 0 makes
  * it the save point; add_recent = 1 also lists path under recent files.
+ * A path too long for file_path changes nothing.
  */
 void editor_apply_loaded_level(EditorState *es, const LevelDef *level,
                                const char *path, int modified,
