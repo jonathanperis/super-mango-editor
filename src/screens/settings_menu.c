@@ -36,6 +36,7 @@ static void shorten_utf8(char *text)
 
 static void render_status(UIState *ui, const char *text)
 {
+    const int ellipsis_w = ui_text_width(ui, "...");
     for (int row = 0; row < 2 && *text; row++) {
         char line[160];
         utf8_copy(line, text, sizeof(line));
@@ -46,7 +47,7 @@ static void render_status(UIState *ui, const char *text)
             if (space && space != line) { *space = '\0'; consumed = (size_t)(space - line); }
         } else if (row == 1 && text[consumed]) {
             while (line[0] && (strlen(line) + 3 >= sizeof(line) ||
-                   ui_text_width(ui, line) + ui_text_width(ui, "...") > 364)) shorten_utf8(line);
+                   ui_text_width(ui, line) + ellipsis_w > 364)) shorten_utf8(line);
             strcat(line, "...");
         }
         ui_label_color(ui, 18, 265 + row * 15, line, ui_color(ui, UI_COLOR_WARNING));
