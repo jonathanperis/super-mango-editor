@@ -388,6 +388,9 @@ typedef struct {
  * Blue flames are manually placed via the blue_flames[] array.
  * Each entry specifies the gap x position where a flame erupts.
  */
+/* A level whose screen_count is 0 (left out of the TOML) is this many
+ * screens wide; level_screen_count below applies it. */
+#define LEVEL_DEFAULT_SCREEN_COUNT 4
 #define LEVEL_NAME_CAPACITY 64
 #define LEVEL_DESCRIPTION_CAPACITY 4096
 #define LEVEL_AUTHOR_CAPACITY 128
@@ -402,7 +405,7 @@ typedef struct {
                               * comment header and as a string field on save    */
     char  generated_by[LEVEL_AUTHOR_CAPACITY]; /* author attribution, e.g. "Lugio, the Creator"
                                * or "Bosser, the Engineer" — crew member sign    */
-    int   screen_count;      /* number of screens wide (0 = default 4)          */
+    int   screen_count;      /* screens wide (0 = LEVEL_DEFAULT_SCREEN_COUNT)   */
 
     /* ---- Authored checkpoints --------------------------------------- */
     CheckpointPlacement checkpoints[MAX_CHECKPOINTS];
@@ -593,6 +596,13 @@ static inline float level_axe_trap_y(const AxeTrapPlacement *p)
 static inline float level_circular_saw_y(const CircularSawPlacement *p)
 {
     return (p->y != 0.0f) ? p->y : level_platform_top_y(2) - (float)SAW_DISPLAY_H;
+}
+
+/* How many screens wide the level is: its screen_count, or
+ * LEVEL_DEFAULT_SCREEN_COUNT when that is 0 (or less). */
+static inline int level_screen_count(const LevelDef *def)
+{
+    return (def->screen_count > 0) ? def->screen_count : LEVEL_DEFAULT_SCREEN_COUNT;
 }
 
 /* Resolve the original spawn, including the legacy engine default. */

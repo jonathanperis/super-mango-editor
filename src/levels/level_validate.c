@@ -1426,8 +1426,8 @@ static int validate_runtime(const LevelDef *def, char *err, size_t err_size,
     /* Then version, size, audio and scoring limits. */
     if (validate_level_settings(def, err, err_size, sink) != 0) return -1;
 
-    /* Most rules below need the world width; 0 screens means the default 4. */
-    screens = (def->screen_count > 0) ? def->screen_count : 4;
+    /* Most rules below need the world width; 0 screens means the default. */
+    screens = level_screen_count(def);
     world_w = (float)screens * (float)GAME_W;
 
     /* Asset paths, physics overrides and per-entity motion values. */
@@ -1495,7 +1495,7 @@ int level_validate_preview(const LevelDef *def, char *err, size_t err_size)
 
     if (level_validate_counts(def, err, err_size) != 0) return -1;
     if (validate_level_settings(def, err, err_size, sink) != 0) return -1;
-    world_w = (float)((def->screen_count > 0) ? def->screen_count : 4) * (float)GAME_W;
+    world_w = (float)level_screen_count(def) * (float)GAME_W;
     if (validate_floor_gaps(def, err, err_size, world_w, sink) != 0) return -1;
     if (validate_rails(def, err, err_size, world_w, sink) != 0) return -1;
     if (validate_platforms(def, err, err_size, world_w, sink) != 0) return -1;
