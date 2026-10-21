@@ -1225,6 +1225,20 @@ static int canvas_navigates_like_a_level_editor(void)
     key_frame(&es, KEY_F, 0);
     CHECK(es.camera.zoom == 0.25f && es.camera.x == 0.0f);
     CHECK(canvas_zoom_index(es.camera.zoom) == 0);
+    CHECK(strcmp(es.status_message, "Zoom to fit: 1/4x") == 0);
+    /* Forty screens fit only below every preset: the exact zoom; the
+     * wheel then goes in to a quarter, and out stays put. */
+    es.level.screen_count = 40;
+    key_frame(&es, KEY_F, 0);
+    CHECK(es.camera.zoom < 0.25f && 40.0f * GAME_W * es.camera.zoom <= (float)CANVAS_W);
+    float fitted = es.camera.zoom;
+    push_wheel(400, 300, -1.0f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == fitted);
+    push_wheel(400, 300, 1.0f, INPUT_CTRL);
+    ui_frame(&es, 400, 300);
+    CHECK(es.camera.zoom == 0.25f);
+    es.level.screen_count = 8;
 
     es.tool = TOOL_SELECT;
     int total = editor_placed_entity_total(&es.level);

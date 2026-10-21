@@ -74,7 +74,8 @@ const char *canvas_zoom_label(int index);
 int canvas_zoom_index(float zoom);
 
 /* Zoom to the largest preset that shows the whole level (its width and
- * height), and scroll to its start. */
+ * height), or for a level too long for every preset the exact zoom that
+ * does, and scroll to its start. */
 void canvas_zoom_to_fit(EditorState *es);
 
 /*

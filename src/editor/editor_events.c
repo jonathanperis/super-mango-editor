@@ -513,7 +513,11 @@ static void editor_key(EditorState *es, const InputEvent *event)
     case KEY_F:
         /* Frame the whole level. */
         canvas_zoom_to_fit(es);
-        editor_set_status(es, "Zoom to fit: %s", canvas_zoom_label(canvas_zoom_index(es->camera.zoom)));
+        if (canvas_zoom_index(es->camera.zoom) >= 0)
+            editor_set_status(es, "Zoom to fit: %s",
+                              canvas_zoom_label(canvas_zoom_index(es->camera.zoom)) + 6);
+        else
+            editor_set_status(es, "Zoom to fit: %d%%", (int)(es->camera.zoom * 100.0f + 0.5f));
         break;
     case KEY_SPACE:
         /* Held, a left drag on the canvas slides the view (see below). */
@@ -589,11 +593,15 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
     float step = event->wheel * 48.0f / zoom;
 
     if (event->mods & INPUT_CTRL) {
-        /* Zoom is only ever one of the canvas's presets (startup, the
-         * toolbar, Fit and this handler set it), so step through them. */
+        /* Zoom is one of the canvas's presets (startup, the toolbar and
+         * this handler set them), or below them all after Fit on a very
+         * long level; step through the presets. */
         const int last = CANVAS_ZOOM_COUNT - 1;
         int index = canvas_zoom_index(es->camera.zoom);
-        if (index < 0) index = canvas_zoom_index(1.0f);
+        /* Below every preset (Fit on a very long level): the next step in
+         * is the smallest preset, and out stays put. */
+        int below = index < 0 && es->camera.zoom < canvas_zoom_preset(0);
+        if (index < 0) index = below ? -1 : canvas_zoom_index(1.0f);
         /*
          * A mouse wheel reports whole notches (1.0), but a trackpad or a
          * pinch reports many small fractions.  Add them up and step one
@@ -612,7 +620,10 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
         }
         /* Stop at the ends instead of wrapping: scrolling past 5x must
          * not suddenly jump back to a quarter. */
-        if (index < 0) index = 0;
+        if (index < 0) {
+            if (below) return;   /* already smaller than every preset */
+            index = 0;
+        }
         if (index > last) index = last;
         if (!float_same_value(canvas_zoom_preset(index), es->camera.zoom))
             canvas_set_zoom(es, canvas_zoom_preset(index), event->x, event->y);

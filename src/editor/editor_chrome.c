@@ -76,8 +76,9 @@ void editor_render_toolbar(EditorState *es)
     static const char *zoom_opts[CANVAS_ZOOM_COUNT + 1];
     for (int zi = 0; zi < CANVAS_ZOOM_COUNT; zi++) zoom_opts[zi] = canvas_zoom_label(zi);
     zoom_opts[CANVAS_ZOOM_COUNT] = "Zoom: Fit";
+    /* A zoom that is no preset came from Fit. */
     int sel = canvas_zoom_index(es->camera.zoom);
-    if (sel < 0) sel = canvas_zoom_index(1.0f);
+    if (sel < 0) sel = CANVAS_ZOOM_COUNT;
     if (ui_dropdown(&es->ui, 8888, bx, by + 2, 80,
                     zoom_opts, CANVAS_ZOOM_COUNT + 1, &sel)) {
         if (sel == CANVAS_ZOOM_COUNT)
