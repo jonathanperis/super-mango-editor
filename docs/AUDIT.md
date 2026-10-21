@@ -18,6 +18,10 @@ delivery report.
 - GitHub About, Pages configuration, recent main CI/deployment status and the
   actual latest published release asset list, retrieved through `gh`.
 
+> **Correction, 2026-10-21:** "four GitHub workflows" above is a miscount. The
+> repository had three: `.github/workflows/build.yml`, `codeql.yml` and
+> `docs.yml`. The rest of this report is left as written on 2026-09-17.
+
 Source/workflows are authoritative for behavior. Historical design proposals are
 explicitly labeled in PRODUCT/DESIGN and are not current acceptance criteria.
 Generated catalog, inventory and overlay snapshots were already fresh.
@@ -104,6 +108,31 @@ publication before the website receives them.
 | Medium | Perform an explicitly authorized browser/device documentation smoke | Desktop/mobile navigation, filtering, overview, keyboard focus, play/debug launch and touch controls observed on real supported browsers/devices |
 | Medium | Resolve existing font/audio provenance gaps from original acquisition records | Documented source, author and license evidence; notices updated without inventing permissions |
 | Ongoing | Regenerate content facts when levels/assets/overlay text change; run both source and emitted-site checks | `make docs-drift`, Astro lint/build and `bun run check-site` pass for the same source revision |
+
+### Follow-up status, 2026-10-21
+
+The table above is unchanged; these lines record where each item stands now.
+
+- **Publish the documentation changes — done.** PR #302 merged on 2026-09-17.
+  The site has since moved to `https://super-mango-editor.jonathanperis.tech/`
+  (2026-10-21), where `robots.txt` points to `sitemap-index.xml` and that
+  sitemap returns HTTP 200.
+- **New release with builder archives — done.** v1.0.976, v1.0.985 and v1.0.994
+  (latest, 2026-10-11) were published. The v1.0.994 Linux archive holds both
+  `super-mango` and `super-mango-editor`, the campaign and labs levels,
+  `LICENSE`, `THIRD_PARTY_NOTICES.md` and `licenses/`. Later changes on `main`
+  (QOA audio, raygui icons, gamepad mappings) are not in a release yet.
+- **Browser/device documentation smoke — still open.** Scripted smoke runs and
+  web fullscreen/touch fixes landed, but no record of a manual smoke on real
+  supported browsers and devices is in the repository.
+- **Font/audio provenance — resolved for current `main` by replacement.** The
+  `round9x13.ttf` font and the earlier WAV audio, both of unknown origin, were
+  removed rather than relicensed (commits `3157f77` and `1c6fb8d` on
+  2026-10-06; `7af2722` moved the generated sounds to QOA on 2026-10-16). See
+  the status note in `AUDIT_IMPLEMENTATION.md` for what remains open in older
+  releases.
+- **Regenerate content facts — ongoing.** `make docs-drift` and the docs build
+  still run in CI.
 
 Broad redesign/A-B proposals in DESIGN remain historical ideas. They require a
 fresh product decision and interaction evidence rather than being treated as

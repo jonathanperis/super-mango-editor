@@ -77,8 +77,13 @@ compile_commands.json
 # Docs generation
 node_modules/
 
-# Local specifications (existing tracked specifications remain tracked)
+# Local specifications. The files already tracked under .specs/ stay tracked
+# on purpose, but any NEW file there is silently ignored: add it with
+# `git add -f .specs/<path>` or it never reaches the repository.
 .specs/
+
+# Local Claude Code agent worktrees and settings
+.claude/
 
 # Task-owned browser verification artifacts
 playwright-evidence/
