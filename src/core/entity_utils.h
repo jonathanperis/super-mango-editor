@@ -18,6 +18,22 @@
 #pragma once
 
 #include <stdint.h>
+#include "game_constants.h" /* GAME_W */
+
+/* ------------------------------------------------------------------ */
+/* Culling                                                             */
+/* ------------------------------------------------------------------ */
+
+/*
+ * on_screen_x — whether the columns [screen_x, screen_x + w) overlap the
+ * GAME_W-wide canvas.  Renderers skip what this rejects: raylib would
+ * still batch and upload a quad that the GPU then clips away, and a long
+ * level keeps most of its objects off screen.
+ */
+static inline int on_screen_x(int screen_x, int w)
+{
+    return screen_x + w > 0 && screen_x < GAME_W;
+}
 
 /* ------------------------------------------------------------------ */
 /* Animation                                                           */

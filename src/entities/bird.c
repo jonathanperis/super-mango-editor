@@ -128,6 +128,7 @@ void bird_variant_render(const BirdSpec *spec, const Bird *birds, int count,
         dst.y = (int)bird_screen_y(spec, b->x, b->base_y);
         dst.w = spec->frame_w;
         dst.h = spec->art_h;
+        if (!on_screen_x(dst.x, dst.w)) continue;
 
         sprite_draw(tex, &src, &dst, 0,
                     b->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL, WHITE);

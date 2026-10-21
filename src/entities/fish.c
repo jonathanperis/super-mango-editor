@@ -115,6 +115,7 @@ void fish_render(const Fish *fish, int count,
             FISH_RENDER_W,
             FISH_RENDER_H
         };
+        if (!on_screen_x(dst.x, dst.w)) continue;
 
         sprite_draw(tex, &src, &dst, 0,
                     f->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL, WHITE);

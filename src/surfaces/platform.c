@@ -7,6 +7,7 @@
  */
 
 #include "../shared/graphics.h"
+#include "../core/entity_utils.h" /* on_screen_x */
 #include <stdio.h>
 
 #include "platform.h"
@@ -42,7 +43,7 @@ void platforms_render(const Platform *platforms, int count,
 
         /* Use per-platform texture if set, otherwise fall back to default */
         Texture2D *tex = p->tex ? p->tex : default_tex;
-        if (!tex) continue;
+        if (!tex || !on_screen_x((int)p->x - cam_x, p->w)) continue;
 
         /*
          * Walk every 16×16 piece position inside the pillar bounding box.
@@ -69,6 +70,7 @@ void platforms_render(const Platform *platforms, int count,
                  */
                 IntRect src = { piece_col * P, piece_row * P, P, P };
                 IntRect dst = { (int)p->x + tx - cam_x, (int)p->y + ty, P, P };
+                if (!on_screen_x(dst.x, dst.w)) continue;
                 sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
             }
         }

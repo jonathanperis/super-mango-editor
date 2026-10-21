@@ -10,6 +10,7 @@
 #include <stdio.h>
 
 #include "spike_platform.h"
+#include "../core/entity_utils.h" /* on_screen_x */
 
 /* ------------------------------------------------------------------ */
 
@@ -32,6 +33,7 @@ void spike_platforms_render(const SpikePlatform *sps, int count,
 
         int n_pieces = sp->w / SPIKE_PLAT_PIECE_W;
         int screen_x = (int)sp->x - cam_x;
+        if (!on_screen_x(screen_x, sp->w)) continue;
 
         for (int p = 0; p < n_pieces; p++) {
             /* Select source slice: 0 = left, 2 = right, 1 = centre */

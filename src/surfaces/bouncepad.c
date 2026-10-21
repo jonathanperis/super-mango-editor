@@ -13,6 +13,7 @@
 
 #include "bouncepad.h"
 #include "../game_constants.h" /* FLOOR_Y, TILE_SIZE */
+#include "../core/entity_utils.h" /* on_screen_x */
 
 /* ------------------------------------------------------------------ */
 
@@ -119,6 +120,7 @@ void bouncepads_render(const Bouncepad *pads, int count,
             p->h
         };
 
+        if (!on_screen_x(dst.x, dst.w)) continue;
         sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
     }
 }
