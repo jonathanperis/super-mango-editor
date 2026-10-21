@@ -4,14 +4,15 @@ import sitemap from "@astrojs/sitemap";
 import tailwindcss from "@tailwindcss/vite";
 import { homeCsp } from "./integrations/home-csp.mjs";
 
-const isProd = process.env.NODE_ENV === "production";
-
 export default defineConfig({
     integrations: [sitemap(), homeCsp()],
     output: "static",
     outDir: "out",
-    site: "https://jonathanperis.github.io",
-    base: isProd ? "/super-mango-editor" : "",
+    // The custom domain serves this project at the host root. A repository
+    // base path would make every asset 404 once GitHub Pages leaves
+    // jonathanperis.github.io/super-mango-editor/.
+    site: "https://super-mango-editor.jonathanperis.tech",
+    base: "",
     markdown: {
         processor: satteri(),
     },

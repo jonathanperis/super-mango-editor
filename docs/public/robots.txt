@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://jonathanperis.github.io/super-mango-editor/sitemap-index.xml
+Sitemap: https://super-mango-editor.jonathanperis.tech/sitemap-index.xml

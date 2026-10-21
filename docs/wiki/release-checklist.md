@@ -144,7 +144,7 @@ After publish, verify:
 - the release asset table has Linux, macOS, Windows, and WebAssembly zip files plus `SHA256SUMS`;
 - `gh attestation verify` succeeds for a downloaded archive (see below);
 - archive downloads match the expected platform names;
-- Pages serves `/super-mango-editor/super-mango.js`, `/super-mango-editor/super-mango.wasm`, and `/super-mango-editor/super-mango.data` under the production project base;
+- Pages serves `/super-mango.js`, `/super-mango.wasm`, and `/super-mango.data` at the root of `https://super-mango-editor.jonathanperis.tech/`;
 - the public docs site and badges do not report stale status.
 
 <a id="verifying-a-download"></a>

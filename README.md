@@ -4,7 +4,7 @@
 
 [![Build Check](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?event=pull_request)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![Main Build](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/build.yml) [![CodeQL](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml/badge.svg)](https://github.com/jonathanperis/super-mango-editor/actions/workflows/codeql.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Play →](https://jonathanperis.github.io/super-mango-editor/)** | **[Learn →](https://jonathanperis.github.io/super-mango-editor/docs/learning-path/)** | **[Builder Manual →](https://jonathanperis.github.io/super-mango-editor/docs/)** | **[Releases →](https://github.com/jonathanperis/super-mango-editor/releases)**
+**[Play →](https://super-mango-editor.jonathanperis.tech/)** | **[Learn →](https://super-mango-editor.jonathanperis.tech/docs/learning-path/)** | **[Builder Manual →](https://super-mango-editor.jonathanperis.tech/docs/)** | **[Releases →](https://github.com/jonathanperis/super-mango-editor/releases)**
 
 ---
 
@@ -18,7 +18,7 @@ in `levels/labs/` go with an eight-lab learning track. The standalone editor
 saves the same TOML files the game loads. Native builds run on macOS, Linux and
 Windows; Emscripten builds the browser version.
 
-**Start learning:** [Sandbox School](https://jonathanperis.github.io/super-mango-editor/docs/learning-path/) · [Debugging C](https://jonathanperis.github.io/super-mango-editor/docs/debugging-c/) · [C in This Codebase](https://jonathanperis.github.io/super-mango-editor/docs/c-concepts/) · [Mechanics Museum](https://jonathanperis.github.io/super-mango-editor/docs/mechanics-museum/) · [Entity Walkthrough](https://jonathanperis.github.io/super-mango-editor/docs/entity-walkthrough/)
+**Start learning:** [Sandbox School](https://super-mango-editor.jonathanperis.tech/docs/learning-path/) · [Debugging C](https://super-mango-editor.jonathanperis.tech/docs/debugging-c/) · [C in This Codebase](https://super-mango-editor.jonathanperis.tech/docs/c-concepts/) · [Mechanics Museum](https://super-mango-editor.jonathanperis.tech/docs/mechanics-museum/) · [Entity Walkthrough](https://super-mango-editor.jonathanperis.tech/docs/entity-walkthrough/)
 
 The source is part of the lesson. Explicit update/draw steps, simple loops and
 comments about units, ownership and library calls are intentional. We favour
@@ -45,7 +45,7 @@ code a learner can trace over a shorter version that hides a step.
 - A debug inspector to freeze, step, slow down and tune the simulation, and to record and replay experiments
 - A standalone level editor with undo/redo, copy/paste, validation that blocks bad saves, autosave and one-key playtesting
 
-The [manual](https://jonathanperis.github.io/super-mango-editor/docs/) covers each of these in detail.
+The [manual](https://super-mango-editor.jonathanperis.tech/docs/) covers each of these in detail.
 
 ## Getting Started
 
@@ -100,12 +100,12 @@ make docs-drift                       # check the manual against the code
 make help                             # list every target with a one-line description
 ```
 
-The [Build System](https://jonathanperis.github.io/super-mango-editor/docs/build-system/) page lists every target and flag, and
-[Testing](https://jonathanperis.github.io/super-mango-editor/docs/testing/) says which checks to run for which change. The debug
-inspector keys are in [Controls](https://jonathanperis.github.io/super-mango-editor/docs/controls/#debug-inspector-keys); debug and
+The [Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/) page lists every target and flag, and
+[Testing](https://super-mango-editor.jonathanperis.tech/docs/testing/) says which checks to run for which change. The debug
+inspector keys are in [Controls](https://super-mango-editor.jonathanperis.tech/docs/controls/#debug-inspector-keys); debug and
 playtest runs never touch your saved profile.
 
-Or just **[play in your browser](https://jonathanperis.github.io/super-mango-editor/)**, no build required.
+Or just **[play in your browser](https://super-mango-editor.jonathanperis.tech/)**, no build required.
 
 ### Release Downloads
 
@@ -115,7 +115,7 @@ the current workflow contain a native archive per platform with both
 third-party notices; run them from the extracted folder. A WebAssembly archive
 holds the normal and debug browser builds; serve it with any static HTTP server.
 Older releases predate this packaging. The website follows successful `main`
-builds, not tags. Details are in the [Release Checklist](https://jonathanperis.github.io/super-mango-editor/docs/release-checklist/).
+builds, not tags. Details are in the [Release Checklist](https://super-mango-editor.jonathanperis.tech/docs/release-checklist/).
 
 ## Project Structure
 
@@ -135,7 +135,7 @@ super-mango-editor/
 └── .github/      CI workflows and SECURITY_TRIAGE.md
 ```
 
-[Source Files](https://jonathanperis.github.io/super-mango-editor/docs/source-files/) describes every `.c` and `.h` file.
+[Source Files](https://super-mango-editor.jonathanperis.tech/docs/source-files/) describes every `.c` and `.h` file.
 
 ## Project Documents
 
@@ -143,7 +143,7 @@ super-mango-editor/
 |------|---------|
 | `PRODUCT.md` | Product direction, player promise, and feature framing. |
 | `DESIGN.md` | How the website looks: built from the game's own sprites, palette and fonts. |
-| `docs/wiki/` | The manual, published on the [docs site](https://jonathanperis.github.io/super-mango-editor/docs/). |
+| `docs/wiki/` | The manual, published on the [docs site](https://super-mango-editor.jonathanperis.tech/docs/). |
 | `docs/README.md` | Website setup, content ownership, generated facts and deployment. |
 | `docs/AUDIT.md`, `docs/AUDIT_IMPLEMENTATION.md` | Historical, dated audit reports (not current status). |
 | `SECURITY.md` | Vulnerability reporting, scope and the web build's shared-origin model. |
@@ -173,7 +173,7 @@ plus a weekly and a manual run:
 - **`codeql.yml`** runs CodeQL security and quality analysis on the C code, the
   workflows, the Python tools and the JavaScript/TypeScript.
 
-The [Build System](https://jonathanperis.github.io/super-mango-editor/docs/build-system/#cicd-pipelines) page has the job-by-job detail.
+The [Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/#cicd-pipelines) page has the job-by-job detail.
 
 ## License
 

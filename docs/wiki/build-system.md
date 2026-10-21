@@ -514,7 +514,7 @@ plugin **4.3.3**, and TypeScript **6.0.3**. TypeScript **7.0.2** is newer but ou
 Astro Check 0.9.10's `^5.0.0 || ^6.0.0` peer range; retain 6.0.3 until supported.
 Locked transitive dependencies respect their upstream version constraints.
 
-Development uses `/`; production output uses `/super-mango-editor/`. Astro does not compile or
+Development and production both serve from `/`. The public host is `super-mango-editor.jonathanperis.tech`, so the repository name is not a path prefix. Astro does not compile or
 copy WASM: see the [website maintainer guide](https://github.com/jonathanperis/super-mango-editor/blob/main/docs/README.md)
 for local game assembly, page registration and generated-content ownership.
 

@@ -1,6 +1,6 @@
 # Website and Builder Manual
 
-Astro static site at <https://jonathanperis.github.io/super-mango-editor/>.
+Astro static site at <https://super-mango-editor.jonathanperis.tech/>.
 The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 
 ## Requirements and Commands
@@ -17,12 +17,12 @@ run frozen install, `bun audit`, lint, build and `check-site`.
 
 | Command (from `docs/`) | Action |
 |---|---|
-| `bun run dev` | Start development server; routes have no repository base prefix |
+| `bun run dev` | Start development server at `/` |
 | `bun run lint` | Run `astro check` |
 | `bun run drift` | Run `make docs-drift`, including generated freshness and roadmap checks |
-| `bun run build` | Build the production site to `docs/out/` with `/super-mango-editor/` base |
+| `bun run build` | Build the production site to `docs/out/` at the domain root |
 | `bun run check-site` | Run `tools/check_docs_site.py` (built routes, Markdown content, links, anchors, metadata, sitemap and the landing-page CSP) and `tests/docs_checks_test.py` |
-| `bun run preview` | Serve the production build; open `/super-mango-editor/` |
+| `bun run preview` | Serve the production build; open `/` |
 
 For a documentation change, from the repository root:
 
@@ -103,7 +103,7 @@ bun run preview
 
 Reassemble after rebuilding Astro, which replaces its output. Touch-control code
 is bundled into the generated game JavaScript. See the public
-[Build System](https://jonathanperis.github.io/super-mango-editor/docs/build-system/)
+[Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/)
 for the CI-authoritative WebAssembly verification contract.
 
 ## Deployment and Analytics
