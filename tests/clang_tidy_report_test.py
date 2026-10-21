@@ -31,6 +31,11 @@ def main() -> None:
         ("tools/level_check.c", 3, 9, "error", "cert-err34-c,bugprone-unused-return-value", "'x' | 'y'"),
     ], findings
 
+    # A Windows path keeps its drive letter instead of being cut at "C:".
+    windows = module.FINDING_RE.match(
+        "C:/a/super-mango/src/main.c:7:3: warning: w [bugprone-branch-clone]")
+    assert windows and windows["path"] == "C:/a/super-mango/src/main.c" and windows["line"] == "7", windows
+
     table = module.markdown_summary(findings, 2)
     assert "2 findings in 2 files" in table, table
     assert "'x' \\| 'y'" in table, table  # a | in a message must not split the cell

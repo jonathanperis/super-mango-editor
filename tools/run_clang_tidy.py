@@ -31,7 +31,9 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT_DIRS = ("src", "tools")
 
 # path:line:col: warning: message [check-name]
-FINDING_RE = re.compile(r"^(?P<path>[^\s:][^:]*):(?P<line>\d+):(?P<col>\d+): "
+# The path may start with a Windows drive letter ("C:/..."), whose colon is
+# part of the path and not the separator before the line number.
+FINDING_RE = re.compile(r"^(?P<path>(?:[A-Za-z]:)?[^\s:][^:]*):(?P<line>\d+):(?P<col>\d+): "
                         r"(?P<level>warning|error): (?P<message>.*?) \[(?P<check>[\w.,-]+)\]$")
 
 
