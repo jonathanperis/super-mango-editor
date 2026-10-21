@@ -10,15 +10,19 @@
  *   world_w = screen_count * GAME_W (default 4 screens = 1600 px)
  *
  * Rendering order (back to front):
- *   1. Sky background
+ *   1. Sky: flat blue, then every background layer with parallax
  *   2. Platforms (pillars) — 9-slice tiled
  *   3. Floor — 9-slice tiled with sea gap edge caps
  *   4. Water strips in sea gaps
  *   5. Entities in game render order (rails, surfaces, collectibles,
  *      hazards, enemies)
- *   6. Selection highlight
- *   7. Ghost preview (placement mode)
- *   8. Grid overlay (optional)
+ *   6. Fog layers (when the toolbar's Fog toggle is on), then the shading
+ *      of everything outside the level
+ *   7. Selection highlight
+ *   8. Ghost preview (placement mode)
+ *   9. Grid overlay (optional)
+ *  10. The "cannot load this level yet" banner, when the level fails the
+ *      game's checks but can still be drawn
  */
 
 #include "canvas.h"
