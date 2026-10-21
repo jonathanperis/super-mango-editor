@@ -643,6 +643,96 @@ static void editor_canvas_wheel(EditorState *es, const InputEvent *event)
     }
 }
 
+/* A button press: the left button reaches lists, the error banner, a
+ * pan or the canvas tools in that order; the middle button starts a pan;
+ * the right button deletes on the canvas. */
+static void editor_mouse_down(EditorState *es, const InputEvent *event, float wx, float wy)
+{
+    if (event->button == MOUSE_BUTTON_LEFT) {
+        /* An open dropdown list hangs over the canvas and the panels.
+         * The press belongs to the list (pick an option or close it);
+         * placing or deleting under it as well would be a surprise. */
+        if (ui_press(&es->ui)) return;
+        /* The canvas's error banner: go to the problem, nothing else. */
+        if (canvas_banner_contains(es, event->x, event->y)) {
+            if (editor_finish_field_edit(es)) (void)editor_focus_validation_issue(es, 0);
+            return;
+        }
+        /* While a pan runs the pointer belongs to it: a left press
+         * neither takes the pan over nor reaches the tools. */
+        if (es->panning) return;
+        /* Space+drag slides the view instead of using the tool. */
+        if (es->space_held && !es->campaign && canvas_contains(event->x, event->y) &&
+            es->ui.active_id == 0) {
+            es->panning = 1;
+            es->pan_button = MOUSE_BUTTON_LEFT;
+            es->pan_x = event->x;
+            es->pan_y = event->y;
+            return;
+        }
+        es->mouse_down = 1;
+        es->focus_area = canvas_contains(event->x, event->y) && !es->campaign
+                       ? EDITOR_FOCUS_CANVAS : EDITOR_FOCUS_PANEL;
+        /* Over the Campaign view the canvas tools are asleep; its
+         * widgets read the click from ui.mouse_clicked. */
+        if (canvas_contains(event->x, event->y) && !es->campaign &&
+            editor_finish_field_edit(es))
+            tools_mouse_down(es, wx, wy);
+    } else if (event->button == MOUSE_BUTTON_MIDDLE) {
+        /* Middle-drag slides the view, in any tool (not in the middle
+         * of a left-button drag, which owns the pointer). */
+        if (!es->campaign && !es->mouse_down && !es->panning &&
+            canvas_contains(event->x, event->y)) {
+            es->panning = 1;
+            es->pan_button = MOUSE_BUTTON_MIDDLE;
+            es->pan_x = event->x;
+            es->pan_y = event->y;
+        }
+    } else if (event->button == MOUSE_BUTTON_RIGHT) {
+        es->mouse_right_down = 1;
+        /* Right-click deletes. During a left-button drag that would shift
+         * the array under drag_index, so the drag would then overwrite a
+         * different entity. Finish (release) the drag first. The same
+         * goes for a click under an open dropdown list. */
+        if (!es->dragging && es->ui.dropdown_open_id == 0 && !es->campaign &&
+            canvas_contains(event->x, event->y) &&
+            editor_finish_field_edit(es))
+            tools_right_click(es, wx, wy);
+    }
+}
+
+/* A button release: ends the pan it started, else reaches the tools. */
+static void editor_mouse_up(EditorState *es, const InputEvent *event, float wx, float wy)
+{
+    /* Only the button that started the pan ends it; another button's
+     * release goes on to the tools as usual. */
+    if (es->panning && event->button == es->pan_button) {
+        es->panning = 0;
+        return;
+    }
+    if (event->button == MOUSE_BUTTON_LEFT) {
+        es->mouse_down = 0;
+        tools_mouse_up(es, wx, wy);
+    }
+    else if (event->button == MOUSE_BUTTON_RIGHT) es->mouse_right_down = 0;
+}
+
+/* Pointer motion: slides the view during a pan, else drags with the tool. */
+static void editor_mouse_move(EditorState *es, const InputEvent *event, float wx, float wy)
+{
+    if (es->panning) {
+        /* The level follows the pointer: the view moves the other way. */
+        float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+        es->camera.x -= (float)(event->x - es->pan_x) / zoom;
+        es->camera.y -= (float)(event->y - es->pan_y) / zoom;
+        es->pan_x = event->x;
+        es->pan_y = event->y;
+        canvas_clamp_camera(es);
+        return;
+    }
+    if (es->mouse_down) tools_mouse_drag(es,wx,wy);
+}
+
 void editor_handle_event(EditorState *es, const InputEvent *event)
 {
     float wx = 0, wy = 0;
@@ -702,83 +792,13 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         ui_queue_text_input(&es->ui, event->text);
         break;
     case INPUT_MOUSE_DOWN:
-        if (event->button == MOUSE_BUTTON_LEFT) {
-            /* An open dropdown list hangs over the canvas and the panels.
-             * The press belongs to the list (pick an option or close it);
-             * placing or deleting under it as well would be a surprise. */
-            if (ui_press(&es->ui)) break;
-            /* The canvas's error banner: go to the problem, nothing else. */
-            if (canvas_banner_contains(es, event->x, event->y)) {
-                if (editor_finish_field_edit(es)) (void)editor_focus_validation_issue(es, 0);
-                break;
-            }
-            /* While a pan runs the pointer belongs to it: a left press
-             * neither takes the pan over nor reaches the tools. */
-            if (es->panning) break;
-            /* Space+drag slides the view instead of using the tool. */
-            if (es->space_held && !es->campaign && canvas_contains(event->x, event->y) &&
-                es->ui.active_id == 0) {
-                es->panning = 1;
-                es->pan_button = MOUSE_BUTTON_LEFT;
-                es->pan_x = event->x;
-                es->pan_y = event->y;
-                break;
-            }
-            es->mouse_down = 1;
-            es->focus_area = canvas_contains(event->x, event->y) && !es->campaign
-                           ? EDITOR_FOCUS_CANVAS : EDITOR_FOCUS_PANEL;
-            /* Over the Campaign view the canvas tools are asleep; its
-             * widgets read the click from ui.mouse_clicked. */
-            if (canvas_contains(event->x, event->y) && !es->campaign &&
-                editor_finish_field_edit(es))
-                tools_mouse_down(es, wx, wy);
-        } else if (event->button == MOUSE_BUTTON_MIDDLE) {
-            /* Middle-drag slides the view, in any tool (not in the middle
-             * of a left-button drag, which owns the pointer). */
-            if (!es->campaign && !es->mouse_down && !es->panning &&
-                canvas_contains(event->x, event->y)) {
-                es->panning = 1;
-                es->pan_button = MOUSE_BUTTON_MIDDLE;
-                es->pan_x = event->x;
-                es->pan_y = event->y;
-            }
-        } else if (event->button == MOUSE_BUTTON_RIGHT) {
-            es->mouse_right_down = 1;
-            /* Right-click deletes. During a left-button drag that would shift
-             * the array under drag_index, so the drag would then overwrite a
-             * different entity. Finish (release) the drag first. The same
-             * goes for a click under an open dropdown list. */
-            if (!es->dragging && es->ui.dropdown_open_id == 0 && !es->campaign &&
-                canvas_contains(event->x, event->y) &&
-                editor_finish_field_edit(es))
-                tools_right_click(es, wx, wy);
-        }
+        editor_mouse_down(es, event, wx, wy);
         break;
     case INPUT_MOUSE_UP:
-        /* Only the button that started the pan ends it; another button's
-         * release goes on to the tools as usual. */
-        if (es->panning && event->button == es->pan_button) {
-            es->panning = 0;
-            break;
-        }
-        if (event->button == MOUSE_BUTTON_LEFT) {
-            es->mouse_down = 0;
-            tools_mouse_up(es, wx, wy);
-        }
-        else if (event->button == MOUSE_BUTTON_RIGHT) es->mouse_right_down = 0;
+        editor_mouse_up(es, event, wx, wy);
         break;
     case INPUT_MOUSE_MOVE:
-        if (es->panning) {
-            /* The level follows the pointer: the view moves the other way. */
-            float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
-            es->camera.x -= (float)(event->x - es->pan_x) / zoom;
-            es->camera.y -= (float)(event->y - es->pan_y) / zoom;
-            es->pan_x = event->x;
-            es->pan_y = event->y;
-            canvas_clamp_camera(es);
-            break;
-        }
-        if (es->mouse_down) tools_mouse_drag(es,wx,wy);
+        editor_mouse_move(es, event, wx, wy);
         break;
     case INPUT_WHEEL:
         /* The panels take the wheel as a float: a trackpad's small
