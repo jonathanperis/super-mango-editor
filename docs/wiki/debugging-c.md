@@ -416,7 +416,7 @@ sample super-mango 5 -file out/labs/sample.txt     # macOS: 5 seconds of samples
 
 `levels/02_lugio_02.toml` is the biggest campaign stage, and
 `--smoke-test-frames` makes the game run a fixed number of frames and quit by
-itself. The top of the main thread's call graph, trimmed:
+itself (a Replay or the next level counts toward the same total). The top of the main thread's call graph, trimmed:
 
 ```text
 Call graph:

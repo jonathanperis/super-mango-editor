@@ -97,7 +97,11 @@ void game_timing_tick_smoke(GameState *gs)
         gs->screen.loop.smoke_frames_run++;
         gs->screen.smoke_test_frames--;
         if (gs->screen.smoke_test_frames == 0) {
-            if (gs->screen.route == GAME_ROUTE_NONE) {
+            /* The run ends here even when this frame also asked for a
+             * Replay, the next level or Level Select: those would go on
+             * with no frames left to count, and so never end. An exit or
+             * a fatal error already ends the run. */
+            if (gs->screen.route != GAME_ROUTE_EXIT && gs->screen.route != GAME_ROUTE_FATAL) {
                 gs->screen.route = GAME_ROUTE_SMOKE_EXIT;
                 printf("SMOKE_STATE {\"frames\":%d,\"x\":%.6f,\"y\":%.6f,"
                        "\"vx\":%.6f,\"vy\":%.6f,\"score\":%d,\"lives\":%d,"

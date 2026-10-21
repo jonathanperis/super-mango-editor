@@ -116,7 +116,10 @@ typedef struct AppSession {
     int game_presented_count;
     int game_open_count;
     int debug_mode;
+    /* A --smoke-test-frames run counts frames across every game it opens:
+     * frames still to run, and frames run so far (see session_close_game). */
     int smoke_test_frames;
+    int smoke_frames_run;
     AppSessionHooks hooks;
     char status_message[160];
     char load_error[96]; /* why the last game failed to open; "" = not said */
