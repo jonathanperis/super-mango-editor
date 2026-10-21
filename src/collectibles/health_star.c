@@ -6,6 +6,7 @@
  */
 
 #include "health_star.h"
+#include "../core/entity_utils.h" /* on_screen_x */
 
 /* ------------------------------------------------------------------ */
 
@@ -33,6 +34,7 @@ void health_stars_render(const HealthStar *stars, int count,
         /* World x minus the camera's left edge gives the screen x. */
         IntRect dst = health_star_get_hitbox(&stars[i]);
         dst.x -= cam_x;
+        if (!on_screen_x(dst.x, dst.w)) continue;
 
         sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }

@@ -4,6 +4,7 @@
  */
 
 #include "coin.h"
+#include "../core/entity_utils.h" /* on_screen_x */
 
 /* 2^(n/12) for n = 0 .. COIN_STREAK_MAX_RISE: equal-tempered semitones,
  * written out so every build plays exactly the same pitches. */
@@ -57,6 +58,7 @@ void coins_render(const Coin *coins, int count,
          * Draw the full Coin.png (NULL src = whole texture)
          * scaled to COIN_DISPLAY_W × COIN_DISPLAY_H at the screen position.
          */
+        if (!on_screen_x(dst.x, dst.w)) continue;
         sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }
 }

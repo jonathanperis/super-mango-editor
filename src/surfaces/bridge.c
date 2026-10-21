@@ -12,6 +12,7 @@
 
 #include "bridge.h"
 #include "game_constants.h" /* FLOOR_Y, TILE_SIZE, GAME_H */
+#include "../core/entity_utils.h" /* on_screen_x */
 
 /* ------------------------------------------------------------------ */
 
@@ -119,6 +120,7 @@ void bridges_render(const Bridge *bridges, int count,
                 BRIDGE_TILE_W,
                 BRIDGE_TILE_H
             };
+            if (!on_screen_x(dst.x, dst.w)) continue;
             sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }

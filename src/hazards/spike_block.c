@@ -8,6 +8,7 @@
 #include "spike_block.h"
 #include "../surfaces/rail.h"
 #include "../game_constants.h" /* GAME_W, GAME_H, GRAVITY — waiting and falling off a rail */
+#include "../core/entity_utils.h" /* on_screen_x */
 
 /* ------------------------------------------------------------------ */
 
@@ -212,6 +213,9 @@ void spike_block_render(const SpikeBlock *sb,
         .w = sb->w,
         .h = sb->h,
     };
+    /* Spinning about its centre, a corner reaches past the box by under
+     * half its width on either side. */
+    if (!on_screen_x(dst.x - sb->w / 2, sb->w * 2)) return;
 
     /*
      * Draw the full texture into dst with rotation.
