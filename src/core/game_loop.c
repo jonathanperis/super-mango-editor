@@ -58,7 +58,7 @@ int game_frame(GameState *gs)
          * experiment returns 0 once its tape has ended. */
         float step_dt = game_experiment_dt(gs, GAME_FIXED_STEP);
         if (step_dt <= 0.0f) break;
-        /* Render-only: where the player and camera were, to draw between. */
+        /* Render-only: where the player, camera and movers were, to draw between. */
         game_timing_note_step(gs);
         cam_x = game_update_active(gs, step_dt, cam_x);
         /* Time trial: record where Mango is after this step and move the

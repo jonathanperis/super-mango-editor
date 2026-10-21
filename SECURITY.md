@@ -17,14 +17,15 @@ release; there are no backported security releases.
 
 Only the latest release and the current `main` branch receive fixes.
 
-The latest published release can lag well behind `main`. At the time of
-writing it is `v1.0.845` (2026-09-17), which predates the move from SDL2 to
-raylib and the editor/lab builder archives, so much of the code in `main`
-(and in this policy's scope) has not shipped in any release yet. A fix to that
-code reaches players through the website, which follows `main`, and through
-the next release. Check the
+The latest published release can lag well behind `main`. The website follows
+`main`, so a fix reaches browser players on the next successful Pages deploy
+and reaches the downloadable archives on the next release. `v1.0.845`
+(2026-09-17) was the last tag taken from a workflow run number. It predates
+the move from SDL2 to raylib and the editor and lab archives. Later releases
+tagged `v1.0.<commit count>` ship the raylib game and the editor. Check the
 [releases page](https://github.com/jonathanperis/super-mango-editor/releases)
-for the current latest release.
+for which release that is. This file does not name it: a version written here
+would go stale, and the releases page is the list that stays current.
 
 ## Scope
 

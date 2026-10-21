@@ -110,4 +110,8 @@ make run-level CC=clang LEVEL=levels/labs/01_collision.toml
 make web
 ```
 
+The editor is a native program. The browser page plays the game and does not
+include the editor. `make run-editor` opens an empty level; Open (`Ctrl+O`)
+loads a file from `levels/` or `levels/labs/`. See [Level Editor](level-editor/).
+
 See [Build System](build-system/) for Linux and Windows instructions.
