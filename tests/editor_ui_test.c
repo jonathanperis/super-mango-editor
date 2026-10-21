@@ -977,6 +977,14 @@ static int palette_shows_what_place_will_add(void)
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(palette_category_is_open(cat));
     CHECK(strcmp(editor_entity_palette_name(ENT_CIRCULAR_SAW), "Circular Saw") == 0);
+    /* Closed while the palette is closed, the category opens again when
+     * the palette shows while placing the same type. */
+    es.palette_open = 0;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    palette_set_category_open_for_test(cat, 0);
+    es.palette_open = 1;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(palette_category_is_open(cat));
 
     {
         char label[64];

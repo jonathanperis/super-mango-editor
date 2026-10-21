@@ -44,3 +44,7 @@ void palette_render(EditorState *es, int start_y, int available_h);
 
 /* Whether a palette category is open (for tests and the layout). */
 int palette_category_is_open(int category);
+#ifdef MANGO_TESTING
+/* Open or close a category directly (tests). */
+void palette_set_category_open_for_test(int category, int open);
+#endif
