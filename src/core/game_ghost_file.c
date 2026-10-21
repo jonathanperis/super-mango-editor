@@ -74,8 +74,7 @@ static int ghost_time_matches_steps(double time, int steps)
  * GHOST_WEB_BUDGET — the most localStorage all browser ghosts may use
  * together, in characters (keys included; ghost text is ASCII).
  *
- * localStorage holds about 5 million characters per site, and on
- * <user>.github.io every project page of that user is the same site. The
+ * localStorage holds about 5 million characters per site (origin). The
  * profile, which holds the player's results and settings, lives there too,
  * and a ghost must never take the space a profile save needs. One million
  * characters keeps five of the longest (five-minute) ghosts or dozens of
