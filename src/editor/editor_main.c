@@ -41,7 +41,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "Warning: assets/ and levels/ were not found here or "
                             "next to the executable\n");
     }
-    /* An EditorState is about 200 KB (the level, its last valid copy, the
+    /* An EditorState is about 300 KB (the level, its last valid copy, the
      * clipboard...), too much for the stack of a thread on Windows (1 MB in
      * all), so it lives on the heap.  calloc gives pointers NULL and numeric
      * members zero, which lets a failed start-up use the same cleanup path
