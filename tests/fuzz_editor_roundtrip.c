@@ -125,6 +125,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     if (write_bytes(input_path, data, size) != 0) return 0;
     if (level_load_toml(input_path, &opened) != 0) return 0;  /* rejected */
 
+    /* The one rewrite saving makes on purpose: a level with an empty name is
+     * written as "Untitled" (serializer_save.c). Expect that, not the input. */
+    if (opened.name[0] == '\0')
+        snprintf(opened.name, sizeof(opened.name), "%s", "Untitled");
+
     /* Save As to a new file, then open it again. */
     remove(saved_path);
     if (level_save_toml_with_policy(&opened, saved_path,
