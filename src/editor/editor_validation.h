@@ -3,6 +3,8 @@
  */
 #pragma once
 
+#include <stdint.h>
+
 #include "../levels/level.h"
 #include "../levels/level_validate.h" /* LevelIssueLocation */
 
@@ -49,6 +51,14 @@ typedef struct {
 void editor_load_report_add(void *report, const char *message, int line);
 
 int editor_validate_level(const LevelDef *def, EditorValidationReport *report);
+/* editor_validate_level, except that whether an asset file exists is asked
+ * again only when the last answer for that path is probe_max_age_ms old or
+ * older.  The editor's frame loop validates every frame of a drag (each
+ * frame a new document) and passes its one-second recheck interval, so a
+ * drag no longer opens every asset file 30 times a second.  Save and
+ * playtest use editor_validate_level, which always asks. */
+int editor_validate_level_reusing(const LevelDef *def, EditorValidationReport *report,
+                                  uint32_t probe_max_age_ms);
 const char *editor_validation_summary(const EditorValidationReport *report);
 /* How many errors and warnings the report counted but had no room to list. */
 int editor_validation_hidden_count(const EditorValidationReport *report);

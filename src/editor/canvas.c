@@ -36,6 +36,7 @@
 #include "entity_meta.h" /* Editor display dimensions and rail helpers          */
 #include "hit_test.h"    /* editor_entity_bounds for the selection outline      */
 #include "tools.h"       /* editor_snap_point for the placement ghost           */
+#include "editor_session.h" /* editor_document_hash */
 #include "../levels/level_loader.h"
 #include "../levels/level_validate.h" /* level_validate_preview */
 #include "../shared/geometry.h" /* float_same_value */
@@ -172,16 +173,32 @@ static void draw_tex(EditorState *es, Texture2D *tex, const IntRect *src,
 /* canvas_render — Main entry point: draw the full level preview        */
 /* ------------------------------------------------------------------ */
 
-int canvas_banner_contains(const EditorState *es, int sx, int sy)
+/* The preview and runtime checks of the current document, run again only
+ * when the document has changed since they last ran. */
+static void canvas_check(EditorState *es)
+{
+    uint64_t hash = editor_document_hash(&es->level);
+    if (es->canvas_check.valid && es->canvas_check.hash == hash) return;
+    es->canvas_check.valid = 1;
+    es->canvas_check.hash = hash;
+    es->canvas_check.error[0] = '\0';
+    es->canvas_check.preview_failed = level_validate_preview(
+        &es->level, es->canvas_check.error, sizeof(es->canvas_check.error)) != 0;
+    es->canvas_check.runtime_failed = !es->canvas_check.preview_failed &&
+        level_validate_runtime(&es->level, es->canvas_check.error,
+                               sizeof(es->canvas_check.error)) != 0;
+}
+
+int canvas_banner_contains(EditorState *es, int sx, int sy)
 {
     if (!es || es->campaign || sx < 0 || sx >= CANVAS_W ||
         sy < CANVAS_BANNER_Y || sy >= CANVAS_BANNER_Y + CANVAS_BANNER_H) return 0;
-    return level_validate_preview(&es->level, NULL, 0) == 0 &&
-           level_validate_runtime(&es->level, NULL, 0) != 0;
+    canvas_check(es);
+    return es->canvas_check.runtime_failed;
 }
 
 void canvas_render(EditorState *es) {
-    char error[128];
+    const char *error = es->canvas_check.error;
     /* The Campaign view takes the canvas's place while it is open. */
     if (es->campaign) {
         editor_campaign_render(es);
@@ -191,12 +208,13 @@ void canvas_render(EditorState *es) {
      * Never feed rejected counts/dimensions into the preview's tile loops;
      * any other mistake (a path, a speed, a coin outside the world) leaves
      * the level drawn, with a banner naming it. */
-    if (level_validate_preview(&es->level, error, sizeof(error)) != 0) {
+    canvas_check(es);
+    if (es->canvas_check.preview_failed) {
         ui_label(&es->ui, 12, TOOLBAR_H + 12, "Preview paused: fix the field named below in the side panel, or press Ctrl+Z");
         ui_label(&es->ui, 12, TOOLBAR_H + 32, error);
         return;
     }
-    int has_error = level_validate_runtime(&es->level, error, sizeof(error)) != 0;
+    int has_error = es->canvas_check.runtime_failed;
     /*
      * Set a clip rectangle so that nothing we draw bleeds outside the canvas
      * area into the toolbar, status bar, or side panel.

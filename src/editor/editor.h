@@ -490,6 +490,16 @@ typedef struct {
     uint64_t validated_document_hash;
     uint32_t last_validation_ms;
     int validation_cache_valid;
+    /* canvas_render's preview and runtime checks of the document with this
+     * hash (see canvas_check in canvas.c), so an unchanged level is not
+     * checked again on every frame and every banner hover. */
+    struct {
+        int      valid;
+        uint64_t hash;
+        int      preview_failed;
+        int      runtime_failed;
+        char     error[128];   /* the first failed check's message */
+    } canvas_check;
 
     /* ---- UI toggles --------------------------------------------------- */
     int            show_grid;     /* 1 = draw grid lines on the canvas         */
