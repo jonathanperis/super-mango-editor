@@ -231,7 +231,7 @@ y = 100.0
 next_phase = "levels/01_lugio_01.toml"  # optional level loaded after completion
 ```
 
-Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px. `next_phase` is serialized inside `[last_star]` because phase progression is tied to collecting the end-of-level star.
+Single-instance. Triggers the level-complete event when collected. Displayed at 24×24 px. A level that leaves out `[last_star]`, or its `x` or `y`, gets the default spot (145, 167) for the missing value; `(0, 0)` is an ordinary position like any other. `next_phase` is serialized inside `[last_star]` because phase progression is tied to collecting the end-of-level star.
 
 ### Level references
 

@@ -315,8 +315,6 @@ void editor_level_init_defaults(LevelDef *level)
     level->screen_count = LEVEL_DEFAULT_SCREEN_COUNT;
     level->player_start_x = 48.0f;
     level->player_start_y = 205.0f;
-    level->last_star.x = 145.0f;
-    level->last_star.y = 167.0f;
     strncpy(level->floor_tile_path, "assets/sprites/levels/grass_tileset.png",
             sizeof(level->floor_tile_path) - 1);
 }

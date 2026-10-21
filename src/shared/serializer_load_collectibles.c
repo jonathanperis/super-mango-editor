@@ -46,12 +46,13 @@ int serializer_load_collectibles(toml_datum_t top, LevelDef *def) {
                   MAX_STAR_GREENS, star_greens);
     LOAD_XY_ARRAY("star_reds", star_red_count, MAX_STAR_REDS, star_reds);
 
-    /* Last star (single table, not array) */
+    /* Last star (single table, not array).  A missing x or y keeps the
+     * default position level_def_init_defaults gave the star. */
     {
         toml_datum_t ls = toml_get(top, "last_star");
         if (ls.type == TOML_TABLE) {
-            def->last_star.x = get_float(ls, "x", 0);
-            def->last_star.y = get_float(ls, "y", 0);
+            def->last_star.x = get_float(ls, "x", def->last_star.x);
+            def->last_star.y = get_float(ls, "y", def->last_star.y);
             /* Optional next_phase for level linking */
             toml_datum_t np = toml_get(ls, "next_phase");
             if (np.type == TOML_STRING) {

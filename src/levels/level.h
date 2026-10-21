@@ -391,6 +391,11 @@ typedef struct {
 /* A level whose screen_count is 0 (left out of the TOML) is this many
  * screens wide; level_screen_count below applies it. */
 #define LEVEL_DEFAULT_SCREEN_COUNT 4
+/* Where the Last Star sits when a level's TOML gives it no x or y.  A fresh
+ * LevelDef starts with it here (level_def_init_defaults) and the serializer
+ * overwrites what the file sets, so a star placed at (0, 0) stays there. */
+#define LEVEL_DEFAULT_LAST_STAR_X 145.0f
+#define LEVEL_DEFAULT_LAST_STAR_Y 167.0f
 #define LEVEL_NAME_CAPACITY 64
 #define LEVEL_DESCRIPTION_CAPACITY 4096
 #define LEVEL_AUTHOR_CAPACITY 128
@@ -624,8 +629,10 @@ static inline void level_effective_spawn(const LevelDef *def,
  * level_def_init_defaults — Reset a LevelDef and apply non-zero sentinels.
  *
  * Most LevelDef fields naturally default to 0 after memset, but physics uses
- * -1.0f as "engine default" so 0.0f remains a valid override.  Every creator
- * of a fresh LevelDef should use this helper instead of raw memset.
+ * -1.0f as "engine default" so 0.0f remains a valid override, and the Last
+ * Star starts at its default spot so (0, 0) remains a valid position.
+ * Every creator of a fresh LevelDef should use this helper instead of raw
+ * memset.
  */
 static inline void level_def_init_defaults(LevelDef *def)
 {
@@ -644,6 +651,8 @@ static inline void level_def_init_defaults(LevelDef *def)
     def->physics.air_friction            = -1.0f;
     def->physics.cam_lookahead_vx_factor = -1.0f;
     def->physics.cam_lookahead_max       = -1.0f;
+    def->last_star.x = LEVEL_DEFAULT_LAST_STAR_X;
+    def->last_star.y = LEVEL_DEFAULT_LAST_STAR_Y;
 }
 
 /* ------------------------------------------------------------------ */

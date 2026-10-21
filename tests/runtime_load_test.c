@@ -405,9 +405,9 @@ static int load_applies_defaults_for_missing_optional_config(void)
         return 1;
     if (expect_int("default water disabled", gs.world.runtime.water_enabled, 0) != 0)
         return 1;
-    if (expect_float("default last star x", gs.world.last_star.x, 145.0f) != 0)
+    if (expect_float("default last star x", gs.world.last_star.x, LEVEL_DEFAULT_LAST_STAR_X) != 0)
         return 1;
-    if (expect_float("default last star y", gs.world.last_star.y, 167.0f) != 0)
+    if (expect_float("default last star y", gs.world.last_star.y, LEVEL_DEFAULT_LAST_STAR_Y) != 0)
         return 1;
     if (expect_int("default hearts", gs.world.hearts, MAX_HEARTS) != 0) return 1;
     if (expect_int("default lives", gs.world.lives, DEFAULT_LIVES) != 0) return 1;
@@ -416,6 +416,24 @@ static int load_applies_defaults_for_missing_optional_config(void)
     if (expect_int("default coin score", gs.world.rules.coin_score, COIN_SCORE) != 0)
         return 1;
 
+    return 0;
+}
+
+/* A Last Star placed at (0, 0) is drawn there, not at the default spot. */
+static int load_keeps_last_star_at_origin(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+
+    level_def_init_defaults(&def);
+    def.last_star = (LastStarPlacement){0.0f, 0.0f};
+    init_test_player(&gs);
+
+    if (level_load(&gs, &def) != 0) return 1;
+    if (expect_float("origin last star x", gs.world.last_star.x, 0.0f) != 0)
+        return 1;
+    if (expect_float("origin last star y", gs.world.last_star.y, 0.0f) != 0)
+        return 1;
     return 0;
 }
 
@@ -545,6 +563,7 @@ int main(void)
     if (load_applies_runtime_state() != 0) return 1;
     if (reset_restores_mutable_state_only() != 0) return 1;
     if (load_applies_defaults_for_missing_optional_config() != 0) return 1;
+    if (load_keeps_last_star_at_origin() != 0) return 1;
     if (load_rejects_invalid_runtime_level_without_exiting() != 0) return 1;
     if (load_keeps_flames_at_world_edge_gap() != 0) return 1;
     if (load_shares_one_texture_per_tile_path() != 0) return 1;
