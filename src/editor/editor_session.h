@@ -62,14 +62,22 @@ typedef enum {
 /* Ask how to handle a source changed on disk. */
 EditorExternalChoice editor_confirm_external_change(EditorState *es);
 
-/* Frame rates for the editor's window with and without focus. */
+/* Frame rates for the editor's window with and without focus, and with
+ * focus but no input for EDITOR_IDLE_MS. */
 #define EDITOR_FPS_FOCUSED   60
+#define EDITOR_FPS_IDLE      30
 #define EDITOR_FPS_UNFOCUSED 10
+#define EDITOR_IDLE_MS       2000u
 
 /* The frame cap a shown window should have: EDITOR_FPS_FOCUSED while it
- * has focus, EDITOR_FPS_UNFOCUSED while another window does. 0 for a
+ * has focus and is in use, EDITOR_FPS_IDLE while it has focus but sits
+ * idle, EDITOR_FPS_UNFOCUSED while another window has focus. 0 for a
  * hidden window, whose own pacing (none, for smoke runs) stays as it is. */
-int editor_frame_rate_for(int hidden, int focused);
+int editor_frame_rate_for(int hidden, int focused, int idle);
+
+/* Record that input arrived now; editor_pace_frames counts idle time from
+ * here. Both frame loops call it for each frame that had events. */
+void editor_note_input(EditorState *es);
 
 /* Apply editor_frame_rate_for to the real window, calling SetTargetFPS only
  * when the rate changes. Both frame loops call it: the editor's and a

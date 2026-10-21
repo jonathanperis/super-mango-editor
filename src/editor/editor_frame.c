@@ -37,8 +37,12 @@ void editor_run_frame(EditorState *es)
     es->ui.time_ms = now;   /* tooltips time how long the pointer rests */
     input_collect();
     InputEvent event;
-    while (input_poll(&event))
+    int got_input = 0;
+    while (input_poll(&event)) {
         editor_handle_event(es, &event);
+        got_input = 1;
+    }
+    if (got_input) editor_note_input(es);
     /* A file dropped on the window arrives outside the event queue. */
     editor_handle_dropped_files(es);
 

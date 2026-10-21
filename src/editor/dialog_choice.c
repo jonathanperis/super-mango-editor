@@ -362,12 +362,11 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
                 break;   /* typing, the wheel, focus: nothing to do here */
             }
         }
+        if (got) editor_note_input(es);
 #if defined(MANGO_TESTING) || defined(MANGO_RAYLIB_MEMORY)
         /* Tests and the Memory backend have no user: once the events a
          * test queued are used up, nobody is left to answer. */
         if (answer < 0 && !got) failed = 1;
-#else
-        (void)got;
 #endif
     }
 

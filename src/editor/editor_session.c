@@ -487,10 +487,16 @@ EditorExternalChoice editor_confirm_external_change(EditorState *es)
     return EDITOR_EXTERNAL_CANCEL;
 }
 
-int editor_frame_rate_for(int hidden, int focused)
+int editor_frame_rate_for(int hidden, int focused, int idle)
 {
     if (hidden) return 0;
-    return focused ? EDITOR_FPS_FOCUSED : EDITOR_FPS_UNFOCUSED;
+    if (!focused) return EDITOR_FPS_UNFOCUSED;
+    return idle ? EDITOR_FPS_IDLE : EDITOR_FPS_FOCUSED;
+}
+
+void editor_note_input(EditorState *es)
+{
+    es->last_input_ms = (uint32_t)clock_millis();
 }
 
 void editor_pace_frames(EditorState *es)
@@ -504,8 +510,15 @@ void editor_pace_frames(EditorState *es)
      * the work. Not EnableEventWaiting: that would stop the frames that
      * autosave, tooltips and the playtest status check depend on. Those
      * timers read clock_millis, so they keep their time at any rate. */
+    /* Nothing in the editor animates but the caret's half-second blink, so
+     * a focused editor nobody touches for EDITOR_IDLE_MS redraws at half
+     * rate. The first input after that waits at most one 33 ms frame, then
+     * the rate is back to full. A held button is never idle: a drag may
+     * rest without the pointer moving. */
     if (!IsWindowReady()) return;
-    int rate = editor_frame_rate_for(IsWindowHidden(), IsWindowFocused());
+    int idle = !es->mouse_down &&
+               (uint32_t)clock_millis() - es->last_input_ms >= EDITOR_IDLE_MS;
+    int rate = editor_frame_rate_for(IsWindowHidden(), IsWindowFocused(), idle);
     if (rate && rate != es->frame_rate) {
         SetTargetFPS(rate);
         es->frame_rate = rate;

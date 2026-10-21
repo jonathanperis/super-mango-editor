@@ -508,6 +508,7 @@ typedef struct {
     char           selected_message[EDITOR_VALIDATION_MESSAGE_LEN];
     int            running;       /* 1 = main loop active, 0 = exit requested  */
     int            frame_rate;    /* cap editor_pace_frames set last; 0 = none yet */
+    uint32_t       last_input_ms; /* clock_millis() of the last input (editor_note_input) */
     int            minimap_dragging; /* a press on the overview strip is held */
     int            shortcut_sheet_open;  /* F1 shortcut list shown (editor_shortcuts.c) */
     int            shortcut_sheet_press; /* the click that closed it awaits its release */
