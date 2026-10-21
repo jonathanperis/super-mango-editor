@@ -274,12 +274,6 @@ static void load_last_star(GameWorld *world, const LevelDef *def)
     world->last_star.w         = LAST_STAR_DISPLAY_W;
     world->last_star.h         = LAST_STAR_DISPLAY_H;
     world->last_star.collected = 0;
-
-    /* If the level didn't place one, use a visible default position */
-    if (def->last_star.x == 0.0f && def->last_star.y == 0.0f) {
-        world->last_star.x = 145.0f;
-        world->last_star.y = 167.0f;
-    }
     world->last_star.active = 1;
 }
 

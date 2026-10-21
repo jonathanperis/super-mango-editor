@@ -985,11 +985,9 @@ static int validate_collectibles(const LevelDef *def, char *err,
                            def->star_reds[i].y, world_w) != 0 &&
             stop_here(sink, err)) return -1;
     }
-    if (def->last_star.x != 0.0f || def->last_star.y != 0.0f) {
-        if (validate_point(err, err_size, "last_star", def->last_star.x,
-                           def->last_star.y, world_w) != 0 &&
-            stop_here(sink, err)) return -1;
-    }
+    if (validate_point(err, err_size, "last_star", def->last_star.x,
+                       def->last_star.y, world_w) != 0 &&
+        stop_here(sink, err)) return -1;
     return 0;
 }
 
