@@ -1,0 +1,48 @@
+# clang-tidy checks for the project's own C code (`make tidy`, and the
+# non-blocking "clang-tidy" job in .github/workflows/static-analysis.yml).
+#
+# Only checks that find real defects in C are on: the Clang static analyzer
+# (clang-analyzer-*), bugprone-* and a few CERT C rules. Style checks such as
+# readability-magic-numbers are left off on purpose. The ones turned off
+# below fire on ordinary, correct code in this project:
+#
+#   bugprone-easily-swappable-parameters   every (x, y) or (w, h) pair
+#   bugprone-reserved-identifier           #define _POSIX_C_SOURCE, which
+#                                          POSIX asks us to write
+#   bugprone-narrowing-conversions         int <-> float in game maths
+#   bugprone-implicit-widening-of-multiplication-result
+#                                          small int products used as sizes
+#   bugprone-assignment-in-if-condition    `if ((fp = fopen(...)) == NULL)`
+#   bugprone-multi-level-implicit-pointer-conversion
+#                                          memset/memcpy on struct arrays
+#   clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+#                                          asks for Annex K memcpy_s and
+#                                          friends, which most libcs lack
+#   clang-analyzer-security.insecureAPI.strcpy  the same, for strcpy/strcat
+#   clang-analyzer-optin.performance.Padding    struct field order, a size
+#                                          hint rather than a defect
+#
+# tools/run_clang_tidy.py only reports files under src/ and tools/:
+# vendor/ (tomlc17) and raylib's headers under out/ are third-party.
+Checks: >-
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  cert-env33-c,
+  cert-err34-c,
+  cert-flp30-c,
+  cert-msc30-c,
+  cert-msc32-c,
+  cert-str34-c,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-assignment-in-if-condition,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -clang-analyzer-security.insecureAPI.strcpy,
+  -clang-analyzer-optin.performance.Padding
+# Report problems in the project's own headers too, never in raylib's.
+HeaderFilterRegex: '/(src|tools)/'
+WarningsAsErrors: ''

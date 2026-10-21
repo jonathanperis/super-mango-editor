@@ -370,6 +370,8 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-serializer-test"
 	python3 tests/validate_levels_test.py
 	python3 tests/gen_sounds_test.py
+	python3 tests/coverage_baseline_test.py
+	python3 tests/clang_tidy_report_test.py
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-validate-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/runtime-load-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/rail-test"
@@ -450,6 +452,13 @@ web-host-contract: ## Check: Web shell, storage and packaging contract tests
 compile-commands: ## Build: Write compile_commands.json for clangd and IDEs
 	CC="$(CC)" RAYLIB_BUILD="$(RAYLIB_BUILD)" python3 tools/gen_compile_commands.py
 
+# clang-tidy over src/ and tools/ with the checks in .clang-tidy; prints the
+# findings and exits 0 (CI's static-analysis.yml shows them in its summary).
+# CLANG_TIDY=/path/to/clang-tidy picks another version.
+.PHONY: tidy
+tidy: compile-commands ## Check: clang-tidy findings in src/ and tools/ (report only)
+	python3 tools/run_clang_tidy.py
+
 level-catalog: ## Generate: Level catalog page from the campaign manifest
 	python3 tools/generate_level_catalog.py
 
@@ -522,8 +531,14 @@ COVERAGE_IGNORE = '(^|/)(vendor|tests|out)/'
 # Optional floor for the TOTAL line coverage, in percent (CI sets one). Empty
 # means "report only". The summary is also kept in summary.txt for CI.
 COVERAGE_MIN ?=
+# Each file's line coverage is also compared with its number in
+# COVERAGE_BASELINE (tools/check_coverage_baseline.py). COVERAGE_TOLERANCE=N
+# fails the run when a file is more than N points below it (CI sets 2);
+# empty means "report only". `make coverage-baseline` rewrites the file.
+COVERAGE_BASELINE = tools/coverage_baseline.txt
+COVERAGE_TOLERANCE ?=
 
-.PHONY: coverage
+.PHONY: coverage coverage-baseline
 coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (clang)
 	rm -rf "$(COVERAGE_OUTDIR)/profiles"
 	mkdir -p "$(COVERAGE_OUTDIR)/profiles" "$(COVERAGE_OUTDIR)/obj/tests"
@@ -550,12 +565,21 @@ coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (cla
 			      printf "coverage: line coverage %s%% meets the %s%% floor\n", lines, min }' \
 			"$(COVERAGE_OUTDIR)/summary.txt"; \
 	fi
+	python3 tools/check_coverage_baseline.py "$(COVERAGE_OUTDIR)/summary.txt" --baseline $(COVERAGE_BASELINE) \
+		$(if $(COVERAGE_TOLERANCE),--tolerance $(COVERAGE_TOLERANCE),)
+
+# Run coverage, then record every file's line coverage as the new baseline.
+# Use the CI configuration (Linux, clang, Memory backend), which the baseline
+# describes: make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+coverage-baseline: coverage ## Generate: Refresh tools/coverage_baseline.txt from a coverage run
+	python3 tools/check_coverage_baseline.py "$(COVERAGE_OUTDIR)/summary.txt" --baseline $(COVERAGE_BASELINE) --write
 
 # ── Fuzzing (POSIX) ──────────────────────────────────────────────────
 # Each harness defines LLVMFuzzerTestOneInput.  fuzz-corpus links it with
 # tests/fuzz_replay_main.c under ASan/UBSan and replays the seed inputs
-# (FUZZ_MUTATIONS=N adds N blind mutations per seed).  fuzz links it with
-# libFuzzer for coverage-guided search; Apple clang lacks libFuzzer, so
+# (FUZZ_MUTATIONS=N adds N blind mutations per seed; the sanitizer CI job
+# passes a small N).  fuzz links it with libFuzzer for coverage-guided
+# search; Apple clang lacks libFuzzer, so
 # point FUZZ_CC at Homebrew LLVM or a Linux clang.  Both honour
 # EXTRA_CFLAGS, so CI's -Werror covers the harnesses under `make sanitize`.
 FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic $(PROJECT_INCLUDES) \
@@ -563,8 +587,12 @@ FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic $(PROJECT_INCLUDES) \
              $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) \
              -fno-omit-frame-pointer -fsanitize=address,undefined \
              -fno-sanitize-recover=undefined $(EXTRA_CFLAGS)
-FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(wildcard $(SHARED_DIR)/serializer*.c) \
-                  src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
+# The level loader and saver, without a harness: both level harnesses use it.
+FUZZ_SERIALIZER_SRCS = $(wildcard $(SHARED_DIR)/serializer*.c) \
+                       src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
+FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(FUZZ_SERIALIZER_SRCS)
+# The editor's save -> load round trip (tests/fuzz_editor_roundtrip.c).
+FUZZ_EDITOR_SRCS = tests/fuzz_editor_roundtrip.c $(FUZZ_SERIALIZER_SRCS)
 # input_backend.c maps the pointer through graphics.c's display_viewport.
 FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
                     src/core/game_ghost.c src/core/game_ghost_file.c \
@@ -577,24 +605,34 @@ FUZZ_HEADERS = $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h $(VENDOR_DIR)/*.h)
 FUZZ_LEVEL_SEEDS = levels levels/labs tests/fixtures/serializer_v1 \
                    tests/fixtures/runtime tests/fuzz/corpus/level
 FUZZ_PROFILE_SEEDS = tests/fuzz/corpus/profile
+# Every level seed is an editor seed too; its own folder adds levels that
+# use many fields at once, so a field the saver drops shows up quickly.
+FUZZ_EDITOR_SEEDS = $(FUZZ_LEVEL_SEEDS) tests/fuzz/corpus/editor
 FUZZ_MUTATIONS ?= 0
 FUZZ_SECONDS ?= 60
 FUZZ_CC ?= $(firstword $(wildcard /opt/homebrew/opt/llvm/bin/clang /usr/local/opt/llvm/bin/clang) clang)
 
 .PHONY: fuzz-corpus fuzz
-fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay ## Test: Replay the fuzz seeds under ASan/UBSan (FUZZ_MUTATIONS=N)
+fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay $(OUTDIR)/fuzz-editor-replay ## Test: Replay the fuzz seeds under ASan/UBSan (FUZZ_MUTATIONS=N)
 	"$(abspath $(OUTDIR))/fuzz-level-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-profile-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_PROFILE_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz-editor-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_EDITOR_SEEDS)
 
-$(OUTDIR)/fuzz-level-replay: tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(FUZZ_HEADERS) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
+# level.h includes raylib's headers, so every replay waits for raylib's build
+# even where it links no raylib code.
+$(OUTDIR)/fuzz-level-replay: tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_LEVEL_SRCS) $(MATH_LIBS)
+
+$(OUTDIR)/fuzz-editor-replay: tests/fuzz_replay_main.c $(FUZZ_EDITOR_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
+	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_EDITOR_SRCS) $(MATH_LIBS)
 
 $(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(LIBS)
 
 # -close_fd_mask=2 hides the loaders' per-input error lines; libFuzzer keeps
 # its own and the sanitizer reports.  Crashes land in $(OUTDIR)/fuzz/ and
-# replay with: $(OUTDIR)/fuzz-level-replay <crash-file>
+# replay with the matching program: $(OUTDIR)/fuzz-level-replay <crash-file>
+# (or fuzz-profile-replay, fuzz-editor-replay).
 fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (needs LLVM clang)
 	@printf 'int LLVMFuzzerTestOneInput(const char *d, unsigned long n) { (void)d; (void)n; return 0; }\n' \
 		| $(FUZZ_CC) -x c -fsanitize=fuzzer -o /dev/null - 2>/dev/null || { \
@@ -603,13 +641,16 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 		echo "      make fuzz FUZZ_CC=\$$(brew --prefix llvm)/bin/clang"; \
 		echo "fuzz: without libFuzzer, 'make fuzz-corpus FUZZ_MUTATIONS=500' runs blind mutations."; \
 		exit 1; }
-	mkdir -p $(OUTDIR)/fuzz/level $(OUTDIR)/fuzz/profile
+	mkdir -p $(OUTDIR)/fuzz/level $(OUTDIR)/fuzz/profile $(OUTDIR)/fuzz/editor
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/level-fuzzer $(FUZZ_LEVEL_SRCS) $(MATH_LIBS)
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/profile-fuzzer $(FUZZ_PROFILE_SRCS) $(LIBS)
+	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/editor-fuzzer $(FUZZ_EDITOR_SRCS) $(MATH_LIBS)
 	"$(abspath $(OUTDIR))/fuzz/level-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
 		-artifact_prefix=$(OUTDIR)/fuzz/level- $(OUTDIR)/fuzz/level $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz/profile-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
 		-artifact_prefix=$(OUTDIR)/fuzz/profile- $(OUTDIR)/fuzz/profile $(FUZZ_PROFILE_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz/editor-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
+		-artifact_prefix=$(OUTDIR)/fuzz/editor- $(OUTDIR)/fuzz/editor $(FUZZ_EDITOR_SEEDS)
 
 # Test objects: one rule for every source. $(OUTDIR) is skipped once out/
 # exists, so the recipe also creates its own directory; otherwise a deleted
