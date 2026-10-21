@@ -1428,8 +1428,6 @@ void editor_campaign_render(EditorState *es)
     int rows;
 
     if (!c) return;
-    /* The verdicts follow every edit, typed names included. */
-    editor_campaign_check(es);
     ui_panel(&es->ui, 0, TOOLBAR_H, CANVAS_W, CANVAS_H);
 
     snprintf(title, sizeof(title), "Campaign: %s (%zu levels)%s", c->manifest_path,
