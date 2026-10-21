@@ -67,8 +67,8 @@ const EditorEntityPreview *editor_entity_preview(EntityType type);
  * texture failed to load). */
 Texture2D *editor_entity_texture(const EntityTextures *textures, EntityType type);
 
-/* Level width in world pixels: screen_count screens (4 when unset) of
- * GAME_W each, the same rule level validation uses. */
+/* Level width in world pixels: level_screen_count screens of GAME_W
+ * each, the same rule level validation uses. */
 float editor_world_width(const LevelDef *level);
 
 /* The floor gap x closest to x, for flames: a flame's x is the gap it

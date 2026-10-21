@@ -46,7 +46,7 @@
 /* ------------------------------------------------------------------ */
 /* Helper: dynamic world width from editor's screen_count setting */
 #define EDITOR_WORLD_W(es) \
-    (((es)->level.screen_count > 0 ? (es)->level.screen_count : 4) * GAME_W)
+    (level_screen_count(&(es)->level) * GAME_W)
 
 /* World-to-screen coordinate transform helpers                        */
 /* ------------------------------------------------------------------ */

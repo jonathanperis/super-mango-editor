@@ -312,7 +312,7 @@ void editor_level_init_defaults(LevelDef *level)
 
     level_def_init_defaults(level);
     strncpy(level->name, "Untitled", sizeof(level->name) - 1);
-    level->screen_count = 4;
+    level->screen_count = LEVEL_DEFAULT_SCREEN_COUNT;
     level->player_start_x = 48.0f;
     level->player_start_y = 205.0f;
     level->last_star.x = 145.0f;

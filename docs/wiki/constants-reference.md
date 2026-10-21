@@ -99,6 +99,7 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 |----------|-------|-------------|
 | `MAX_CHECKPOINTS` | `99` | Maximum authored `[[checkpoints]]` records per level |
 | `MAX_LEVEL_SCREENS` | `99` | Maximum `screen_count` |
+| `LEVEL_DEFAULT_SCREEN_COUNT` | `4` | Screens a level spans when its `screen_count` is `0`; `level_screen_count()` in `src/levels/level.h` applies it |
 | `GAME_LEVEL_PATH_MAX` | `1024` | Byte capacity of a UTF-8 level path (matches the editor) |
 
 Every simulation step: `player->vy += GRAVITY * dt` (a floor or platform snap cancels it while standing).
