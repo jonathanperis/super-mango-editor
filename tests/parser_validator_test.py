@@ -13,6 +13,13 @@ import check_docs_drift  # noqa: E402
 import run_scripted_smoke  # noqa: E402
 
 
+def scripted_smoke_reader(path):
+    """The scripted smoke's level reader. It needs only the start position,
+    so there is no document to compare: encoding errors are what matter."""
+    run_scripted_smoke.level_start_x(path)
+    return None
+
+
 def main() -> int:
     bom = b"\xef\xbb\xbf"
     document = b'format_version=1\nscreen_count=4\nname="Mango"\n'
@@ -35,9 +42,7 @@ def main() -> int:
     readers = (
         ("validator", validate_levels.load_level),
         ("docs drift", check_docs_drift.load_level),
-        ("scripted smoke", lambda path: run_scripted_smoke.check_builtin_behavior(
-            {"elapsed": 5 / 60, "paused": 0, "complete": 0, "x": 81},
-            "move-right", path, 5)),
+        ("scripted smoke", scripted_smoke_reader),
     )
     for name, reader in readers:
         for data, valid in cases:
