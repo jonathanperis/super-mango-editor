@@ -230,18 +230,18 @@ void rails_render(const Rail *rails, int count,
             const RailTile *t = &rail->tiles[i];
 
             /*
-             * src — the 16×16 region to cut from Rails.png.
-             * Determined by the tile's connection bitmask.
-             */
-            IntRect src = connection_to_src(t->connections);
-
-            /*
              * dst — where to draw on screen.
              * Subtract cam_x so the rail scrolls with the camera.
              * Tile positions are already in logical pixels; no scaling needed.
              */
             IntRect dst = { t->x - cam_x, t->y, RAIL_TILE_W, RAIL_TILE_H };
             if (!on_screen_x(dst.x, dst.w)) continue;
+
+            /*
+             * src — the 16×16 region to cut from Rails.png.
+             * Determined by the tile's connection bitmask.
+             */
+            IntRect src = connection_to_src(t->connections);
 
             sprite_draw(tex, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
