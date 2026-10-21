@@ -75,6 +75,11 @@
  */
 static int category_open[EDITOR_ENTITY_CATEGORY_COUNT] = { 0 };
 
+/* The type the palette last showed while placing (-1 = none), and whether
+ * it was placing then: a change opens and reveals the type's row. */
+static int s_shown_type = -1;
+static int s_shown_place = 0;
+
 
 /* ------------------------------------------------------------------ */
 /* Internal helpers — forward declarations                             */
@@ -371,8 +376,11 @@ void palette_render(EditorState *es, int start_y, int available_h)
     int folded = panel_h <= TITLE_H && es->selection.index >= 0 && es->tool != TOOL_PLACE;
     palette_title_bar(es, panel_x, panel_y, folded);
 
-    /* If collapsed or folded, just show the header bar */
+    /* If collapsed or folded, just show the header bar.  Nothing is shown
+     * placing then, so the next time the body is drawn while placing, the
+     * type's row is revealed again. */
     if (!es->palette_open || folded) {
+        s_shown_place = 0;
         return;
     }
 
@@ -384,9 +392,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * its category and scroll its row into view.  Only on the change, so
      * the designer can still close that category afterwards. */
     {
-        static int shown_type = -1, shown_place = 0;
         int placing = es->tool == TOOL_PLACE;
-        if (placing && (!shown_place || (int)es->palette_type != shown_type) &&
+        if (placing && (!s_shown_place || (int)es->palette_type != s_shown_type) &&
             es->palette_type >= 0 && es->palette_type < ENT_COUNT) {
             int cat = (int)editor_entity_category(es->palette_type);
             if (cat >= 0 && cat < EDITOR_ENTITY_CATEGORY_COUNT) {
@@ -399,8 +406,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
                 }
             }
         }
-        shown_type = (int)es->palette_type;
-        shown_place = placing;
+        s_shown_type = (int)es->palette_type;
+        s_shown_place = placing;
     }
 
     /*
@@ -458,3 +465,10 @@ int palette_category_is_open(int category)
 {
     return category >= 0 && category < EDITOR_ENTITY_CATEGORY_COUNT && category_open[category];
 }
+
+#ifdef MANGO_TESTING
+void palette_set_category_open_for_test(int category, int open)
+{
+    if (category >= 0 && category < EDITOR_ENTITY_CATEGORY_COUNT) category_open[category] = open;
+}
+#endif
