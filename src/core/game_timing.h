@@ -82,10 +82,11 @@ void game_timing_tick_smoke(GameState *gs);
  * drawn between the last two steps, as far along as the time waiting in the
  * accumulator: one step behind at most, but moving every frame.
  *
- * Only drawing uses it. game_timing_note_step copies the player's and the
- * camera's position before each step into GameLoopState, and the render
- * view reads them; nothing in the simulation reads either, and the steps,
- * their order and their inputs are unchanged, so runs and replays are too.
+ * Only drawing uses it. game_timing_note_step copies the player, the camera
+ * and the moving world objects before each step into GameLoopState, and the
+ * render view reads them; nothing in the simulation reads those copies, and
+ * the steps, their order and their inputs are unchanged, so runs and
+ * replays are too.
  */
 
 /* Beyond this many pixels in one step (a respawn, a camera snap, a new
@@ -99,7 +100,8 @@ typedef struct {
                                draws the latest step itself               */
 } GameRenderView;
 
-/* Remember the player and camera as they are before the next fixed step. */
+/* Remember the player, the camera and the moving world objects as they are
+ * before the next fixed step. */
 void game_timing_note_step(GameState *gs);
 
 /* Where this frame draws the camera and player. The latest step itself
@@ -112,6 +114,7 @@ GameRenderView game_timing_render_view(const GameState *gs, int cam_x);
 /* Move (*x, *y), a position after the latest step, back toward (from_x,
  * from_y), where it was one step earlier, as the view draws the player:
  * by the view's t, and not at all when either axis moved more than
- * GAME_INTERP_MAX_JUMP. The time-trial ghost goes through it too, so a run
- * that matches the best one draws both in the same place. */
+ * GAME_INTERP_MAX_JUMP. The time-trial ghost and the moving world objects
+ * go through it too, so a run that matches the best one draws the ghost
+ * where the player is, and a rider stays on the platform under their feet. */
 void game_timing_view_point(const GameRenderView *view, float from_x, float from_y, float *x, float *y);

@@ -142,17 +142,34 @@ typedef struct {
  * consumes it in steps of exactly 1/TARGET_FPS seconds. Leftover time (less
  * than one step) waits for the next frame.
  */
+/* Where one mover was before the latest fixed step. Drawing reads it so a
+ * fast display can place the sprite between two steps. The simulation never
+ * reads it. y is 0 when the mover's picture height is not a stored
+ * coordinate (a spider on the floor, a bird whose height is a sine of x). */
+typedef struct {
+    float x, y;
+} RenderPrev;
+
 typedef struct {
     double prev_time;      /* GetTime() seconds when the previous frame began   */
     double accumulator;    /* real seconds waiting to be simulated              */
     int    clock_started;  /* 0 = no previous frame time yet (first frame)      */
     int    fp_prev_riding; /* float platform player stood on last step          */
     int    smoke_frames_run; /* frames actually executed by a smoke run         */
-    /* Render-only: the player and camera before the latest fixed step, so a
-     * frame between two steps can be drawn between them. The simulation
-     * never reads these (game_timing_render_view does). */
+    /* Render-only: positions before the latest fixed step, so a frame between
+     * two steps can be drawn between them. The simulation never reads these
+     * (game_timing_render_view and the layer renderers do). */
     float  prev_player_x, prev_player_y, prev_camera_x;
     int    has_prev;         /* 1 once a step has recorded the values above   */
+    RenderPrev prev_spider[MAX_SPIDERS];
+    RenderPrev prev_jumping_spider[MAX_JUMPING_SPIDERS];
+    RenderPrev prev_bird[MAX_BIRDS];
+    RenderPrev prev_faster_bird[MAX_FASTER_BIRDS];
+    RenderPrev prev_fish[MAX_FISH];
+    RenderPrev prev_faster_fish[MAX_FASTER_FISH];
+    RenderPrev prev_spike_block[MAX_SPIKE_BLOCKS];
+    RenderPrev prev_float_platform[MAX_FLOAT_PLATFORMS];
+    RenderPrev prev_saw[MAX_CIRCULAR_SAWS];
 } GameLoopState;
 
 /*

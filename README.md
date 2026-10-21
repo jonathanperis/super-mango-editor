@@ -157,7 +157,8 @@ checks that guard them together.
 
 `build.yml` and `codeql.yml` run on every pull request and every push to
 `main`; `docs.yml` runs only on pull requests that touch the website's inputs,
-plus a weekly and a manual run:
+plus a weekly and a manual run. `fuzz.yml` runs weekly and on demand, and is
+not a required check.
 
 - **`build.yml`** builds and tests the game and editor on Linux, macOS and
   Windows with warnings as errors, renders every level briefly, and builds the
@@ -172,6 +173,9 @@ plus a weekly and a manual run:
   `build.yml` before it is published.
 - **`codeql.yml`** runs CodeQL security and quality analysis on the C code, the
   workflows, the Python tools and the JavaScript/TypeScript.
+- **`fuzz.yml`** runs coverage-guided libFuzzer against the level loader and
+  the profile and ghost decoders (`make fuzz`). Sanitizer runs still replay
+  the seed corpus on every pull request.
 
 The [Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/#cicd-pipelines) page has the job-by-job detail.
 
