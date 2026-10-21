@@ -9,7 +9,6 @@
 #include "../shared/printf_format.h"
 #include "../shared/serializer_io.h"
 #include "tomlc17.h"
-#include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdarg.h>
@@ -558,18 +557,7 @@ void game_profile_unlock(GameProfileLock *lock)
 /* 1 existing, 0 absent, -1 failed. Never mistake unreadable data for absence. */
 static int read_native(const char *path, char **out)
 {
-    *out = NULL;
-    FILE *fp = serializer_fopen_utf8(path, "rb");
-    if (!fp) return errno == ENOENT ? 0 : -1;
-    char *text = malloc(PROFILE_TEXT_MAX);
-    if (!text) { fclose(fp); return -1; }
-    size_t size = fread(text, 1, PROFILE_TEXT_MAX, fp);
-    int failed = ferror(fp) || size >= PROFILE_TEXT_MAX || memchr(text, '\0', size) != NULL;
-    if (fclose(fp) != 0) failed = 1;
-    if (failed) { free(text); return -1; }
-    text[size] = '\0';
-    *out = text;
-    return 1;
+    return serializer_read_file(path, PROFILE_TEXT_MAX, out);
 }
 #endif
 

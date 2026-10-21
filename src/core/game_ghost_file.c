@@ -30,7 +30,6 @@
 #include "game_ghost.h"
 #include "../game.h"  /* GameState: this file reads its fields */
 
-#include <errno.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -297,18 +296,7 @@ int game_ghost_file_path(const char *profile_path, const char *level_key,
 /* Read a whole ghost file. 1 read, 0 missing, -1 unreadable or too big. */
 static int read_ghost_file(const char *path, char **out)
 {
-    *out = NULL;
-    FILE *fp = serializer_fopen_utf8(path, "rb");
-    if (!fp) return errno == ENOENT ? 0 : -1;
-    char *text = malloc(GHOST_TEXT_MAX);
-    if (!text) { fclose(fp); return -1; }
-    size_t size = fread(text, 1, GHOST_TEXT_MAX, fp);
-    int failed = ferror(fp) || size >= GHOST_TEXT_MAX || memchr(text, '\0', size) != NULL;
-    if (fclose(fp) != 0) failed = 1;
-    if (failed) { free(text); return -1; }
-    text[size] = '\0';
-    *out = text;
-    return 1;
+    return serializer_read_file(path, GHOST_TEXT_MAX, out);
 }
 #endif
 

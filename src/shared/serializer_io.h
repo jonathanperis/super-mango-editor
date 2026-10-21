@@ -43,6 +43,18 @@ SerializerPathStatus serializer_probe_path_utf8(const char *path);
 /* Return non-zero when a UTF-8 path names a readable file. */
 int serializer_file_exists_utf8(const char *path);
 
+/*
+ * Read a whole text file into a new NUL-terminated buffer of max_bytes
+ * (the text plus its final NUL).  Returns SERIALIZER_PATH_EXISTING with
+ * *out set (the caller frees it), SERIALIZER_PATH_MISSING when no file has
+ * that name, and SERIALIZER_PATH_ERROR when the file exists but cannot be
+ * read, does not fit, or contains a NUL byte.  *out is NULL unless the
+ * read succeeded.  Unreadable data is never reported as a missing file,
+ * so a caller that starts over on "missing" never overwrites it.
+ */
+SerializerPathStatus serializer_read_file(const char *path, size_t max_bytes,
+                                          char **out);
+
 /* Fingerprint bytes read from an opened UTF-8 path. */
 int serializer_fingerprint_utf8(const char *path,
                                 SerializerFileFingerprint *fingerprint);

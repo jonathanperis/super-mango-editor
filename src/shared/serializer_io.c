@@ -9,10 +9,10 @@
 
 #include "serializer_io.h"
 
-#include <errno.h>  /* errno, EEXIST */
+#include <errno.h>  /* errno, EEXIST, ENOENT */
 #include <stdio.h>  /* fprintf, remove, snprintf */
 #include <stdlib.h> /* free, malloc, realpath */
-#include <string.h> /* memcpy, memset, strlen, strrchr */
+#include <string.h> /* memchr, memcpy, memset, strlen, strrchr */
 #include <stdint.h> /* uint64_t */
 
 #ifdef _WIN32
@@ -165,6 +165,38 @@ int serializer_file_exists_utf8(const char *path)
     if (!fp) return 0;
     fclose(fp);
     return 1;
+}
+
+SerializerPathStatus serializer_read_file(const char *path, size_t max_bytes,
+                                          char **out)
+{
+    *out = NULL;
+    if (max_bytes == 0) return SERIALIZER_PATH_ERROR;
+
+    /* fopen sets errno only when it fails, and the Windows path conversion
+     * may fail without setting it, so clear it first: an old ENOENT left by
+     * some earlier call must not make an unreadable file look missing. */
+    errno = 0;
+    FILE *fp = serializer_fopen_utf8(path, "rb");
+    if (!fp) return errno == ENOENT ? SERIALIZER_PATH_MISSING : SERIALIZER_PATH_ERROR;
+
+    char *text = malloc(max_bytes);
+    if (!text) {
+        fclose(fp);
+        return SERIALIZER_PATH_ERROR;
+    }
+    /* Ask for max_bytes: getting all of them means the text and its NUL
+     * cannot both fit, so the file is too big. */
+    size_t size = fread(text, 1, max_bytes, fp);
+    int failed = ferror(fp) || size >= max_bytes || memchr(text, '\0', size) != NULL;
+    if (fclose(fp) != 0) failed = 1;
+    if (failed) {
+        free(text);
+        return SERIALIZER_PATH_ERROR;
+    }
+    text[size] = '\0';
+    *out = text;
+    return SERIALIZER_PATH_EXISTING;
 }
 
 int serializer_fingerprint_utf8(const char *path,

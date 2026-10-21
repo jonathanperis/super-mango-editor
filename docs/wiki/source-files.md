@@ -103,7 +103,7 @@ src/
 │   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
-│   ├── serializer_io.h / .c      UTF-8 path I/O, temp-file-then-rename saves, symlink checks
+│   ├── serializer_io.h / .c      UTF-8 path I/O, size-limited whole-file reads, temp-file-then-rename saves, symlink checks
 │   ├── serializer_load.c         `level_load_toml` staged parse orchestration
 │   ├── serializer_load_header.h / .c        TOML header/meta and floor-gap parsing
 │   ├── serializer_load_checkpoints.h / .c   Strict authored checkpoint parsing
