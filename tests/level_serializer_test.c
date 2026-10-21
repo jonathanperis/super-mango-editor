@@ -1070,6 +1070,47 @@ static int missing_physics_uses_engine_defaults(void)
     return 0;
 }
 
+/*
+ * A Last Star the file puts at (0, 0) stays there through a load and a save,
+ * and a level without one gets the default position.  (0, 0) used to mean
+ * "not placed", so a star authored there jumped to the default.
+ */
+static int last_star_at_origin_stays_there(void)
+{
+    const char *path = TEST_OUT "test_last_star_origin.toml";
+    FILE *fp = fopen(path, "w");
+    LevelDef def, again;
+
+    if (!fp) return fail("could not write last-star fixture");
+    fprintf(fp, "name = \"Origin Star\"\n");
+    fprintf(fp, "screen_count = 1\n");
+    fprintf(fp, "[last_star]\nx = 0\ny = 0\n");
+    fclose(fp);
+
+    if (level_load_toml(path, &def) != 0)
+        return fail("could not load last-star fixture");
+    if (def.last_star.x != 0.0f || def.last_star.y != 0.0f)
+        return fail("a last star authored at (0, 0) should stay there");
+    if (level_save_toml(&def, path) != 0 || level_load_toml(path, &again) != 0)
+        return fail("could not round-trip last-star fixture");
+    if (again.last_star.x != 0.0f || again.last_star.y != 0.0f)
+        return fail("a last star at (0, 0) should survive a save");
+
+    fp = fopen(path, "w");
+    if (!fp) return fail("could not rewrite last-star fixture");
+    fprintf(fp, "name = \"No Star\"\n");
+    fprintf(fp, "screen_count = 1\n");
+    fclose(fp);
+    if (level_load_toml(path, &def) != 0)
+        return fail("could not load star-less fixture");
+    if (def.last_star.x != LEVEL_DEFAULT_LAST_STAR_X ||
+        def.last_star.y != LEVEL_DEFAULT_LAST_STAR_Y)
+        return fail("a level without [last_star] should get the default position");
+
+    remove(path);
+    return 0;
+}
+
 /* The problems level_load_toml_explained reported, first one kept. */
 typedef struct {
     int count;
@@ -1503,6 +1544,7 @@ int main(void)
     if (rich_level_roundtrip() != 0) return 1;
     if (independent_star_color_counts_roundtrip() != 0) return 1;
     if (missing_physics_uses_engine_defaults() != 0) return 1;
+    if (last_star_at_origin_stays_there() != 0) return 1;
     if (legacy_version_loads_as_current() != 0) return 1;
     if (explicit_version_saves_first_and_roundtrips() != 0) return 1;
     if (rejects_invalid_format_versions_transactionally() != 0) return 1;
