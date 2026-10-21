@@ -733,9 +733,15 @@ WEB_FLAGS = -s USE_GLFW=3 \
 # Same warning set as native builds so Web-only code paths stay warning-free.
 # Emscripten documents EM_JS(...); with a trailing semicolon, which pedantic C
 # reports as an empty file-scope declaration; that one diagnostic is disabled.
-WEB_OPT = -O2
+# -Os, and raylib's Web library at -Os too (tools/build_raylib.py): the game
+# is light on CPU and WebGL draws the frames, so code size is what players
+# wait for. Against -O2 the .wasm went from 469 KB to 371 KB (190 KB to
+# 166 KB gzipped).
+WEB_OPT = -Os
 WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi $(WEB_OPT) -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
-WEB_LINK_FLAGS = -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
+# The page only runs in browsers; Node merely syntax-checks the .js and
+# compiles the .wasm (tools/check_wasm_artifacts.py), so drop Node support.
+WEB_LINK_FLAGS = -s ENVIRONMENT=web -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
 WEB_HTML = $(OUTDIR)/super-mango.html
 # The debug page runs the same program as the normal page and differs only by
 # one inline marker script (web/debug-boot.js), so it is not linked at all:
