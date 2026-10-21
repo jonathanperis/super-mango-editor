@@ -541,6 +541,10 @@ static void render_platforms(EditorState *es) {
         int   plat_h = pp->tile_height * TILE_SIZE;
         float plat_y = level_platform_top_y(pp->tile_height);
 
+        /* A platform outside the view draws nothing: skip all its pieces. */
+        EditorRect bounds = { plat_x, plat_y, (float)plat_w, (float)plat_h };
+        if (!canvas_shows(es, &bounds)) continue;
+
         /* Select texture based on tile_path */
         Texture2D *tex;
         if (pp->tile_path[0] != '\0') {
