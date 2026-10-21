@@ -80,7 +80,12 @@ and damage; axe swings; spike-block rails (loop, detach, end cap); knockback
 throwing a climber off; jumping spiders, a spider keeping its authored speed
 through every turn, fish and faster-fish leaps, bird patrols, bridge crumbling
 (and not crumbling under a player on another surface) and the camera jumping
-to the respawn point. It checks parallax scroll factors and wrapping
+to the respawn point. Linked into the same binary, `tests/creature_update_test.c`
+and `tests/player_climb_test.c` call `birds_update`, `bird_variant_update`,
+`spiders_update` and the climbing code (`player/player_climb.c`, the climbing
+half of `player_handle_input`) on hand-made structs with no level loaded:
+patrol turns, wing and leg frame rates, the sine-wave hitbox, floor-gap turns,
+grab zones, the 80 px/s climb, the top clamp and every way of letting go. It checks parallax scroll factors and wrapping
 (`parallax_layer_offset`) and renders one frame in every overlay state (play,
 pause, game over, completion with and without a next level, a failed next
 level, settings open). It also replays

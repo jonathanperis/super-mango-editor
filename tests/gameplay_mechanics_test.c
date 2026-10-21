@@ -10,7 +10,9 @@
  * entity renderers and the overlay draw every fixture at least once.
  *
  * The scripted-input replay (input/game_replay.c) is covered in
- * game_replay_test.c, linked into this same binary.
+ * game_replay_test.c, linked into this same binary, and so are the direct
+ * (level-free) checks of the creature updates (creature_update_test.c) and
+ * of climbing (player_climb_test.c).
  */
 #include <math.h>
 #include <stdio.h>
@@ -1267,6 +1269,11 @@ int main(void)
 #define CASE(fn) {#fn, fn}
         CASE(climbing_ladder_rope_and_vine),
         CASE(knockback_throws_a_climber_off),
+        CASE(climb_grab_zones_cover_every_tile),
+        CASE(climb_grab_picks_the_first_overlap),
+        CASE(climb_update_moves_clamps_and_lets_go),
+        CASE(climb_controls_follow_the_input),
+        CASE(climb_a_whole_vine_up_and_down),
         CASE(blue_flame_erupts_on_a_cycle_and_burns),
         CASE(axe_traps_swing_spin_and_hit),
         CASE(spikes_hurt_once_per_invincibility),
@@ -1275,9 +1282,15 @@ int main(void)
         CASE(jumping_spider_leaps_the_gap),
         CASE(jumping_spider_minimum_speed_clears_a_gap),
         CASE(spider_keeps_its_authored_speed),
+        CASE(spiders_update_patrols_and_animates),
+        CASE(spiders_turn_at_floor_gaps),
         CASE(fish_leap_from_the_water_and_patrol),
         CASE(faster_fish_leap_higher_and_patrol_faster),
         CASE(birds_patrol_at_their_own_speeds),
+        CASE(birds_update_patrols_and_turns),
+        CASE(bird_wings_beat_at_each_variant_rate),
+        CASE(bird_hitbox_rides_the_sine_wave),
+        CASE(bird_variant_uses_its_spec),
         CASE(bridge_crumbles_under_the_player),
         CASE(bridge_ignores_a_player_on_another_surface),
         CASE(camera_jumps_to_the_respawn_point),
