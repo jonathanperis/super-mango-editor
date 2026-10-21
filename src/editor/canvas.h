@@ -71,6 +71,13 @@ void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy);
  */
 int canvas_contains(int sx, int sy);
 
+/* The red "cannot load this level yet" banner along the canvas's bottom
+ * edge, shown while the level is drawable but fails the game's checks:
+ * is (sx, sy) on it?  A click there goes to the problem. */
+#define CANVAS_BANNER_H 20
+#define CANVAS_BANNER_Y (TOOLBAR_H + CANVAS_H - CANVAS_BANNER_H)
+int canvas_banner_contains(const EditorState *es, int sx, int sy);
+
 /* Whether any part of world rectangle r is inside the canvas's view. */
 int canvas_shows(const EditorState *es, const EditorRect *r);
 

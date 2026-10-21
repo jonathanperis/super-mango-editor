@@ -1021,6 +1021,17 @@ static int a_drawable_mistake_keeps_the_canvas_editable(void)
     click_frame(&es, 300, 250);
     CHECK(es.level.coin_count == 1);
     CHECK(strstr(es.status_message, "Canvas paused") == NULL);
+
+    /* The banner along the canvas's bottom takes a click to the problem
+     * (the next_phase field) and places nothing. */
+    {
+        int placed = es.level.coin_count;
+        CHECK(canvas_banner_contains(&es, 300, CANVAS_BANNER_Y + 5));
+        CHECK(!canvas_banner_contains(&es, 300, CANVAS_BANNER_Y - 5));
+        click_frame(&es, 300, CANVAS_BANNER_Y + 5);
+        CHECK(es.level.coin_count == placed);
+        CHECK(strstr(es.status_message, "next_phase") != NULL);
+    }
     {
         EditorIssueSnapshot now;
         editor_level_issue_snapshot(&es.level, &now);
