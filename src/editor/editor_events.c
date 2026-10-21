@@ -668,6 +668,11 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
              * The press belongs to the list (pick an option or close it);
              * placing or deleting under it as well would be a surprise. */
             if (ui_press(&es->ui)) break;
+            /* The canvas's error banner: go to the problem, nothing else. */
+            if (canvas_banner_contains(es, event->x, event->y)) {
+                if (editor_finish_field_edit(es)) (void)editor_focus_validation_issue(es, 0);
+                break;
+            }
             es->mouse_down = 1;
             es->focus_area = canvas_contains(event->x, event->y) && !es->campaign
                            ? EDITOR_FOCUS_CANVAS : EDITOR_FOCUS_PANEL;
