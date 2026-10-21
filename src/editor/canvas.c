@@ -1059,7 +1059,8 @@ static void render_sprites(EditorState *es, const EntityType *types, int count) 
         EntityType type = types[t];
         const EditorEntityPreview *preview = editor_entity_preview(type);
         Texture2D *tex = editor_entity_texture(&es->textures, type);
-        const IntRect *src = preview->crop ? &preview->src : NULL;
+        /* A type without a preview row draws its whole texture. */
+        const IntRect *src = (preview && preview->crop) ? &preview->src : NULL;
 
         for (int i = 0; i < editor_entity_count(&es->level, type); i++) {
             EditorRect r;
