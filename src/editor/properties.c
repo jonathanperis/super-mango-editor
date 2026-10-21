@@ -1310,7 +1310,7 @@ void properties_render(EditorState *es, int start_y, int available_h)
 
     if (!es->panel_open) return;
 
-    editor_begin_change_tracking(es, 1);
+    editor_begin_change_tracking(es, EDITOR_CHANGE_ENTITY);
     es->ui.before_change = editor_before_change;
     es->ui.before_change_context = es;
 
@@ -1598,7 +1598,7 @@ static int config_level_fields(EditorState *es, int x, int y)
     /* ---- Next phase path ---- */
     ui_label(&es->ui, x + 8, y, "Next:");
     if (ui_text_field_hint(&es->ui, 9031, x + 55, y, 310, es->level.next_phase,
-                           (int)(int)sizeof(es->level.next_phase), NEXT_PHASE_HINT, 0))
+                           (int)sizeof(es->level.next_phase), NEXT_PHASE_HINT, 0))
         editor_commit_change(es);
     return y + 24;
 }
@@ -1939,7 +1939,7 @@ static int config_fog_layers(EditorState *es, int x, int y)
  */
 void level_config_render(EditorState *es, int start_y, int available_h,
                          int total_content_h) {
-    editor_begin_change_tracking(es, 2);
+    editor_begin_change_tracking(es, EDITOR_CHANGE_CONFIG);
     es->ui.before_change = editor_before_change;
     es->ui.before_change_context = es;
 
