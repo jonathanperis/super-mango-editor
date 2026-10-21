@@ -73,7 +73,7 @@ def make_executable(path: Path) -> None:
 
 def write_native_readme(bundle: Path, executable: str) -> None:
     (bundle / "README.txt").write_text(
-        f"""Super Mango builder release\n\nKeep assets/ and levels/ beside both programs; they find them from any starting folder.\n\nGame: ./{executable}\nEditor: ./super-mango-editor{'.exe' if executable.endswith('.exe') else ''}\n\nraylib is linked statically. Native OS graphics/audio support is required. Linux dialogs require zenity.\nRequired non-system Windows runtime DLLs are included. Playtest starts the sibling game without saving a personal profile.\n\nLearning manual:\n  https://jonathanperis.github.io/super-mango-editor/docs/learning-path/\n\nSource:\n  https://github.com/jonathanperis/super-mango-editor\nSee LICENSE, THIRD_PARTY_NOTICES.md and licenses/.\n""",
+        f"""Super Mango builder release\n\nKeep assets/ and levels/ beside both programs; they find them from any starting folder.\n\nGame: ./{executable}\nEditor: ./super-mango-editor{'.exe' if executable.endswith('.exe') else ''}\n\nraylib is linked statically. Native OS graphics/audio support is required. Linux dialogs require zenity.\nRequired non-system Windows runtime DLLs are included. Playtest starts the sibling game without saving a personal profile.\n\nLearning manual:\n  https://super-mango-editor.jonathanperis.tech/docs/learning-path/\n\nSource:\n  https://github.com/jonathanperis/super-mango-editor\nSee LICENSE, THIRD_PARTY_NOTICES.md and licenses/.\n""",
         encoding="utf-8",
     )
 

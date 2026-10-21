@@ -50,14 +50,13 @@ requires an attacker who already controls the local user account, and the
 CodeQL path-injection findings already triaged as intentional local-user file
 selection in [`.github/SECURITY_TRIAGE.md`](.github/SECURITY_TRIAGE.md).
 
-## Web build storage and the shared origin
+## Web build storage
 
-The browser game is served from GitHub Pages at
-`https://jonathanperis.github.io/super-mango-editor/`. Browser storage is
-scoped to the *origin* (`https://jonathanperis.github.io`), which is shared
-with every other GitHub Pages site of the same account. Any script running on
-that origin can read or write the game's storage. Without a custom domain this
-cannot be isolated, so the game treats stored values as untrusted input:
+The browser game is served from
+`https://super-mango-editor.jonathanperis.tech/`. Browser storage is scoped to
+that origin. It is not shared with `jonathanperis.github.io` or with other
+names under `jonathanperis.tech`. The game still treats stored values as
+untrusted input:
 
 - Keys are prefixed: `super-mango-profile-v2` (with read-only fallback to
   `super-mango-profile-v1`) and one `super-mango-ghost-v1:<level path>` entry
@@ -107,10 +106,9 @@ WebAssembly compilation only):
 
 A `<meta>` policy cannot set `frame-ancestors`, and GitHub Pages cannot send
 CSP headers. Google Analytics, when configured, loads on manual pages but not
-on the home page that hosts the game. `'self'` covers the whole
-`jonathanperis.github.io` origin, and pages on that shared origin can still
-access the game's storage, which is why the validation above is the security
-boundary.
+on the home page that hosts the game. `'self'` is this host only. A script
+that runs on this origin can still read the stored profile and ghosts, which
+is why the validation above is the security boundary.
 
 ## Verifying releases
 
