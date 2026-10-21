@@ -38,6 +38,7 @@
 #include "levels/level_start.h"  /* level_ground_top_at */
 #include "player/player_surfaces.h"
 #include "player/player_internal.h"
+#include <rlgl.h>  /* rlDrawRenderBatchActive */
 
 extern float test_last_music_volume;
 
