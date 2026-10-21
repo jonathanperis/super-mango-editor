@@ -1142,9 +1142,12 @@ static void render_player_spawn(EditorState *es) {
 
 static void render_checkpoints(EditorState *es)
 {
+    /* Where the pointer is in the world: the same for every checkpoint. */
+    float cursor_x, cursor_y;
+    canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &cursor_x, &cursor_y);
+
     for (int i = 0; i < es->level.checkpoint_count; i++) {
         const CheckpointPlacement *cp = &es->level.checkpoints[i];
-        float cursor_x, cursor_y;
         int hovered;
         int selected = es->selection.type == ENT_CHECKPOINT &&
                        es->selection.index == i;
@@ -1159,8 +1162,6 @@ static void render_checkpoints(EditorState *es)
             }
         }
 
-        canvas_screen_to_world(es, es->mouse_x, es->mouse_y,
-                               &cursor_x, &cursor_y);
         hovered = cursor_x >= cp->x - 4.0f && cursor_x < cp->x + 5.0f &&
                   cursor_y >= cp->y - 20.0f && cursor_y < cp->y + 4.0f;
 
