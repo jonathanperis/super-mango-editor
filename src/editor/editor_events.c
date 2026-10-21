@@ -142,7 +142,7 @@ static void open_dropped_level(EditorState *es, const char *path)
         return;
     }
     /* A drag owns the document until the button is released (see
-     * editor_key); a load would pull the level out from under it. */
+     * editor_key_while_dragging); a load would pull the level out from under it. */
     if (es->dragging) {
         editor_set_status(es, "Release the mouse to finish the move first (Esc cancels it)");
         return;
@@ -262,7 +262,7 @@ static void editor_history(EditorState *es, int redo)
     int placed_count = 0;
     Command command;
     int group;
-    if (es->dragging) return;  /* editor_key already explained why */
+    if (es->dragging) return;  /* see editor_key_while_dragging */
     if (!editor_finish_field_edit(es)) return;
     if (!(redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command))) {
         editor_set_status(es, "Nothing to %s", redo ? "redo" : "undo");
@@ -303,30 +303,44 @@ static void editor_history(EditorState *es, int redo)
     editor_set_status(es, "%s: %s", redo ? "Redid" : "Undid", what);
 }
 
-static void editor_key(EditorState *es, const InputEvent *event)
+/* Shift, Ctrl, Alt and Super pressed alone: they only change what the
+ * next key does, so the messages below stay silent for them. */
+static int is_modifier_key(int key)
 {
-    int key = event->key;
-    int ctrl = (event->mods & (INPUT_CTRL | INPUT_SUPER)) != 0;
-    int shift = (event->mods & INPUT_SHIFT) != 0;
+    return key == KEY_LEFT_SHIFT || key == KEY_RIGHT_SHIFT ||
+           key == KEY_LEFT_CONTROL || key == KEY_RIGHT_CONTROL ||
+           key == KEY_LEFT_ALT || key == KEY_RIGHT_ALT ||
+           key == KEY_LEFT_SUPER || key == KEY_RIGHT_SUPER;
+}
+
+/*
+ * editor_key_while_dragging — Step 1 of editor_key: a key pressed while an
+ * entity is dragged or a row is painted.
+ */
+static void editor_key_while_dragging(EditorState *es, int key)
+{
     /* While an entity is being dragged, or a row painted, the gesture owns
      * the document: Undo, Delete or Paste would shift array slots under
      * it.  Only Esc acts until the button is released: it cancels a move,
      * and ends a row, keeping what was placed.  Modifier keys stay silent
      * because Shift is how a drag snaps to the grid. */
-    if (es->dragging || es->painting) {
-        if (key == KEY_ESCAPE) {
-            if (es->painting) tools_end_paint(es);
-            else tools_cancel_drag(es);
-        }
-        else if (key != KEY_LEFT_SHIFT && key != KEY_RIGHT_SHIFT &&
-                 key != KEY_LEFT_CONTROL && key != KEY_RIGHT_CONTROL &&
-                 key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&
-                 key != KEY_LEFT_SUPER && key != KEY_RIGHT_SUPER)
-            editor_set_status(es, es->painting
-                ? "Release the mouse to finish the row first (Esc ends it)"
-                : "Release the mouse to finish the move first (Esc cancels it)");
-        return;
+    if (key == KEY_ESCAPE) {
+        if (es->painting) tools_end_paint(es);
+        else tools_cancel_drag(es);
     }
+    else if (!is_modifier_key(key))
+        editor_set_status(es, es->painting
+            ? "Release the mouse to finish the row first (Esc ends it)"
+            : "Release the mouse to finish the move first (Esc cancels it)");
+}
+
+/*
+ * editor_key_in_widget — Step 2 of editor_key: an open dropdown, the text
+ * field being edited, or a clicked problem row may take the key first.
+ * Returns 1 when one of them used it, 0 to pass it on.
+ */
+static int editor_key_in_widget(EditorState *es, int key, int ctrl, int shift)
+{
     /* An active text field owns ordinary typing. The digit '2' in a field
      * must not also select the Place tool. Modifiers come from this event. */
     /* An open dropdown list owns the keys that work it: Up / Down,
@@ -343,7 +357,7 @@ static void editor_key(EditorState *es, const InputEvent *event)
         case KEY_ESCAPE: es->ui.dropdown_open_id = 0;           break;
         default: break;
         }
-        return;
+        return 1;
     }
     if (es->ui.active_id && !ctrl && key != KEY_ESCAPE && key != KEY_F5) {
         /* Caret keys act at once, in the order they were pressed, so
@@ -368,7 +382,7 @@ static void editor_key(EditorState *es, const InputEvent *event)
             break;
         default: break;
         }
-        return;
+        return 1;
     }
     /* A validation or load-problem row clicked last: Ctrl+C copies its
      * text (even when the click put the caret in the field it is about).
@@ -381,7 +395,7 @@ static void editor_key(EditorState *es, const InputEvent *event)
         es->selected_message[0] && !field_has_selection) {
         clipboard_set(es->selected_message);
         editor_set_status(es, "Copied: %s", es->selected_message);
-        return;
+        return 1;
     }
     /* Ctrl with a field active edits text: copy, cut and paste act on the
      * selection, Ctrl+A selects everything, Ctrl+Left / Right jump a word
@@ -410,95 +424,111 @@ static void editor_key(EditorState *es, const InputEvent *event)
         case KEY_RIGHT: ui_edit_key(&es->ui, UI_KEY_WORD_RIGHT, shift); break;
         default: break;
         }
-        return;
+        return 1;
     }
+    return 0;
+}
+
+/*
+ * editor_key_in_campaign — Step 3 of editor_key: a key pressed while the
+ * Campaign view is open.
+ */
+static void editor_key_in_campaign(EditorState *es, int key, int ctrl, int shift)
+{
     /* The Campaign view covers the canvas: a level shortcut there would
      * change a document the designer cannot see.  It takes Esc (cancel a
      * name being typed, else close), Ctrl+S (save the campaign), Ctrl+M
      * (close) and the undo keys only.  Those replay the view's own history
-     * (editor_campaign.c); the level's undo stack, reached further down,
-     * is out of their way until the view closes. */
-    if (es->campaign) {
-        if (key == KEY_ESCAPE && es->ui.active_id)
-            ui_cancel_active_edit(&es->ui);
-        else if (key == KEY_ESCAPE || (ctrl && key == KEY_M))
-            (void)editor_campaign_close(es, 0);
-        else if (ctrl && key == KEY_S)
-            (void)editor_campaign_save(es);
-        else if (ctrl && key == KEY_Z && !shift)
-            (void)editor_campaign_undo(es);
-        else if (ctrl && (key == KEY_Z || key == KEY_Y))
-            (void)editor_campaign_redo(es);
-        else if (key != KEY_LEFT_SHIFT && key != KEY_RIGHT_SHIFT &&
-                 key != KEY_LEFT_CONTROL && key != KEY_RIGHT_CONTROL &&
-                 key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&
-                 key != KEY_LEFT_SUPER && key != KEY_RIGHT_SUPER)
-            editor_set_status(es, "Campaign view: Esc or Close returns to the level");
-        return;
+     * (editor_campaign.c); the level's undo stack, reached from
+     * editor_ctrl_shortcut, is out of their way until the view closes. */
+    if (key == KEY_ESCAPE && es->ui.active_id)
+        ui_cancel_active_edit(&es->ui);
+    else if (key == KEY_ESCAPE || (ctrl && key == KEY_M))
+        (void)editor_campaign_close(es, 0);
+    else if (ctrl && key == KEY_S)
+        (void)editor_campaign_save(es);
+    else if (ctrl && key == KEY_Z && !shift)
+        (void)editor_campaign_undo(es);
+    else if (ctrl && (key == KEY_Z || key == KEY_Y))
+        (void)editor_campaign_redo(es);
+    else if (!is_modifier_key(key))
+        editor_set_status(es, "Campaign view: Esc or Close returns to the level");
+}
+
+/*
+ * editor_ctrl_shortcut — Step 4 of editor_key: Ctrl (Cmd on macOS) with a
+ * key, the level's file, history and clipboard commands.
+ */
+static void editor_ctrl_shortcut(EditorState *es, int key, int shift)
+{
+    switch (key) {
+    case KEY_S:
+        if (shift) (void)editor_save_current_level_as(es);
+        else (void)editor_save_current_level(es);
+        break;
+    case KEY_O:
+        if (editor_confirm_discard_changes(es, "open another level")) editor_open_level_file(es);
+        break;
+    case KEY_N:
+        if (editor_confirm_discard_changes(es, "create a new level")) editor_reset_new_level(es);
+        break;
+    case KEY_R:
+        if (!editor_finish_field_edit(es)) break;
+        if (es->recovery_entry_count) {
+            int selected = editor_choose_recovery(es);
+            uint64_t id = selected >= 0 ? es->pending_recovery_id : 0;
+            if (id && editor_confirm_discard_changes(es, "recover autosave"))
+                (void)editor_recover_entry_by_id(es, id);
+            else
+                es->pending_recovery_id = 0;
+        } else
+            editor_set_status(es, "Recovery copy not found");
+        break;
+    case KEY_ONE: case KEY_TWO: case KEY_THREE: case KEY_FOUR: case KEY_FIVE: {
+        int index = key-KEY_ONE;
+        if (index < es->recent_file_count && editor_confirm_discard_changes(es, "open a recent level"))
+            if (editor_load_level(es, es->recent_files[index])) editor_set_status(es, "Failed to load recent file");
+        break;
     }
-    if (ctrl) {
-        switch (key) {
-        case KEY_S:
-            if (shift) (void)editor_save_current_level_as(es);
-            else (void)editor_save_current_level(es);
-            break;
-        case KEY_O:
-            if (editor_confirm_discard_changes(es, "open another level")) editor_open_level_file(es);
-            break;
-        case KEY_N:
-            if (editor_confirm_discard_changes(es, "create a new level")) editor_reset_new_level(es);
-            break;
-        case KEY_R:
-            if (!editor_finish_field_edit(es)) break;
-            if (es->recovery_entry_count) {
-                int selected = editor_choose_recovery(es);
-                uint64_t id = selected >= 0 ? es->pending_recovery_id : 0;
-                if (id && editor_confirm_discard_changes(es, "recover autosave"))
-                    (void)editor_recover_entry_by_id(es, id);
-                else
-                    es->pending_recovery_id = 0;
-            } else
-                editor_set_status(es, "Recovery copy not found");
-            break;
-        case KEY_ONE: case KEY_TWO: case KEY_THREE: case KEY_FOUR: case KEY_FIVE: {
-            int index = key-KEY_ONE;
-            if (index < es->recent_file_count && editor_confirm_discard_changes(es, "open a recent level"))
-                if (editor_load_level(es, es->recent_files[index])) editor_set_status(es, "Failed to load recent file");
-            break;
-        }
-        case KEY_Z:
-            editor_history(es, shift);
-            break;
-        case KEY_Y:
-            editor_history(es, 1);
-            break;
-        case KEY_C:
+    case KEY_Z:
+        editor_history(es, shift);
+        break;
+    case KEY_Y:
+        editor_history(es, 1);
+        break;
+    case KEY_C:
+        editor_copy_selected(es);
+        break;
+    case KEY_X:
+        /* Cut: copy, then delete the selection. */
+        if (es->selection.index >= 0 && editor_finish_field_edit(es)) {
             editor_copy_selected(es);
-            break;
-        case KEY_X:
-            /* Cut: copy, then delete the selection. */
-            if (es->selection.index >= 0 && editor_finish_field_edit(es)) {
-                editor_copy_selected(es);
-                tools_delete_selected(es);
-            }
-            break;
-        case KEY_A:
-            if (editor_finish_field_edit(es)) editor_select_all(es);
-            break;
-        case KEY_V:
-            if (editor_finish_field_edit(es)) editor_paste_clipboard(es);
-            break;
-        case KEY_D:
-            if (editor_finish_field_edit(es)) editor_duplicate_selection(es);
-            break;
-        case KEY_M:
-            (void)editor_campaign_open(es, NULL);
-            break;
-        default:
-            break;
+            tools_delete_selected(es);
         }
-        return;
+        break;
+    case KEY_A:
+        if (editor_finish_field_edit(es)) editor_select_all(es);
+        break;
+    case KEY_V:
+        if (editor_finish_field_edit(es)) editor_paste_clipboard(es);
+        break;
+    case KEY_D:
+        if (editor_finish_field_edit(es)) editor_duplicate_selection(es);
+        break;
+    case KEY_M:
+        (void)editor_campaign_open(es, NULL);
+        break;
+    default:
+        break;
     }
+}
+
+/*
+ * editor_plain_key — Step 5 of editor_key: a key without Ctrl, the tools,
+ * view toggles, deleting and nudging.
+ */
+static void editor_plain_key(EditorState *es, int key, int shift)
+{
     switch (key) {
     case KEY_ESCAPE:
         if (es->ui.active_id) ui_cancel_active_edit(&es->ui);
@@ -539,10 +569,11 @@ static void editor_key(EditorState *es, const InputEvent *event)
         break;
     case KEY_BACKSPACE:
         /* Backspace too deletes: many laptop keyboards (Macs) have no Delete
-         * key.  Inside a text field it edits text instead (handled above).
-         * But right after Enter commits a field, a Backspace still meant
-         * for that field would delete the selection, so Backspace deletes
-         * only while the canvas has the focus (the last click was on it). */
+         * key.  Inside a text field it edits text instead (see
+         * editor_key_in_widget).  But right after Enter commits a field, a
+         * Backspace still meant for that field would delete the selection,
+         * so Backspace deletes only while the canvas has the focus (the
+         * last click was on it). */
         if (es->selection.index < 0) break;
         if (es->focus_area != EDITOR_FOCUS_CANVAS) {
             editor_set_status(es, "Backspace deletes on the canvas: click it first, "
@@ -578,6 +609,31 @@ static void editor_key(EditorState *es, const InputEvent *event)
     default:
         break;
     }
+}
+
+/*
+ * editor_key — Route one key press.
+ *
+ * Each step either uses the key or passes it on, in this order: a drag
+ * in progress, an open widget, the Campaign view, then the level's own
+ * shortcuts (with Ctrl, or plain keys).
+ */
+static void editor_key(EditorState *es, const InputEvent *event)
+{
+    int key = event->key;
+    int ctrl = (event->mods & (INPUT_CTRL | INPUT_SUPER)) != 0;
+    int shift = (event->mods & INPUT_SHIFT) != 0;
+    if (es->dragging || es->painting) {
+        editor_key_while_dragging(es, key);
+        return;
+    }
+    if (editor_key_in_widget(es, key, ctrl, shift)) return;
+    if (es->campaign) {
+        editor_key_in_campaign(es, key, ctrl, shift);
+        return;
+    }
+    if (ctrl) editor_ctrl_shortcut(es, key, shift);
+    else editor_plain_key(es, key, shift);
 }
 
 /*
