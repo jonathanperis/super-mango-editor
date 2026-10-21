@@ -710,6 +710,7 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
             if (es->space_held && !es->campaign && canvas_contains(event->x, event->y) &&
                 es->ui.active_id == 0) {
                 es->panning = 1;
+                es->pan_button = MOUSE_BUTTON_LEFT;
                 es->pan_x = event->x;
                 es->pan_y = event->y;
                 break;
@@ -723,9 +724,12 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
                 editor_finish_field_edit(es))
                 tools_mouse_down(es, wx, wy);
         } else if (event->button == MOUSE_BUTTON_MIDDLE) {
-            /* Middle-drag slides the view, in any tool. */
-            if (!es->campaign && canvas_contains(event->x, event->y)) {
+            /* Middle-drag slides the view, in any tool (not in the middle
+             * of a left-button drag, which owns the pointer). */
+            if (!es->campaign && !es->mouse_down && !es->panning &&
+                canvas_contains(event->x, event->y)) {
                 es->panning = 1;
+                es->pan_button = MOUSE_BUTTON_MIDDLE;
                 es->pan_x = event->x;
                 es->pan_y = event->y;
             }
@@ -742,8 +746,9 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         }
         break;
     case INPUT_MOUSE_UP:
-        if (es->panning && (event->button == MOUSE_BUTTON_MIDDLE ||
-                            event->button == MOUSE_BUTTON_LEFT)) {
+        /* Only the button that started the pan ends it; another button's
+         * release goes on to the tools as usual. */
+        if (es->panning && event->button == es->pan_button) {
             es->panning = 0;
             break;
         }
