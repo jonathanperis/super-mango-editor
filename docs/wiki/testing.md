@@ -283,7 +283,7 @@ After a Pages deploy, smoke the live site with at least:
 ```sh
 python3 - <<'PY'
 from urllib.request import Request, urlopen
-base = 'https://jonathanperis.github.io/super-mango-editor/'
+base = 'https://super-mango-editor.jonathanperis.tech/'
 for path, markers in {
     '': ['Super Mango', 'super-mango.js'],
     'docs/': ['Builder Manual', 'Trace every wire'],
