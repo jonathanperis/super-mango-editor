@@ -308,10 +308,11 @@ static void editor_key(EditorState *es, const InputEvent *event)
     int key = event->key;
     int ctrl = (event->mods & (INPUT_CTRL | INPUT_SUPER)) != 0;
     int shift = (event->mods & INPUT_SHIFT) != 0;
-    /* While an entity is being dragged, the drag owns the document: Undo,
-     * Delete or Paste would shift array slots under it.  Only Esc (cancel
-     * the move) acts until the button is released.  Modifier keys stay
-     * silent because Shift is how a drag snaps to the grid. */
+    /* While an entity is being dragged, or a row painted, the gesture owns
+     * the document: Undo, Delete or Paste would shift array slots under
+     * it.  Only Esc acts until the button is released: it cancels a move,
+     * and ends a row, keeping what was placed.  Modifier keys stay silent
+     * because Shift is how a drag snaps to the grid. */
     if (es->dragging || es->painting) {
         if (key == KEY_ESCAPE) {
             if (es->painting) tools_end_paint(es);
@@ -321,7 +322,9 @@ static void editor_key(EditorState *es, const InputEvent *event)
                  key != KEY_LEFT_CONTROL && key != KEY_RIGHT_CONTROL &&
                  key != KEY_LEFT_ALT && key != KEY_RIGHT_ALT &&
                  key != KEY_LEFT_SUPER && key != KEY_RIGHT_SUPER)
-            editor_set_status(es, "Release the mouse to finish the move first (Esc cancels it)");
+            editor_set_status(es, es->painting
+                ? "Release the mouse to finish the row first (Esc ends it)"
+                : "Release the mouse to finish the move first (Esc cancels it)");
         return;
     }
     /* An active text field owns ordinary typing. The digit '2' in a field
