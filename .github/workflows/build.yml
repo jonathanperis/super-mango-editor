@@ -107,6 +107,11 @@ jobs:
       # One checksum-verified raylib source archive shared by every build
       # directory and restored from the Actions cache below.
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      # Compile in parallel: hosted runners have 3-4 cores and every object
+      # used to build one at a time. Test recipes still run their programs
+      # one after another. No --output-sync: it would hold back the output
+      # of a hanging test, and macOS's make 3.81 does not have it.
+      MAKEFLAGS: -j4
       MANGO_CC: ${{ matrix.cc }}
 
     steps:
@@ -403,6 +408,7 @@ jobs:
     env:
       EXTRA_CFLAGS: -Werror
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      MAKEFLAGS: -j4  # see the build job
 
     steps:
       - name: Checkout source
@@ -504,6 +510,7 @@ jobs:
     env:
       EXTRA_CFLAGS: -Werror
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      MAKEFLAGS: -j4  # see the build job
 
     steps:
       - name: Checkout source
@@ -618,6 +625,7 @@ jobs:
     env:
       EXTRA_CFLAGS: -Werror
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      MAKEFLAGS: -j4  # see the build job
 
     defaults:
       run:
@@ -726,6 +734,7 @@ jobs:
     env:
       EXTRA_CFLAGS: ${{ matrix.extra_cflags }}
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      MAKEFLAGS: -j4  # see the build job
       # Hosted Windows VMs have no audio endpoint, and the game requires an
       # audio device to start. Real GLFW/OpenGL graphics with miniaudio's null
       # playback device keeps every test meaningful (see build-system.md).
