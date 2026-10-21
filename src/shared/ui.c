@@ -717,10 +717,23 @@ static size_t field_display_copy(char *out, size_t out_size, const char *text, s
     return i;
 }
 
+/* The start of the character that byte offset `at` of text falls in. */
+static size_t char_start_at(const char *text, size_t at)
+{
+    while (at > 0 && is_continuation_byte(text[at])) at--;
+    return at;
+}
+
 /*
  * draw_field_text — Draw a field's idle text from x: line breaks shown as
  * pilcrows, and text wider than max_width cut at a character boundary and
  * ended with "..." so it never runs past the field.
+ *
+ * Every idle field is drawn each frame, and a description may hold 4 KiB.
+ * Measuring one character shorter at a time cost a measurement of the
+ * whole remaining text per character: millions of glyphs a frame for a
+ * long description.  Width only grows with the prefix, so a binary search
+ * finds the longest prefix that fits in about 12 measurements.
  */
 static void draw_field_text(UIState *ui, int x, int y, int max_width,
                             const char *text, Color color)
@@ -731,12 +744,15 @@ static void draw_field_text(UIState *ui, int x, int y, int max_width,
     (void)field_display_copy(shown, sizeof(shown), text, length);
     if (ui_text_width(ui, shown) > max_width) {
         int room = max_width - ui_text_width(ui, "...");
-        size_t keep = length;
-        while (keep > 0) {
-            keep--;
-            while (keep > 0 && is_continuation_byte(text[keep])) keep--;
-            if (text_width_of(ui, text, 0, keep) <= room) break;
+        /* low ends as the largest offset whose whole characters fit; the
+         * full text does not fit, so the cut always drops something. */
+        size_t low = 0, high = length > 0 ? length - 1 : 0;
+        while (low < high) {
+            size_t mid = low + (high - low + 1) / 2;
+            if (text_width_of(ui, text, 0, char_start_at(text, mid)) <= room) low = mid;
+            else high = mid - 1;
         }
+        size_t keep = char_start_at(text, low);
         (void)field_display_copy(shown, sizeof(shown) - 3, text, keep);
         strcat(shown, "...");
     }
