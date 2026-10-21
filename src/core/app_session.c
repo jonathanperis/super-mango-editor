@@ -188,6 +188,12 @@ static void session_close_game(AppSession *session)
     if (!session->game) return;
     settings_menu_cleanup(&session->settings);
     GameState *game = session->game;
+    /* A smoke run's count goes on in the next game (a Replay, say), rather
+     * than starting again and never reaching its end. */
+    if (session->smoke_test_frames > 0) {
+        session->smoke_test_frames = game->screen.smoke_test_frames;
+        session->smoke_frames_run = game->screen.loop.smoke_frames_run;
+    }
     /* Detach the owner first, then release its contents and the allocation.
      * game_cleanup releases members; it does not free the GameState itself. */
     session->game = NULL;
@@ -484,6 +490,7 @@ static GameState *session_make_game(AppSession *session, const char *path, const
     game->screen.debug_mode = session->debug_mode;
     game->screen.random_seed = session->random_seed;
     game->screen.smoke_test_frames = session->smoke_test_frames;
+    game->screen.loop.smoke_frames_run = session->smoke_frames_run;
     copy_path(game->world.level_path, sizeof(game->world.level_path), path);
     copy_path(game->screen.replay_script_path, sizeof(game->screen.replay_script_path), session->replay_script_path);
     copy_path(game->screen.replay_dir, sizeof(game->screen.replay_dir), session->replay_dir);

@@ -1275,13 +1275,32 @@ static int replay_reuses_the_session_assets(void)
 
 static int native_replay_keeps_session_ownership(void)
 {
+    /* Two frames: the Replay asked for on the first, one left for the new game. */
     AppSessionConfig config = {.level_path = "tests/fixtures/runtime/transition.toml",
-                               .smoke_test_frames = 1};
+                               .smoke_test_frames = 2};
     AppSession *session = session_create(&config);
     if (!session) return 1;
     session->game->screen.route = GAME_ROUTE_REPLAY;
     int result = session_run(session) != EXIT_SUCCESS ||
                  expect_int("native replay reopens game", session->game_open_count, 2);
+    session_destroy(&session);
+    return result;
+}
+
+/* --smoke-test-frames counts the whole run. A Replay used to hand the new
+ * game the full count again, so a replay script that finished the level
+ * and chose Replay never ended. */
+static int smoke_frames_count_across_a_replay(void)
+{
+    AppSessionConfig config = {.level_path = "tests/fixtures/runtime/transition.toml",
+                               .smoke_test_frames = 3};
+    AppSession *session = session_create(&config);
+    if (!session) return 1;
+    session->game->screen.route = GAME_ROUTE_REPLAY;
+    int result = session_run(session) != EXIT_SUCCESS ||
+                 expect_int("the replay opens a second game", session->game_open_count, 2) ||
+                 expect_int("both games share the three frames", session->smoke_frames_run, 3) ||
+                 expect_int("no frames are left", session->smoke_test_frames, 0);
     session_destroy(&session);
     return result;
 }
@@ -1771,6 +1790,7 @@ int main(void)
         CASE(web_frame_pacing_contract_test),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
+        CASE(smoke_frames_count_across_a_replay),
         CASE(replay_reuses_the_session_assets),
         CASE(asset_cache_contract_test), CASE(session_asset_reuse_test),
         CASE(game_without_session_frees_its_files_test),
