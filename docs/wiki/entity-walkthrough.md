@@ -243,7 +243,7 @@ placement struct. Follow the existing `ENT_COIN` code in each place:
 | `undo.h` | Add `TokenPlacement token;` to the `PlacementData` union |
 | `properties.c` | Write `draw_token_properties()` with x/y fields that call `editor_commit_change()`, and point `[ENT_TOKEN]` at it in `s_property_panels` |
 | `hit_test.c` | Add a bounds case to `editor_entity_bounds()` and put `ENT_TOKEN` into `s_hit_order`, which is the exact reverse of the canvas draw order |
-| `canvas.c` | A render function for Tokens, called from `canvas_render()` beside `render_coins()` |
+| `canvas.c` | Put `ENT_TOKEN` into `s_pickup_sprites` just after `ENT_COIN`: `render_sprites()` draws each token in the box from `editor_entity_bounds()`, with the sprite from its `s_entity_meta` row |
 | `tools.c` | Clamp case in `editor_clamp_placement()`, move case in `editor_move_placement()` (drag, nudge and paste all move through it) and defaults in `default_placement()` |
 | `editor_session.c` | Add `EDITOR_HASH_ARRAY` for tokens to the document hash so the dirty marker sees Token edits |
 
