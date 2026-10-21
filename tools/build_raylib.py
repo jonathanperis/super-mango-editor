@@ -102,7 +102,9 @@ def main() -> None:
                "-DCUSTOMIZE_BUILD=OFF",
                "-DCMAKE_BUILD_TYPE=" + ("Debug" if args.mode == "debug" else "Release")]
     if args.platform == "web":
-        command = ["emcmake", *command, "-DPLATFORM=Web"]
+        # Size over speed for the download, like the Makefile's WEB_OPT. CMake
+        # appends its Release flags (-O3) after CMAKE_C_FLAGS, so set them.
+        command = ["emcmake", *command, "-DPLATFORM=Web", "-DCMAKE_C_FLAGS_RELEASE=-Os -DNDEBUG"]
     else:
         command += ["-DPLATFORM=" + ("Memory" if args.platform == "memory" else "Desktop"),
                     "-DCMAKE_C_COMPILER=" + args.cc]
