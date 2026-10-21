@@ -185,7 +185,7 @@ int player_update_climbing(Player *player, float dt,
     }
 
     /* Bottom detach — feet below climbable bottom → release and fall. */
-    float player_bottom = player->y + player->h - FLOOR_SINK;
+    float player_bottom = player->y + player->h - PLAYER_FLOOR_SINK;
     if (player_bottom > climb_bottom) {
         player->on_vine = 0;
         player->vy      = 0.0f;

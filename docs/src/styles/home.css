@@ -80,7 +80,7 @@
 .scene-player {
     position: absolute;
     left: 18%;
-    /* The game sinks the player 16 px into the ground (FLOOR_SINK); at 3x
+    /* The game sinks the player 16 px into the ground (PLAYER_FLOOR_SINK); at 3x
      * that is 48 px, so the frame's bottom sits 48 px below the grass top. */
     bottom: calc(var(--ground-h) - 48px);
     z-index: 2;
@@ -415,7 +415,7 @@
     border-image: var(--grass) 16 16 0 fill / 32px 32px 0 repeat;
     image-rendering: pixelated;
 }
-/* At 2x the 16 px FLOOR_SINK becomes 32 px: feet meet the grass top (32 px). */
+/* At 2x the 16 px PLAYER_FLOOR_SINK becomes 32 px: feet meet the grass top (32 px). */
 .footer-player { position: absolute; left: 12%; top: -32px; z-index: 1; }
 /* The credits sit on the level's dirt: the same 9-slice tile, with the
  * grass edge hidden off the top so only soil shows. */

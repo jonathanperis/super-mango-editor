@@ -95,14 +95,14 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
      *   floor.  Capturing the true absolute value before the update avoids
      *   all cancellation error.
      */
-    const float prev_bottom = player->y + player->h - FLOOR_SINK;
+    const float prev_bottom = player->y + player->h - PLAYER_FLOOR_SINK;
     /*
      * prev_top — sprite top edge before this frame's physics update.
-     * Derived from prev_bottom: prev_top = prev_bottom − player->h + FLOOR_SINK.
+     * Derived from prev_bottom: prev_top = prev_bottom − player->h + PLAYER_FLOOR_SINK.
      * Combined with PHYS_PAD_TOP below to obtain the physical head position
      * for the spike-platform ceiling crossing test.
      */
-    const float prev_top    = prev_bottom - player->h + FLOOR_SINK;
+    const float prev_top    = prev_bottom - player->h + PLAYER_FLOOR_SINK;
     /*
      * prev_center_x — physics centre before this frame's movement. With
      * prev_bottom it tells the floor check whether the player was already
@@ -144,13 +144,13 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
      * platform or bridge candidate. Do not carry the player with, or crumble,
      * a discarded support.
      *
-     * Landing set y = surface_y - h + FLOOR_SINK; adding h back and
-     * subtracting FLOOR_SINK can differ from surface_y in the last bits of a
+     * Landing set y = surface_y - h + PLAYER_FLOOR_SINK; adding h back and
+     * subtracting PLAYER_FLOOR_SINK can differ from surface_y in the last bits of a
      * float, so "still on this surface" allows a tiny tolerance instead of
      * exact equality. Other surfaces sit whole pixels away. vy is exactly 0
      * after a landing (it is assigned, not computed), so that test stays. */
     const float support_tolerance = 0.01f;   /* logical px */
-    const float feet = player->y + player->h - FLOOR_SINK;
+    const float feet = player->y + player->h - PLAYER_FLOOR_SINK;
     if (*out_fp_landed_idx >= 0 &&
         (player->vy != 0.0f ||
          fabsf(feet - float_platforms[*out_fp_landed_idx].y) > support_tolerance))

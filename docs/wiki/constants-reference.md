@@ -128,7 +128,7 @@ from x = 0.
 
 ## Player Constants
 
-Frame/hitbox constants live in `player_internal.h`; movement defaults live in `player_lifecycle.c`; jump/climb constants live in focused helper files.
+Frame/hitbox constants live in `player_internal.h`, except `PLAYER_FLOOR_SINK`, which is in the public `player.h` because the level loader uses it too; movement defaults live in `player_lifecycle.c`; jump/climb constants live in focused helper files.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

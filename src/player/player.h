@@ -19,6 +19,17 @@
 #include "../surfaces/rope.h"           /* RopeDecor — climbable, same mechanics as vine   */
 
 /*
+ * PLAYER_FLOOR_SINK — pixels the player overlaps with the floor top.
+ * Transparent padding at the bottom of the 48×48 frame would otherwise make
+ * the character appear to float above the grass.
+ *
+ * Public because the level loader uses it too: it places the player on the
+ * level's spawn point with the same formula a landing uses
+ * (surface_y - h + PLAYER_FLOOR_SINK).
+ */
+#define PLAYER_FLOOR_SINK 16
+
+/*
  * JUMP_VY — upward velocity a jump starts with, in px/s (negative = up).
  *
  * Public because the level validator compares bouncepads against it: a
@@ -99,7 +110,7 @@ typedef struct {
     float air_friction;        /* passive air drag when no key held (px/s²)       */
     float     hurt_timer;        /* seconds remaining of invincibility blink; 0 = normal */
     float     spawn_x;          /* level-defined spawn x (platform top-left)           */
-    float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + FLOOR_SINK) */
+    float     spawn_y;          /* level-defined spawn y (platform top; adjusted by -h + PLAYER_FLOOR_SINK) */
     IntRect      frame;   /* source rect: which part of the sheet to draw */
     Texture2D   *texture; /* sprite sheet held from the asset cache (one
                              reference); NULL until initialized */
