@@ -377,6 +377,44 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 
 /*
+ * LevelLayer — one picture layer drawn behind or in front of the level.
+ *
+ * Background, foreground and fog layers all use this shape, and the
+ * editor's undo snapshot (LevelConfigSnapshot in editor/undo.h) stores the
+ * same type, so the two can be copied without listing each field.
+ */
+typedef struct {
+    char  path[64];   /* PNG path relative to repo root */
+    float speed;      /* scroll fraction: 0.0=static, 0.5=half cam speed */
+} LevelLayer;
+
+/*
+ * LevelPhysics — per-level overrides for the player's movement and camera.
+ *
+ * Every field uses -1.0 to mean "use the engine #define default".  These
+ * fields are applied by level_load after player_init, so they override the
+ * constants without touching any .c file.  Set only the values you want to
+ * change; leave the rest at -1.0 to keep the engine defaults.  0.0 is a
+ * valid override (e.g. zero friction) — do not use it as sentinel.
+ * LevelConfigSnapshot (editor/undo.h) stores the same type, so one struct
+ * assignment copies all of it.
+ */
+typedef struct {
+    float walk_max_speed;       /* max walking speed (px/s)                        */
+    float run_max_speed;        /* max running speed (px/s)                        */
+    float walk_ground_accel;    /* ground accel while walking (px/s²)              */
+    float run_ground_accel;     /* ground accel while running (px/s²)              */
+    float ground_friction;      /* brake when no key held on ground (px/s²)        */
+    float ground_counter_accel; /* extra brake when pressing opposite dir (px/s²)  */
+    float air_accel_walk;       /* air accel in walk arc (px/s²)                   */
+    float air_accel_run;        /* air accel in run arc (less control) (px/s²)     */
+    float air_friction;         /* passive drag in air when no key held (px/s²)    */
+    /* Camera lookahead */
+    float cam_lookahead_vx_factor; /* px of lookahead per px/s of velocity         */
+    float cam_lookahead_max;       /* maximum lookahead offset in pixels            */
+} LevelPhysics;
+
+/*
  * LevelDef — all data needed to load and reset a level.
  *
  * To create a new level, add a TOML document under levels/, load it into a
@@ -501,25 +539,17 @@ typedef struct {
      */
 
     /* Background layers (back-to-front render order) */
-    struct {
-        char  path[64];   /* PNG path relative to repo root */
-        float speed;      /* scroll fraction: 0.0=static, 0.5=half cam speed */
-    } background_layers[MAX_BACKGROUND_LAYERS];
-    int background_layer_count;
+    LevelLayer background_layers[MAX_BACKGROUND_LAYERS];
+    int        background_layer_count;
 
     /* Foreground layers (water/lava strip — rendered on top of floor/entities) */
-    struct {
-        char  path[64];
-        float speed;
-    } foreground_layers[MAX_BACKGROUND_LAYERS];
-    int foreground_layer_count;
+    LevelLayer foreground_layers[MAX_BACKGROUND_LAYERS];
+    int        foreground_layer_count;
 
-    /* Fog layers (atmospheric overlay textures that pan across the screen) */
-    struct {
-        char  path[64];
-        float speed;    /* reserved for future use (e.g. variable drift speed) */
-    } fog_layers[MAX_FOG_TEXTURES];
-    int fog_layer_count;
+    /* Fog layers (atmospheric overlay textures that pan across the screen;
+     * their speed is reserved for future use, e.g. variable drift speed) */
+    LevelLayer fog_layers[MAX_FOG_TEXTURES];
+    int        fog_layer_count;
 
     /* Player spawn position */
     float player_start_x;
@@ -538,25 +568,8 @@ typedef struct {
     int   score_per_life;   /* score threshold for bonus life (0 = use default 1000) */
     int   coin_score;       /* points per coin (0 = use COIN_SCORE default 100)      */
 
-    /* ---- Player movement physics (-1.0 = use engine #define default) --------- *
-     * These fields are applied by level_load after player_init, so they           *
-     * override the constants without touching any .c file.  Set only the values   *
-     * you want to change; leave the rest at -1.0 to keep the engine defaults.     *
-     * 0.0 is a valid override (e.g. zero friction) — do not use it as sentinel.  */
-    struct {
-        float walk_max_speed;       /* max walking speed (px/s)                        */
-        float run_max_speed;        /* max running speed (px/s)                        */
-        float walk_ground_accel;    /* ground accel while walking (px/s²)              */
-        float run_ground_accel;     /* ground accel while running (px/s²)              */
-        float ground_friction;      /* brake when no key held on ground (px/s²)        */
-        float ground_counter_accel; /* extra brake when pressing opposite dir (px/s²)  */
-        float air_accel_walk;       /* air accel in walk arc (px/s²)                   */
-        float air_accel_run;        /* air accel in run arc (less control) (px/s²)     */
-        float air_friction;         /* passive drag in air when no key held (px/s²)    */
-        /* Camera lookahead */
-        float cam_lookahead_vx_factor; /* px of lookahead per px/s of velocity         */
-        float cam_lookahead_max;       /* maximum lookahead offset in pixels            */
-    } physics;
+    /* ---- Player movement physics (see LevelPhysics above) ------------------- */
+    LevelPhysics physics;
 } LevelDef;
 
 /*

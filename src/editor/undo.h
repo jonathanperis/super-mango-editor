@@ -124,6 +124,9 @@ typedef union {
  * LevelConfigSnapshot — focused snapshot for level-wide editor settings.
  * Entity arrays intentionally excluded: config undo must not restore
  * unrelated entity edits.
+ *
+ * The layers and physics use the same LevelLayer and LevelPhysics types as
+ * LevelDef (levels/level.h), so a field added there is copied here too.
  */
 typedef struct {
     char name[LEVEL_NAME_CAPACITY];
@@ -132,22 +135,13 @@ typedef struct {
     int screen_count;
     char next_phase[256];
 
-    struct {
-        char path[64];
-        float speed;
-    } background_layers[MAX_BACKGROUND_LAYERS];
+    LevelLayer background_layers[MAX_BACKGROUND_LAYERS];
     int background_layer_count;
 
-    struct {
-        char path[64];
-        float speed;
-    } foreground_layers[MAX_BACKGROUND_LAYERS];
+    LevelLayer foreground_layers[MAX_BACKGROUND_LAYERS];
     int foreground_layer_count;
 
-    struct {
-        char path[64];
-        float speed;
-    } fog_layers[MAX_FOG_TEXTURES];
+    LevelLayer fog_layers[MAX_FOG_TEXTURES];
     int fog_layer_count;
 
     char music_path[64];
@@ -158,19 +152,7 @@ typedef struct {
     int score_per_life;
     int coin_score;
 
-    struct {
-        float walk_max_speed;
-        float run_max_speed;
-        float walk_ground_accel;
-        float run_ground_accel;
-        float ground_friction;
-        float ground_counter_accel;
-        float air_accel_walk;
-        float air_accel_run;
-        float air_friction;
-        float cam_lookahead_vx_factor;
-        float cam_lookahead_max;
-    } physics;
+    LevelPhysics physics;
 } LevelConfigSnapshot;
 
 /* ------------------------------------------------------------------ */

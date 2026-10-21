@@ -22,6 +22,9 @@ LevelConfigSnapshot editor_snapshot_config(const LevelDef *level)
     memcpy(snapshot.generated_by, level->generated_by, sizeof(snapshot.generated_by));
     snapshot.screen_count = level->screen_count;
     memcpy(snapshot.next_phase, level->next_phase, sizeof(snapshot.next_phase));
+    /* Both sides hold LevelLayer arrays of the same length.  C cannot
+     * assign a whole array, so memcpy copies them; the physics block below
+     * is one struct, so a plain assignment copies every field of it. */
     memcpy(snapshot.background_layers, level->background_layers,
            sizeof(snapshot.background_layers));
     snapshot.background_layer_count = level->background_layer_count;
@@ -38,17 +41,7 @@ LevelConfigSnapshot editor_snapshot_config(const LevelDef *level)
     snapshot.initial_lives = level->initial_lives;
     snapshot.score_per_life = level->score_per_life;
     snapshot.coin_score = level->coin_score;
-    snapshot.physics.walk_max_speed = level->physics.walk_max_speed;
-    snapshot.physics.run_max_speed = level->physics.run_max_speed;
-    snapshot.physics.walk_ground_accel = level->physics.walk_ground_accel;
-    snapshot.physics.run_ground_accel = level->physics.run_ground_accel;
-    snapshot.physics.ground_friction = level->physics.ground_friction;
-    snapshot.physics.ground_counter_accel = level->physics.ground_counter_accel;
-    snapshot.physics.air_accel_walk = level->physics.air_accel_walk;
-    snapshot.physics.air_accel_run = level->physics.air_accel_run;
-    snapshot.physics.air_friction = level->physics.air_friction;
-    snapshot.physics.cam_lookahead_vx_factor = level->physics.cam_lookahead_vx_factor;
-    snapshot.physics.cam_lookahead_max = level->physics.cam_lookahead_max;
+    snapshot.physics = level->physics;
     return snapshot;
 }
 
@@ -76,17 +69,7 @@ static void editor_apply_config_snapshot(LevelDef *level,
     level->initial_lives = snapshot->initial_lives;
     level->score_per_life = snapshot->score_per_life;
     level->coin_score = snapshot->coin_score;
-    level->physics.walk_max_speed = snapshot->physics.walk_max_speed;
-    level->physics.run_max_speed = snapshot->physics.run_max_speed;
-    level->physics.walk_ground_accel = snapshot->physics.walk_ground_accel;
-    level->physics.run_ground_accel = snapshot->physics.run_ground_accel;
-    level->physics.ground_friction = snapshot->physics.ground_friction;
-    level->physics.ground_counter_accel = snapshot->physics.ground_counter_accel;
-    level->physics.air_accel_walk = snapshot->physics.air_accel_walk;
-    level->physics.air_accel_run = snapshot->physics.air_accel_run;
-    level->physics.air_friction = snapshot->physics.air_friction;
-    level->physics.cam_lookahead_vx_factor = snapshot->physics.cam_lookahead_vx_factor;
-    level->physics.cam_lookahead_max = snapshot->physics.cam_lookahead_max;
+    level->physics = snapshot->physics;
 }
 
 void editor_begin_change_tracking(EditorState *es, int kind)
