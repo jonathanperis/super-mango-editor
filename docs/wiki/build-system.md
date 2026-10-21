@@ -322,7 +322,7 @@ Builds and runs native regression harnesses, including hidden-window session/edi
 make test
 ```
 
-Current test binaries (17):
+Current test binaries (18):
 
 - `out/level-serializer-test`
 - `out/level-validate-test`
@@ -332,6 +332,7 @@ Current test binaries (17):
 - `out/collision-test`
 - `out/phase-transition-test`
 - `out/editor-validation-test`
+- `out/editor-undo-recovery-test`
 - `out/gameplay-damage-test`
 - `out/gameplay-config-test`
 - `out/gameplay-score-test`

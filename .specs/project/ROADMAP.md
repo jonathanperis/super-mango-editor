@@ -16,7 +16,7 @@ code-scanning alert (#308, #309). Goal was to resolve both codebase audit rounds
 | Authored checkpoints | Shipped | Optional `[[checkpoints]]` use exact x/y respawns; records disable legacy screen-boundary fallback |
 | Standalone editor | Shipped | `make editor`, `make run-editor`; palette/canvas/properties/undo/playtest support checkpoints |
 | Campaign editing | Shipped | Editor Campaign view (`Ctrl+M`) reorders, adds, removes, renames and relinks manifest entries with the game's campaign rules (`src/levels/campaign_catalog.c`), with its own undo/redo history; `editor_validation_test` / `editor_ui_test` cover it |
-| Tests | Shipped | `make test` runs 17 native binaries, a parser allocation probe, and Python/Node host checks (levels, sounds, parser encoding, web host, packaging, SARIF filter) |
+| Tests | Shipped | `make test` runs 18 native binaries, a parser allocation probe, and Python/Node host checks (levels, sounds, parser encoding, web host, packaging, SARIF filter) |
 | Level validation | Shipped | `make validate-levels` |
 | CI smoke gates | Shipped | Native game/editor smoke, scripted replay smoke and WebAssembly artifact smoke in `build.yml` |
 | Docs checks | Shipped | Always-on `Docs drift` job in `build.yml` runs `make docs-drift`; `docs.yml` lints, audits, builds and site-checks the website on pull requests that touch it, weekly and on demand |

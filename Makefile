@@ -158,7 +158,7 @@ TEST_TARGETS  = $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
                  $(OUTDIR)/runtime-load-test \
                  $(OUTDIR)/rail-test $(OUTDIR)/entity-utils-test \
                  $(OUTDIR)/collision-test $(OUTDIR)/phase-transition-test \
-                 $(OUTDIR)/editor-validation-test \
+                 $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-undo-recovery-test \
                  $(OUTDIR)/gameplay-damage-test $(OUTDIR)/gameplay-config-test \
                  $(OUTDIR)/gameplay-score-test \
                  $(OUTDIR)/game-overlay-test $(OUTDIR)/game-events-test \
@@ -377,6 +377,7 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/collision-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/phase-transition-test"
 	MANGO_TEST_WINDOW=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-validation-test"
+	$(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-undo-recovery-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-damage-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-config-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-score-test"
@@ -648,11 +649,13 @@ $(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/parser_boundary_test.o
 # level_validate.c shares the levels/<name>.toml rule from level_ref.c.
 $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
 $(OUTDIR)/runtime-load-test $(OUTDIR)/editor-validation-test \
+$(OUTDIR)/editor-undo-recovery-test \
 $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_ref.o
 
 # "Playtest from here" checks a start point with the game's own rules, and
 # the Campaign view checks the manifest with them.
-$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_start.o \
+$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-undo-recovery-test \
+$(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_start.o \
 		$(OBJDIR)/src/levels/campaign_catalog.o $(OBJDIR)/src/levels/level_path.o
 
 $(OUTDIR)/level-validate-test: $(TEST_SOURCE_DIR)/level_validate_test.o $(TEST_VALIDATE_OBJ)
@@ -679,6 +682,11 @@ $(OUTDIR)/phase-transition-test: $(TEST_SOURCE_DIR)/phase_transition_test.o $(TE
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
 $(OUTDIR)/editor-validation-test: $(TEST_SOURCE_DIR)/editor_validation_test.o $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
+
+# Undo/redo, the clipboard and crash recovery, called directly on a bare
+# EditorState (no window).
+$(OUTDIR)/editor-undo-recovery-test: $(TEST_SOURCE_DIR)/editor_undo_recovery_test.o $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
 
 # The editor as a designer drives it: events in, document/undo state out.
