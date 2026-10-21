@@ -91,7 +91,7 @@ was built with, compile and link settings apart:
 | `$(OBJDIR)/build-flags.txt` | `CC`, `CFLAGS` (with `EXTRA_CFLAGS`), `PROJECT_INCLUDES` | game, editor and tool objects |
 | `$(OBJDIR)/test-flags.txt` | `CC`, `TEST_CFLAGS`, `PROJECT_INCLUDES`, every per-object `TEST_OBJ_FLAGS_<source>` extra and the text of the two per-object lookups | test copies of objects |
 | `$(OBJDIR)/link-flags.txt` | `CC`, `CFLAGS`, `TEST_CFLAGS`, `LIBS` (with `EXTRA_LDFLAGS`), `EDITOR_LIBS`, `TEST_LIBS`, `MATH_LIBS` | every native program is relinked; no object recompiles |
-| `$(OBJDIR)/fuzz-flags.txt` | `CC`, `FUZZ_FLAGS`, `LIBS`, `MATH_LIBS` | the two fuzz replay programs |
+| `$(OBJDIR)/fuzz-flags.txt` | `CC`, `FUZZ_FLAGS`, `LIBS`, `MATH_LIBS` | the three fuzz replay programs |
 | `$(RAYLIB_BUILD)/make-options.txt` | the `build_raylib.py` options | raylib |
 | `$(WEB_RAYLIB_BUILD)/make-options.txt` | the Emscripten pin and `WEB_RAYLIB_OPTIONS` | Web raylib |
 | `$(OBJDIR)/web/build-flags.txt` | the Emscripten pin, `WEB_CFLAGS` (with `WEB_OPT` and `EXTRA_WEB_CFLAGS`), `WEB_INCLUDES` | Web objects |
@@ -343,7 +343,7 @@ Current test binaries (18):
 - `out/gameplay-mechanics-test`
 - `out/editor-ui-test`
 
-`make test` also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`.
+`make test` also runs `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`, `tests/coverage_baseline_test.py` and `tests/clang_tidy_report_test.py`.
 Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
 Node tests `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
 `tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs` and
@@ -392,11 +392,23 @@ Builds the game and editor and runs `make test` in a separate `out-sanitize/` tr
 
 ### `make coverage`
 
-Rebuilds and runs `make test` in `out/coverage/` with clang source-based coverage, then prints an `llvm-cov` per-file summary. Requires clang plus `llvm-profdata`/`llvm-cov` (`xcrun` on macOS). See [Testing](../testing/#coverage).
+Rebuilds and runs `make test` in `out/coverage/` with clang source-based coverage, then prints an `llvm-cov` per-file summary and compares each file with `tools/coverage_baseline.txt` (`COVERAGE_TOLERANCE=<points>` makes a drop fail). Requires clang plus `llvm-profdata`/`llvm-cov` (`xcrun` on macOS). See [Testing](../testing/#coverage).
+
+### `make coverage-baseline`
+
+Runs `make coverage`, then rewrites `tools/coverage_baseline.txt` with every file's line coverage. Use the CI configuration, which the baseline describes:
+
+```sh
+make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+```
+
+### `make tidy`
+
+Writes `compile_commands.json` (`make compile-commands`), then runs clang-tidy with the checks in `.clang-tidy` over `src/` and `tools/` through `tools/run_clang_tidy.py`. It prints the findings and exits 0; `CLANG_TIDY=` picks the program. `static-analysis.yml` runs the same script in CI. See [Testing](../testing/#static-analysis).
 
 ### `make fuzz-corpus` / `make fuzz`
 
-`fuzz-corpus` replays the level and profile fuzz seeds under ASan/UBSan with a plain driver. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). See [Testing](../testing/#fuzzing).
+`fuzz-corpus` replays the level, editor round-trip and profile fuzz seeds under ASan/UBSan with a plain driver; CI's sanitizer job passes `FUZZ_MUTATIONS=50`. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). See [Testing](../testing/#fuzzing).
 
 ```sh
 make fuzz-corpus FUZZ_MUTATIONS=500
@@ -593,14 +605,15 @@ make
 
 ## CI/CD Pipelines
 
-Four workflow files handle automated builds, docs checks, analysis and fuzzing; GitHub Pages publishing is part of `build.yml`:
+Five workflow files handle automated builds, docs checks, analysis and fuzzing; GitHub Pages publishing is part of `build.yml`:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (a required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); Linux scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format); a `Coverage (Linux x86_64)` job runs `make coverage` on the Memory backend with a line-coverage floor and posts the per-file table to the job summary; on `main` pushes a `Release freshness` job warns when `main` is more than 50 commits past the latest `v*` tag. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` (tagged `v1.0.<commit count>`) |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (a required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); Linux scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format); a `Coverage (Linux x86_64)` job runs `make coverage` on the Memory backend with a line-coverage floor and a per-file check against `tools/coverage_baseline.txt` (no file may drop more than 2 points), posts the per-file table and the baseline comparison to the job summary and uploads `summary.txt` as the `coverage-summary` artifact; the three Windows jobs each cover something the others do not (comments in `build.yml`): the GCC build leg ships and checks the release zip, the Clang job catches Clang warnings in `_WIN32`-only code, and `Desktop backend` runs the real GLFW/OpenGL backend and the scripted smoke; on `main` pushes a `Release freshness` job warns when `main` is more than 50 commits past the latest `v*` tag. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` (tagged `v1.0.<commit count>`) |
 | Docs | `docs.yml` | Relevant pull requests, weekly, manual | Frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows. `make docs-drift` is left to the always-on `Docs drift` job, and on `main` the `Pages build` job lints, builds and checks the site, so neither runs twice. The weekly run audits the lockfile against new advisories. Superseded PR runs are cancelled |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis; superseded PR runs are cancelled. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
-| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 60 seconds per harness) on the level loader and the profile and ghost decoders. Not a required check. Every pull request still replays the fuzz seed corpus under `make sanitize` |
+| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 60 seconds per harness) on the level loader, the editor's save → load round trip and the profile and ghost decoders. Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
+| Static analysis | `static-analysis.yml` | Push to `main`, pull requests, manual | `clang-tidy (informational)`: builds the pinned raylib for its headers, writes `compile_commands.json` and runs `tools/run_clang_tidy.py` with the checks in `.clang-tidy` (Clang static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/` only. Findings go to the job summary; the job never fails on them and is not a required check |
 | Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
 
 Every job sets `timeout-minutes`. Every native leg (Clang and GCC) passes

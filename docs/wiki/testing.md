@@ -10,11 +10,12 @@ Use this page to choose the smallest useful verification set for a change. Run c
 
 | Changed area | Run locally | Why |
 |--------------|-------------|-----|
-| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 18 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, parser encoding, web host, release packaging, CodeQL SARIF filter). |
+| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 18 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, coverage baseline, clang-tidy report, parser encoding, web host, release packaging, CodeQL SARIF filter). |
 | Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Loads root and lab levels through the C loader and validator, then checks assets, the v1 campaign manifest, generated facts, schema docs and prose counts. |
 | Player/world runtime startup | `make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Renders every TOML level plus the editor in bounded hidden windows. |
 | Replay or event handling | `make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic commands/action masks and checks movement/jump/pause results. |
 | Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the editor and renders five hidden-window frames; a desktop context is still required. |
+| Suspected C defects | `make tidy` | clang-tidy (static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/`; report only. |
 | Memory/UB-sensitive C changes | `make sanitize CC=clang` and, when startup paths changed, `make sanitize-smoke CC=clang` | Runs AddressSanitizer/UBSan over tests and optionally smoke startup. |
 | Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts and sounds, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap/CSP (`check-site` also runs `tests/docs_checks_test.py`). Uses the frozen `bun.lock` dependency set. |
 | WebAssembly payload | `make web`, artifact checks, green WebAssembly + Pages assembly checks, and actual browser startup for runtime changes | Build raylib and the application with the same pinned SDK. HTTP/module checks do not execute the browser frame loop. |
@@ -58,7 +59,8 @@ archive contents, editor inclusion, reserve-asset exclusion and license notices.
 - `gameplay-mechanics-test`
 - `editor-ui-test`
 
-It also runs `tests/validate_levels_test.py` and `tests/gen_sounds_test.py`. The
+It also runs `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`,
+`tests/coverage_baseline_test.py` and `tests/clang_tidy_report_test.py`. The
 `web-host-contract` prerequisite adds `tools/check_web_boot_contract.py`,
 `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
 `tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs`,
@@ -168,32 +170,67 @@ fails the run when the TOTAL line coverage drops below that floor; it is empty
 (report only) by default. The `Coverage (Linux x86_64)` CI job runs
 `make coverage` on the headless Memory backend with a floor set a little below
 the measured total (91.2% of lines when the floor was set), and publishes the
-per-file table in the job summary.
+per-file table in the job summary and as the `coverage-summary` artifact.
+
+A total can hide one file losing its tests, so `make coverage` also compares
+every file's line coverage with its number in `tools/coverage_baseline.txt`
+(`tools/check_coverage_baseline.py`, tested by `tests/coverage_baseline_test.py`).
+`COVERAGE_TOLERANCE=<points>` fails the run when a file falls more than that
+many points below its baseline; it is empty (report only) by default, and CI
+sets 2. New and removed files are listed but never fail. When coverage changes
+on purpose (tests removed, a file split), refresh the baseline in the same pull
+request with the CI configuration:
+
+```sh
+make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+```
 
 Coverage only measures what the tests execute. Use it to find untested
 branches; the CI floor only catches a large, accidental drop.
 
 ## Fuzzing
 
-Two harnesses feed untrusted text to the parsers the game uses
+Three harnesses feed untrusted text to the parsers the game and editor use
 (POSIX only):
 
 - `tests/fuzz_level_parse.c` writes the input to a temporary `.toml` file and
   calls `level_load_toml()` (tomlc17, schema, loaders, `level_validate_runtime()`).
   An accepted level must save, reload and save again to identical bytes.
+- `tests/fuzz_editor_roundtrip.c` checks the editor's promise that a saved
+  level opens unchanged. An accepted level is saved as a new file and as a
+  crash-recovery copy, and each reloaded `LevelDef` must equal the first one
+  byte for byte, which also catches a field that is loaded but never saved.
+  The recovery copy's destination path (the level's name) must read back
+  unless it holds a control byte. Its own seeds are in
+  `tests/fuzz/corpus/editor/`.
 - `tests/fuzz_profile_decode.c` calls `game_profile_decode()`. An accepted
   profile must encode, decode and encode again to identical text.
 
-Both define the libFuzzer entry point `LLVMFuzzerTestOneInput`.
+Each defines the libFuzzer entry point `LLVMFuzzerTestOneInput`.
 
 | Command | What it does |
 |---------|--------------|
-| `make fuzz-corpus` | Builds both harnesses with `tests/fuzz_replay_main.c` under ASan/UBSan and replays the seeds: `levels/`, `levels/labs/`, `tests/fixtures/serializer_v1/`, `tests/fixtures/runtime/`, `tests/fuzz/corpus/level/` and `tests/fuzz/corpus/profile/`. `make sanitize` runs it too. `FUZZ_MUTATIONS=N` adds N blind byte mutations per seed: this is slower and weaker than libFuzzer, but needs no extra toolchain. |
-| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/` and `out/fuzz/profile/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. `.github/workflows/fuzz.yml` runs this weekly and on demand; it is not a required check. |
+| `make fuzz-corpus` | Builds every harness with `tests/fuzz_replay_main.c` under ASan/UBSan and replays the seeds: `levels/`, `levels/labs/`, `tests/fixtures/serializer_v1/`, `tests/fixtures/runtime/`, `tests/fuzz/corpus/level/` and `tests/fuzz/corpus/profile/`, and for the editor harness the level seeds plus `tests/fuzz/corpus/editor/`. `make sanitize` runs it too, and CI's sanitizer job adds `FUZZ_MUTATIONS=50`. `FUZZ_MUTATIONS=N` adds N blind byte mutations per seed: this is slower and weaker than libFuzzer, but needs no extra toolchain. |
+| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/`, `out/fuzz/editor/` and `out/fuzz/profile/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. `.github/workflows/fuzz.yml` runs this weekly and on demand; it is not a required check. |
 
-Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-profile-replay`).
+Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-editor-replay`, `out/fuzz-profile-replay`).
 If an input exposed a real bug, add it to `tests/fuzz/corpus/` after the fix.
 Keep that corpus small and hand-reviewed.
+
+## Static Analysis
+
+`make tidy` runs clang-tidy over the project's own C files (`src/` and
+`tools/`) using the checks in `.clang-tidy`: the Clang static analyzer
+(`clang-analyzer-*`), `bugprone-*` and a few CERT C rules. The file lists the
+checks it turns off and why (most fire on correct code here, such as
+`#define _POSIX_C_SOURCE` or every `(x, y)` parameter pair). Findings in
+`vendor/` and raylib's headers are never reported. `tools/run_clang_tidy.py`
+reads `compile_commands.json`, prints each finding once and exits 0;
+`--strict` makes any finding fail, and `tests/clang_tidy_report_test.py`
+covers its filtering. The `clang-tidy (informational)` job in
+`.github/workflows/static-analysis.yml` runs it on every pull request and lists
+the findings in its job summary; it is not a required check, so read the
+findings as leads to triage, not as errors.
 
 ## Browser Startup Check
 

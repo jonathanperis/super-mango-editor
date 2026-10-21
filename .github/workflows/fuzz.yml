@@ -1,8 +1,9 @@
 name: Fuzz
 
-# Weekly coverage-guided search of the level loader and the profile and ghost
-# decoders. Pull requests already replay the seed corpus under `make sanitize`
-# in build.yml. This job is not a required check: a crash here is a bug to
+# Weekly coverage-guided search of the level loader, the editor's save -> load
+# round trip (tests/fuzz_editor_roundtrip.c) and the profile and ghost
+# decoders; `make fuzz` runs each harness in turn for FUZZ_SECONDS. Pull
+# requests already replay the seed corpus under `make sanitize` in build.yml. This job is not a required check: a crash here is a bug to
 # fix, and the failing input is uploaded from out/fuzz/.
 on:
   schedule:
