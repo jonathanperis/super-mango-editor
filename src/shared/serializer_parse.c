@@ -120,6 +120,8 @@ typedef struct {
     size_t enum_count;
     SerializerEnumValidator enum_validator;
     int required;
+    size_t string_capacity; /* STRING fields: bytes of the char array the value
+                             * is copied into, including the final NUL */
 } SerializerFieldSpec;
 
 typedef enum {
@@ -136,16 +138,25 @@ typedef struct {
     const SerializerFieldSpec *fields;
     size_t field_count;
     int max_count;
+    size_t string_capacity; /* string values: same as in SerializerFieldSpec */
 } SerializerRootSpec;
 
-#define INTEGER_FIELD(key) { key, SERIALIZER_VALUE_INTEGER, NULL, 0, NULL, 0 }
-#define NUMBER_FIELD(key)  { key, SERIALIZER_VALUE_NUMBER,  NULL, 0, NULL, 0 }
-#define STRING_FIELD(key)  { key, SERIALIZER_VALUE_STRING,  NULL, 0, NULL, 0 }
+/*
+ * A string field names the char array its value is copied into, and its
+ * capacity is that array's size: STRING_FIELD("path", FIELD_SIZE(LevelLayer,
+ * path)) refuses a path that would not fit in LevelLayer.path.  FIELD_SIZE
+ * asks sizeof about a struct member without needing a variable of that type.
+ */
+#define FIELD_SIZE(type, member) sizeof(((type *)0)->member)
+#define INTEGER_FIELD(key) { key, SERIALIZER_VALUE_INTEGER, NULL, 0, NULL, 0, 0 }
+#define NUMBER_FIELD(key)  { key, SERIALIZER_VALUE_NUMBER,  NULL, 0, NULL, 0, 0 }
+#define STRING_FIELD(key, capacity) \
+    { key, SERIALIZER_VALUE_STRING, NULL, 0, NULL, 0, capacity }
 #define REQUIRED_NUMBER_FIELD(key) \
-    { key, SERIALIZER_VALUE_NUMBER, NULL, 0, NULL, 1 }
+    { key, SERIALIZER_VALUE_NUMBER, NULL, 0, NULL, 1, 0 }
 #define ENUM_FIELD(key, values, validator) \
     { key, SERIALIZER_VALUE_ENUM, values, sizeof(values) / sizeof((values)[0]), \
-      validator, 0 }
+      validator, 0, 0 }
 
 static const char *const RAIL_LAYOUT_VALUES[] = {"RECT", "HORIZ"};
 static const char *const AXE_MODE_VALUES[] = {"PENDULUM", "SPIN"};
@@ -175,13 +186,14 @@ static const SerializerFieldSpec PLATFORM_FIELDS[] = {
     NUMBER_FIELD("x"),
     INTEGER_FIELD("tile_height"),
     INTEGER_FIELD("tile_width"),
-    STRING_FIELD("tile_path")
+    STRING_FIELD("tile_path", FIELD_SIZE(PlatformPlacement, tile_path))
 };
 
 static const SerializerFieldSpec LAST_STAR_FIELDS[] = {
     NUMBER_FIELD("x"),
     NUMBER_FIELD("y"),
-    STRING_FIELD("next_phase")
+    /* last_star.next_phase is stored in LevelDef.next_phase */
+    STRING_FIELD("next_phase", FIELD_SIZE(LevelDef, next_phase))
 };
 
 static const SerializerFieldSpec SPIDER_FIELDS[] = {
@@ -287,7 +299,7 @@ static const SerializerFieldSpec CLIMBABLE_FIELDS[] = {
 };
 
 static const SerializerFieldSpec LAYER_FIELDS[] = {
-    STRING_FIELD("path"),
+    STRING_FIELD("path", FIELD_SIZE(LevelLayer, path)),
     NUMBER_FIELD("speed")
 };
 
@@ -307,22 +319,25 @@ static const SerializerFieldSpec PHYSICS_FIELDS[] = {
 
 #define FIELD_COUNT(fields) (sizeof(fields) / sizeof((fields)[0]))
 #define ROOT_VALUE(key, value_kind) \
-    { key, SERIALIZER_ROOT_VALUE, value_kind, NULL, 0, 0 }
+    { key, SERIALIZER_ROOT_VALUE, value_kind, NULL, 0, 0, 0 }
+#define ROOT_STRING(key, capacity) \
+    { key, SERIALIZER_ROOT_VALUE, SERIALIZER_VALUE_STRING, NULL, 0, 0, \
+      capacity }
 #define ROOT_TABLE(key, table_fields) \
     { key, SERIALIZER_ROOT_TABLE, SERIALIZER_VALUE_STRING, table_fields, \
-      FIELD_COUNT(table_fields), 0 }
+      FIELD_COUNT(table_fields), 0, 0 }
 #define ROOT_INTEGER_ARRAY(key, max_items) \
     { key, SERIALIZER_ROOT_ARRAY_INTEGER, SERIALIZER_VALUE_INTEGER, NULL, 0, \
-      max_items }
+      max_items, 0 }
 #define ROOT_TABLE_ARRAY(key, table_fields, max_items) \
     { key, SERIALIZER_ROOT_ARRAY_TABLE, SERIALIZER_VALUE_STRING, table_fields, \
-      FIELD_COUNT(table_fields), max_items }
+      FIELD_COUNT(table_fields), max_items, 0 }
 
 static const SerializerRootSpec ROOT_FIELDS[] = {
     ROOT_VALUE("format_version", SERIALIZER_VALUE_INTEGER),
-    ROOT_VALUE("name", SERIALIZER_VALUE_STRING),
-    ROOT_VALUE("description", SERIALIZER_VALUE_STRING),
-    ROOT_VALUE("generated_by", SERIALIZER_VALUE_STRING),
+    ROOT_STRING("name", FIELD_SIZE(LevelDef, name)),
+    ROOT_STRING("description", FIELD_SIZE(LevelDef, description)),
+    ROOT_STRING("generated_by", FIELD_SIZE(LevelDef, generated_by)),
     ROOT_VALUE("screen_count", SERIALIZER_VALUE_INTEGER),
     ROOT_INTEGER_ARRAY("floor_gaps", MAX_FLOOR_GAPS),
     ROOT_TABLE_ARRAY("rails", RAIL_FIELDS, MAX_RAILS),
@@ -365,9 +380,9 @@ static const SerializerRootSpec ROOT_FIELDS[] = {
     ROOT_TABLE_ARRAY("fog_layers", LAYER_FIELDS, MAX_FOG_TEXTURES),
     ROOT_VALUE("player_start_x", SERIALIZER_VALUE_NUMBER),
     ROOT_VALUE("player_start_y", SERIALIZER_VALUE_NUMBER),
-    ROOT_VALUE("music_path", SERIALIZER_VALUE_STRING),
+    ROOT_STRING("music_path", FIELD_SIZE(LevelDef, music_path)),
     ROOT_VALUE("music_volume", SERIALIZER_VALUE_INTEGER),
-    ROOT_VALUE("floor_tile_path", SERIALIZER_VALUE_STRING),
+    ROOT_STRING("floor_tile_path", FIELD_SIZE(LevelDef, floor_tile_path)),
     ROOT_VALUE("initial_hearts", SERIALIZER_VALUE_INTEGER),
     ROOT_VALUE("initial_lives", SERIALIZER_VALUE_INTEGER),
     ROOT_VALUE("score_per_life", SERIALIZER_VALUE_INTEGER),
@@ -378,12 +393,14 @@ static const SerializerRootSpec ROOT_FIELDS[] = {
 #undef ROOT_TABLE_ARRAY
 #undef ROOT_INTEGER_ARRAY
 #undef ROOT_TABLE
+#undef ROOT_STRING
 #undef ROOT_VALUE
 #undef FIELD_COUNT
 #undef ENUM_FIELD
 #undef STRING_FIELD
 #undef NUMBER_FIELD
 #undef INTEGER_FIELD
+#undef FIELD_SIZE
 
 PRINTF_FORMAT(3, 4)
 static int schema_error(char *error, size_t error_size, const char *format, ...)
@@ -487,10 +504,13 @@ static int toml_string_matches(toml_datum_t value, const char *expected)
     return memcmp(value.u.str.ptr, expected, expected_len) == 0;
 }
 
+/* string_capacity is only read for SERIALIZER_VALUE_STRING (see
+ * STRING_FIELD); every other type passes 0. */
 static int validate_scalar(toml_datum_t value, SerializerValueType expected,
                            const char *path, const char *const *enum_values,
                            size_t enum_count,
                            SerializerEnumValidator enum_validator,
+                           size_t string_capacity,
                            char *error, size_t error_size)
 {
     if (expected == SERIALIZER_VALUE_INTEGER) {
@@ -543,15 +563,10 @@ static int validate_scalar(toml_datum_t value, SerializerValueType expected,
             return schema_error(error, error_size,
                                 "%s is not valid UTF-8", path);
         }
-        const char *key = strrchr(path, '.');
-        key = key ? key + 1 : path;
-        size_t capacity = sizeof(((LevelDef *)0)->music_path);
-        if (!strcmp(key, "name")) capacity = sizeof(((LevelDef *)0)->name);
-        if (!strcmp(key, "description")) capacity = sizeof(((LevelDef *)0)->description);
-        if (!strcmp(key, "generated_by")) capacity = sizeof(((LevelDef *)0)->generated_by);
-        if (!strcmp(key, "next_phase")) capacity = sizeof(((LevelDef *)0)->next_phase);
-        if (value.u.str.len < 0 || (size_t)value.u.str.len >= capacity) {
-            return schema_error(error, error_size, "%s exceeds its %zu-byte storage", path, capacity - 1);
+        /* The value and its final NUL must fit in the field's array. */
+        if ((size_t)value.u.str.len >= string_capacity) {
+            return schema_error(error, error_size, "%s exceeds its %zu-byte storage",
+                                path, string_capacity - 1);
         }
         return 0;
     }
@@ -604,7 +619,7 @@ static int validate_table_fields(toml_datum_t table, const char *path,
         }
         if (validate_scalar(table.u.tab.value[i], field->type, child_path,
                             field->enum_values, field->enum_count,
-                            field->enum_validator,
+                            field->enum_validator, field->string_capacity,
                             error, error_size) != 0) {
             return -1;
         }
@@ -652,7 +667,7 @@ static int validate_root_array(const SerializerRootSpec *field,
         if (field->type == SERIALIZER_ROOT_ARRAY_INTEGER) {
             snprintf(item_path, sizeof(item_path), "%s[%d]", path, i);
             if (validate_scalar(item, SERIALIZER_VALUE_INTEGER, item_path,
-                                NULL, 0, NULL, error, error_size) != 0) {
+                                NULL, 0, NULL, 0, error, error_size) != 0) {
                 return -1;
             }
         } else {
@@ -695,7 +710,8 @@ static int validate_root_v1(toml_datum_t top, char *error, size_t error_size)
         switch (field->type) {
             case SERIALIZER_ROOT_VALUE:
                 if (validate_scalar(value, field->value_type, path, NULL, 0,
-                                    NULL, error, error_size) != 0) {
+                                    NULL, field->string_capacity,
+                                    error, error_size) != 0) {
                     return -1;
                 }
                 break;
@@ -721,7 +737,8 @@ static int validate_root_v1(toml_datum_t top, char *error, size_t error_size)
 /* Legacy files may use fractional integers and omit types/fields. Validate
  * every value we actually consume before the legacy readers convert it. */
 static int validate_legacy_value(toml_datum_t value, SerializerValueType type,
-                                 const char *path, char *error, size_t error_size)
+                                 size_t string_capacity, const char *path,
+                                 char *error, size_t error_size)
 {
     if (type == SERIALIZER_VALUE_INTEGER && value.type == TOML_FP64) {
         if (!isfinite(value.u.fp64) || trunc(value.u.fp64) < INT_MIN ||
@@ -733,7 +750,8 @@ static int validate_legacy_value(toml_datum_t value, SerializerValueType type,
         (type == SERIALIZER_VALUE_NUMBER &&
          (value.type == TOML_INT64 || value.type == TOML_FP64)) ||
         (type == SERIALIZER_VALUE_STRING && value.type == TOML_STRING))
-        return validate_scalar(value, type, path, NULL, 0, NULL, error, error_size);
+        return validate_scalar(value, type, path, NULL, 0, NULL, string_capacity,
+                               error, error_size);
     return 0;
 }
 
@@ -745,7 +763,8 @@ static int validate_legacy_fields(toml_datum_t table, const SerializerRootSpec *
         const SerializerFieldSpec *field = find_field(root->fields, root->field_count,
                                                        table.u.tab.key[i], table.u.tab.len[i]);
         if (field && validate_legacy_value(table.u.tab.value[i], field->type,
-                                           field->name, error, error_size) != 0) return -1;
+                                           field->string_capacity, field->name,
+                                           error, error_size) != 0) return -1;
     }
     return 0;
 }
@@ -757,7 +776,8 @@ static int validate_legacy(toml_datum_t top, char *error, size_t error_size)
         toml_datum_t value = top.u.tab.value[i];
         if (!field) continue;
         if (field->type == SERIALIZER_ROOT_VALUE) {
-            if (validate_legacy_value(value, field->value_type, field->name, error, error_size) != 0)
+            if (validate_legacy_value(value, field->value_type, field->string_capacity,
+                                      field->name, error, error_size) != 0)
                 return -1;
         } else if (field->type == SERIALIZER_ROOT_TABLE) {
             if (validate_legacy_fields(value, field, error, error_size) != 0) return -1;
@@ -765,7 +785,8 @@ static int validate_legacy(toml_datum_t top, char *error, size_t error_size)
             for (int j = 0; j < value.u.arr.size; j++) {
                 if (field->type == SERIALIZER_ROOT_ARRAY_INTEGER) {
                     if (validate_legacy_value(value.u.arr.elem[j], SERIALIZER_VALUE_INTEGER,
-                                               field->name, error, error_size) != 0) return -1;
+                                              0, field->name, error, error_size) != 0)
+                        return -1;
                 } else if (validate_legacy_fields(value.u.arr.elem[j], field, error, error_size) != 0)
                     return -1;
             }

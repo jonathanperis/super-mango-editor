@@ -1170,6 +1170,50 @@ static int explained_load_gives_schema_lines(void)
     return 0;
 }
 
+/*
+ * Each string field is checked against the array it is copied into: a
+ * layer path against LevelLayer.path (64 bytes) and last_star.next_phase
+ * against LevelDef.next_phase (256 bytes).  One character more than fits
+ * is a schema error naming that field's own limit.
+ */
+static int expect_string_too_long(const char *table, const char *key,
+                                  size_t capacity, const char *expected)
+{
+    const char *path = TEST_OUT "test_string_capacity.toml";
+    LevelDef def;
+    LoadProblemLog log = {0};
+    FILE *file = fopen(path, "wb");
+
+    if (!file) return fail("cannot write string-capacity fixture");
+    fprintf(file, "format_version = 1\n%s\n%s = \"", table, key);
+    for (size_t i = 0; i < capacity; i++) fputc('x', file);
+    fputs("\"\n", file);
+    if (fclose(file) != 0) return fail("cannot close string-capacity fixture");
+
+    level_def_init_defaults(&def);
+    int loaded = level_load_toml_explained(path, &def, log_load_problem, &log) == 0;
+    (void)remove(path);
+    if (loaded) return fail("an over-long string field loaded");
+    if (!strstr(log.first, expected)) {
+        fprintf(stderr, "FAIL: expected '%s' in '%s'\n", expected, log.first);
+        return 1;
+    }
+    return 0;
+}
+
+static int string_fields_use_their_own_capacity(void)
+{
+    if (expect_string_too_long("[[background_layers]]", "path",
+                               sizeof(((LevelDef *)0)->background_layers[0].path),
+                               "background_layers[0].path exceeds its 63-byte storage"))
+        return 1;
+    if (expect_string_too_long("[last_star]", "next_phase",
+                               sizeof(((LevelDef *)0)->next_phase),
+                               "last_star.next_phase exceeds its 255-byte storage"))
+        return 1;
+    return 0;
+}
+
 static int write_format_version_fixture(const char *path, const char *version)
 {
     FILE *fp = fopen(path, "w");
@@ -1536,6 +1580,7 @@ int main(void)
     }
     if (load_all_repo_levels() != 0) return 1;
     if (explained_load_gives_schema_lines() != 0) return 1;
+    if (string_fields_use_their_own_capacity() != 0) return 1;
     if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
     if (control_chars_roundtrip() != 0) return 1;
