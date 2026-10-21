@@ -11,6 +11,14 @@ make editor        # build the editor binary → out/super-mango-editor
 make run-editor    # build game + editor, then launch editor
 ```
 
+The browser build is the game. The editor is a native program: it opens files
+on your machine, writes the same TOML the game loads, and starts a playtest
+as a separate process. `make run-editor` opens an empty level. Open
+(`Ctrl+O`) and choose a file under `levels/` or `levels/labs/`. The campaign
+files are `levels/00_sandbox_01.toml`, `levels/01_lugio_01.toml` and
+`levels/02_lugio_02.toml`. `levels/labs/01_collision.toml` is the shortest
+file to learn the tools.
+
 ---
 
 ## Window Layout

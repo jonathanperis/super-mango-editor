@@ -66,6 +66,39 @@
 /* Player header */
 #include "../player/player.h"
 
+#include <stddef.h>   /* offsetof */
+#include <string.h>   /* memcpy: a draw-only copy of the movers */
+
+/* This frame's view between the last two steps (game_timing_render_view),
+ * set by game_render_frame before the layers run. Render-only. t == 1 draws
+ * the latest step: debug, smoke, replay, experiment, and a frame that has
+ * not taken a step yet. */
+static GameRenderView s_view;
+
+/* Copy movers into `shown` and slide each one toward where it was before
+ * the latest step. The simulated array is not written. When t is 1 the
+ * original array is returned and `shown` is unused. y_offset < 0 leaves y
+ * alone, so a bird stays on the sine wave of its blended x. */
+static const void *movers_between_steps(void *shown, const void *src, int count,
+                                        int max_count, size_t stride, size_t x_offset,
+                                        int y_offset, const RenderPrev *prev)
+{
+    if (count > max_count) count = max_count;
+    if (s_view.t >= 1.0f || count <= 0) return src;
+    memcpy(shown, src, (size_t)count * stride);
+    char *row = shown;
+    for (int i = 0; i < count; i++) {
+        float x = 0.0f, y = 0.0f;
+        memcpy(&x, row + x_offset, sizeof(x));
+        if (y_offset >= 0) memcpy(&y, row + (size_t)y_offset, sizeof(y));
+        game_timing_view_point(&s_view, prev[i].x, y_offset < 0 ? 0.0f : prev[i].y, &x, &y);
+        memcpy(row + x_offset, &x, sizeof(x));
+        if (y_offset >= 0) memcpy(row + (size_t)y_offset, &y, sizeof(y));
+        row += stride;
+    }
+    return shown;
+}
+
 /* The player's reduced-motion setting (no profile means "off"). */
 static int reduced_motion(const GameState *gs)
 {
@@ -202,8 +235,14 @@ static void render_floor(GameState *gs, int cam_x)
  * bouncepads and entities, so they read as mid-air surfaces. */
 static void render_float_platforms(GameState *gs, int cam_x)
 {
-    float_platforms_render(gs->world.float_platforms, gs->world.float_platform_count,
-                           gs->assets.textures.float_platform, cam_x);
+    FloatPlatform shown[MAX_FLOAT_PLATFORMS];
+    int count = gs->world.float_platform_count;
+    if (count > MAX_FLOAT_PLATFORMS) count = MAX_FLOAT_PLATFORMS;
+    const FloatPlatform *draw = movers_between_steps(
+        shown, gs->world.float_platforms, count, MAX_FLOAT_PLATFORMS, sizeof(shown[0]),
+        offsetof(FloatPlatform, x), (int)offsetof(FloatPlatform, y),
+        gs->screen.loop.prev_float_platform);
+    float_platforms_render(draw, count, gs->assets.textures.float_platform, cam_x);
 }
 
 /* Layer 5: ground spikes on the floor surface. */
@@ -342,15 +381,26 @@ static void render_flames(GameState *gs, int cam_x)
  * the ground, so the water wave art occludes the submerged portion. */
 static void render_fish(GameState *gs, int cam_x)
 {
-    fish_render(gs->world.fish, gs->world.fish_count,
-            gs->assets.textures.fish, cam_x);
+    Fish shown[MAX_FISH];
+    int count = gs->world.fish_count;
+    if (count > MAX_FISH) count = MAX_FISH;
+    const Fish *draw = movers_between_steps(
+        shown, gs->world.fish, count, MAX_FISH, sizeof(shown[0]),
+        offsetof(Fish, x), (int)offsetof(Fish, y), gs->screen.loop.prev_fish);
+    fish_render(draw, count, gs->assets.textures.fish, cam_x);
 }
 
 /* Layer 20: faster fish. */
 static void render_faster_fish(GameState *gs, int cam_x)
 {
-    faster_fish_render(gs->world.faster_fish, gs->world.faster_fish_count,
-                       gs->assets.textures.faster_fish, cam_x);
+    FasterFish shown[MAX_FASTER_FISH];
+    int count = gs->world.faster_fish_count;
+    if (count > MAX_FASTER_FISH) count = MAX_FASTER_FISH;
+    const FasterFish *draw = movers_between_steps(
+        shown, gs->world.faster_fish, count, MAX_FASTER_FISH, sizeof(shown[0]),
+        offsetof(FasterFish, x), (int)offsetof(FasterFish, y),
+        gs->screen.loop.prev_faster_fish);
+    faster_fish_render(draw, count, gs->assets.textures.faster_fish, cam_x);
 }
 
 /*
@@ -372,8 +422,14 @@ static void render_water(GameState *gs, int cam_x)
 static void render_spike_blocks(GameState *gs, int cam_x)
 {
     if (gs->assets.textures.spike_block) {
-        spike_blocks_render(gs->world.spike_blocks, gs->world.spike_block_count,
-                            gs->assets.textures.spike_block, cam_x);
+        SpikeBlock shown[MAX_SPIKE_BLOCKS];
+        int count = gs->world.spike_block_count;
+        if (count > MAX_SPIKE_BLOCKS) count = MAX_SPIKE_BLOCKS;
+        const SpikeBlock *draw = movers_between_steps(
+            shown, gs->world.spike_blocks, count, MAX_SPIKE_BLOCKS, sizeof(shown[0]),
+            offsetof(SpikeBlock, x), (int)offsetof(SpikeBlock, y),
+            gs->screen.loop.prev_spike_block);
+        spike_blocks_render(draw, count, gs->assets.textures.spike_block, cam_x);
     }
 }
 
@@ -387,8 +443,14 @@ static void render_axe_traps(GameState *gs, int cam_x)
 /* Layer 24: circular saws. */
 static void render_circular_saws(GameState *gs, int cam_x)
 {
-    circular_saws_render(gs->world.circular_saws, gs->world.circular_saw_count,
-                         gs->assets.textures.circular_saw, cam_x);
+    CircularSaw shown[MAX_CIRCULAR_SAWS];
+    int count = gs->world.circular_saw_count;
+    if (count > MAX_CIRCULAR_SAWS) count = MAX_CIRCULAR_SAWS;
+    const CircularSaw *draw = movers_between_steps(
+        shown, gs->world.circular_saws, count, MAX_CIRCULAR_SAWS, sizeof(shown[0]),
+        offsetof(CircularSaw, x), (int)offsetof(CircularSaw, y),
+        gs->screen.loop.prev_saw);
+    circular_saws_render(draw, count, gs->assets.textures.circular_saw, cam_x);
 }
 
 /* ------------------------------------------------------------------ */
@@ -398,38 +460,57 @@ static void render_circular_saws(GameState *gs, int cam_x)
 /* Layer 25: spiders. */
 static void render_spiders(GameState *gs, int cam_x)
 {
-    spiders_render(gs->world.spiders, gs->world.spider_count,
-                   gs->assets.textures.spider, cam_x);
+    Spider shown[MAX_SPIDERS];
+    int count = gs->world.spider_count;
+    if (count > MAX_SPIDERS) count = MAX_SPIDERS;
+    const Spider *draw = movers_between_steps(
+        shown, gs->world.spiders, count, MAX_SPIDERS, sizeof(shown[0]),
+        offsetof(Spider, x), -1, gs->screen.loop.prev_spider);
+    spiders_render(draw, count, gs->assets.textures.spider, cam_x);
 }
 
 /* Layer 26: jumping spiders. */
 static void render_jumping_spiders(GameState *gs, int cam_x)
 {
-    jumping_spiders_render(gs->world.jumping_spiders, gs->world.jumping_spider_count,
-                           gs->assets.textures.jumping_spider, cam_x);
+    JumpingSpider shown[MAX_JUMPING_SPIDERS];
+    int count = gs->world.jumping_spider_count;
+    if (count > MAX_JUMPING_SPIDERS) count = MAX_JUMPING_SPIDERS;
+    const JumpingSpider *draw = movers_between_steps(
+        shown, gs->world.jumping_spiders, count, MAX_JUMPING_SPIDERS, sizeof(shown[0]),
+        offsetof(JumpingSpider, x), (int)offsetof(JumpingSpider, y),
+        gs->screen.loop.prev_jumping_spider);
+    jumping_spiders_render(draw, count, gs->assets.textures.jumping_spider, cam_x);
 }
 
 /* Layer 27: birds, in the sky in front of the spiders. */
 static void render_birds(GameState *gs, int cam_x)
 {
-    birds_render(gs->world.birds, gs->world.bird_count,
-                 gs->assets.textures.bird, cam_x);
+    /* Only x is blended. bird_screen_y rebuilds the sine from that x, so
+     * the sprite stays on the wave instead of cutting across it. */
+    Bird shown[MAX_BIRDS];
+    int count = gs->world.bird_count;
+    if (count > MAX_BIRDS) count = MAX_BIRDS;
+    const Bird *draw = movers_between_steps(
+        shown, gs->world.birds, count, MAX_BIRDS, sizeof(shown[0]),
+        offsetof(Bird, x), -1, gs->screen.loop.prev_bird);
+    birds_render(draw, count, gs->assets.textures.bird, cam_x);
 }
 
 /* Layer 28: faster birds. */
 static void render_faster_birds(GameState *gs, int cam_x)
 {
-    faster_birds_render(gs->world.faster_birds, gs->world.faster_bird_count,
-                        gs->assets.textures.faster_bird, cam_x);
+    FasterBird shown[MAX_FASTER_BIRDS];
+    int count = gs->world.faster_bird_count;
+    if (count > MAX_FASTER_BIRDS) count = MAX_FASTER_BIRDS;
+    const FasterBird *draw = movers_between_steps(
+        shown, gs->world.faster_birds, count, MAX_FASTER_BIRDS, sizeof(shown[0]),
+        offsetof(FasterBird, x), -1, gs->screen.loop.prev_faster_bird);
+    faster_birds_render(draw, count, gs->assets.textures.faster_bird, cam_x);
 }
 
 /* ------------------------------------------------------------------ */
 /* Layers 29-33: ghost, player, fog, HUD and debug                     */
 /* ------------------------------------------------------------------ */
-
-/* This frame's view between the last two steps (game_timing_render_view),
- * set by game_render_frame before the layers run. Render-only. */
-static GameRenderView s_view;
 
 /*
  * Layer 29: the time-trial ghost. Mango as he was at this moment of the

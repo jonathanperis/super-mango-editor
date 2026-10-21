@@ -99,7 +99,9 @@ cases run on Windows too. On POSIX it also covers the playtest process status
 and the native file pickers through stand-in `osascript`/`zenity` scripts. The in-window prompts are answered with queued events (keys, clicks, closing the window), on every system; a prompt opened mid-frame must leave the frame's target and clip as it found them. They write scratch files
 under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
 `make test`, `make sanitize` and `make coverage` can run at the same time in one
-checkout. Test objects are also built with `-DMANGO_TESTING`, which turns on the
+checkout. The cases in those two programs are grouped under `tests/editor_ui/`
+and `tests/editor_validation/` and included back into `tests/editor_ui_test.c`
+and `tests/editor_validation_test.c`. They are not extra binaries. Test objects are also built with `-DMANGO_TESTING`, which turns on the
 `*_test_set_*` seams (canned answers for native dialogs, injected save failures,
 fake controller input); the game and editor binaries are built without it, so
 they do not contain those functions.
@@ -174,7 +176,7 @@ Both define the libFuzzer entry point `LLVMFuzzerTestOneInput`.
 | Command | What it does |
 |---------|--------------|
 | `make fuzz-corpus` | Builds both harnesses with `tests/fuzz_replay_main.c` under ASan/UBSan and replays the seeds: `levels/`, `levels/labs/`, `tests/fixtures/serializer_v1/`, `tests/fixtures/runtime/`, `tests/fuzz/corpus/level/` and `tests/fuzz/corpus/profile/`. `make sanitize` runs it too. `FUZZ_MUTATIONS=N` adds N blind byte mutations per seed: this is slower and weaker than libFuzzer, but needs no extra toolchain. |
-| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/` and `out/fuzz/profile/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. |
+| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/` and `out/fuzz/profile/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. `.github/workflows/fuzz.yml` runs this weekly and on demand; it is not a required check. |
 
 Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-profile-replay`).
 If an input exposed a real bug, add it to `tests/fuzz/corpus/` after the fix.

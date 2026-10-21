@@ -688,6 +688,40 @@ static int render_view_interpolates_without_touching_the_run(void)
     CHECK(view.t == 1.0f && gx == 104.0f && gy == 198.0f);
     gs.screen.debug_mode = 0;
 
+    /* Movers recorded before the step are drawn between that position and
+     * the one after it. A bird stores x only: its height is a sine of x. */
+    gs.screen.loop.accumulator = GAME_FIXED_STEP * 0.5;
+    gs.world.spider_count = 1;
+    gs.world.spiders[0].x = 10.0f;
+    gs.world.bird_count = 1;
+    gs.world.birds[0].x = 40.0f;
+    gs.world.fish_count = 1;
+    gs.world.fish[0].x = 20.0f;
+    gs.world.fish[0].y = 80.0f;
+    game_timing_note_step(&gs);
+    gs.world.spiders[0].x = 18.0f;
+    gs.world.birds[0].x = 44.0f;
+    gs.world.fish[0].x = 24.0f;
+    gs.world.fish[0].y = 70.0f;
+    view = game_timing_render_view(&gs, 54);
+    float sx = 18.0f, sy = 0.0f;
+    game_timing_view_point(&view, gs.screen.loop.prev_spider[0].x,
+                           gs.screen.loop.prev_spider[0].y, &sx, &sy);
+    CHECK(view.t == 0.5f && NEAR(sx, 14.0f) && sy == 0.0f);
+    float bx = 44.0f, by = 0.0f;
+    game_timing_view_point(&view, gs.screen.loop.prev_bird[0].x,
+                           gs.screen.loop.prev_bird[0].y, &bx, &by);
+    CHECK(NEAR(bx, 42.0f));
+    float fx = 24.0f, fy = 70.0f;
+    game_timing_view_point(&view, gs.screen.loop.prev_fish[0].x,
+                           gs.screen.loop.prev_fish[0].y, &fx, &fy);
+    CHECK(NEAR(fx, 22.0f) && NEAR(fy, 75.0f));
+    /* A step longer than the snap distance is shown where it landed. */
+    gs.world.spiders[0].x = 10.0f + GAME_INTERP_MAX_JUMP + 1.0f;
+    sx = gs.world.spiders[0].x;
+    game_timing_view_point(&view, gs.screen.loop.prev_spider[0].x, 0.0f, &sx, &sy);
+    CHECK(sx == gs.world.spiders[0].x);
+
     /* Noting each step changes nothing the simulation keeps. */
     GameState a = {0}, b = {0};
     stand_player_on_floor(&a, 100.0f);

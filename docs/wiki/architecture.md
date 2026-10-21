@@ -164,8 +164,15 @@ in one step (a respawn, a camera snap, a new level) is shown where it lands.
 Debug mode (whose hitbox outlines must sit on the sprite) and smoke, replay
 and experiment runs draw the latest step itself. The time-trial ghost is
 blended the same way between its last two samples (`game_timing_view_point`),
-so a run that matches the best one draws both in the same place. Enemies,
-hazards and platforms are still drawn at their latest step. The accumulator restarts half a step full after pauses and loads, which
+so a run that matches the best one draws both in the same place. Spiders,
+jumping spiders, birds, fish and their faster variants, circular saws, spike
+blocks and float platforms are blended the same way from the positions
+`game_timing_note_step` stored before the step. A bird's height stays on its
+sine wave because only its x is blended and the wave is computed from that x.
+A step that moves any of them more than 48 px is shown where it is now. A
+saw's patrol position is blended; its spin angle stays on the latest step, as
+do axe swings, flame eruptions, bouncepad squashes and crumbling bridge
+bricks. The player is not carried by those. The accumulator restarts half a step full after pauses and loads, which
 absorbs sub-millisecond vsync jitter. Frame time is clamped to 0.25 s and at most
 5 steps run per frame; excess time is dropped (below 12 FPS the game slows down
 instead of spiralling). Smoke and scripted replays feed exactly one step per

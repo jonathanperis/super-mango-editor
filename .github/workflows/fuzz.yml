@@ -1,0 +1,59 @@
+name: Fuzz
+
+# Weekly coverage-guided search of the level loader and the profile and ghost
+# decoders. Pull requests already replay the seed corpus under `make sanitize`
+# in build.yml. This job is not a required check: a crash here is a bug to
+# fix, and the failing input is uploaded from out/fuzz/.
+on:
+  schedule:
+    - cron: "15 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A manual run does not cancel the weekly one, and a weekly run does not
+# cancel a manual one. Each run id is its own group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  libfuzzer:
+    name: libFuzzer (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      CC: clang
+      FUZZ_CC: clang
+      FUZZ_SECONDS: "60"
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y clang cmake libgl1-mesa-dev libx11-dev \
+            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+
+      - name: Cache pinned raylib source archive
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/raylib
+          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+      - name: Search for 60 seconds per harness
+        run: make fuzz
+
+      - name: Upload crashes
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-crashes
+          path: out/fuzz/**
+          if-no-files-found: ignore
