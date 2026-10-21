@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from validate_levels import load_level
@@ -57,12 +58,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-editor", action="store_true", help="skip editor smoke scenario")
     parser.add_argument("--replay-dir", default=DEFAULT_REPLAY_DIR,
                         help="folder for generated replay scripts, passed to the game as --replay-dir")
+    parser.add_argument("--jobs", type=int, default=min(4, os.cpu_count() or 1),
+                        help="scenarios to run at once (default: up to 4)")
     return parser.parse_args()
 
 
-def run(cmd: list[str], env: dict[str, str]) -> str:
+def run(cmd: list[str], env: dict[str, str], log=print) -> str:
     printable = " ".join(shlex.quote(part) for part in cmd)
-    print(f"scripted-smoke: {printable}")
+    log(f"scripted-smoke: {printable}")
     result = subprocess.run(cmd, cwd=ROOT, env=env, text=True,
                             capture_output=True, timeout=30)
     if result.returncode:
@@ -82,7 +85,16 @@ def smoke_state(output: str, frames: int) -> dict:
     return state
 
 
-def check_builtin_behavior(state: dict, replay: str, level: Path, frames: int) -> None:
+def level_start_x(level: Path) -> float:
+    """Where the player starts on x; a level without a start uses x = 80."""
+    data = load_level(level)
+    start_x = data.get("player_start_x", 0)
+    if start_x == 0 and data.get("player_start_y", 0) == 0:
+        start_x = 80
+    return start_x
+
+
+def check_builtin_behavior(state: dict, replay: str, start_x: float, frames: int) -> None:
     if frames != 5:
         return  # Longer/custom runs still verify determinism and finite state.
     expected_active_frames = 3 if replay == "pause-resume" else 5
@@ -90,10 +102,6 @@ def check_builtin_behavior(state: dict, replay: str, level: Path, frames: int) -
         raise AssertionError(f"incorrect active simulation time: {state}")
     if state["paused"] or state["complete"]:
         raise AssertionError(f"unexpected overlay after built-in replay: {state}")
-    data = load_level(level)
-    start_x = data.get("player_start_x", 0)
-    if start_x == 0 and data.get("player_start_y", 0) == 0:
-        start_x = 80
     if replay == "move-right" and state["x"] <= start_x:
         raise AssertionError("right input did not move the player")
     if replay == "jump-right" and state["vy"] >= 0:
@@ -182,32 +190,49 @@ def main() -> int:
     # as given (short, like the default) and only Python resolves it.
     replay_dir = ROOT / args.replay_dir
     replays = selected_replays(args, replay_dir)
+    scenarios = []
     for level in levels:
         level_path = level if level.is_absolute() else ROOT / level
         if not level_path.exists():
             raise SystemExit(f"level missing: {level}")
-        rel_level = repo_relative(level_path)
-        for seed in args.seeds:
-            for replay in replays:
-                cmd = [
-                    str(binary),
-                    "--level",
-                    rel_level,
-                    "--smoke-test-frames",
-                    str(args.frames),
-                    "--seed",
-                    str(seed),
-                    "--replay-dir",
-                    args.replay_dir,
-                    "--replay-script",
-                    replay_id(replay),
-                ]
-                first = smoke_state(run(cmd, env), args.frames)
-                second = smoke_state(run(cmd, env), args.frames)
-                if first != second:
-                    raise AssertionError(f"non-deterministic replay: {first} != {second}")
-                if not args.replays:
-                    check_builtin_behavior(first, replay_id(replay), level_path, args.frames)
+        start_x = level_start_x(level_path)
+        scenarios += [(repo_relative(level_path), start_x, seed, replay)
+                      for seed in args.seeds for replay in replays]
+
+    def run_scenario(scenario) -> list[str]:
+        """Play one scenario twice and check it; returns its log lines."""
+        rel_level, start_x, seed, replay = scenario
+        cmd = [
+            str(binary),
+            "--level",
+            rel_level,
+            "--smoke-test-frames",
+            str(args.frames),
+            "--seed",
+            str(seed),
+            "--replay-dir",
+            args.replay_dir,
+            "--replay-script",
+            replay_id(replay),
+        ]
+        log: list[str] = []
+        first = smoke_state(run(cmd, env, log.append), args.frames)
+        second = smoke_state(run(cmd, env, log.append), args.frames)
+        if first != second:
+            raise AssertionError(f"non-deterministic replay: {first} != {second}")
+        if not args.replays:
+            check_builtin_behavior(first, replay_id(replay), start_x, args.frames)
+        return log
+
+    # Each scenario only reads the replay scripts and never saves a profile,
+    # so several run at once. map() hands results (and the first failure)
+    # back in scenario order, which keeps the log in the same order as a
+    # one-at-a-time run. The checks below rewrite a replay script and a
+    # profile, so they wait until every scenario has finished.
+    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+        for log in pool.map(run_scenario, scenarios):
+            for line in log:
+                print(line)
 
     scenario_count = len(levels) * len(args.seeds) * len(replays)
     if not args.replays:
