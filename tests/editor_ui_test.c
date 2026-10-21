@@ -1211,9 +1211,12 @@ static int canvas_navigates_like_a_level_editor(void)
 
     /* A left release does not end a middle-button pan. */
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
+    push_event(INPUT_KEY_DOWN, KEY_SPACE, 0, 0, 0);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 400, 300);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 400, 300);
+    push_event(INPUT_KEY_UP, KEY_SPACE, 0, 0, 0);
     ui_frame(&es, 400, 300);
-    CHECK(es.panning);
+    CHECK(es.panning && es.pan_button == MOUSE_BUTTON_MIDDLE);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
     ui_frame(&es, 400, 300);
     CHECK(!es.panning);
