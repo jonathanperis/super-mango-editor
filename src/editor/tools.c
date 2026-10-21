@@ -989,7 +989,14 @@ static int place_entity(EditorState *es, float world_x, float world_y)
         pd.spike_block.rail_index = rail >= 0 ? rail : 0;
     }
     editor_clamp_placement(&es->level, type, &pd);
-    return editor_add_placement(es, type, &pd, "place");
+    /* A row never stacks copies: past the world's edge the clamp, and for
+     * a spike block or a flame its rail or gap, can land the next one
+     * exactly where the last one went. */
+    if (es->painting && es->paint_count > 0 &&
+        memcmp(&pd, &es->paint_last, sizeof(pd)) == 0) return -1;
+    if (editor_add_placement(es, type, &pd, "place") != 0) return -1;
+    es->paint_last = pd;
+    return 0;
 }
 
 /*
