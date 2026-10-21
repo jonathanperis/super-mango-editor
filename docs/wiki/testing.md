@@ -10,7 +10,7 @@ Use this page to choose the smallest useful verification set for a change. Run c
 
 | Changed area | Run locally | Why |
 |--------------|-------------|-----|
-| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 17 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, parser encoding, web host, release packaging, CodeQL SARIF filter). |
+| C runtime, gameplay, collision, score, overlays, sessions | `make test CC=clang` | Builds and runs 18 native regression binaries, a parser allocation probe, and Python/Node host checks (levels, generated sounds, parser encoding, web host, release packaging, CodeQL SARIF filter). |
 | Level TOML, campaign manifest, or level schema | `make validate-levels` and `make docs-drift` | Loads root and lab levels through the C loader and validator, then checks assets, the v1 campaign manifest, generated facts, schema docs and prose counts. |
 | Player/world runtime startup | `make smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEED=1` | Renders every TOML level plus the editor in bounded hidden windows. |
 | Replay or event handling | `make scripted-smoke CC=clang SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"` | Generates deterministic commands/action masks and checks movement/jump/pause results. |
@@ -37,7 +37,7 @@ ownership through overflow, undo/redo, branching and clearing.
 generated JSON instead of maintaining its own counts. Packaging tests inspect
 archive contents, editor inclusion, reserve-asset exclusion and license notices.
 
-`make test` builds these 17 native binaries under `out/` and runs each one:
+`make test` builds these 18 native binaries under `out/` and runs each one:
 
 - `level-serializer-test`
 - `level-validate-test`
@@ -47,6 +47,7 @@ archive contents, editor inclusion, reserve-asset exclusion and license notices.
 - `collision-test`
 - `phase-transition-test`
 - `editor-validation-test`
+- `editor-undo-recovery-test`
 - `gameplay-damage-test`
 - `gameplay-config-test`
 - `gameplay-score-test`
@@ -97,7 +98,14 @@ nudges, Ctrl+D, the snap toggle, Alt+click cycling, text-field caret and Tab,
 Up/Down stepping number fields, validation messages that select the problem,
 the Campaign view, Playtest from here, a level dropped on the window, the
 toolbar's tooltips and toggles, and the mouse cursor's shapes) and checks the
-resulting document and undo history; it also reads the canvas back to check the floor still reaches both
+resulting document and undo history. `editor-undo-recovery-test` calls the
+safety nets directly on a bare `EditorState`: undo and redo of every kind of
+step (`editor_undo_apply.c`, `undo.c`), edits taken back when the history cannot
+record them, the `UNDO_MAX` cap, multi-selection copy/paste/cut with its offset
+and clamping, refused pastes, and recovery snapshots (naming, recovering a
+crashed editor's copy by id, the picker, and never offering a copy another
+running editor owns, with a child process held on a gate pipe standing in for
+that editor). `editor-ui-test` also reads the canvas back to check the floor still reaches both
 edges at every zoom and scroll. It and `editor-validation-test` edit a campaign in a
 scratch game folder, made and entered through `tests/test_folders.h`, so those
 cases run on Windows too. On POSIX it also covers the playtest process status
@@ -133,7 +141,7 @@ The artifact check also rejects an `emscripten_sleep` dependency in the emitted
 glue: this catches native-only calls such as raylib's Web `WindowShouldClose`
 before a non-Asyncify build is deployed.
 
-Two extra standalone probes accompany the 17 regression binaries:
+Two extra standalone probes accompany the 18 regression binaries:
 `make parser-allocation-probe` checks parser buffer-growth limits without huge
 allocations, and `make parser-encoding-probe` checks all Python level readers.
 Both run under `make test`; `make sanitize` instruments the C probe as well.
