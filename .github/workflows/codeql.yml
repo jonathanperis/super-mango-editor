@@ -63,10 +63,9 @@ jobs:
           languages: c-cpp
           queries: security-and-quality
 
+      # In parallel, as in build.yml; CodeQL traces every compiler process.
       - name: Build for CodeQL
-        run: |
-          make
-          make editor
+        run: make -j4 all editor
 
       # Analyze without uploading, then drop code-quality results that sit in
       # third-party code (raylib build headers under out/, vendored tomlc17
