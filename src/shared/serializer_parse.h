@@ -18,6 +18,13 @@ int get_int(toml_datum_t tab, const char *key, int fallback);
 const char *get_str(toml_datum_t tab, const char *key, const char *fallback);
 
 /*
+ * Copy src (NULL reads as "") into the dst_size-byte array dst.  A longer
+ * src is cut so dst always ends in a NUL; the schema check has already
+ * refused strings that would not fit, so the cut is only a safety net.
+ */
+void copy_str(char *dst, size_t dst_size, const char *src);
+
+/*
  * Validate explicit v1 schema before any TOML value is normalized into a
  * LevelDef. Missing format_version selects legacy-compatible loading.
  */

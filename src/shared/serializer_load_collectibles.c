@@ -4,18 +4,10 @@
 
 #include <stddef.h> /* size_t */
 #include <stdio.h>  /* fprintf */
-#include <string.h> /* strncpy */
 
 #include "serializer_load_collectibles.h"
 #include "serializer_parse.h"
 #include "../levels/level.h" /* LevelDef and its MAX_* array limits */
-
-static void copy_collectible_string(char *dst, size_t dst_size, const char *src) {
-    if (!dst || dst_size == 0) return;
-
-    strncpy(dst, src ? src : "", dst_size - 1);
-    dst[dst_size - 1] = '\0';
-}
 
 #define LOAD_XY_ARRAY(toml_key, count_field, max_count, dest_field)        \
     do {                                                                   \
@@ -56,8 +48,8 @@ int serializer_load_collectibles(toml_datum_t top, LevelDef *def) {
             /* Optional next_phase for level linking */
             toml_datum_t np = toml_get(ls, "next_phase");
             if (np.type == TOML_STRING) {
-                copy_collectible_string(def->next_phase,
-                                        sizeof(def->next_phase), np.u.s);
+                copy_str(def->next_phase,
+                         sizeof(def->next_phase), np.u.s);
             }
         }
     }

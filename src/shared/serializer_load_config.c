@@ -3,17 +3,10 @@
  */
 
 #include <stddef.h> /* size_t */
-#include <string.h> /* memcpy, strcmp, strlen, strncmp, strncpy */
+#include <string.h> /* memcpy, strcmp, strlen, strncmp */
 
 #include "serializer_load_config.h"
 #include "serializer_parse.h"
-
-static void copy_config_string(char *dst, size_t dst_size, const char *src) {
-    if (!dst || dst_size == 0) return;
-
-    strncpy(dst, src ? src : "", dst_size - 1);
-    dst[dst_size - 1] = '\0';
-}
 
 /*
  * The shipped ambient loops were WAV files until they became QOA. A level
@@ -51,7 +44,7 @@ void serializer_load_config(toml_datum_t top, LevelDef *def) {
     /* Music */
     {
         const char *mp = get_str(top, "music_path", "");
-        copy_config_string(def->music_path, sizeof(def->music_path), mp);
+        copy_str(def->music_path, sizeof(def->music_path), mp);
         rename_shipped_wav_loop(def->music_path);
     }
     def->music_volume = get_int(top, "music_volume", 0);
@@ -59,7 +52,7 @@ void serializer_load_config(toml_datum_t top, LevelDef *def) {
     /* Floor tile */
     {
         const char *ftp = get_str(top, "floor_tile_path", "");
-        copy_config_string(def->floor_tile_path, sizeof(def->floor_tile_path), ftp);
+        copy_str(def->floor_tile_path, sizeof(def->floor_tile_path), ftp);
     }
 
     /* Game rules */

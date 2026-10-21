@@ -4,19 +4,11 @@
 
 #include <stddef.h> /* size_t */
 #include <stdio.h>  /* fprintf */
-#include <string.h> /* strncpy */
 
 #include "serializer_load_geometry.h"
 #include "serializer_parse.h"
 #include "serializer_types.h"
 #include "../levels/level.h" /* LevelDef and its MAX_* array limits */
-
-static void copy_geometry_string(char *dst, size_t dst_size, const char *src) {
-    if (!dst || dst_size == 0) return;
-
-    strncpy(dst, src ? src : "", dst_size - 1);
-    dst[dst_size - 1] = '\0';
-}
 
 int serializer_load_geometry(toml_datum_t top, LevelDef *def) {
     if (!def) return -1;
@@ -40,8 +32,8 @@ int serializer_load_geometry(toml_datum_t top, LevelDef *def) {
 
         {
             const char *tp = get_str(elem, "tile_path", "");
-            copy_geometry_string(def->platforms[idx].tile_path,
-                                 sizeof(def->platforms[idx].tile_path), tp);
+            copy_str(def->platforms[idx].tile_path,
+                     sizeof(def->platforms[idx].tile_path), tp);
         }
     });
 
