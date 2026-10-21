@@ -297,7 +297,7 @@ make run-editor
 
 ### `make web`
 
-Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.0.9**; use that SDK with `emcc` on `PATH` for matching local builds. `make web` first checks `emcc --version` against `EMSCRIPTEN_VERSION` (by default that same pin) and stops with a clear message on a mismatch; pass `EMSCRIPTEN_VERSION=<x.y.z>` to expect another release, or `EMSCRIPTEN_VERSION=` to skip the check.
+Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.0.12**; use that SDK with `emcc` on `PATH` for matching local builds. `make web` first checks `emcc --version` against `EMSCRIPTEN_VERSION` (by default that same pin) and stops with a clear message on a mismatch; pass `EMSCRIPTEN_VERSION=<x.y.z>` to expect another release, or `EMSCRIPTEN_VERSION=` to skip the check.
 
 ```sh
 make web
@@ -637,7 +637,7 @@ a run sits on a queued macOS job, look at the account's other running
 workflows before suspecting this one.
 
 **Toolchain drift under `-Werror`.** Linux/macOS use the runner image's
-compilers and the WebAssembly leg pins Emscripten 6.0.9, but Windows uses
+compilers and the WebAssembly leg pins Emscripten 6.0.12, but Windows uses
 MSYS2, a rolling distribution: `setup-msys2` runs with `update: true` and
 `pacman` installs the current GCC/Clang. MSYS2 cannot reliably install older
 package versions, so these are not pinned. A new compiler release can add a

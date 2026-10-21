@@ -32,7 +32,7 @@ code a learner can trace over a shorter version that hides a step.
 | raylib | 6.2, pinned source/checksum | Window, graphics, input, PNG loading, built-in text font and audio; bundled GLFW on desktop |
 | CMake | Available platform version | Out-of-source raylib dependency build; Make remains the application entry point |
 | tomlc17 | R260821 + project patches | TOML v1.1 parser; [upstream provenance and patch inventory](vendor/tomlc17/README.md) |
-| Emscripten | 6.0.9 in CI | WebAssembly compilation for browser play |
+| Emscripten | 6.0.12 in CI | WebAssembly compilation for browser play |
 
 ## What is in it
 
@@ -80,7 +80,7 @@ pacman -S make mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-gcc mingw-w64-u
 # plus Node.js 22.12+ from https://nodejs.org/ on PATH
 ```
 
-**WebAssembly:** install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.9** with `emcc` and `emcmake` on `PATH`. GitHub CI is the authoritative WASM release verification; report local toolchain failures separately from application failures.
+**WebAssembly:** install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.12** with `emcc` and `emcmake` on `PATH`. GitHub CI is the authoritative WASM release verification; report local toolchain failures separately from application failures.
 
 The docs tools need Python 3.11+; the docs site also needs Bun
 (see [website maintenance](docs/README.md)). On a machine without a display or

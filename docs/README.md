@@ -88,7 +88,7 @@ against their actual declarations and callers; do not only replace backend names
 ## Local Game Preview
 
 Astro does **not** compile or copy WebAssembly. A docs-only preview renders the
-site, but game startup needs the game artifacts. With Emscripten **6.0.9**,
+site, but game startup needs the game artifacts. With Emscripten **6.0.12**,
 build and assemble from the repository root:
 
 ```sh
