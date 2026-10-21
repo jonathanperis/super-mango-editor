@@ -163,6 +163,14 @@ static void draw_tex(EditorState *es, Texture2D *tex, const IntRect *src,
 /* canvas_render — Main entry point: draw the full level preview        */
 /* ------------------------------------------------------------------ */
 
+int canvas_banner_contains(const EditorState *es, int sx, int sy)
+{
+    if (!es || es->campaign || sx < 0 || sx >= CANVAS_W ||
+        sy < CANVAS_BANNER_Y || sy >= CANVAS_BANNER_Y + CANVAS_BANNER_H) return 0;
+    return level_validate_preview(&es->level, NULL, 0) == 0 &&
+           level_validate_runtime(&es->level, NULL, 0) != 0;
+}
+
 void canvas_render(EditorState *es) {
     char error[128];
     /* The Campaign view takes the canvas's place while it is open. */
@@ -257,9 +265,11 @@ void canvas_render(EditorState *es) {
         char banner[192];
         Color shade = ui_color(&es->ui, UI_COLOR_PANEL);
         shade.a = 230;
-        snprintf(banner, sizeof(banner), "The game cannot load this level yet: %s", error);
-        DrawRectangle(0, TOOLBAR_H, CANVAS_W, 20, shade);
-        ui_label_color(&es->ui, 8, TOOLBAR_H + 5, banner, ui_color(&es->ui, UI_COLOR_ERROR));
+        /* Along the canvas's bottom edge, clear of the screen numbers at
+         * the top; a click on it goes to the problem (editor_events.c). */
+        snprintf(banner, sizeof(banner), "The game cannot load this level yet: %s (click to fix)", error);
+        DrawRectangle(0, CANVAS_BANNER_Y, CANVAS_W, CANVAS_BANNER_H, shade);
+        ui_label_color(&es->ui, 8, CANVAS_BANNER_Y + 5, banner, ui_color(&es->ui, UI_COLOR_ERROR));
     }
 
     /* Remove the clip rectangle so other UI elements can draw freely */
