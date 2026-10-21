@@ -537,6 +537,7 @@ typedef struct {
      * view; pan_x/pan_y is where the pointer was at the last move. */
     int            panning;
     int            pan_x, pan_y;
+    int            pan_button;    /* the button whose release ends the pan  */
     int            space_held;    /* Space is down (and no field is typing) */
 
     /* ---- Drag state (moving one entity with the Select tool) ---------- */
