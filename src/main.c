@@ -63,47 +63,58 @@ static void free_owned_paths(char **owned)
     }
 }
 
-int main(int argc, char **argv)
+/* What parse_args found: run the session, or end now with a status. */
+typedef enum {
+    ARGS_RUN,           /* the configuration is ready */
+    ARGS_EXIT_SUCCESS,  /* --help printed the usage */
+    ARGS_EXIT_FAILURE   /* a flag was wrong; the error is printed */
+} ArgsResult;
+
+/*
+ * parse_args — Read every flag into *config.
+ *
+ * *seed_set records that --seed was given; *level_typed that --level was
+ * (rather than a built-in default such as --sandbox's level). A flag's own
+ * value is checked here; flags that only make sense together are checked
+ * afterwards, by check_arg_combinations.
+ */
+static ArgsResult parse_args(int argc, char **argv, AppSessionConfig *config,
+                             int *seed_set, int *level_typed)
 {
-    /* The designated initializer enables saving and zero-initializes the
-     * remaining members. A NULL level path selects the campaign menu. */
-    AppSessionConfig config = {.profile_enabled = 1};
-    int seed_set = 0;
-    int level_typed = 0;  /* --level came from the user, not a built-in default */
     for (int i = 1; i < argc; i++) {
         const char *option = argv[i];
         if (!strcmp(option, "--debug"))
-            config.debug_mode = 1;
+            config->debug_mode = 1;
         else if (!strcmp(option, "--sandbox")) {
-            config.level_path = "levels/00_sandbox_01.toml";
-            level_typed = 0;
+            config->level_path = "levels/00_sandbox_01.toml";
+            *level_typed = 0;
         }
         else if (!strcmp(option, "--no-save"))
-            config.profile_enabled = 0;
+            config->profile_enabled = 0;
         else if (!strcmp(option, "--continue"))
-            config.continue_last = 1;
+            config->continue_last = 1;
         else if (!strcmp(option, "--level") || !strcmp(option, "--profile") ||
                  !strcmp(option, "--replay-script") || !strcmp(option, "--replay-dir") ||
                  !strcmp(option, "--experiment")) {
             const char *value = argument(argc, argv, &i);
             if (!value) {
                 fprintf(stderr, "Error: %s requires a path\n", option);
-                return EXIT_FAILURE;
+                return ARGS_EXIT_FAILURE;
             }
             if (!strcmp(option, "--level")) {
-                config.level_path = value;
-                level_typed = 1;
+                config->level_path = value;
+                *level_typed = 1;
             }
             else if (!strcmp(option, "--profile"))
-                config.profile_path = value;
+                config->profile_path = value;
             else if (!strcmp(option, "--replay-script"))
-                config.replay_script_path = value;
+                config->replay_script_path = value;
             else if (!strcmp(option, "--replay-dir"))
-                config.replay_dir = value;
+                config->replay_dir = value;
             else {
-                config.experiment_path = value;
-                config.debug_mode = 1;
-                config.profile_enabled = 0;
+                config->experiment_path = value;
+                config->debug_mode = 1;
+                config->profile_enabled = 0;
             }
         } else if (!strcmp(option, "--start-x") || !strcmp(option, "--start-checkpoint")) {
             /* Playtest from a point (the editor's "Playtest from here"):
@@ -113,36 +124,36 @@ int main(int argc, char **argv)
             const char *text = argument(argc, argv, &i);
             if (unsigned_argument(text, &value) || value > INT_MAX) {
                 fprintf(stderr, "Error: %s requires a whole number\n", option);
-                return EXIT_FAILURE;
+                return ARGS_EXIT_FAILURE;
             }
-            if (config.start.kind != LEVEL_START_DEFAULT) {
+            if (config->start.kind != LEVEL_START_DEFAULT) {
                 fprintf(stderr, "Error: use only one of --start-x and --start-checkpoint\n");
-                return EXIT_FAILURE;
+                return ARGS_EXIT_FAILURE;
             }
             if (!strcmp(option, "--start-x")) {
-                config.start.kind = LEVEL_START_AT_X;
-                config.start.x = (float)value;
+                config->start.kind = LEVEL_START_AT_X;
+                config->start.x = (float)value;
             } else {
-                config.start.kind = LEVEL_START_AT_CHECKPOINT;
-                config.start.checkpoint = (int)value;
+                config->start.kind = LEVEL_START_AT_CHECKPOINT;
+                config->start.checkpoint = (int)value;
             }
         } else if (!strcmp(option, "--seed") || !strcmp(option, "--smoke-test-frames")) {
             unsigned int value;
             const char *text = argument(argc, argv, &i);
             if (unsigned_argument(text, &value)) {
                 fprintf(stderr, "Error: %s requires an unsigned integer\n", option);
-                return EXIT_FAILURE;
+                return ARGS_EXIT_FAILURE;
             }
             if (!strcmp(option, "--seed")) {
-                config.random_seed = value;
-                seed_set = 1;
+                config->random_seed = value;
+                *seed_set = 1;
             }
             else {
                 if (!value || value > INT_MAX) {
                     fprintf(stderr, "Error: --smoke-test-frames requires a positive integer\n");
-                    return EXIT_FAILURE;
+                    return ARGS_EXIT_FAILURE;
                 }
-                config.smoke_test_frames = (int)value;
+                config->smoke_test_frames = (int)value;
             }
         } else if (!strcmp(option, "--help")) {
             puts("Super Mango: --level PATH | --continue | --sandbox\n"
@@ -157,63 +168,100 @@ int main(int argc, char **argv)
                  "--continue resumes the last stage at its saved Continue point.\n"
                  "Profiles: OS preference directory on native; localStorage on web.\n"
                  "Smoke/replay never reads or writes personal profiles.");
-            return EXIT_SUCCESS;
+            return ARGS_EXIT_SUCCESS;
         } else if (option[0] == '-') {
             fprintf(stderr, "Error: unknown option '%s'\n", option);
-            return EXIT_FAILURE;
+            return ARGS_EXIT_FAILURE;
         }
     }
-    if (config.experiment_path && (!config.level_path || config.replay_script_path)) {
+    return ARGS_RUN;
+}
+
+/*
+ * check_arg_combinations — Refuse flags that cannot work together.
+ *
+ * Returns 0 when the combination is valid, or -1 after printing why not.
+ */
+static int check_arg_combinations(const AppSessionConfig *config, int level_typed)
+{
+    if (config->experiment_path && (!config->level_path || config->replay_script_path)) {
         fprintf(stderr, "Error: --experiment requires --level and cannot combine with --replay-script\n");
-        return EXIT_FAILURE;
+        return -1;
     }
     /* The folder only says where --replay-script looks; alone it would be
      * silently ignored, so refuse it the way --experiment refuses a
      * missing --level. */
-    if (config.replay_dir && !config.replay_script_path) {
+    if (config->replay_dir && !config->replay_script_path) {
         fprintf(stderr, "Error: --replay-dir requires --replay-script\n");
-        return EXIT_FAILURE;
+        return -1;
     }
     /* A start point is for playtesting one level the user named; a replay
      * or an experiment must start where it was recorded. */
-    if (config.start.kind != LEVEL_START_DEFAULT &&
-        (!level_typed || config.replay_script_path || config.experiment_path)) {
+    if (config->start.kind != LEVEL_START_DEFAULT &&
+        (!level_typed || config->replay_script_path || config->experiment_path)) {
         fprintf(stderr, "Error: --start-x and --start-checkpoint require --level and "
                         "cannot combine with --replay-script or --experiment\n");
-        return EXIT_FAILURE;
+        return -1;
     }
+    return 0;
+}
+
+#ifndef __EMSCRIPTEN__
+/*
+ * enter_asset_folder — Move to the folder that holds assets/ and levels/.
+ *
+ * Every asset and level path is relative, so the game needs a working
+ * folder that holds assets/ and levels/. Started from somewhere else (a
+ * shortcut, a file manager, `../out/super-mango`), move to the folder of
+ * the executable instead. Paths the user typed were meant relative to
+ * the original folder, so make them absolute before moving. --level is
+ * the exception when it does not exist there: then it most likely names
+ * a bundled level such as levels/labs/01_collision.toml.
+ *
+ * The absolute copies go into owned_paths, which the caller frees.
+ * Returns -1 only when a copy cannot be allocated.
+ */
+static int enter_asset_folder(AppSessionConfig *config, int level_typed, char **owned_paths)
+{
+    if (asset_root_contains("")) return 0;
+    if (level_typed && !serializer_file_exists_utf8(config->level_path)) level_typed = 0;
+    if (keep_typed_path(&config->level_path, level_typed, &owned_paths[0]) ||
+        keep_typed_path(&config->profile_path, 1, &owned_paths[1]) ||
+        keep_typed_path(&config->experiment_path, 1, &owned_paths[2]) ||
+        keep_typed_path(&config->replay_dir, 1, &owned_paths[3])) {
+        fprintf(stderr, "Error: out of memory while reading the command line\n");
+        return -1;
+    }
+    if (asset_root_enter() != 0)
+        fprintf(stderr, "Warning: assets/ and levels/ were not found here or "
+                        "next to the executable\n");
+    return 0;
+}
+#endif
+
+int main(int argc, char **argv)
+{
+    /* The designated initializer enables saving and zero-initializes the
+     * remaining members. A NULL level path selects the campaign menu. */
+    AppSessionConfig config = {.profile_enabled = 1};
+    int seed_set = 0;
+    int level_typed = 0;  /* --level came from the user, not a built-in default */
+    ArgsResult parsed = parse_args(argc, argv, &config, &seed_set, &level_typed);
+    if (parsed == ARGS_EXIT_SUCCESS) return EXIT_SUCCESS;
+    if (parsed == ARGS_EXIT_FAILURE) return EXIT_FAILURE;
+    if (check_arg_combinations(&config, level_typed) != 0) return EXIT_FAILURE;
     if (config.smoke_test_frames > 0 && !config.level_path)
         config.level_path = "levels/00_sandbox_01.toml";
 
     /* Absolute copies of typed paths when the working folder moves below. */
     char *owned_paths[TYPED_PATH_COUNT] = {NULL, NULL, NULL, NULL};
+    /* The browser preloads assets/ and levels/ at "/", its working folder,
+     * so only a native build may need to move. */
 #ifndef __EMSCRIPTEN__
-    /*
-     * Every asset and level path is relative, so the game needs a working
-     * folder that holds assets/ and levels/. Started from somewhere else (a
-     * shortcut, a file manager, `../out/super-mango`), move to the folder of
-     * the executable instead. Paths the user typed were meant relative to
-     * the original folder, so make them absolute before moving. --level is
-     * the exception when it does not exist there: then it most likely names
-     * a bundled level such as levels/labs/01_collision.toml.
-     */
-    if (!asset_root_contains("")) {
-        if (level_typed && !serializer_file_exists_utf8(config.level_path)) level_typed = 0;
-        if (keep_typed_path(&config.level_path, level_typed, &owned_paths[0]) ||
-            keep_typed_path(&config.profile_path, 1, &owned_paths[1]) ||
-            keep_typed_path(&config.experiment_path, 1, &owned_paths[2]) ||
-            keep_typed_path(&config.replay_dir, 1, &owned_paths[3])) {
-            fprintf(stderr, "Error: out of memory while reading the command line\n");
-            free_owned_paths(owned_paths);
-            return EXIT_FAILURE;
-        }
-        if (asset_root_enter() != 0)
-            fprintf(stderr, "Warning: assets/ and levels/ were not found here or "
-                            "next to the executable\n");
+    if (enter_asset_folder(&config, level_typed, owned_paths) != 0) {
+        free_owned_paths(owned_paths);
+        return EXIT_FAILURE;
     }
-#else
-    /* The browser preloads assets/ and levels/ at "/", its working folder. */
-    (void)level_typed;
 #endif
 
     /* A fixed seed makes enemy/decorative randomness reproducible. A normal
