@@ -38,7 +38,16 @@ HARDEN_CFLAGS  = -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 
 HARDEN_LDFLAGS = -pie -Wl,-z,relro,-z,now
 endif
 MODE_FLAGS_release = -O2 $(HARDEN_CFLAGS)
-MODE_LDFLAGS_release = $(HARDEN_LDFLAGS)
+# Release binaries ship without a symbol table (-s): nothing reads it, and
+# it was about 12% of each executable (230 KB). Not on macOS, where the
+# linker deprecates -s; the ad-hoc signature is made after the link, so a
+# later strip would invalidate it.
+ifeq ($(shell uname -s),Darwin)
+STRIP_LDFLAGS =
+else
+STRIP_LDFLAGS = -s
+endif
+MODE_LDFLAGS_release = $(HARDEN_LDFLAGS) $(STRIP_LDFLAGS)
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
 # Tests write scratch files under their own OUTDIR (tests/test_paths.h), so
 # test, sanitize and coverage trees can run side by side in one checkout.
