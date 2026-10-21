@@ -21,8 +21,8 @@
 #include <string.h>     /* strrchr for filename extraction       */
 
 #include "properties.h"
-#include "asset_choices.h"
-#include "../screens/hud.h" /* MAX_HEARTS */ /* the files each asset dropdown offers */
+#include "asset_choices.h" /* the files each asset dropdown offers */
+#include "../screens/hud.h"  /* MAX_HEARTS */
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "editor_files.h"  /* editor_path_for_display for recent entries   */
