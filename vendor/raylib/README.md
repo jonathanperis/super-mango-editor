@@ -92,6 +92,14 @@ changes.
 - miniaudio's data-converter initialization passes a null heap through unchanged
   for a zero-allocation passthrough conversion instead of adding zero to null
   (found by UBSan).
+- miniaudio's `ma_device_uninit` wakes the backend's own data loop before it
+  joins the device thread. Upstream (0.11.25, and the 0.11.26 dev branch) no
+  longer stops a started device there; it only signals the worker's wakeup
+  event, which a PulseAudio worker blocked in `pa_mainloop_iterate` never
+  sees, so `CloseAudioDevice` waited for PulseAudio's next timer: about 2 s on
+  every game and editor exit on Linux, and per process in CI's scripted smoke.
+  The patch calls the same `onDeviceDataLoopWakeup` that `ma_device_stop`
+  uses; the worker already exits when it finds the device uninitialized.
 
 One desktop leak is fixed the same way. Upstream `SetMouseCursor` on the GLFW
 backend calls `glfwCreateStandardCursor` on every call and never frees the

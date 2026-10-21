@@ -9,6 +9,10 @@
     {
       "before": "        result = ma_channel_converter_init_preallocated(&channelConverterConfig, ma_offset_ptr(pHeap, heapLayout.channelConverterOffset), &pConverter->channelConverter);",
       "after": "        /* Super Mango: passthrough conversion may have a null, zero-sized heap. */\n        result = ma_channel_converter_init_preallocated(&channelConverterConfig, pHeap != NULL ? ma_offset_ptr(pHeap, heapLayout.channelConverterOffset) : NULL, &pConverter->channelConverter);"
+    },
+    {
+      "before": "        ma_event_signal(&pDevice->wakeupEvent);\n        ma_thread_wait(&pDevice->thread);",
+      "after": "        ma_event_signal(&pDevice->wakeupEvent);\n        /* Super Mango: a started device's worker waits inside the backend's own\n           loop (PulseAudio's pa_mainloop_iterate), which wakeupEvent never\n           reaches. Wake that loop as ma_device_stop does, or the join below\n           waits for the backend's next timer: about 2 s on every exit. */\n        if (pDevice->pContext->callbacks.onDeviceDataLoopWakeup != NULL) {\n            pDevice->pContext->callbacks.onDeviceDataLoopWakeup(pDevice);\n        }\n        ma_thread_wait(&pDevice->thread);"
     }
   ],
   "src/platforms/rcore_desktop_glfw.c": [
