@@ -727,7 +727,8 @@ static size_t char_start_at(const char *text, size_t at)
 /*
  * draw_field_text — Draw a field's idle text from x: line breaks shown as
  * pilcrows, and text wider than max_width cut at a character boundary and
- * ended with "..." so it never runs past the field.
+ * ended with "..." so it never runs past the field.  Returns 1 when the
+ * text was cut.
  *
  * Every idle field is drawn each frame, and a description may hold 4 KiB.
  * Measuring one character shorter at a time cost a measurement of the
@@ -735,14 +736,15 @@ static size_t char_start_at(const char *text, size_t at)
  * long description.  Width only grows with the prefix, so a binary search
  * finds the longest prefix that fits in about 12 measurements.
  */
-static void draw_field_text(UIState *ui, int x, int y, int max_width,
-                            const char *text, Color color)
+static int draw_field_text(UIState *ui, int x, int y, int max_width,
+                           const char *text, Color color)
 {
     char shown[UI_EDIT_BUFFER_SIZE * 2];
     size_t length = strlen(text);
 
     (void)field_display_copy(shown, sizeof(shown), text, length);
-    if (ui_text_width(ui, shown) > max_width) {
+    int cut = ui_text_width(ui, shown) > max_width;
+    if (cut) {
         int room = max_width - ui_text_width(ui, "...");
         /* low ends as the largest offset whose whole characters fit; the
          * full text does not fit, so the cut always drops something. */
@@ -757,6 +759,7 @@ static void draw_field_text(UIState *ui, int x, int y, int max_width,
         strcat(shown, "...");
     }
     draw_text(ui, x, y, shown, color);
+    return cut;
 }
 
 /*
@@ -1274,8 +1277,9 @@ void ui_label_color(UIState *ui, int x, int y, const char *text,
 int ui_label_fit(UIState *ui, int x, int y, int max_w, const char *text, Color color)
 {
     if (!text || !text[0]) return 0;
-    draw_field_text(ui, x, y, max_w, text, color);
-    if (ui_text_width(ui, text) <= max_w && !strchr(text, '\n')) return 0;
+    /* A label that was cut short, or has line breaks shown as pilcrows,
+     * offers its full text as a tooltip. */
+    if (!draw_field_text(ui, x, y, max_w, text, color) && !strchr(text, '\n')) return 0;
     /* In a scrolled panel, a row moved out of the view (under the panel's
      * title, say) is not what the pointer is on. */
     if (ui->clip_active &&
