@@ -165,7 +165,10 @@ The Makefile detects GNU Make's built-in compiler default (`$(origin CC)` is `de
 ### Builder and build modes
 
 `make builder` builds both executables. `make run-editor` also builds the sibling
-game needed for F5 playtest. The default build includes `-g -O0`; `make debug`
+game needed for F5 playtest. The default build includes `-g -O0` for the game and
+editor; its raylib keeps symbols and asserts (CMake `Debug`) but is built `-O2`, since
+unoptimized, the Memory backend's software rasterizer took over half of every
+test and smoke run. `make debug`
 isolates it under `out/debug/`, and `make release` builds `-O2` game/editor binaries
 under `out/release/`. Release builds on Linux/macOS add `-fstack-protector-strong` and
 `-D_FORTIFY_SOURCE=2`; Linux also links PIE with full RELRO (`-pie -Wl,-z,relro,-z,now`)

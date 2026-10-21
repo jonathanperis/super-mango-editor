@@ -132,6 +132,12 @@ def main() -> None:
     if args.platform == "memory" or args.null_audio:
         # Only miniaudio's null backend: playback "succeeds" without hardware.
         flags += ["-DMA_ENABLE_ONLY_SPECIFIC_BACKENDS", "-DMA_ENABLE_NULL"]
+    if args.mode == "debug":
+        # Debug builds debug this project, not the pinned raylib: keep its
+        # symbols and asserts (CMake's Debug type) but optimize it. Unoptimized,
+        # the Memory backend's software rasterizer and miniaudio's resampler
+        # take over half the CPU time of every test, smoke and replay run.
+        flags += ["-O2"]
     if args.sanitize:
         flags += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
     if flags:
