@@ -1835,6 +1835,44 @@ void ui_tooltip(UIState *ui, const char *text)
  * long enough: a title-coloured box below and right of the pointer, moved
  * back inside the view (or above the pointer) near an edge.
  */
+/*
+ * wrap_tooltip — Copy text into out with line breaks so no line is wider
+ * than max_w: a line ends at the last space or '/' that fits, or, in a
+ * run with neither (a long file name), at the last character that fits.
+ */
+#define TOOLTIP_MAX_W 480
+static void wrap_tooltip(UIState *ui, const char *text, char *out, size_t out_size, int max_w)
+{
+    size_t used = 0, len = strlen(text);
+    size_t i = 0;
+
+    if (out_size == 0) return;
+    while (i < len && used + 2 < out_size) {
+        /* How far this line can go from text[i]. */
+        size_t end = i, last_break = 0;
+        while (end < len) {
+            size_t next = end + 1;
+            while (next < len && is_continuation_byte(text[next])) next++;
+            if (text_width_of(ui, text, i, next) > max_w) break;
+            if (text[end] == ' ' || text[end] == '/') last_break = next;
+            end = next;
+        }
+        if (end < len && last_break > i) end = last_break;
+        if (end == i) {                  /* one character wider than max_w */
+            end = i + 1;
+            while (end < len && is_continuation_byte(text[end])) end++;
+        }
+        size_t n = end - i;
+        if (used + n + 2 > out_size) n = out_size - used - 2;
+        memcpy(out + used, text + i, n);
+        used += n;
+        i = end;
+        while (i < len && text[i] == ' ') i++;   /* no space starts a line */
+        if (i < len) out[used++] = '\n';
+    }
+    out[used] = '\0';
+}
+
 static void draw_tooltip(UIState *ui)
 {
     const int pad = 6;
@@ -1845,7 +1883,12 @@ static void draw_tooltip(UIState *ui)
     if (!ui->tooltip_text || ui->tooltip_dismissed || ui->dropdown_open_id != 0) return;
     /* Unsigned subtraction: right across a wrap of the clock too. */
     if ((uint32_t)(ui->time_ms - ui->tooltip_since_ms) < UI_TOOLTIP_DELAY_MS) return;
-    font_measure(ui->font, ui->tooltip_text, &tw, &th);
+    /* Long tips (a validation message with a full path) wrap to lines no
+     * wider than TOOLTIP_MAX_W or the window. */
+    char wrapped[UI_EDIT_BUFFER_SIZE];
+    int max_text_w = view_w - 2 * pad - 8 < TOOLTIP_MAX_W ? view_w - 2 * pad - 8 : TOOLTIP_MAX_W;
+    wrap_tooltip(ui, ui->tooltip_text, wrapped, sizeof(wrapped), max_text_w);
+    font_measure(ui->font, wrapped, &tw, &th);
     w = tw + 2 * pad;
     h = th + 2 * pad;
     /* Clear of the pointer's arrow, which hangs down and to the right. */
@@ -1857,7 +1900,7 @@ static void draw_tooltip(UIState *ui)
     if (y < 0) y = 0;
     draw_rect(x, y, w, h, ui_color(ui, UI_COLOR_TITLE));
     draw_control_border(ui, x, y, w, h);
-    draw_text(ui, x + pad, y + pad, ui->tooltip_text, ui_color(ui, UI_COLOR_TEXT));
+    draw_text(ui, x + pad, y + pad, wrapped, ui_color(ui, UI_COLOR_TEXT));
     ui->tooltip_shown = 1;
     ui->tip_box[0] = x;
     ui->tip_box[1] = y;
