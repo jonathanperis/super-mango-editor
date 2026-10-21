@@ -103,7 +103,7 @@ int level_start_resolve(const LevelDef *def, const LevelStart *start,
         if (err && err_size > 0) snprintf(err, err_size, "no level to start in");
         return -1;
     }
-    screens = def->screen_count > 0 ? def->screen_count : 4;
+    screens = level_screen_count(def);
     world_w = (float)screens * (float)GAME_W;
 
     switch (start->kind) {

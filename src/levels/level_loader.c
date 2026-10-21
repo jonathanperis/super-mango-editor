@@ -750,8 +750,8 @@ void level_apply(GameState *gs, const LevelDef *def)
      * game (checkpoints, camera, completion, audio settings) to read */
     world->runtime.current_level = def;
 
-    /* Set world width from screen_count (default 4 screens if not specified) */
-    int screens = (def->screen_count > 0) ? def->screen_count : 4;
+    /* Set world width from screen_count (the default when not specified) */
+    int screens = level_screen_count(def);
     world->runtime.world_w = screens * GAME_W;
 
     /* ---- Platform tile images, held from the asset cache ------------ */

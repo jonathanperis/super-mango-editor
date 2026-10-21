@@ -346,7 +346,7 @@ static void draw_floor_gap_properties(EditorState *es, int y)
      * We take a pointer to the array element so ui_int_field can modify it.
      */
     int *p = &es->level.floor_gaps[es->selection.index];
-    int screens = es->level.screen_count > 0 ? es->level.screen_count : 4;
+    int screens = level_screen_count(&es->level);
     field_label(es, y, "x", FIELD_ID(ENT_FLOOR_GAP, 0));
     if (ui_int_field_limited(&es->ui, FIELD_ID(ENT_FLOOR_GAP, 0),
                              FIELD_X, y, FIELD_W, p,

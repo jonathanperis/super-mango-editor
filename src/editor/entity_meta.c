@@ -461,7 +461,7 @@ Texture2D *editor_entity_texture(const EntityTextures *textures, EntityType type
 
 float editor_world_width(const LevelDef *level)
 {
-    int screens = (level && level->screen_count > 0) ? level->screen_count : 4;
+    int screens = level ? level_screen_count(level) : LEVEL_DEFAULT_SCREEN_COUNT;
     /* A hand-edited file may hold any int; never let it overflow below. */
     if (screens > MAX_LEVEL_SCREENS) screens = MAX_LEVEL_SCREENS;
     return (float)screens * (float)GAME_W;
