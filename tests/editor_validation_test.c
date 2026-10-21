@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "shared/graphics.h"
+#include <rlgl.h>  /* rlDrawRenderBatchActive */
 #include "shared/text.h"
 
 #include <time.h>

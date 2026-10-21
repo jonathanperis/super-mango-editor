@@ -6,6 +6,7 @@
  * build of this one file that counts loads (MANGO_TESTING).
  */
 #include "graphics.h"
+#include <rlgl.h>  /* rlgl after raylib.h, which defines its Matrix type */
 
 #ifdef MANGO_TESTING
 /* Test builds count image loads and live handles (see graphics.h). */
