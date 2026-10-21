@@ -706,6 +706,9 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
                 if (editor_finish_field_edit(es)) (void)editor_focus_validation_issue(es, 0);
                 break;
             }
+            /* While a pan runs the pointer belongs to it: a left press
+             * neither takes the pan over nor reaches the tools. */
+            if (es->panning) break;
             /* Space+drag slides the view instead of using the tool. */
             if (es->space_held && !es->campaign && canvas_contains(event->x, event->y) &&
                 es->ui.active_id == 0) {
