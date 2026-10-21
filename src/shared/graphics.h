@@ -3,7 +3,6 @@
 #pragma once
 
 #include <raylib.h>
-#include <rlgl.h>
 #include <stdlib.h>
 #include "geometry.h"
 
