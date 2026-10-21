@@ -645,6 +645,20 @@ static int long_status_messages_show_whole_in_a_tooltip(void)
     CHECK(es.ui.tooltip_shown && es.ui.tooltip_text == es.status_message);
     CHECK(es.ui.tip_box[0] + es.ui.tip_box[2] <= EDITOR_W);
 
+    /* A message longer than any window wraps into a box that fits. */
+    {
+        char longest[300];
+        memset(longest, 'a', sizeof(longest) - 1);
+        longest[sizeof(longest) - 1] = '\0';
+        memcpy(longest, "Missing file assets/", 20);
+        editor_set_status(&es, "%s", longest);
+        hover_frame(&es, 930, bar_y, 3000);
+        hover_frame(&es, 930, bar_y, 3000 + UI_TOOLTIP_DELAY_MS);
+        CHECK(es.ui.tooltip_shown);
+        CHECK(es.ui.tip_box[0] >= 0 && es.ui.tip_box[0] + es.ui.tip_box[2] <= EDITOR_W);
+        CHECK(es.ui.tip_box[2] <= 480 + 12 && es.ui.tip_box[3] > 30);
+    }
+
     /* A cut label outside the active clip (a row scrolled out of a panel's
      * view) gives no tooltip there. */
     {
