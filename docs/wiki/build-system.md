@@ -173,6 +173,8 @@ isolates it under `out/debug/`, and `make release` builds `-O2` game/editor bina
 under `out/release/`. Release builds on Linux/macOS add `-fstack-protector-strong` and
 `-D_FORTIFY_SOURCE=2`; Linux also links PIE with full RELRO (`-pie -Wl,-z,relro,-z,now`)
 against a position-independent release raylib. MSYS2/MinGW keeps plain `-O2`.
+Linux and Windows release executables link with `-s` (no symbol table, about 230 KB
+less each); macOS keeps its symbols, because its ad-hoc signature is made after the link.
 Their object directories never overlap. Changing flags inside one `OUTDIR` is
 safe (the [flag stamps](#flag-stamps) rebuild what changed), but switching back
 and forth recompiles each time, so give long-lived flag combinations their own
