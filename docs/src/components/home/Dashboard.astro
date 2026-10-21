@@ -332,9 +332,30 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
         document.body.appendChild(script);
     }
 
+    // The .wasm and .data files are most of the download, and super-mango.js
+    // asks for them only once it has loaded and run. Starting them on the
+    // click lets them download during the scroll and the script's own
+    // download. Emscripten fetches both in CORS mode with same-origin
+    // credentials, which crossorigin gives a preload, so it reuses them.
+    function preloadGameFiles() {
+        for (const name of ['super-mango.wasm', 'super-mango.data']) {
+            const href = `${gameAssetBase}${name}`;
+            if (document.head.querySelector(`link[rel="preload"][href="${href}"]`)) continue;
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'fetch';
+            link.crossOrigin = 'anonymous';
+            link.href = href;
+            document.head.appendChild(link);
+        }
+    }
+
     function requestGameStart(debug = false) {
         const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        preloadGameFiles();
         document.getElementById('play')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+        // The script compiles the game on the main thread; give the smooth
+        // scroll a moment to start first.
         window.setTimeout(() => startGame(debug), 120);
     }
 
