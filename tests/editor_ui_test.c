@@ -1333,6 +1333,16 @@ static int place_drag_paints_a_row(void)
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(es.level.coin_count == 0);
 
+    /* Dragging on past the world's left edge stacks nothing there: the
+     * clamp lands each further copy where the last one went. */
+    es.camera.x = 0.0f;
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 40, 300);
+    for (int x = 30; x >= -400; x -= 10) push_event(INPUT_MOUSE_MOVE, 0, 0, x, 300);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, -400, 300);
+    ui_frame(&es, 100, 300);
+    CHECK(es.level.coin_count <= 2);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+
     es.palette_type = ENT_PLAYER_SPAWN;
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 100, 300);
     push_event(INPUT_MOUSE_MOVE, 0, 0, 300, 300);

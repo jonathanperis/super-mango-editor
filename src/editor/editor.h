@@ -559,6 +559,7 @@ typedef struct {
     int            paint_grouped;  /* an undo group is open for the row       */
     int            paint_count;    /* entities placed by this press            */
     float          paint_x, paint_y; /* where the last one went (world px)    */
+    PlacementData  paint_last;     /* the last one placed, as stored        */
     int            drag_moved;    /* 1 once the cursor passed the threshold    */
     EntityType     drag_type;     /* entity grabbed (its corner snaps)          */
     int            drag_index;
