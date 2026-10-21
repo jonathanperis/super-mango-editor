@@ -46,7 +46,7 @@ void player_resolve_floor_collision(Player *player,
      * top edge (FLOOR_Y − BOUNCEPAD_H).  The pad's sprite is decorative;
      * physically it is just a region of the floor that bounces.
      */
-    const float ground_snap = (float)(FLOOR_Y - player->h + FLOOR_SINK);
+    const float ground_snap = (float)(FLOOR_Y - player->h + PLAYER_FLOOR_SINK);
 
     /*
      * Gap walls — once the player's feet are below the floor surface inside
@@ -146,14 +146,14 @@ void player_resolve_platform_collisions(Player *player,
      * above to below.  This is frame-rate-independent and handles any fall
      * speed correctly.
      *
-     * The "physics bottom" strips the FLOOR_SINK visual offset so contact
+     * The "physics bottom" strips the PLAYER_FLOOR_SINK visual offset so contact
      * lands the sprite at the same apparent depth as on the main floor.
      */
     if (player->vy < 0.0f) {
         return;
     }
 
-    float bottom = player->y + player->h - FLOOR_SINK;
+    float bottom = player->y + player->h - PLAYER_FLOOR_SINK;
 
     for (int i = 0; i < platform_count; i++) {
         const Platform *plat = &platforms[i];
@@ -165,7 +165,7 @@ void player_resolve_platform_collisions(Player *player,
 
         /* Vertical crossing: bottom was at or above surface, now below. */
         if (prev_bottom <= plat->y && bottom >= plat->y) {
-            player->y         = plat->y - player->h + FLOOR_SINK;
+            player->y         = plat->y - player->h + PLAYER_FLOOR_SINK;
             player->vy        = 0.0f;
             player->on_ground = 1;
             bottom = plat->y;  /* later candidates must be nearer, never lower */
@@ -210,7 +210,7 @@ void player_resolve_platform_collisions(Player *player,
 
             /* Vertical crossing, relative to the moving top surface. */
             if (prev_bottom <= fp->prev_y && bottom >= fp->y) {
-                player->y          = fp->y - player->h + FLOOR_SINK;
+                player->y          = fp->y - player->h + PLAYER_FLOOR_SINK;
                 player->vy         = 0.0f;
                 player->on_ground  = 1;
                 *out_fp_landed_idx = i;
@@ -243,7 +243,7 @@ void player_resolve_platform_collisions(Player *player,
                 /* gap > 0 means player is below the surface (platform rose). */
                 float gap = bottom - sfp->y;
                 if (h_ov && gap >= 0.0f && gap < (float)FLOAT_PLATFORM_STICK_TOL) {
-                    player->y          = sfp->y - player->h + FLOOR_SINK;
+                    player->y          = sfp->y - player->h + PLAYER_FLOOR_SINK;
                     player->vy         = 0.0f;
                     player->on_ground  = 1;
                     *out_fp_landed_idx = prev_fp_landed_idx;
@@ -271,7 +271,7 @@ void player_resolve_bridge_collision(Player *player,
         return;
     }
 
-    float bottom = player->y + player->h - FLOOR_SINK;
+    float bottom = player->y + player->h - PLAYER_FLOOR_SINK;
     float pcx = player->x + player->w / 2.0f;
 
     for (int i = 0; i < bridge_count; i++) {
@@ -284,7 +284,7 @@ void player_resolve_bridge_collision(Player *player,
         if (!bridge_has_solid_at(br, pcx)) continue;
 
         if (prev_bottom <= br->base_y && bottom >= br->base_y) {
-            player->y         = br->base_y - player->h + FLOOR_SINK;
+            player->y         = br->base_y - player->h + PLAYER_FLOOR_SINK;
             player->vy        = 0.0f;
             player->on_ground = 1;
             *out_bridge_landed_idx = i;
@@ -306,7 +306,7 @@ void player_resolve_spike_platform_top_collision(Player *player,
         return;
     }
 
-    float bottom = player->y + player->h - FLOOR_SINK;
+    float bottom = player->y + player->h - PLAYER_FLOOR_SINK;
     for (int i = 0; i < spike_platform_count; i++) {
         const SpikePlatform *sp = &spike_platforms[i];
         if (!sp->active) continue;
@@ -316,7 +316,7 @@ void player_resolve_spike_platform_top_collision(Player *player,
         if (!h_overlap) continue;
 
         if (prev_bottom <= sp->y && bottom >= sp->y) {
-            player->y         = sp->y - player->h + FLOOR_SINK;
+            player->y         = sp->y - player->h + PLAYER_FLOOR_SINK;
             player->vy        = 0.0f;
             player->on_ground = 1;
             bottom = sp->y;

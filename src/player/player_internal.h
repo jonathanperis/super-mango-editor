@@ -7,16 +7,11 @@
  */
 #pragma once
 
+#include "player.h"  /* PLAYER_FLOOR_SINK, shared with the level loader */
+
 /* Width and height of one sprite frame in the sheet (pixels). */
 #define PLAYER_FRAME_W 48
 #define PLAYER_FRAME_H 48
-
-/*
- * PLAYER_FLOOR_SINK — pixels the player overlaps with the floor top.
- * Transparent padding at the bottom of the 48×48 frame would otherwise make
- * the character appear to float above the grass.
- */
-#define PLAYER_FLOOR_SINK 16
 
 /*
  * Physics-box insets from the 48×48 frame to the visible character art.
@@ -31,7 +26,6 @@
 /* Backward-compatible private names used by the remaining monolithic code. */
 #define FRAME_W     PLAYER_FRAME_W
 #define FRAME_H     PLAYER_FRAME_H
-#define FLOOR_SINK  PLAYER_FLOOR_SINK
 #define PHYS_PAD_X  PLAYER_PHYS_PAD_X
 #define PHYS_PAD_TOP PLAYER_PHYS_PAD_TOP
 #define COYOTE_TIME PLAYER_COYOTE_TIME
