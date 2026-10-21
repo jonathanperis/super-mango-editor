@@ -722,6 +722,12 @@ static int render_view_interpolates_without_touching_the_run(void)
     game_timing_view_point(&view, gs.screen.loop.prev_spider[0].x, 0.0f, &sx, &sy);
     CHECK(sx == gs.world.spiders[0].x);
 
+    /* Restarting the clock (a level load does) forgets the noted positions,
+     * so the next frame shows everything where it is now. */
+    game_timing_restart_clock(&gs);
+    view = game_timing_render_view(&gs, 54);
+    CHECK(view.t == 1.0f && view.cam_x == 54);
+
     /* Noting each step changes nothing the simulation keeps. */
     GameState a = {0}, b = {0};
     stand_player_on_floor(&a, 100.0f);
