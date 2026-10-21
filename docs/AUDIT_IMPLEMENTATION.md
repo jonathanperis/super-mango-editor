@@ -110,6 +110,32 @@ Asset Provenance manual page.
 Full interactive playthrough and physical-device/browser compatibility remain
 testing follow-ups. No commit, push, release publication or deployment was made.
 
+### Status, 2026-10-21
+
+The paragraphs above are left as written on 2026-09-16.
+
+- **Audio — resolved for current `main`.** Commit `3157f77` (2026-10-06)
+  replaced every shipped WAV with sounds synthesized by `tools/gen_sounds.py`
+  (no recorded or sampled material) and deleted the unused, unlicensed
+  reserves; `7af2722` (2026-10-16) moved them to QOA, encoded by `tools/qoa.py`.
+  They are project work under `LICENSE`, and `make docs-drift` fails if a
+  committed sound is not the generator's output. The older music and ambience
+  files (`game_music.ogg`, the `sounds/*.mp3` and `*.ogg` files) had already been
+  removed by April 2026.
+- **Font — resolved for current `main`.** Commit `1c6fb8d` (2026-10-06)
+  removed `round9x13.ttf`; all text now uses raylib's built-in default font,
+  covered by raylib's zlib/libpng licence. No font file ships.
+- **Sprites — unchanged.** JuhoSprite credit and the CC BY 4.0 link stay in
+  `THIRD_PARTY_NOTICES.md` and the Asset Provenance page.
+- **Still open for the owner.** Where `round9x13.ttf` and the replaced
+  WAV/OGG/MP3 files originally came from, and under what licence, is not
+  recorded anywhere in the repository or its history. They remain in Git
+  history, and the releases published before 2026-10-06 were built while they
+  were in the tree (checked: the v1.0.845 Linux archive carries
+  `assets/fonts/round9x13.ttf` and the original WAVs). The v1.0.976 archive and
+  later ones ship the generated audio and no font file. Whether to keep the
+  older releases published is the owner's call.
+
 ## Try it
 
 ```sh
