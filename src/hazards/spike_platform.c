@@ -58,7 +58,7 @@ void spike_platforms_render(const SpikePlatform *sps, int count,
  *
  * The hitbox extends 4 px above the visual platform so that a player
  * standing on top (whose physics bottom sits exactly at sp->y due to
- * FLOOR_SINK snapping) still registers an overlap.  Without this
+ * PLAYER_FLOOR_SINK snapping) still registers an overlap.  Without this
  * extension, the strict rectangle overlap test would miss
  * the edge-aligned case and no damage would ever trigger.
  */

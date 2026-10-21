@@ -99,14 +99,14 @@ int player_init(Player *player, AssetCache *cache)
 
     /*
      * Place the player horizontally centered, sitting on top of the floor.
-     * FLOOR_Y is the top edge of the grass tiles. FLOOR_SINK adds a small
+     * FLOOR_Y is the top edge of the grass tiles. PLAYER_FLOOR_SINK adds a small
      * downward offset to compensate for transparent padding at the bottom of
      * the sprite frame, so the feet visually rest on the grass surface.
      */
     /*
      * Default spawn on top of the first platform (x=80, y=172, width=TILE_SIZE).
      * Centre horizontally on the pillar; snap vertically using the same
-     * formula as platform landing: plat_y − player_h + FLOOR_SINK.
+     * formula as platform landing: plat_y − player_h + PLAYER_FLOOR_SINK.
      *
      * spawn_x/spawn_y store the level-defined spawn point.  level_load will
      * override these (and reposition x/y) once the LevelDef is available.

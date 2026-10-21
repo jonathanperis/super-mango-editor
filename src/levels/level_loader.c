@@ -766,8 +766,8 @@ void level_apply(GameState *gs, const LevelDef *def)
     /*
      * Player spawn — override the defaults set by player_init.
      * player_init has already run by this point, so w/h are valid.
-     * FLOOR_SINK is 16 px (defined in player.c); we use the same literal
-     * here to keep the spawn formula consistent with player_reset.
+     * PLAYER_FLOOR_SINK (player.h) is the same sink player_reset and every
+     * landing use, so the player starts standing exactly as after a landing.
      */
     level_effective_spawn(def, &world->respawn_x, &world->respawn_y);
     world->checkpoint_index = -1;
@@ -782,7 +782,7 @@ void level_apply(GameState *gs, const LevelDef *def)
     world->player.spawn_x = world->respawn_x;
     world->player.spawn_y = world->respawn_y;
     world->player.x = world->respawn_x + (TILE_SIZE - world->player.w) / 2.0f;
-    world->player.y = world->respawn_y - world->player.h + 16;  /* 16 = FLOOR_SINK */
+    world->player.y = world->respawn_y - world->player.h + PLAYER_FLOOR_SINK;
 
     /* ---- Level-wide configuration ---------------------------------- */
     /*
