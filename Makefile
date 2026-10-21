@@ -763,7 +763,8 @@ WEB_INCLUDES = -I$(WEB_RAYLIB_BUILD)/build/raylib/include $(PROJECT_INCLUDES)
 # The .js/.wasm/.data siblings are emitted with the HTML file. Listing every
 # link input lets `web` (and dist-wasm through it) skip emcc only when fresh.
 WEB_LINK_INPUTS = $(WEB_OBJS) $(WEB_RAYLIB_LIB) $(WEB_LINK_FLAGS_STAMP) \
-                  $(filter-out web/debug-boot.js,$(wildcard web/*)) $(wildcard assets/* assets/*/* assets/*/*/*) \
+                  $(filter-out web/debug-boot.js,$(wildcard web/*)) \
+                  $(filter-out assets/sprites/unused/%,$(wildcard assets/* assets/*/* assets/*/*/*)) \
                   $(wildcard levels/* levels/*/*) tools/web_csp.py
 
 web: $(WEB_HTML) $(WEB_DEBUG_HTML) ## Build: WebAssembly game with Emscripten (emcc on PATH)
