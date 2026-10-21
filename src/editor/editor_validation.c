@@ -13,6 +13,7 @@
 #include "../effects/parallax.h"    /* MAX_BACKGROUND_LAYERS */
 #include "../levels/level_loader.h"
 #include "../levels/level_validate.h" /* LevelIssueLocation */
+#include "../shared/platform.h"     /* clock_millis */
 #include "../shared/serializer_io.h"
 #include "../surfaces/platform.h"   /* MAX_PLATFORMS */
 
@@ -33,7 +34,42 @@ typedef struct {
     EditorValidationReport *report;
     char rejected[PATH_FIELDS_MAX][48];
     int rejected_count;
+    uint32_t probe_max_age_ms;   /* see editor_validate_level_reusing */
 } ValidationPass;
+
+/* Answers from serializer_file_exists_utf8 that a later pass may reuse.
+ * LevelDef paths fit in 64 bytes, and a level names at most
+ * PATH_FIELDS_MAX of them; slots are reused oldest first. */
+typedef struct {
+    char path[64];
+    int exists;
+    uint32_t checked_ms;
+} PathProbe;
+static PathProbe s_probes[PATH_FIELDS_MAX];
+static int s_next_probe;
+
+/* Does path exist? An answer younger than max_age_ms is reused rather
+ * than asking the file system again; 0 always asks. */
+static int path_exists(const char *path, uint32_t max_age_ms)
+{
+    uint32_t now = (uint32_t)clock_millis();
+    PathProbe *slot = NULL;
+
+    for (int i = 0; i < PATH_FIELDS_MAX && !slot; i++)
+        if (strcmp(s_probes[i].path, path) == 0) slot = &s_probes[i];
+    if (slot && max_age_ms > 0 && now - slot->checked_ms < max_age_ms) return slot->exists;
+
+    int exists = serializer_file_exists_utf8(path);
+    if (strlen(path) >= sizeof(s_probes[0].path)) return exists;
+    if (!slot) {
+        slot = &s_probes[s_next_probe];
+        s_next_probe = (s_next_probe + 1) % PATH_FIELDS_MAX;
+        strcpy(slot->path, path);
+    }
+    slot->exists = exists;
+    slot->checked_ms = now;
+    return exists;
+}
 
 static void report_add_at(EditorValidationReport *report, int is_error,
                           const LevelIssueLocation *where,
@@ -114,11 +150,17 @@ static void check_path(ValidationPass *pass, const char *field, const char *path
     if (!path || path[0] == '\0') return;
     for (int i = 0; i < pass->rejected_count; i++)
         if (strcmp(pass->rejected[i], field) == 0) return;
-    if (!serializer_file_exists_utf8(path))
+    if (!path_exists(path, pass->probe_max_age_ms))
         report_add(pass->report, 1, "%s missing: %s", field, path);
 }
 
 int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
+{
+    return editor_validate_level_reusing(def, report, 0);
+}
+
+int editor_validate_level_reusing(const LevelDef *def, EditorValidationReport *report,
+                                  uint32_t probe_max_age_ms)
 {
     char field[64];
     /* Static: about 2.6 KB of field names; the editor is single-threaded. */
@@ -138,6 +180,7 @@ int editor_validate_level(const LevelDef *def, EditorValidationReport *report)
      * fine here too. */
     pass.report = report;
     pass.rejected_count = 0;
+    pass.probe_max_age_ms = probe_max_age_ms;
     (void)level_validate_runtime_each(def, add_runtime_issue, &pass);
 
     check_path(&pass, "music_path", def->music_path);
