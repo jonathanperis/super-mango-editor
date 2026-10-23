@@ -1,4 +1,4 @@
-/* Emscripten 6.0.9's GLFW port installs keyboard handlers on window. Scope
+/* Emscripten 6.0.13's GLFW port installs keyboard handlers on window. Scope
  * those exact handlers to the game canvas so page forms and Tab retain their
  * normal behavior. The C input owner installs/removes this scope with raylib. */
 (function(root) {

@@ -7,7 +7,7 @@ The game and editor use **raylib 6.2**, built from upstream commit
 verifies it before extraction, applies the documented source fixes in
 `patches.json`, and builds a static library with CMake. Native builds use bundled
 GLFW; browser builds use the Web backend
-and the project's Emscripten 6.0.9 toolchain. Desktop SDL backends are not used.
+and the project's Emscripten 6.0.13 toolchain. Desktop SDL backends are not used.
 raylib's automatic F12 screenshot shortcut is disabled because application
 bindings and explicit exports belong to Super Mango.
 

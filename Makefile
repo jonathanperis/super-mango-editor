@@ -778,7 +778,7 @@ $(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/gameplay_mechanics_test.o 
 # EMSCRIPTEN_VERSION=<x.y.z> to expect another release, or leave it empty
 # (EMSCRIPTEN_VERSION=) to skip the check.
 # renovate: datasource=github-tags depName=emscripten-core/emsdk
-EMSCRIPTEN_VERSION ?= 6.0.9
+EMSCRIPTEN_VERSION ?= 6.0.13
 WEB_FLAGS = -s USE_GLFW=3 \
             --pre-js web/touch-controls.js \
             --pre-js web/keyboard-scope.js \
