@@ -771,6 +771,7 @@ GAMEPLAY_TEST_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/input/game_
                      $(TEST_GAME_INPUT_OBJ)
 $(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/gameplay_mechanics_test.o $(TEST_SOURCE_DIR)/game_replay_test.o \
 		$(TEST_SOURCE_DIR)/creature_update_test.o $(TEST_SOURCE_DIR)/player_climb_test.o \
+		$(TEST_SOURCE_DIR)/thin_coverage_test.o \
 		$(GAMEPLAY_TEST_OBJS)
 	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
