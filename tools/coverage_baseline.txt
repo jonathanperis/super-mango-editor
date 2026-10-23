@@ -6,7 +6,7 @@
 #   make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
 collectibles/coin.c 100.00
 collectibles/health_star.c 100.00
-collectibles/last_star.c 63.64
+collectibles/last_star.c 100.00
 collision/collision_damage.c 100.00
 collision/floor_gap_collision.c 100.00
 collision/game_collision.c 94.16
@@ -14,7 +14,7 @@ core/app_session.c 94.05
 core/debug.c 92.41
 core/entity_utils.c 100.00
 core/entity_utils.h 100.00
-core/game_bouncepads.c 67.74
+core/game_bouncepads.c 100.00
 core/game_bridges.c 100.00
 core/game_camera.c 93.33
 core/game_checkpoint.c 94.64
@@ -66,7 +66,7 @@ editor/palette.c 99.52
 editor/properties.c 95.77
 editor/tools.c 96.10
 editor/undo.c 100.00
-effects/fog.c 71.59
+effects/fog.c 100.00
 effects/parallax.c 95.08
 effects/water.c 89.09
 entities/bird.c 100.00
@@ -77,10 +77,10 @@ entities/jumping_spider.c 100.00
 entities/spider.c 100.00
 hazards/axe_trap.c 94.37
 hazards/blue_flame.c 100.00
-hazards/circular_saw.c 69.05
+hazards/circular_saw.c 100.00
 hazards/spike.c 100.00
 hazards/spike_block.c 100.00
-hazards/spike_platform.c 60.00
+hazards/spike_platform.c 100.00
 input/game_bindings.c 100.00
 input/game_events.c 93.15
 input/game_input.c 86.21
@@ -122,14 +122,14 @@ shared/platform.c 98.90
 shared/serializer_emit.c 94.00
 shared/serializer_io.c 90.78
 shared/serializer_load.c 91.26
-shared/serializer_load_checkpoints.c 76.74
+shared/serializer_load_checkpoints.c 100.00
 shared/serializer_load_climbables.c 100.00
 shared/serializer_load_collectibles.c 100.00
 shared/serializer_load_config.c 100.00
 shared/serializer_load_enemies.c 100.00
 shared/serializer_load_geometry.c 100.00
 shared/serializer_load_hazards.c 100.00
-shared/serializer_load_header.c 73.21
+shared/serializer_load_header.c 100.00
 shared/serializer_load_layers.c 80.33
 shared/serializer_load_surfaces.c 100.00
 shared/serializer_parse.c 91.74

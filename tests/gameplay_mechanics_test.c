@@ -11,8 +11,9 @@
  *
  * The scripted-input replay (input/game_replay.c) is covered in
  * game_replay_test.c, linked into this same binary, and so are the direct
- * (level-free) checks of the creature updates (creature_update_test.c) and
- * of climbing (player_climb_test.c).
+ * (level-free) checks of the creature updates (creature_update_test.c),
+ * climbing (player_climb_test.c) and the thin modules
+ * (thin_coverage_test.c).
  */
 #include <math.h>
 #include <stdio.h>
@@ -1303,6 +1304,7 @@ int main(void)
         CASE(every_overlay_state_renders),
         CASE(replay_scripts_drive_the_game),
         CASE(replay_scripts_reject_malformed_files),
+        CASE(thin_modules_cover_their_branches),
 #undef CASE
     };
     int failures = 0;
