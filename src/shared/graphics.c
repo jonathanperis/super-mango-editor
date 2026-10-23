@@ -88,7 +88,10 @@ Rectangle display_viewport(int window_w, int window_h, int canvas_w, int canvas_
     if (scale >= 1) {
         int width = canvas_w*scale, height = canvas_h*scale;
         /* Whole-pixel offsets keep each canvas pixel on the window's grid. */
-        return (Rectangle){(float)((window_w-width)/2), (float)((window_h-height)/2),
+        /* Integer division is the point: the offset is a whole number of
+         * window pixels, so the canvas stays on the pixel grid. */
+        return (Rectangle){(float)((window_w - width) / 2), /* NOLINT(bugprone-integer-division) */
+                           (float)((window_h - height) / 2), /* NOLINT(bugprone-integer-division) */
                            (float)width, (float)height};
     }
     /* A window smaller than the canvas cannot fit even 1x. Shrinking by a

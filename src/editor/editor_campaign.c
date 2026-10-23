@@ -1415,6 +1415,7 @@ static void draw_buttons(EditorState *es, EditorCampaign *c)
         case CAMPAIGN_BUTTON_SAVE:   (void)editor_campaign_save(es); break;
         case CAMPAIGN_BUTTON_REVERT: (void)editor_campaign_revert(es); break;
         case CAMPAIGN_BUTTON_CLOSE:  (void)editor_campaign_close(es, 0); break;
+        default: break;
         }
         /* Close and Revert free the view; nothing below may touch it. */
         return;

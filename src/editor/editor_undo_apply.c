@@ -3,6 +3,7 @@
  */
 
 #include "editor_undo_apply.h"
+#include "snapshot_equal.h"
 
 #include <string.h>
 
@@ -125,7 +126,7 @@ void editor_commit_change(EditorState *es)
                            EDITOR_LAST_STAR_NEXT_PHASE_WIDGET &&
                            strcmp(es->pending_text_before,
                                   es->level.next_phase) != 0;
-        if (memcmp(&es->pending_entity_before, &after, sizeof(after)) != 0 ||
+        if (!placement_same(type, &es->pending_entity_before, &after) ||
             text_changed) {
             cmd.type = CMD_PROPERTY;
             cmd.entity_type = es->pending_entity_type;
@@ -162,7 +163,7 @@ void editor_commit_change(EditorState *es)
         }
     } else if (es->change_tracking_kind == EDITOR_CHANGE_CONFIG) {
         LevelConfigSnapshot after = editor_snapshot_config(&es->level);
-        if (memcmp(&es->pending_config_before, &after, sizeof(after)) != 0) {
+        if (!config_snapshot_same(&es->pending_config_before, &after)) {
             cmd.type = CMD_CONFIG;
             cmd.config_before = es->pending_config_before;
             cmd.config_after = after;

@@ -212,7 +212,7 @@ TEST_GAME_CHECKPOINT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_checkpoint.o
 TEST_HUD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/hud.o
 TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(SHARED_DIR)/ui.o
 TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validation editor_files \
-                   editor_recovery editor_session editor_undo_apply entity_meta editor_campaign) \
+                   editor_recovery editor_session editor_undo_apply snapshot_equal entity_meta editor_campaign) \
                    $(TEST_EDITOR_UI_OBJ) \
                    $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,tools hit_test editor_clipboard \
                    editor_events canvas editor_panels editor_layout palette properties asset_choices \

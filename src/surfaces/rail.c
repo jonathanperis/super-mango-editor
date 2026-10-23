@@ -273,10 +273,10 @@ void rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y) {
     int   j    = (i + 1) % r->count;
     float frac = t - (float)i;
 
-    float cx_i = (float)(r->tiles[i].x + RAIL_TILE_W / 2);
-    float cy_i = (float)(r->tiles[i].y + RAIL_TILE_H / 2);
-    float cx_j = (float)(r->tiles[j].x + RAIL_TILE_W / 2);
-    float cy_j = (float)(r->tiles[j].y + RAIL_TILE_H / 2);
+    float cx_i = (float)r->tiles[i].x + (float)RAIL_TILE_W / 2.0f;
+    float cy_i = (float)r->tiles[i].y + (float)RAIL_TILE_H / 2.0f;
+    float cx_j = (float)r->tiles[j].x + (float)RAIL_TILE_W / 2.0f;
+    float cy_j = (float)r->tiles[j].y + (float)RAIL_TILE_H / 2.0f;
 
     /*
      * Linear interpolation (lerp): result = a + (b − a) × frac.

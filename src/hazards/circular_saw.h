@@ -56,7 +56,7 @@
  * SAW_PUSH_VY    : upward bounce component (negative = up on screen).
  */
 #define SAW_PUSH_SPEED  220.0f
-#define SAW_PUSH_VY    -150.0f
+#define SAW_PUSH_VY    (-150.0f)
 
 /* ------------------------------------------------------------------ */
 

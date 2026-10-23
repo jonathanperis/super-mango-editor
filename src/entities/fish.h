@@ -17,7 +17,7 @@
 /* FISH_SPEED — the usual patrol speed, px/s; the level's vx is the speed
  * actually used (shipped levels author this value). */
 #define FISH_SPEED         70.0f
-#define FISH_JUMP_VY     -280.0f    /* upward jump impulse in px/s             */
+#define FISH_JUMP_VY     (-280.0f)   /* upward jump impulse in px/s             */
 #define FISH_JUMP_MIN      1.4f     /* minimum seconds before next jump        */
 #define FISH_JUMP_MAX      3.0f     /* maximum seconds before next jump        */
 /*

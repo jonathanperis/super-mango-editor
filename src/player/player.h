@@ -36,7 +36,7 @@
  * player standing on a pad cannot jump (the pad keeps relaunching them), so
  * every pad must launch at least as hard as a normal jump.
  */
-#define JUMP_VY  -325.0f
+#define JUMP_VY  (-325.0f)
 
 /*
  * PLAYER_HURT_TIME — seconds of invincibility after a hit. apply_damage sets

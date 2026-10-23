@@ -173,8 +173,10 @@ static int legacy_respawn_column_is_safe(const GameState *gs, float x)
  */
 static float legacy_safe_respawn_x(const GameState *gs, float boundary_x)
 {
+    /* Step is 8, and a level is far smaller than the range where a float
+     * can no longer hold every integer, so the counter stays exact. */
     for (float x = boundary_x; x > gs->world.respawn_x && x >= 0.0f;
-         x -= LEGACY_CHECKPOINT_STEP) {
+         x -= LEGACY_CHECKPOINT_STEP) { /* NOLINT(cert-flp30-c) */
         if (legacy_respawn_column_is_safe(gs, x)) return x;
     }
     return -1.0f;
