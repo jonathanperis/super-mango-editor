@@ -11,7 +11,7 @@ collision/collision_damage.c 100.00
 collision/floor_gap_collision.c 100.00
 collision/game_collision.c 94.16
 core/app_session.c 94.05
-core/debug.c 92.41
+core/debug.c 92.47
 core/entity_utils.c 100.00
 core/entity_utils.h 100.00
 core/game_bouncepads.c 100.00
@@ -40,10 +40,10 @@ core/game_timing.h 100.00
 core/game_update.c 100.00
 core/game_window.c 80.00
 editor/asset_choices.c 100.00
-editor/canvas.c 94.29
+editor/canvas.c 94.27
 editor/dialog_choice.c 96.28
 editor/editor.c 83.33
-editor/editor_campaign.c 91.29
+editor/editor_campaign.c 91.19
 editor/editor_chrome.c 84.94
 editor/editor_clipboard.c 94.63
 editor/editor_events.c 93.81
@@ -66,10 +66,11 @@ editor/palette.c 99.52
 editor/properties.c 96.45
 editor/properties_config.c 93.23
 editor/properties_entities.c 97.40
+editor/snapshot_equal.c 89.16
 editor/tools.c 90.68
 editor/tools_bounds.c 98.14
 editor/tools_drag.c 97.09
-editor/tools_nudge.c 93.75
+editor/tools_nudge.c 93.98
 editor/tools_place.c 96.79
 editor/undo.c 100.00
 effects/fog.c 100.00
@@ -90,7 +91,7 @@ hazards/spike_platform.c 100.00
 input/game_bindings.c 100.00
 input/game_events.c 93.15
 input/game_input.c 86.21
-input/game_replay.c 97.66
+input/game_replay.c 97.67
 input/game_web_input.c 100.00
 input/input_backend.c 81.57
 levels/campaign_catalog.c 84.86
@@ -102,7 +103,7 @@ levels/level_ref.c 98.15
 levels/level_resources.c 97.14
 levels/level_session.c 85.50
 levels/level_start.c 86.27
-levels/level_validate.c 96.51
+levels/level_validate.c 96.52
 levels/phase_transition.c 100.00
 player/player.c 93.75
 player/player_animation.c 100.00
@@ -121,7 +122,7 @@ shared/asset_cache.c 99.20
 shared/asset_root.c 83.08
 shared/audio.c 94.87
 shared/geometry.h 91.67
-shared/graphics.c 84.06
+shared/graphics.c 84.29
 shared/graphics.h 82.61
 shared/hex.h 100.00
 shared/platform.c 98.90
