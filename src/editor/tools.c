@@ -23,6 +23,7 @@
 #include "entity_meta.h" /* Editor display dimensions and rail helpers     */
 #include "hit_test.h"    /* editor_hit_test                                */
 #include "undo.h"    /* Command, PlacementData, undo_push                 */
+#include "snapshot_equal.h" /* field comparison, not memcmp of the union */
 #include "../levels/level_loader.h" /* level_validate_runtime            */
 #include "../levels/level_validate.h" /* level_validate_preview, _each   */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
@@ -993,7 +994,7 @@ static int place_entity(EditorState *es, float world_x, float world_y)
      * a spike block or a flame its rail or gap, can land the next one
      * exactly where the last one went. */
     if (es->painting && es->paint_count > 0 &&
-        memcmp(&pd, &es->paint_last, sizeof(pd)) == 0) return -1;
+        placement_same(type, &pd, &es->paint_last)) return -1;
     if (editor_add_placement(es, type, &pd, "place") != 0) return -1;
     es->paint_last = pd;
     return 0;
@@ -1384,7 +1385,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         Command cmd;
         PlacementData after = editor_snapshot_entity(&es->level, es->drag_items[i].type,
                                                      es->drag_items[i].index);
-        if (memcmp(&after, &es->drag_befores[i], sizeof(after)) == 0) continue;
+        if (placement_same(es->drag_items[i].type, &after, &es->drag_befores[i])) continue;
         memset(&cmd, 0, sizeof(cmd));
         cmd.type         = CMD_MOVE;
         cmd.entity_type  = (int)es->drag_items[i].type;
@@ -1499,16 +1500,23 @@ void tools_cancel_drag(EditorState *es)
 
 /* A fingerprint of which entities a list names, so a run of nudges is
  * only merged while it keeps moving the same ones (FNV-1a over the list). */
+/* Low byte first, the same order a little-endian machine reads the two ints.
+ * The hash is only compared in this process; it is not written to a file. */
+static uint64_t fnv_int(uint64_t hash, unsigned value)
+{
+    for (int shift = 0; shift < 32; shift += 8) {
+        hash ^= (value >> shift) & 0xffu;
+        hash *= UINT64_C(1099511628211);
+    }
+    return hash;
+}
+
 static uint64_t selection_key(const Selection *items, int count)
 {
     uint64_t hash = UINT64_C(1469598103934665603);
     for (int i = 0; i < count; i++) {
-        int pair[2] = {(int)items[i].type, items[i].index};
-        const unsigned char *bytes = (const unsigned char *)pair;
-        for (size_t b = 0; b < sizeof(pair); b++) {
-            hash ^= bytes[b];
-            hash *= UINT64_C(1099511628211);
-        }
+        hash = fnv_int(hash, (unsigned)items[i].type);
+        hash = fnv_int(hash, (unsigned)items[i].index);
     }
     return hash;
 }
@@ -1538,7 +1546,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
         after[i] = editor_move_placement(items[i].type, &before[i], dx, dy);
         editor_clamp_placement(&es->level, items[i].type, &after[i]);
         (void)editor_entity_write(&es->level, items[i].type, items[i].index, &after[i]);
-        if (memcmp(&before[i], &after[i], sizeof(after[i])) != 0) changed++;
+        if (!placement_same(items[i].type, &before[i], &after[i])) changed++;
     }
     if (editor_edit_kept_level(&es->level, &issues_before, error, sizeof(error)) != 0) {
         for (int i = 0; i < count; i++)
@@ -1578,7 +1586,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
     }
     for (int i = 0; i < count; i++) {
         Command cmd;
-        if (memcmp(&before[i], &after[i], sizeof(after[i])) == 0) continue;
+        if (placement_same(items[i].type, &before[i], &after[i])) continue;
         if (merge && undo_amend_after(es->undo, es->nudge_group, (int)items[i].type,
                                       items[i].index, &after[i])) continue;
         memset(&cmd, 0, sizeof(cmd));

@@ -247,7 +247,7 @@ int game_experiment_load(GameState *gs, const char *path)
         tape->fingerprint.content_hash != gs->world.source_level_hash) goto done;
     char expected[17];
     snprintf(expected, sizeof(expected), "%016llx", (unsigned long long)tape->fingerprint.content_hash);
-    if (strcmp(expected, hash.u.str.ptr)) goto done;
+    if (strcmp(expected, hash.u.str.ptr) != 0) goto done;
     tape->count = frames.u.arr.size;
     tape->seed = (unsigned int)seed.u.int64;
     str_copy(tape->level_path, gs->world.level_path, sizeof(tape->level_path));

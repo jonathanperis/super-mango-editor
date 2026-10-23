@@ -209,10 +209,9 @@ static void render_floor(GameState *gs, int cam_x)
                 if (tx     == gx + FLOOR_GAP_W)  at_left_edge  = 1;  /* gap ends right before this piece  */
             }
 
-            if (at_left_edge && at_right_edge) piece_col = 1;  /* squeezed — use fill */
-            else if (at_left_edge)             piece_col = 0;
-            else if (at_right_edge)            piece_col = 2;
-            else                               piece_col = 1;
+            if (at_left_edge && !at_right_edge)       piece_col = 0;
+            else if (at_right_edge && !at_left_edge)  piece_col = 2;
+            else                                      piece_col = 1;  /* fill, including a piece squeezed between two edges */
 
             /*
              * src  — the 16×16 region to cut from the tile sheet.

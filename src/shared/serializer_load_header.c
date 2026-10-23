@@ -15,18 +15,17 @@ int serializer_load_header(toml_datum_t top, LevelDef *def) {
     /* Missing format_version is the supported legacy v1 representation. */
     {
         toml_datum_t version = toml_get(top, "format_version");
-        if (version.type == TOML_UNKNOWN) {
+        if (version.type == TOML_UNKNOWN ||
+            (version.type == TOML_INT64 && version.u.int64 == LEVEL_FORMAT_VERSION)) {
             def->format_version = LEVEL_FORMAT_VERSION;
         } else if (version.type != TOML_INT64) {
             fprintf(stderr, "serializer: format_version must be TOML integer %d\n",
                     LEVEL_FORMAT_VERSION);
             return -1;
-        } else if (version.u.int64 != LEVEL_FORMAT_VERSION) {
+        } else {
             fprintf(stderr, "serializer: unsupported format_version %lld (expected %d)\n",
                     (long long)version.u.int64, LEVEL_FORMAT_VERSION);
             return -1;
-        } else {
-            def->format_version = LEVEL_FORMAT_VERSION;
         }
     }
 

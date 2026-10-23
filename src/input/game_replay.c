@@ -132,8 +132,9 @@ int game_replay_load(GameState *gs)
             gs->screen.replay_event_count >= MAX_REPLAY_EVENTS) goto invalid;
         int key = replay_keycode(key_name);
         if (key == KEY_NULL ||
-            (strcmp(action, "down") && strcmp(action, "press") &&
-             strcmp(action, "up") && strcmp(action, "release") && strcmp(action, "tap"))) goto invalid;
+            (strcmp(action, "down") != 0 && strcmp(action, "press") != 0 &&
+             strcmp(action, "up") != 0 && strcmp(action, "release") != 0 &&
+             strcmp(action, "tap") != 0)) goto invalid;
         if (gs->screen.replay_event_count && frame < gs->screen.replay_events[gs->screen.replay_event_count - 1].frame)
             goto invalid;
         GameReplayEvent *event = &gs->screen.replay_events[gs->screen.replay_event_count++];

@@ -38,7 +38,7 @@
  * At 55 px/s the spider is airborne ~0.67 s, covering ~37 px horizontally —
  * enough to clear the 32-px sea gaps.
  */
-#define JSPIDER_JUMP_VY     -200.0f  /* upward impulse in px/s (negative = up)*/
+#define JSPIDER_JUMP_VY     (-200.0f) /* upward impulse in px/s (negative = up)*/
 #define JSPIDER_GRAVITY      600.0f  /* downward accel in px/s² while airborne*/
 
 /* ---- Types -------------------------------------------------------------- */

@@ -245,7 +245,7 @@ void game_inspector_render(GameState *gs)
 
     /* Mark the physical foot point (the point the one-way landing test uses)
      * with a short line: cyan while on the ground, white in the air. */
-    int x = (int)(gs->world.player.x + gs->world.player.w / 2) - (int)gs->world.camera.x;
+    int x = (int)(gs->world.player.x + (float)gs->world.player.w / 2.0f) - (int)gs->world.camera.x;
     int y = (int)(gs->world.player.y + gs->world.player.h - PLAYER_FLOOR_SINK);
     DrawLine(x-5,y,x+5,y,(Color){gs->world.player.on_ground ? 0 : 255,255,255,255});
 }

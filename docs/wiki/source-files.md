@@ -85,6 +85,7 @@ src/
 │   ├── editor_clipboard.h / .c   Copy/paste; a rail rider re-attaches to its rail by shape and position
 │   ├── editor_validation.h / .c  Level validation report helpers
 │   ├── editor_undo_apply.h / .c  Undo operation application
+│   ├── snapshot_equal.h / .c     Field comparison of placement and config snapshots (undo)
 │   ├── file_dialog.h / .c        Native file dialogs
 │   └── undo.h / .c               Compact history with owned config snapshots; `undo_push(stack, const Command *)`
 ├── shared/

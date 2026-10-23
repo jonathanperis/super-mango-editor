@@ -469,9 +469,10 @@ EditorExternalChoice editor_confirm_external_change(EditorState *es)
     int button_id = 0;
 
     if (!es) return EDITOR_EXTERNAL_CANCEL;
-    if (editor_test_external_choice != (EditorExternalChoice)-1) {
+    /* -1 is the "no scripted answer" sentinel, outside the enum on purpose. */
+    if (editor_test_external_choice != (EditorExternalChoice)-1) { /* NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange) */
         EditorExternalChoice result = editor_test_external_choice;
-        editor_test_external_choice = (EditorExternalChoice)-1;
+        editor_test_external_choice = (EditorExternalChoice)-1; /* NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange) */
         return result;
     }
     if (dialog_choice("File Changed Externally", "The source file changed on disk. Replace it, save as another file, or cancel.",

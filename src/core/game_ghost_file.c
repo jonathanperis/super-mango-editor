@@ -316,7 +316,7 @@ int game_ghost_load(const GameProfile *profile, const char *level_key, GameGhost
     found = read_ghost_file(path, &text);
 #endif
     /* A ghost stored under one level's name must be for that level. */
-    if (found == 1 && (game_ghost_decode(out, text) || strcmp(out->level, level_key))) {
+    if (found == 1 && (game_ghost_decode(out, text) || strcmp(out->level, level_key) != 0)) {
         game_ghost_track_free(out);
         found = -1;
     }

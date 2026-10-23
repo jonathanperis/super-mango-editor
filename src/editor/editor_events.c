@@ -200,7 +200,8 @@ static void note_redone_place(Selection *placed, int *count, const Command *comm
         if (placed[i].type == (EntityType)command->entity_type &&
             placed[i].index >= command->entity_index)
             placed[i].index++;
-    placed[*count].type = (EntityType)command->entity_type;
+    /* entity_type is an EntityType stored as int on the command. */
+    placed[*count].type = (EntityType)command->entity_type; /* NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange) */
     placed[*count].index = command->entity_index;
     (*count)++;
 }
