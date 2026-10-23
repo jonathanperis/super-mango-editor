@@ -63,9 +63,17 @@ src/
 │   ├── editor.h / .c             Editor state, resource startup/cleanup and loop delegation
 │   ├── canvas.h / .c             Zoomable editing canvas with horizontal and vertical camera scrolling
 │   ├── palette.h / .c            Entity palette
-│   ├── properties.h / .c         Property panels: one draw_<type>_properties function per entity type (picked from a table), plus level config
+│   ├── properties.h / .c         Property panels: s_property_panels and properties_render
+│   ├── properties_internal.h     Field ids, row layout and the helpers the panel files share
+│   ├── properties_entities.c     One draw_<type>_properties function per entity type
+│   ├── properties_config.c       Level Config, one config_* helper per settings group
 │   ├── asset_choices.h / .c      The files each asset dropdown offers (layer images, floor/platform tiles, music); a test checks them against the folders
-│   ├── tools.h / .c              Selection and placement tools
+│   ├── tools.h / .c              Tool entry points: deletion, select-all and the level-issue gate
+│   ├── tools_internal.h          The seam drag, place, nudge and delete call across
+│   ├── tools_bounds.c            editor_clamp_placement and editor_move_placement
+│   ├── tools_place.c             TOOL_PLACE defaults and painting a row
+│   ├── tools_drag.c              Select, box-select and drag
+│   ├── tools_nudge.c             Arrow-key nudge, one undo group per run
 │   ├── hit_test.h / .c           Entity rectangles and click hit-testing
 │   ├── entity_meta.h / .c        One table row per entity type (names, capacity, LevelDef storage, placement preview) plus shared read/insert/remove of placements
 │   ├── editor_frame.h / .c       Per-frame editor orchestration
@@ -101,7 +109,10 @@ src/
 │   ├── utf8.h                   Strict UTF-8 checks for loaded strings and typed text
 │   ├── hex.h                    Fixed-width lowercase hex reader for ghost and resume values
 │   ├── printf_format.h          PRINTF_FORMAT: lets GCC/Clang check printf-style format arguments
-│   ├── ui.h / .c                 Immediate-mode widgets shared by editor and game settings
+│   ├── ui.h / ui.c               Immediate-mode edit buffer, caret and the helpers the widgets call
+│   ├── ui_internal.h             Drawing and hit-testing helpers shared inside the ui module
+│   ├── ui_widgets.c              Buttons, fields, dropdowns and labels
+│   ├── ui_scroll.c               Scrolled panels and their scrollbars
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
 │   ├── serializer_io.h / .c      UTF-8 path I/O, size-limited whole-file reads, temp-file-then-rename saves, symlink checks
@@ -619,7 +630,7 @@ reports it, resident memory in MB.
 | `shared/raymath_inline.h` | Why raymath is included static inline, and when using it would change replay numbers |
 | `shared/audio.h`, `shared/audio.c` | Owned samples, borrowed alias data, per-play volume and music pumping |
 | `shared/text.h`, `shared/text.c` | Borrowing raylib's built-in font and drawing glyphs from its one atlas texture |
-| `shared/ui.h`, `shared/ui.c` | Immediate-mode calls, stable widget IDs, staged edits and labels drawn from the font atlas |
+| `shared/ui.h`, `shared/ui.c`, `ui_widgets.c`, `ui_scroll.c` | Immediate-mode calls, stable widget IDs, staged edits and labels drawn from the font atlas. The edit buffer stays in `ui.c`; the widgets and the scrollbars are the other two files |
 | `shared/platform.h`, `shared/platform.c` | Monotonic elapsed time, UTF-8 copying and caller-owned OS paths |
 | `shared/asset_root.h`, `shared/asset_root.c` | Why relative paths depend on the working folder, and how startup finds the asset root |
 | `shared/utf8.h` | What makes a UTF-8 byte sequence valid (overlong forms, surrogates, truncation) |

@@ -210,14 +210,18 @@ TEST_GAME_RANDOM_OBJ = $(OBJDIR)/src/core/game_random.o
 TEST_GAME_GHOST_OBJ = $(OBJDIR)/src/core/game_ghost.o
 TEST_GAME_CHECKPOINT_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/core/game_checkpoint.o
 TEST_HUD_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/screens/hud.o
-TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(SHARED_DIR)/ui.o
+TEST_EDITOR_UI_OBJ = $(TEST_OBJDIR)/$(SHARED_DIR)/ui.o \
+                   $(TEST_OBJDIR)/$(SHARED_DIR)/ui_widgets.o \
+                   $(TEST_OBJDIR)/$(SHARED_DIR)/ui_scroll.o
 TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validation editor_files \
                    editor_recovery editor_session editor_undo_apply snapshot_equal entity_meta editor_campaign) \
                    $(TEST_EDITOR_UI_OBJ) \
                    $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,tools hit_test editor_clipboard \
                    editor_events canvas editor_panels editor_layout palette properties asset_choices \
                    editor_textures \
-                   editor_playtest editor_shortcuts file_dialog dialog_choice undo)
+                   editor_playtest editor_shortcuts file_dialog dialog_choice undo \
+                   properties_entities properties_config \
+                   tools_bounds tools_place tools_drag tools_nudge)
 # The editor's own window, chrome and frame, for editor-ui-test.
 TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \
                    editor_frame editor_minimap)
