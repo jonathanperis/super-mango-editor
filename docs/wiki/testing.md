@@ -302,6 +302,7 @@ units and owner/borrower contracts still need their existing regression checks.
 - level, screen and lab counts in `PRODUCT.md`, the README and `.specs/project/` match `docs/src/generated/project.json` and `levels/`;
 - every render layer count ("N render layers", "N-layer order") in the manual, README, `PRODUCT.md` and `.specs/project/` matches the rows of the [render order table](../architecture/#render-order-back-to-front), numbered 1..N;
 - the Emscripten version is the same in the Makefile, `build.yml` and the files the check lists in `EMSCRIPTEN_MENTIONS` (the READMEs, the Build System page, `vendor/raylib/README.md` and `web/keyboard-scope.js`). Dated reports such as `docs/AUDIT_IMPLEMENTATION.md` keep the version they were written against.
+- `VERSION` is `MAJOR.MINOR.PATCH`, and `build.yml` tags `v` plus that file instead of `v1.0.<commit count>`. The [release checklist](../release-checklist/) is the rule for which number comes next.
 
 Each failure names the page and line to fix.
 

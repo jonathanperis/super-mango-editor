@@ -6,7 +6,7 @@ name: Build & Release
 #                  (pages-build/pages-deploy); no release is created.
 #   pull_request   builds the game as a check only; no release is created.
 #   push tag v*    builds and creates a GitHub Release for that tag.
-#   workflow_dispatch builds and creates a manually versioned GitHub Release.
+#   workflow_dispatch builds and creates a GitHub Release tagged from VERSION.
 # ──────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -950,13 +950,12 @@ jobs:
       contents: write
 
     steps:
-      # Manual releases are tagged v1.0.<commits on main>. The commit count
-      # only grows as main does, unlike the workflow run number, which every pull
-      # request run also advances; it continues the existing v1.0.N series
-      # (v1.0.845 was the last run-number tag, at a lower commit count). A
-      # full-history checkout is needed: a shallow clone would count one.
-      - name: Checkout history for the release number
-        if: "!startsWith(github.ref, 'refs/tags/v')"
+      # The release version is the VERSION file (MAJOR.MINOR.PATCH). A pushed
+      # v* tag must be v plus that file. A manual dispatch on main creates
+      # that tag when it does not exist yet. The v1.0.<commit count> series
+      # ended at v1.0.994 (v1.0.845 was the last workflow-run-number tag).
+      # Full history is required so an existing tag is visible to this job.
+      - name: Checkout source for the release version
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -967,13 +966,22 @@ jobs:
         env:
           PUSHED_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
         run: |
+          version=$(tr -d '[:space:]' < VERSION)
+          if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::VERSION must be MAJOR.MINOR.PATCH, found: ${version:-empty}"
+            exit 1
+          fi
+          tag="v${version}"
           if [ -n "$PUSHED_TAG" ]; then
+            if [ "$PUSHED_TAG" != "$tag" ]; then
+              echo "::error::Tag $PUSHED_TAG does not match VERSION ($tag)."
+              exit 1
+            fi
             echo "tag=$PUSHED_TAG" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          tag="v1.0.$(git rev-list --count HEAD)"
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-            echo "::error::$tag already exists; merge a new commit to main or push an explicit v* tag."
+            echo "::error::$tag already exists. Bump VERSION and merge that commit before dispatching again."
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
