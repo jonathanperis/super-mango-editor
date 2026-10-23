@@ -82,6 +82,7 @@ pacman -S make mingw-w64-ucrt-x86_64-clang mingw-w64-ucrt-x86_64-gcc mingw-w64-u
 
 **WebAssembly:** install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) at **6.0.13** with `emcc` and `emcmake` on `PATH`. GitHub CI is the authoritative WASM release verification; report local toolchain failures separately from application failures.
 
+`make doctor` reports which of these are missing before the first build.
 The docs tools need Python 3.11+; the docs site also needs Bun
 (see [website maintenance](docs/README.md)). On a machine without a display or
 sound card, `make test OUTDIR=out/headless RAYLIB_PLATFORM=memory` runs the

@@ -343,7 +343,7 @@ Current test binaries (18):
 - `out/gameplay-mechanics-test`
 - `out/editor-ui-test`
 
-`make test` also runs `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`, `tests/coverage_baseline_test.py` and `tests/clang_tidy_report_test.py`.
+`make test` also runs `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`, `tests/coverage_baseline_test.py`, `tests/clang_tidy_report_test.py` and `tests/doctor_test.py`.
 Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
 Node tests `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
 `tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs` and
@@ -400,6 +400,20 @@ Runs `make coverage`, then rewrites `tools/coverage_baseline.txt` with every fil
 
 ```sh
 make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+```
+
+### `make doctor`
+
+Runs `tools/doctor.py`. Required failures are a missing C compiler, a `c++`
+that cannot link the C++ standard library (the probe raylib's CMake build
+runs), CMake, Make, Python 3.11+, Node.js 22.12+, or a Linux X11/GL
+development header. zenity (Linux file dialogs), Bun (the docs site), `emcc`
+(compared with the Makefile's `EMSCRIPTEN_VERSION`, not a second copy of the
+pin) and a playback device are printed and do not fail. Headless `make test`
+needs none of those four.
+
+```sh
+make doctor
 ```
 
 ### `make tidy`
@@ -544,6 +558,12 @@ Override `OUTDIR`/`DISTDIR` only when you intend to remove those specific build 
 ---
 
 ## Prerequisites
+
+`make doctor` checks this list on the machine you are about to build on.
+It fails when a compiler, the C++ standard library raylib's CMake probe
+links, CMake, Make, Python, Node.js, or (on Linux) an X11/GL header is
+missing, and it names the package. zenity, Bun, emcc and a playback device
+are reported and do not fail the command.
 
 ### macOS (Apple Silicon / Intel)
 
