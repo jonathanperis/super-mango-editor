@@ -127,6 +127,37 @@ class DocsChecksTest(unittest.TestCase):
                 self.assertTrue(any(expected in error for error in drift.FAILURES), drift.FAILURES)
         drift.FAILURES.clear()
 
+    def test_stale_stack_claims_fail(self):
+        # The maintainer pages and STATE.md quote pins. A rewritten version,
+        # a WAV description, or an old regression-binary count must fail drift.
+        original_read = drift.read
+        cases = [
+            (ROOT / ".specs" / "project" / "STATE.md", "raylib 6.2", "raylib 6.0",
+             drift.check_state_stack_claims, "says raylib 6.0"),
+            (ROOT / ".specs" / "project" / "STATE.md", "twelve QOA files", "twelve WAVs",
+             drift.check_state_stack_claims, "must name the QOA files"),
+            (ROOT / "docs" / "README.md", "does not run on pushes to `main`",
+             "checks every `main` push",
+             drift.check_docs_readme_workflow, "does not run on pushes to `main`"),
+            (ROOT / "docs" / "README.md", "Astro **7.3.8**", "Astro **7.3.6**",
+             drift.check_frontend_versions, "says astro 7.3.6"),
+            (ROOT / "Makefile", "18-regression-binary", "17-regression-binary",
+             drift.check_native_test_counts, "says 17-regression-binary"),
+        ]
+        for target, old, new, check, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertIn(old, original_read(target))
+
+                def mutated(path, target=target, old=old, new=new):
+                    text = original_read(path)
+                    return text.replace(old, new) if path == target else text
+
+                drift.FAILURES.clear()
+                with patch.object(drift, "read", side_effect=mutated):
+                    check()
+                self.assertTrue(any(expected in error for error in drift.FAILURES), drift.FAILURES)
+        drift.FAILURES.clear()
+
     def test_function_locations_on_the_current_manual(self):
         # Every "`foo()` in `src/...`" claim in the manual holds today, and the
         # pattern sees the claims (so a regex that matched nothing would fail).

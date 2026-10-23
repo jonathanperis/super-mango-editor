@@ -434,6 +434,14 @@ def check_native_test_counts() -> None:
     for target in targets:
         if target.removesuffix("-test") not in tests_line:
             fail(f".specs/project/STATE.md: the `- Tests:` line does not list `{target}`")
+    # A comment such as "the 17-regression-binary inventory" is not a prose sentence,
+    # so the regex above never sees it. The Makefile is the inventory those comments describe.
+    makefile = read(ROOT / "Makefile")
+    for line_no, line in enumerate(makefile.splitlines(), start=1):
+        for count in re.findall(r"\b(\d+)-regression-binary\b", line):
+            if int(count) != len(targets):
+                fail(f"Makefile:{line_no}: says {count}-regression-binary; "
+                     f"TEST_TARGETS has {len(targets)}")
 
 
 # "`NAME` in `src/file.h`" names the file that defines NAME. When a constant
@@ -493,6 +501,107 @@ def check_workflow_claims() -> None:
                      "only build.yml's `Docs drift` job does")
             if not docs_on_main and docs_filtered and re.search(r"Docs \(runs on every `main` push", line):
                 fail(f"{page_label(page, line_no)}: docs.yml does not run on main pushes")
+
+
+def check_state_stack_claims() -> None:
+    """STATE.md's raylib pin and sound format follow the manifest and the generator."""
+    manifest = json.loads(read(ROOT / "vendor" / "raylib" / "manifest.json"))
+    pin = str(manifest["version"])
+    state_path = ROOT / ".specs" / "project" / "STATE.md"
+    state = read(state_path)
+    for line_no, line in enumerate(state.splitlines(), start=1):
+        for found in re.findall(r"\braylib (\d+\.\d+)\b", line):
+            if found != pin:
+                fail(f"{page_label(state_path, line_no)}: says raylib {found}; "
+                     f"vendor/raylib/manifest.json pins {pin}")
+    audio = next((line for line in state.splitlines() if line.startswith("- Audio:")), "")
+    if "QOA" not in audio or re.search(r"\bWAVs?\b", audio):
+        fail(".specs/project/STATE.md: the `- Audio:` line must name the QOA files "
+             "tools/gen_sounds.py writes, not WAV")
+
+
+def locked_frontend_versions() -> dict[str, str]:
+    """Resolved versions of the docs site's direct dependencies, from bun.lock.
+
+    bun.lock is JSON with trailing commas, which json.loads rejects. Dropping
+    a comma that sits immediately before a closing brace or bracket is enough.
+    """
+    text = re.sub(r",(\s*[}\]])", r"\1", read(ROOT / "docs" / "bun.lock"))
+    lock = json.loads(text)
+    workspace = lock["workspaces"][""]
+    names = list(workspace.get("dependencies", {})) + list(workspace.get("devDependencies", {}))
+    resolved: dict[str, str] = {}
+    for name in names:
+        entry = lock["packages"][name][0]
+        prefix = name + "@"
+        if not entry.startswith(prefix):
+            fail(f"docs/bun.lock: package {name} is recorded as {entry}")
+            continue
+        resolved[name] = entry[len(prefix):]
+    return resolved
+
+
+# Bold versions in the two maintainer pages that name the docs toolchain.
+# The Tailwind sentence covers both the package and its Vite plugin.
+FRONTEND_VERSION_CLAIMS = [
+    ("docs/README.md", r"Astro \*\*([^*]+)\*\*", "astro"),
+    ("docs/README.md", r"`@astrojs/markdown-satteri`\s+\*\*([^*]+)\*\*", "@astrojs/markdown-satteri"),
+    ("docs/README.md", r"`@astrojs/sitemap` \*\*([^*]+)\*\*", "@astrojs/sitemap"),
+    ("docs/README.md", r"`@astrojs/check` \*\*([^*]+)\*\*", "@astrojs/check"),
+    ("docs/README.md", r"and TypeScript \*\*([^*]+)\*\*", "typescript"),
+    ("docs/README.md", r"Tailwind CSS\s+and its Vite plugin \*\*([^*]+)\*\*", "tailwindcss"),
+    ("docs/wiki/build-system.md", r"Astro \*\*([^*]+)\*\*", "astro"),
+    ("docs/wiki/build-system.md", r"`@astrojs/markdown-satteri` \*\*([^*]+)\*\*", "@astrojs/markdown-satteri"),
+    ("docs/wiki/build-system.md", r"`@astrojs/sitemap` \*\*([^*]+)\*\*", "@astrojs/sitemap"),
+    ("docs/wiki/build-system.md", r"`@astrojs/check` \*\*([^*]+)\*\*", "@astrojs/check"),
+    ("docs/wiki/build-system.md", r"and TypeScript \*\*([^*]+)\*\*", "typescript"),
+    ("docs/wiki/build-system.md", r"Tailwind CSS and its Vite\s+plugin \*\*([^*]+)\*\*", "tailwindcss"),
+]
+
+
+def check_frontend_versions() -> None:
+    """Maintainer pages quote the versions bun.lock actually installed."""
+    locked = locked_frontend_versions()
+    vite = locked.get("@tailwindcss/vite")
+    tailwind = locked.get("tailwindcss")
+    if vite and tailwind and vite != tailwind:
+        fail(f"docs/bun.lock: tailwindcss {tailwind} and @tailwindcss/vite {vite} differ; "
+             "the maintainer pages describe them as one version")
+    for rel, pattern, package in FRONTEND_VERSION_CLAIMS:
+        text = read(ROOT / rel)
+        found = re.findall(pattern, text)
+        if not found:
+            fail(f"{rel}: missing the locked version of {package}")
+            continue
+        expected = locked.get(package)
+        for version in found:
+            if version != expected:
+                fail(f"{rel}: says {package} {version}; docs/bun.lock resolved {expected}")
+
+
+def check_docs_readme_workflow() -> None:
+    """docs/README.md's deployment section matches docs.yml's real triggers."""
+    rel = "docs/README.md"
+    text = read(ROOT / rel)
+    marker = "## Deployment and Analytics"
+    if marker not in text:
+        fail(f"{rel}: missing the Deployment and Analytics section")
+        return
+    section = text.split(marker, 1)[1].split("\n## ", 1)[0]
+    _, docs_on_main, _ = workflow_triggers("docs.yml")
+    docs_runs_drift = "make docs-drift" in "\n".join(
+        line for line in read(ROOT / ".github" / "workflows" / "docs.yml").splitlines()
+        if line.strip().startswith("run:"))
+    if not docs_on_main:
+        if "does not run on pushes to `main`" not in section:
+            fail(f"{rel}: Deployment must say docs.yml does not run on pushes to `main`")
+        if re.search(r"docs\.yml`? checks every `main` push", section):
+            fail(f"{rel}: docs.yml does not run on every main push")
+    if not docs_runs_drift:
+        if "does not run `make docs-drift`" not in section:
+            fail(f"{rel}: Deployment must say docs.yml does not run `make docs-drift`")
+        if re.search(r"\bIt runs drift\b", section):
+            fail(f"{rel}: docs.yml does not run the docs drift check")
 
 
 def check_readme_prerequisites() -> None:
@@ -1108,8 +1217,11 @@ def main() -> int:
     check_release_version()
     check_emscripten_pins()
     check_native_test_counts()
+    check_state_stack_claims()
+    check_frontend_versions()
     check_constant_locations()
     check_workflow_claims()
+    check_docs_readme_workflow()
     check_readme_prerequisites()
     check_content_counts()
     check_pages_metadata()
