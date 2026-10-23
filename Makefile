@@ -372,6 +372,7 @@ test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser
 	python3 tests/gen_sounds_test.py
 	python3 tests/coverage_baseline_test.py
 	python3 tests/clang_tidy_report_test.py
+	python3 tests/doctor_test.py
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-validate-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/runtime-load-test"
 	$(RUN_PREFIX) "$(abspath $(OUTDIR))/rail-test"
@@ -458,6 +459,12 @@ compile-commands: ## Build: Write compile_commands.json for clangd and IDEs
 .PHONY: tidy
 tidy: compile-commands ## Check: clang-tidy findings in src/ and tools/ (report only)
 	python3 tools/run_clang_tidy.py
+
+# Reports missing host tools. Optional tools (zenity, Bun, emcc, audio) warn
+# and do not fail, so a native build machine can still be "ready".
+.PHONY: doctor
+doctor: ## Check: Host compilers, libraries and optional tools
+	python3 tools/doctor.py
 
 level-catalog: ## Generate: Level catalog page from the campaign manifest
 	python3 tools/generate_level_catalog.py
