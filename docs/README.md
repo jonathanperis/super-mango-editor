@@ -8,8 +8,8 @@ The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** and Bun
 **1.4.2**. Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
-The supported frontend versions are Astro **7.3.6**, `@astrojs/markdown-satteri`
-**0.4.3**, `@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS
+The supported frontend versions are Astro **7.3.8**, `@astrojs/markdown-satteri`
+**0.4.4**, `@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS
 and its Vite plugin **4.3.3**, and TypeScript **6.0.3**. TypeScript **7.0.2** is
 newer, but Astro Check 0.9.10 requires `^5.0.0 || ^6.0.0`; retain 6.0.3 until the
 checker supports 7.x. Keep peer constraints enforced. After dependency updates,
@@ -108,9 +108,11 @@ for the CI-authoritative WebAssembly verification contract.
 
 ## Deployment and Analytics
 
-`docs.yml` checks every `main` push and relevant pull requests (including
-source, level, root-doc and workflow changes). It runs drift, frozen install, Astro lint, dependency audit,
-build and built-site validation. It does not deploy.
+`docs.yml` lints, audits, builds and link-checks the website. It runs on
+pull requests that touch the site's inputs (source, levels, root docs and
+workflows included), weekly, and on demand. It does not run on pushes to `main`,
+it does not run `make docs-drift` (the always-on `Docs drift` job in `build.yml`
+does), and it does not deploy.
 
 On a main push or manual run on main, Build & Release ends with two Pages jobs.
 `pages-build` checks out that run's commit, builds/checks the site with
