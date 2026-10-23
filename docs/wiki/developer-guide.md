@@ -269,7 +269,7 @@ button. The icons are raygui's own bitmaps, generated into
 `vendor/raygui/raygui_icons.h` by `tools/import_raygui_icons.py` (see
 `vendor/raygui/README.md`), and `ui_draw_icon` draws them in the label's
 colour, so they follow the style like the text does. Only the icons come from
-raygui; the widgets stay in `ui.c`.
+raygui; the widgets stay in `ui_widgets.c`.
 
 `ui_label_fit(ui, x, y, max_w, text, colour)` draws a label cut to `max_w`
 with `...`, and when it had to cut, registers itself so the full text shows as
