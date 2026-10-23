@@ -60,7 +60,8 @@ archive contents, editor inclusion, reserve-asset exclusion and license notices.
 - `editor-ui-test`
 
 It also runs `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`,
-`tests/coverage_baseline_test.py` and `tests/clang_tidy_report_test.py`. The
+`tests/coverage_baseline_test.py`, `tests/clang_tidy_report_test.py` and
+`tests/doctor_test.py`. The
 `web-host-contract` prerequisite adds `tools/check_web_boot_contract.py`,
 `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
 `tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs`,
