@@ -21,11 +21,13 @@ The latest published release can lag well behind `main`. The website follows
 `main`, so a fix reaches browser players on the next successful Pages deploy
 and reaches the downloadable archives on the next release. `v1.0.845`
 (2026-09-17) was the last tag taken from a workflow run number. It predates
-the move from SDL2 to raylib and the editor and lab archives. Later releases
-tagged `v1.0.<commit count>` ship the raylib game and the editor. Check the
+the move from SDL2 to raylib and the editor and lab archives. Later tags
+through `v1.0.994` were `v1.0.<commit count>` and ship the raylib game and the
+editor. From `v2.0.0` the version is semver in the `VERSION` file, and routine
+releases stay on `2.0.x`. Check the
 [releases page](https://github.com/jonathanperis/super-mango-editor/releases)
-for which release that is. This file does not name it: a version written here
-would go stale, and the releases page is the list that stays current.
+for which release is current. This file does not name it: a version written
+here would go stale, and the releases page is the list that stays current.
 
 ## Scope
 

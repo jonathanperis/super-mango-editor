@@ -573,6 +573,27 @@ EMSCRIPTEN_MENTIONS = [
 ]
 
 
+def check_release_version() -> None:
+    """VERSION is semver and the release job tags v$VERSION, not a commit count."""
+    raw = read(ROOT / "VERSION")
+    version = raw.strip()
+    if raw != version + "\n" or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+        fail("VERSION: must be MAJOR.MINOR.PATCH followed by a single trailing newline")
+    workflow = read(ROOT / ".github" / "workflows" / "build.yml")
+    if "v1.0.$(git rev-list --count HEAD)" in workflow:
+        fail("build.yml: manual releases must read VERSION, not the commit count on main")
+    if "version=$(tr -d '[:space:]' < VERSION)" not in workflow or 'tag="v${version}"' not in workflow:
+        fail("build.yml: the release job must tag v plus the VERSION file")
+    checklist = read(ROOT / "docs" / "wiki" / "release-checklist.md")
+    if "a routine release bumps the patch" not in checklist or "2.0.x" not in checklist:
+        fail("docs/wiki/release-checklist.md: document semver, with routine releases on 2.0.x")
+    build_system = read(ROOT / "docs" / "wiki" / "build-system.md")
+    if "v1.0.<commit count>" in build_system:
+        fail("docs/wiki/build-system.md: still describes releases as v1.0.<commit count>")
+    if "the `VERSION` file" not in build_system:
+        fail("docs/wiki/build-system.md: the Build & Release row must name the VERSION file")
+
+
 def check_emscripten_pins() -> None:
     makefile = re.search(r"^EMSCRIPTEN_VERSION \?= (\S+)$", read(ROOT / "Makefile"), re.M)
     workflow = re.search(r"depName=emscripten-core/emsdk\s*\n\s*version: (\S+)",
@@ -1084,6 +1105,7 @@ def main() -> int:
     check_developer_context_docs()
     check_public_readme_docs()
     check_wasm_authority_docs()
+    check_release_version()
     check_emscripten_pins()
     check_native_test_counts()
     check_constant_locations()

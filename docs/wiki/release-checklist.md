@@ -99,13 +99,39 @@ Before creating a release, confirm checks for the intended source commit are gre
 
 Publishing rules:
 
-- push a `v*` tag to create a tagged GitHub Release, or
-- use `workflow_dispatch` **on `main`** for a manually versioned release. It is
-  tagged `v1.0.<N>`, where N is the number of commits on `main`
-  (`git rev-list --count HEAD`), so numbers only grow as `main` does. This
-  continues the earlier `v1.0.N` series, which used the workflow run number
-  (`v1.0.845` was the last); the release job stops with an error rather than
-  reuse a tag that already exists.
+The version is [semver](https://semver.org/), recorded in `VERSION` at the
+repository root (`MAJOR.MINOR.PATCH`, no `v` prefix). There is no version
+string in the game or editor binaries; `VERSION` is the source of truth, and
+`make docs-drift` checks that `build.yml` reads it.
+
+`v1.0.845` was the last tag taken from a workflow run number. Tags after that
+through `v1.0.994` were `v1.0.<commit count on main>`. That count is not a
+version, and the series stops there. An older `v1.1.0` tag points at pre-rewrite
+history and has no GitHub Release; leave it. From **2.0.0** onward:
+
+- a routine release bumps the patch, so the line stays `2.0.x` (`2.0.1`, then
+  `2.0.2`, and so on);
+- bump the minor for a compatible set of player-visible changes worth calling
+  out on their own;
+- bump the major for an incompatible change.
+
+To publish:
+
+1. Set `VERSION` to the new number and merge that commit to `main` once its
+   checks are green. Do not reuse a number that already has a `v*` tag.
+2. Either push the tag `v` plus the contents of `VERSION` (the first tag
+   under this rule is `v2.0.0`) onto that exact commit, or run
+   `workflow_dispatch` **on `main`**.
+   A dispatch reads `VERSION` and creates that tag. The release job refuses a
+   pushed tag that does not match `VERSION`, and it refuses a dispatch when
+   that tag already exists.
+3. The GitHub Release is named `Super Mango` plus the tag. After it publishes,
+   prepend a short summary of what changed since the previous release to the
+   generated download and verification notes. The workflow writes those notes
+   itself; the summary is the part a player reads first.
+
+The release name follows the tag, so a `VERSION` of `2.0.0` publishes as
+`Super Mango v2.0.0`.
 
 A separate `Checksums and provenance` job (the only one holding
 `attestations: write` and `id-token: write`) waits for the same gates as the
