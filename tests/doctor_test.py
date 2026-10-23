@@ -43,7 +43,9 @@ class FakeHost:
         return self.family_name
 
     def read(self, path: Path):
-        return self.files.get(str(path))
+        # Fixtures use POSIX paths. On Windows, str(Path("/proc/..."))
+        # is a different string, so also try the POSIX form.
+        return self.files.get(str(path), self.files.get(path.as_posix()))
 
     def run(self, argv, stdin=None, timeout=20):
         program = Path(argv[0]).name
