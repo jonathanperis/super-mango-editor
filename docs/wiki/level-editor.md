@@ -480,12 +480,12 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor_validation.c` / `editor_validation.h` | In-memory level validation report used by status, save, autosave, and playtest |
 | `canvas.c` / `canvas.h` | Level preview rendering, `canvas_screen_to_world`, grid overlay |
 | `palette.c` / `palette.h` | Entity palette panel — category rows, type selection, a thumbnail of each entity's sprite (its first frame, trimmed to the art); a new type to place opens its category and scrolls into view |
-| `properties.c` / `properties.h` | Property inspector panel — one `draw_<type>_properties()` function per entity type, chosen from the `s_property_panels` table, plus Level Config drawn by one `config_*` helper per settings group |
+| `properties.c` / `properties.h`, `properties_entities.c`, `properties_config.c` | Property inspector panel — one `draw_<type>_properties()` function per entity type, chosen from the `s_property_panels` table, plus Level Config drawn by one `config_*` helper per settings group |
 | `asset_choices.c` / `asset_choices.h` | The files each asset dropdown offers. `editor_ui_test` fails when a file in `assets/sprites/backgrounds`, `foregrounds`, `levels` or `assets/sounds/levels` is missing from its list; a level path no list names shows its file name in the dropdown |
-| `tools.c` / `tools.h` | Mouse interaction for Select / Place / Delete tools |
+| `tools.c` / `tools.h`, `tools_bounds.c`, `tools_place.c`, `tools_drag.c`, `tools_nudge.c` | Mouse interaction for Select / Place / Delete tools. Clamp and move are `tools_bounds.c`, new entities `tools_place.c`, the drag `tools_drag.c`, arrow keys `tools_nudge.c` |
 | `hit_test.c` / `hit_test.h` | Entity rectangles shared by click hit-testing and the selection outline; reverse-draw-order hit test |
 | `entity_meta.c` / `entity_meta.h` | The per-type table (names, category, capacity, where the placements live in `LevelDef`, the placement-ghost sprite) and the shared read/insert/remove helpers used by tools, undo and paste |
-| `src/shared/ui.c` / `ui.h` | Immediate-mode UI widget library shared with game settings |
+| `src/shared/ui.c` / `ui.h`, `ui_widgets.c`, `ui_scroll.c` | Immediate-mode UI widget library shared with game settings. Widgets are `ui_widgets.c`; scrolling is `ui_scroll.c` |
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
 | `src/shared/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |
 | `src/shared/serializer_save.c`, `serializer_emit.c`, `serializer_io.c` | TOML emission and atomic file persistence |
