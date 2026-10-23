@@ -403,7 +403,7 @@ $(filter-out $(TEST_OBJDIR)/%,$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS) $(TO
 $(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)): $(TEST_FLAGS_STAMP)
 $(TARGET) $(EDITOR_TARGET) $(TEST_TARGETS): $(LINK_FLAGS_STAMP)
 
-# Extra standalone parser probes; keep the 17-regression-binary inventory above.
+# Extra standalone parser probes; keep the 18-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
 parser-allocation-probe: $(OUTDIR)/parser-allocation-probe
 	$(RUN_PREFIX) "$(abspath $<)"
