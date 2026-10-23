@@ -162,7 +162,9 @@ static int fog_waves_fade_overlap_and_fill(void)
     for (int i = 0; i < MAX_FOG_TEXTURES + 1; i++)
         snprintf(paths[i], sizeof(paths[i]), "assets/no-such-fog-%d.png", i);
     snprintf(paths[0], sizeof(paths[0]), "assets/sprites/foregrounds/fog_1.png");
-    fog_init(&fog, NULL, paths, MAX_FOG_TEXTURES + 1);
+    /* The parameter is an array of const rows. GCC -Wpedantic rejects
+     * passing char[][64] for that before C23, so the call names the type. */
+    fog_init(&fog, NULL, (const char (*)[64])paths, MAX_FOG_TEXTURES + 1);
     CHECK(fog.tex_count == MAX_FOG_TEXTURES);
     CHECK(fog.textures[0] != NULL);
     CHECK(fog.instances[0].active);
