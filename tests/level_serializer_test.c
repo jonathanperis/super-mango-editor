@@ -14,6 +14,7 @@
 #endif
 
 #include "shared/serializer.h"
+#include "shared/serializer_load_header.h"
 #include "levels/level.h"
 #include "test_paths.h"         /* TEST_OUT scratch directory */
 
@@ -1565,9 +1566,78 @@ static int metadata_roundtrip_and_limits(void)
     return failed;
 }
 
+/* Schema validation rejects a non-integer floor_gaps array and a bad
+ * format_version before the header loader runs, so these cases parse
+ * TOML and call the loader directly. */
+static int load_header_text(const char *text, LevelDef *def, int *status)
+{
+    toml_result_t parsed = toml_parse(text, (int)strlen(text));
+
+    if (!parsed.ok) {
+        toml_free(parsed);
+        return fail("header fixture did not parse");
+    }
+    level_def_init_defaults(def);
+    *status = serializer_load_header(parsed.toptab, def);
+    toml_free(parsed);
+    return 0;
+}
+
+static int header_rejects_cover_the_loader(void)
+{
+    char too_many[512];
+    int used = 0;
+    int status = 0;
+    LevelDef def;
+    toml_datum_t empty;
+
+    memset(&empty, 0, sizeof(empty));
+    if (serializer_load_header(empty, NULL) != -1)
+        return fail("header load should reject a null level");
+
+    if (load_header_text("format_version = true\n", &def, &status) != 0)
+        return 1;
+    if (status == 0) return fail("a boolean format_version should be rejected");
+
+    if (load_header_text("format_version = 2\n", &def, &status) != 0)
+        return 1;
+    if (status == 0) return fail("an unsupported format_version should be rejected");
+
+    if (load_header_text("format_version = 1\nname = \"Current\"\n", &def, &status) != 0)
+        return 1;
+    if (status != 0) return fail("the current format_version should load");
+    if (expect_int_value("direct format version", def.format_version,
+                         LEVEL_FORMAT_VERSION) != 0)
+        return 1;
+
+    if (load_header_text("floor_gaps = [\"no\"]\n", &def, &status) != 0)
+        return 1;
+    if (status == 0) return fail("a non-numeric floor gap should be rejected");
+
+    if (load_header_text("floor_gaps = [12.5]\n", &def, &status) != 0)
+        return 1;
+    if (status != 0) return fail("a float floor gap should load");
+    if (expect_int_value("float floor gap", def.floor_gaps[0], 12) != 0)
+        return 1;
+
+    used = snprintf(too_many, sizeof(too_many), "floor_gaps = [");
+    for (int i = 0; i < MAX_FLOOR_GAPS + 1 && used > 0 &&
+         used < (int)sizeof(too_many); i++)
+        used += snprintf(too_many + used, sizeof(too_many) - (size_t)used,
+                         "%s0", i ? ", " : "");
+    if (used < 0 || used >= (int)sizeof(too_many) - 2)
+        return fail("could not build too many floor gaps");
+    too_many[used++] = ']';
+    too_many[used] = '\0';
+    if (load_header_text(too_many, &def, &status) != 0) return 1;
+    if (status == 0) return fail("too many floor gaps should be rejected");
+    return 0;
+}
+
 int main(void)
 {
     if (ensure_out_dir() != 0) return 1;
+    if (header_rejects_cover_the_loader() != 0) return 1;
     if (parser_boundary_test() || metadata_roundtrip_and_limits()) return 1;
     const char *numeric_cases[] = {
         "music_volume = nan\n", "music_volume = 1e30\n",
