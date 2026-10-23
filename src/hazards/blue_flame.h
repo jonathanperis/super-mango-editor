@@ -55,7 +55,7 @@
  * naturally as BLUE_FLAME_RISE_DECEL slows it each frame, so it eases into
  * the apex smoothly.
  */
-#define BLUE_FLAME_LAUNCH_VY    -550.0f
+#define BLUE_FLAME_LAUNCH_VY    (-550.0f)
 
 /*
  * BLUE_FLAME_RISE_DECEL — deceleration applied each frame during the rise (px/s²).

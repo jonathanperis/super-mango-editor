@@ -753,7 +753,7 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size)
                 case 'n': ch = '\n'; break;
                 case 'r': ch = '\r'; break;
                 case 't': ch = '\t'; break;
-                case '\\': break;
+                case '\\':
                 case '"': break;
                 default:
                     goto fail;

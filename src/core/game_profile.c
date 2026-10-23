@@ -229,7 +229,7 @@ static int decode_resume(toml_datum_t table, GameResume *resume)
         toml_datum_t value = table.u.tab.value[i];
         int field = 0;
         if (strlen(key) != (size_t)table.u.tab.len[i]) return -1;
-        while (field < RESUME_FIELDS && strcmp(key, names[field])) field++;
+        while (field < RESUME_FIELDS && strcmp(key, names[field]) != 0) field++;
         int failed;
         switch (field) {
         case 0: failed = string(value, resume->path, sizeof(resume->path)); break;
@@ -629,7 +629,7 @@ int game_profile_save(GameProfile *profile)
     if (!result) {
         char *current = NULL;
         int found = read_native(profile->path, &current);
-        if (found < 0 || (profile->baseline ? found != 1 || strcmp(profile->baseline, current) : found != 0)) result = -1;
+        if (found < 0 || (profile->baseline ? found != 1 || strcmp(profile->baseline, current) != 0 : found != 0)) result = -1;
         free(current);
         if (!result) {
             /* Replace an existing profile; create a first one only while no
@@ -714,7 +714,7 @@ int game_profile_record(GameProfile *profile, const char *key, int score, int co
     if (!game_profile_key_valid(key) || score < 0 || coins < 0 || coins > MAX_COINS ||
         !isfinite(elapsed) || elapsed < 0 || elapsed > 1e9f) return -1;
     int index = 0;
-    while (index < profile->data.count && strcmp(profile->data.levels[index].path, key)) index++;
+    while (index < profile->data.count && strcmp(profile->data.levels[index].path, key) != 0) index++;
     if (index == PROFILE_LEVEL_COUNT) return -1;
     GameProgress *result = &profile->data.levels[index];
     if (index == profile->data.count) {
@@ -760,6 +760,6 @@ void game_profile_clear_resume(GameProfile *profile)
 
 const GameResume *game_profile_resume(const GameProfile *profile, const char *key)
 {
-    if (!profile || !key || !profile->data.resume.path[0] || strcmp(profile->data.resume.path, key)) return NULL;
+    if (!profile || !key || !profile->data.resume.path[0] || strcmp(profile->data.resume.path, key) != 0) return NULL;
     return &profile->data.resume;
 }

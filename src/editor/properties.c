@@ -149,7 +149,10 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
  *                 field clamps a bigger value and refuses a typed 0, and the
  *                 status bar says which happened (show_field_note).
  */
-#define PATROL_SPEED_LIMIT    ((float)MAX_PATROL_SPEED)
+/* The limit is an int (see MAX_PATROL_SPEED). Casting that int, rather than
+ * the macro's division, keeps the value and stays out of a float division. */
+static const int patrol_speed_limit_px = MAX_PATROL_SPEED;
+#define PATROL_SPEED_LIMIT    ((float)patrol_speed_limit_px)
 
 /*
  * show_field_note — When the last commit limited or refused what was

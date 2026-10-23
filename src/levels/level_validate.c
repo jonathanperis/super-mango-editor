@@ -322,7 +322,8 @@ static int validate_motion(char *err, size_t err_size, const char *field, float 
 static int validate_patrol_speed(char *err, size_t err_size,
                                  const char *field, float vx)
 {
-    if (!isfinite(vx) || vx == 0.0f || fabsf(vx) > (float)MAX_PATROL_SPEED) {
+    const int speed_limit = MAX_PATROL_SPEED;
+    if (!isfinite(vx) || vx == 0.0f || fabsf(vx) > (float)speed_limit) {
         if (err && err_size > 0) {
             snprintf(err, err_size,
                      "%s is %.2f (must be nonzero and at most %d px/s either way)",

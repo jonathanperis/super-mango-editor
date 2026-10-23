@@ -7,6 +7,7 @@
 #include "../collision/game_collision.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 #if defined(__APPLE__)
 #include <mach/mach.h>
@@ -33,8 +34,10 @@ static float get_resident_mb(void)
     if (file) {
         char line[128];
         while (fgets(line,sizeof(line),file)) {
-            long kb;
-            if (sscanf(line, "VmRSS: %ld kB", &kb) == 1) {
+            if (strncmp(line, "VmRSS:", 6) == 0) {
+                char *end = NULL;
+                long kb = strtol(line + 6, &end, 10);
+                if (end == line + 6) continue;
                 fclose(file);
                 return (float)kb / 1024;
             }

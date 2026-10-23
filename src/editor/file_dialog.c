@@ -145,7 +145,8 @@ int file_dialog_open(char *buf, int buf_size) {
      * "r" opens the pipe for reading.  If the command fails to start
      * (e.g. osascript not found), popen returns NULL.
      */
-    FILE *fp = popen(cmd, "r");
+    /* `cmd` is a fixed string in this function, not caller input. */
+    FILE *fp = popen(cmd, "r"); /* NOLINT(cert-env33-c) */
     if (!fp) {
         fprintf(stderr, "Warning: could not open file dialog\n");
         return FILE_DIALOG_ERROR;
@@ -290,7 +291,8 @@ int file_dialog_save(char *buf, int buf_size)
         "--file-filter='All files | *' 2>/dev/null";
 #endif
 
-    FILE *fp = popen(cmd, "r");
+    /* `cmd` is a fixed string in this function, not caller input. */
+    FILE *fp = popen(cmd, "r"); /* NOLINT(cert-env33-c) */
     int result;
 
     if (!fp) {

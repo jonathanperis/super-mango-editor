@@ -66,7 +66,9 @@ static const char *platform_paths[] = {
 static const char *music_names[] = { "(none)", "water.qoa", "lava.qoa", "winds.qoa" };
 static const char *music_paths[] = { "", SND "water.qoa", SND "lava.qoa", SND "winds.qoa" };
 
-#define CHOICES(names, paths) { names, paths, (int)(sizeof(paths) / sizeof(paths[0])) }
+/* `paths` stays unparenthesized: sizeof of a parenthesized array is the
+ * pointer size, and this macro's count would then be 0. */
+#define CHOICES(names, paths) { names, paths, (int)(sizeof(paths) / sizeof(paths[0])) } /* NOLINT(bugprone-macro-parentheses) */
 _Static_assert(sizeof(bg_names) == sizeof(bg_paths), "one name per background");
 _Static_assert(sizeof(fg_names) == sizeof(fg_paths), "one name per foreground");
 _Static_assert(sizeof(fog_names) == sizeof(fog_paths), "one name per fog image");

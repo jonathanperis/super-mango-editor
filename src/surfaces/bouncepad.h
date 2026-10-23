@@ -33,9 +33,9 @@
  *
  * Negative because screen Y increases downward (up = negative vy).
  */
-#define BOUNCEPAD_VY_SMALL   -380.0f
-#define BOUNCEPAD_VY_MEDIUM  -536.25f
-#define BOUNCEPAD_VY_HIGH    -700.0f
+#define BOUNCEPAD_VY_SMALL   (-380.0f)
+#define BOUNCEPAD_VY_MEDIUM  (-536.25f)
+#define BOUNCEPAD_VY_HIGH    (-700.0f)
 
 /* Legacy define — kept for existing code that references it. */
 #define BOUNCEPAD_VY  BOUNCEPAD_VY_MEDIUM

@@ -59,7 +59,7 @@
  *                    moving horizontally. Negative = upward in screen-space.
  */
 #define SPIKE_PUSH_SPEED  220.0f
-#define SPIKE_PUSH_VY    -150.0f
+#define SPIKE_PUSH_VY    (-150.0f)
 
 /* ------------------------------------------------------------------ */
 

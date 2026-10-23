@@ -79,7 +79,8 @@ GameRoute game_terminal_action_route(GameTerminalAction action)
     case GAME_TERMINAL_ACTION_REPLAY:       return GAME_ROUTE_REPLAY;
     case GAME_TERMINAL_ACTION_LEVEL_SELECT: return GAME_ROUTE_LEVEL_SELECT;
     case GAME_TERMINAL_ACTION_EXIT:         return GAME_ROUTE_EXIT;
-    case GAME_TERMINAL_ACTION_RETRY:        return GAME_ROUTE_NONE;
+    case GAME_TERMINAL_ACTION_RETRY:        /* Retry stays on this level. */
+        /* fallthrough */
     default:                                return GAME_ROUTE_NONE;
     }
 }

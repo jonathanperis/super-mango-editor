@@ -40,9 +40,7 @@ void player_release_jump(Player *player) {
 }
 
 int player_update_jump_timers(Player *player, float dt, int was_on_ground) {
-    if (player->on_ground) {
-        player->coyote_timer = COYOTE_TIME;
-    } else if (was_on_ground && player->vy >= 0.0f) {
+    if (player->on_ground || (was_on_ground && player->vy >= 0.0f)) {
         player->coyote_timer = COYOTE_TIME;
     } else if (player->coyote_timer > 0.0f) {
         player->coyote_timer -= dt;

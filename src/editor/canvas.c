@@ -433,8 +433,10 @@ static void draw_parallax_layer(EditorState *es, Texture2D *tex, float speed) {
     int tex_w = tex->width;
     int offset = (((int)(es->camera.x * speed)) % tex_w + tex_w) % tex_w;
     float view_w = (float)CANVAS_W / es->camera.zoom;
-    for (float dx = (float)-offset; dx < view_w; dx += (float)tex_w) {
-        IntRect dst = { (int)(dx * es->camera.zoom), w2s_y(es, 0.0f),
+    /* `offset` and `tex_w` are whole pixels, so the counter stays an int.
+     * A float counter would be exact here too, and clang-tidy flags it. */
+    for (int dx = -offset; (float)dx < view_w; dx += tex_w) {
+        IntRect dst = { (int)((float)dx * es->camera.zoom), w2s_y(es, 0.0f),
                         w2s_w(es, tex_w), w2s_h(es, GAME_H) };
         sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }
@@ -473,8 +475,9 @@ static void render_fog(EditorState *es) {
         if (!tex) continue;
         float start = floorf(es->camera.x / PREVIEW_FOG_W) * PREVIEW_FOG_W;
         float end = es->camera.x + (float)CANVAS_W / es->camera.zoom;
-        for (float wx = start; wx < end; wx += PREVIEW_FOG_W) {
-            IntRect dst = { w2s_x(es, wx), w2s_y(es, 0.0f),
+        /* `start` is a whole multiple of PREVIEW_FOG_W. */
+        for (int wx = (int)start; (float)wx < end; wx += PREVIEW_FOG_W) {
+            IntRect dst = { w2s_x(es, (float)wx), w2s_y(es, 0.0f),
                             w2s_w(es, PREVIEW_FOG_W), w2s_h(es, GAME_H) };
             sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, (Color){255, 255, 255, PREVIEW_FOG_ALPHA});
         }
@@ -661,10 +664,9 @@ static void render_floor(EditorState *es) {
                 if (tx == gx + FLOOR_GAP_W)     at_left_edge  = 1;
             }
 
-            if (at_left_edge && at_right_edge) piece_col = 1;
-            else if (at_left_edge)             piece_col = 0;
-            else if (at_right_edge)            piece_col = 2;
-            else                               piece_col = 1;
+            if (at_left_edge && !at_right_edge)       piece_col = 0;
+            else if (at_right_edge && !at_left_edge)  piece_col = 2;
+            else                                      piece_col = 1;
 
             IntRect src = { piece_col * P, piece_row * P, P, P };
             IntRect dst = {
@@ -833,10 +835,9 @@ static void render_float_platforms(EditorState *es) {
                  *   piece 2 = right cap (src x = 2 * FPLAT_PIECE_W)
                  */
                 int piece;
-                if (fp->tile_count == 1)              piece = 1; /* single */
-                else if (p == 0)                      piece = 0; /* left   */
-                else if (p == fp->tile_count - 1)     piece = 2; /* right  */
-                else                                  piece = 1; /* centre */
+                if (p == 0 && fp->tile_count != 1)                 piece = 0; /* left   */
+                else if (p == fp->tile_count - 1 && fp->tile_count != 1) piece = 2; /* right  */
+                else                                               piece = 1; /* centre, or the only piece */
 
                 IntRect src = { piece * FPLAT_PIECE_W, 0,
                                  FPLAT_PIECE_W, FPLAT_PIECE_H };
@@ -896,10 +897,9 @@ static void render_spike_platforms(EditorState *es) {
              *   0 = left, 1 = centre, 2 = right
              */
             int piece;
-            if (sp->tile_count == 1)            piece = 1;
-            else if (t == 0)                    piece = 0;
-            else if (t == sp->tile_count - 1)   piece = 2;
-            else                                piece = 1;
+            if (t == 0 && sp->tile_count != 1)                   piece = 0;
+            else if (t == sp->tile_count - 1 && sp->tile_count != 1) piece = 2;
+            else                                                 piece = 1;
 
             IntRect src = { piece * SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_Y,
                              SPIKE_PLAT_PIECE_W, SPIKE_PLAT_SRC_H };

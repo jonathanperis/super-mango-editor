@@ -607,11 +607,14 @@ int ui_apply_active_edit(UIState *ui)
         float *target = (float *)ui->edit_target;
         if (!parse_float_value(ui->edit_buf, &value)) return 0;
         /* As for integers: limits apply to a value the user changed. */
-        if (memcmp(&value, target, sizeof(value)) != 0) value = limit_float_edit(ui, value);
+        /* Bits, not numeric equality: -0 and a new fraction must count as edits.
+         * parse_float_value already rejects NaN and infinity. */
+        if (memcmp(&value, target, sizeof(value)) != 0) /* NOLINT(bugprone-suspicious-memory-comparison) */
+            value = limit_float_edit(ui, value);
         /* A field that must not hold 0 treats a typed 0 like text that is
          * not a number: nothing is stored and the field stays active. */
         if (ui->edit_float_nonzero && value == 0.0f &&
-            memcmp(&value, target, sizeof(value)) != 0) {
+            memcmp(&value, target, sizeof(value)) != 0) { /* NOLINT(bugprone-suspicious-memory-comparison) */
             snprintf(ui->edit_note, sizeof(ui->edit_note),
                      "0 is not allowed here; type a value other than 0");
             return 0;
@@ -620,7 +623,7 @@ int ui_apply_active_edit(UIState *ui)
          * bits, not about numbers being close: any edit, however small, is
          * a change worth an undo step. Comparing the bytes says exactly that
          * (parse_float_value already rejects NaN and infinity). */
-        if (memcmp(&value, target, sizeof(value)) != 0) {
+        if (memcmp(&value, target, sizeof(value)) != 0) { /* NOLINT(bugprone-suspicious-memory-comparison) */
             notify_before_change(ui, ui->active_id);
             *target = value;
             changed = 1;

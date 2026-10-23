@@ -201,7 +201,7 @@ void axe_traps_render(const AxeTrap *traps, int count,
          * at the hook/nail point where the axe would be mounted.
          */
         Vector2 pivot = {
-            .x = AXE_DISPLAY_W / 2,  /* horizontal centre of the sprite */
+            .x = (float)AXE_DISPLAY_W / 2.0f,  /* horizontal centre of the sprite */
             .y = 4,                   /* a few pixels below the very top */
         };
 
