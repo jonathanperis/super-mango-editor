@@ -150,6 +150,7 @@ super-mango-editor/
 | `SECURITY.md` | Vulnerability reporting, scope and the web build's shared-origin model. |
 | `THIRD_PARTY_NOTICES.md` | Third-party code and media notices. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |
+| `CONTRIBUTING.md` | Branch shape, which checks are required, and the headless test command. |
 
 If any of these disagree with the code, the code wins: update the docs and the
 checks that guard them together.
