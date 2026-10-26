@@ -63,6 +63,13 @@ static int xy_same(float ax, float ay, float bx, float by)
     return f32_same(ax, bx) && f32_same(ay, by);
 }
 
+/*
+ * placement_same — Compare the fields of one placed entity.
+ *
+ * Returns 1 when the active member for `type` matches, including float
+ * bits. A null pair matches; one null side does not. ENT_COUNT and any
+ * other type this switch does not name do not match.
+ */
 int placement_same(EntityType type, const PlacementData *a, const PlacementData *b)
 {
     if (!a || !b) return a == b;
