@@ -559,14 +559,26 @@ FRONTEND_VERSION_CLAIMS = [
 ]
 
 
+def major_minor(version: str) -> str | None:
+    """`7.3` from `7.3` or `7.3.8`. Anything else is not a release line."""
+    match = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?", version)
+    if not match:
+        return None
+    return f"{match.group(1)}.{match.group(2)}"
+
+
 def check_frontend_versions() -> None:
-    """Maintainer pages quote the versions bun.lock actually installed."""
+    """Maintainer pages quote the major.minor line bun.lock installed.
+
+    A lockfile-only patch bump stays on that line, so it does not need a
+    docs edit. A minor or major bump still has to update the quoted line.
+    """
     locked = locked_frontend_versions()
     vite = locked.get("@tailwindcss/vite")
     tailwind = locked.get("tailwindcss")
-    if vite and tailwind and vite != tailwind:
-        fail(f"docs/bun.lock: tailwindcss {tailwind} and @tailwindcss/vite {vite} differ; "
-             "the maintainer pages describe them as one version")
+    if vite and tailwind and major_minor(vite) != major_minor(tailwind):
+        fail(f"docs/bun.lock: tailwindcss {tailwind} and @tailwindcss/vite {vite} "
+             "are on different major.minor lines; the maintainer pages describe them as one")
     for rel, pattern, package in FRONTEND_VERSION_CLAIMS:
         text = read(ROOT / rel)
         found = re.findall(pattern, text)
@@ -574,9 +586,14 @@ def check_frontend_versions() -> None:
             fail(f"{rel}: missing the locked version of {package}")
             continue
         expected = locked.get(package)
+        line = major_minor(expected) if expected else None
+        if not line:
+            fail(f"docs/bun.lock: {package} resolved {expected}, which is not major.minor.patch")
+            continue
         for version in found:
-            if version != expected:
-                fail(f"{rel}: says {package} {version}; docs/bun.lock resolved {expected}")
+            if version != line:
+                fail(f"{rel}: says {package} {version}; quote {line}, "
+                     f"the major.minor docs/bun.lock resolved from {expected}")
 
 
 def check_docs_readme_workflow() -> None:

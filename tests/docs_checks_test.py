@@ -139,8 +139,10 @@ class DocsChecksTest(unittest.TestCase):
             (ROOT / "docs" / "README.md", "does not run on pushes to `main`",
              "checks every `main` push",
              drift.check_docs_readme_workflow, "does not run on pushes to `main`"),
-            (ROOT / "docs" / "README.md", "Astro **7.3.8**", "Astro **7.3.6**",
-             drift.check_frontend_versions, "says astro 7.3.6"),
+            (ROOT / "docs" / "README.md", "Astro **7.3**", "Astro **7.2**",
+             drift.check_frontend_versions, "says astro 7.2"),
+            (ROOT / "docs" / "README.md", "Astro **7.3**", "Astro **7.3.8**",
+             drift.check_frontend_versions, "says astro 7.3.8"),
             (ROOT / "Makefile", "18-regression-binary", "17-regression-binary",
              drift.check_native_test_counts, "says 17-regression-binary"),
         ]
