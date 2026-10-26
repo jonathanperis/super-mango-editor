@@ -698,12 +698,15 @@ the Emscripten SDK (the setup-emsdk `version` in `build.yml`, `EMSCRIPTEN_VERSIO
 in the Makefile and every version quoted in the docs, grouped into one pull
 request; `make docs-drift` fails if they disagree), Mesa for the `Desktop
 backend` job, the raylib tag and commit in `vendor/raylib/manifest.json`, and
-the vendored tomlc17 release. None of them automerge. Mesa and raylib bumps
-also need their new SHA-256 entered by hand (CI fails closed until then), and
-tomlc17 only appears on the Dependency Dashboard, because re-importing it means
-re-applying the project patches listed in `vendor/tomlc17/README.md`. Pins
-inside a workflow or the Makefile carry a `# renovate: datasource=... depName=...`
-comment on the line above.
+the vendored tomlc17 release. None of them automerge. Mesa's `MESA_SHA256` is
+the digest of `mesa3d-<version>-release-msvc.7z`; the
+`github-release-attachments` manager replaces it when the version changes, and
+the Desktop backend job still fails closed if the pin and the archive disagree.
+Raylib bumps still need their new SHA-256 entered by hand (CI fails closed
+until then), and tomlc17 only appears on the Dependency Dashboard, because
+re-importing it means re-applying the project patches listed in
+`vendor/tomlc17/README.md`. Pins inside a workflow or the Makefile carry a
+`# renovate: datasource=... depName=...` comment on the line above.
 
 The repository restricts third-party Actions to an allowlist and requires full
 commit-SHA pins. A renamed or transferred Action can resolve through the GitHub

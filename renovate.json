@@ -3,11 +3,19 @@
   "extends": ["github>jonathanperis/.github"],
   "customManagers": [
     {
-      "description": "Version pins marked with a `# renovate: datasource=... depName=...` comment on the line above: Emscripten in build.yml and the Makefile, Mesa in build.yml",
+      "description": "Version pins marked with a `# renovate: datasource=... depName=...` comment on the line above: Emscripten in build.yml and the Makefile. Mesa is a separate manager so its archive SHA-256 moves with the version.",
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github/workflows/build\\.yml$/", "/^Makefile$/"],
       "matchStrings": [
-        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n[^\\n]*?(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>(?!pal1000/mesa-dist-win\\b)\\S+)\\s*\\n[^\\n]*?(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ]
+    },
+    {
+      "description": "Mesa version and the SHA-256 of mesa3d-<version>-release-msvc.7z. github-release-attachments identifies that asset from the current digest and hashes the same name on the new release.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/build\\.yml$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>github-release-attachments)\\s+depName=(?<depName>pal1000/mesa-dist-win)\\s*\\n\\s*MESA_VERSION:\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*\\n\\s*MESA_SHA256:\\s*(?<currentDigest>[a-f0-9]{64})"
       ]
     },
     {
@@ -48,7 +56,7 @@
   ],
   "packageRules": [
     {
-      "description": "Toolchain and vendored-source pins change generated code or need manual follow-up (checksums, patches), so they are never automerged",
+      "description": "Toolchain and vendored-source pins change generated code or still need a maintainer to finish them (raylib's checksum and patches), so they are never automerged",
       "matchManagers": ["custom.regex"],
       "automerge": false
     },
@@ -59,9 +67,15 @@
       "groupName": "emscripten"
     },
     {
-      "description": "Mesa and raylib bumps also need a new SHA-256 (MESA_SHA256 in build.yml, sha256 in vendor/raylib/manifest.json); CI fails closed until it is updated",
+      "description": "Mesa's archive SHA-256 is updated with the version by github-release-attachments",
       "matchManagers": ["custom.regex"],
-      "matchPackageNames": ["pal1000/mesa-dist-win", "raysan5/raylib"],
+      "matchPackageNames": ["pal1000/mesa-dist-win"],
+      "prBodyNotes": ["MESA_SHA256 is the SHA-256 of mesa3d-<version>-release-msvc.7z and is updated with the version."]
+    },
+    {
+      "description": "raylib bumps need a new SHA-256 in vendor/raylib/manifest.json; CI fails closed until it is updated",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["raysan5/raylib"],
       "prBodyNotes": ["Update the pinned SHA-256 for the new archive before merging; the checksum check in CI fails until then."]
     },
     {

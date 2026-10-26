@@ -720,6 +720,27 @@ def check_release_version() -> None:
         fail("docs/wiki/build-system.md: the Build & Release row must name the VERSION file")
 
 
+def check_mesa_pin() -> None:
+    """Mesa's version and archive SHA-256 are one Renovate attachment pin."""
+    workflow = read(ROOT / ".github" / "workflows" / "build.yml")
+    pin = re.search(
+        r"datasource=github-release-attachments depName=pal1000/mesa-dist-win\s*\n"
+        r"\s*MESA_VERSION:\s*(\d+\.\d+\.\d+)\s*\n"
+        r"\s*MESA_SHA256:\s*([a-f0-9]{64})",
+        workflow,
+    )
+    if not pin:
+        fail("build.yml: Mesa pin must be MESA_VERSION plus MESA_SHA256 under a "
+             "github-release-attachments renovate comment")
+    renovate = read(ROOT / "renovate.json")
+    if "github-release-attachments" not in renovate or "MESA_SHA256" not in renovate:
+        fail("renovate.json: the Mesa manager must capture MESA_SHA256 with the version")
+    manual = read(ROOT / "docs" / "wiki" / "build-system.md")
+    if "github-release-attachments" not in manual:
+        fail("docs/wiki/build-system.md: Mesa's checksum must name the "
+             "github-release-attachments manager")
+
+
 def check_emscripten_pins() -> None:
     makefile = re.search(r"^EMSCRIPTEN_VERSION \?= (\S+)$", read(ROOT / "Makefile"), re.M)
     workflow = re.search(r"depName=emscripten-core/emsdk\s*\n\s*version: (\S+)",
@@ -1233,6 +1254,7 @@ def main() -> int:
     check_wasm_authority_docs()
     check_release_version()
     check_emscripten_pins()
+    check_mesa_pin()
     check_native_test_counts()
     check_state_stack_claims()
     check_frontend_versions()
