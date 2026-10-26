@@ -13,7 +13,7 @@
         "level-catalog": "python3 ../tools/generate_level_catalog.py"
     },
     "dependencies": {
-        "@astrojs/markdown-satteri": "^0.4.4",
+        "@astrojs/markdown-satteri": "^0.4.5",
         "@astrojs/sitemap": "^3.7.4",
         "@fontsource/atkinson-hyperlegible": "^5.3.0",
         "@fontsource/dm-mono": "^5.3.0",
@@ -21,7 +21,7 @@
         "astro": "^7.3.8"
     },
     "devDependencies": {
-        "@astrojs/check": "^0.9.10",
+        "@astrojs/check": "^0.9.12",
         "@tailwindcss/vite": "^4.3.3",
         "tailwindcss": "^4.3.3",
         "typescript": "^6.0.3"
