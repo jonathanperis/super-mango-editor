@@ -8,11 +8,12 @@ The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** and Bun
 **1.4.2**. Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
-The supported frontend versions are Astro **7.3.8**, `@astrojs/markdown-satteri`
-**0.4.4**, `@astrojs/sitemap` **3.7.4**, `@astrojs/check` **0.9.10**, Tailwind CSS
-and its Vite plugin **4.3.3**, and TypeScript **6.0.3**. TypeScript **7.0.2** is
-newer, but Astro Check 0.9.10 requires `^5.0.0 || ^6.0.0`; retain 6.0.3 until the
-checker supports 7.x. Keep peer constraints enforced. After dependency updates,
+The supported frontend versions are Astro **7.3**, `@astrojs/markdown-satteri`
+**0.4**, `@astrojs/sitemap` **3.7**, `@astrojs/check` **0.9**, Tailwind CSS
+and its Vite plugin **4.3**, and TypeScript **6.0**. A lockfile patch bump
+stays on that line. TypeScript 7 is newer, but Astro Check 0.9 requires
+`^5.0.0 || ^6.0.0`; retain 6.0 until the checker supports 7.x. Keep peer
+constraints enforced. After dependency updates,
 run frozen install, `bun audit`, lint, build and `check-site`.
 
 | Command (from `docs/`) | Action |
