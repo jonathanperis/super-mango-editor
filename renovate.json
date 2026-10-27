@@ -3,19 +3,19 @@
   "extends": ["github>jonathanperis/.github"],
   "customManagers": [
     {
-      "description": "Version pins marked with a `# renovate: datasource=... depName=...` comment on the line above: Emscripten in build.yml and the Makefile. Mesa is a separate manager so its archive SHA-256 moves with the version.",
+      "description": "Version pins marked with a `# renovate: datasource=... depName=...` comment on the line above: Emscripten in build.yml and the Makefile. Mesa uses `# renovate-attachment:` and its own manager so this pattern can stay RE2-safe and still leave that pin alone.",
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github/workflows/build\\.yml$/", "/^Makefile$/"],
       "matchStrings": [
-        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>(?!pal1000/mesa-dist-win\\b)\\S+)\\s*\\n[^\\n]*?(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n[^\\n]*?(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ]
     },
     {
-      "description": "Mesa version and the SHA-256 of mesa3d-<version>-release-msvc.7z. github-release-attachments identifies that asset from the current digest and hashes the same name on the new release.",
+      "description": "Mesa version and the SHA-256 of mesa3d-<version>-release-msvc.7z, marked `# renovate-attachment:` so the generic manager does not capture MESA_VERSION alone. github-release-attachments identifies that asset from the current digest and hashes the same name on the new release.",
       "customType": "regex",
       "managerFilePatterns": ["/^\\.github/workflows/build\\.yml$/"],
       "matchStrings": [
-        "#\\s*renovate:\\s*datasource=(?<datasource>github-release-attachments)\\s+depName=(?<depName>pal1000/mesa-dist-win)\\s*\\n\\s*MESA_VERSION:\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*\\n\\s*MESA_SHA256:\\s*(?<currentDigest>[a-f0-9]{64})"
+        "#\\s*renovate-attachment:\\s*datasource=(?<datasource>github-release-attachments)\\s+depName=(?<depName>pal1000/mesa-dist-win)\\s*\\n\\s*MESA_VERSION:\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*\\n\\s*MESA_SHA256:\\s*(?<currentDigest>[a-f0-9]{64})"
       ]
     },
     {

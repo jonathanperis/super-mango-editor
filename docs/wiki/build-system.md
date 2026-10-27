@@ -706,7 +706,10 @@ Raylib bumps still need their new SHA-256 entered by hand (CI fails closed
 until then), and tomlc17 only appears on the Dependency Dashboard, because
 re-importing it means re-applying the project patches listed in
 `vendor/tomlc17/README.md`. Pins inside a workflow or the Makefile carry a
-`# renovate: datasource=... depName=...` comment on the line above.
+`# renovate: datasource=... depName=...` comment on the line above, except
+Mesa, whose comment is `# renovate-attachment:`. That marker keeps the generic
+manager off the Mesa pin: RE2 has no lookahead, and a second match would move
+`MESA_VERSION` without `MESA_SHA256`.
 
 The repository restricts third-party Actions to an allowlist and requires full
 commit-SHA pins. A renamed or transferred Action can resolve through the GitHub
