@@ -724,21 +724,27 @@ def check_mesa_pin() -> None:
     """Mesa's version and archive SHA-256 are one Renovate attachment pin."""
     workflow = read(ROOT / ".github" / "workflows" / "build.yml")
     pin = re.search(
-        r"datasource=github-release-attachments depName=pal1000/mesa-dist-win\s*\n"
+        r"# renovate-attachment: datasource=github-release-attachments depName=pal1000/mesa-dist-win\s*\n"
         r"\s*MESA_VERSION:\s*(\d+\.\d+\.\d+)\s*\n"
         r"\s*MESA_SHA256:\s*([a-f0-9]{64})",
         workflow,
     )
     if not pin:
         fail("build.yml: Mesa pin must be MESA_VERSION plus MESA_SHA256 under a "
-             "github-release-attachments renovate comment")
+             "# renovate-attachment: github-release-attachments comment")
     renovate = read(ROOT / "renovate.json")
     if "github-release-attachments" not in renovate or "MESA_SHA256" not in renovate:
         fail("renovate.json: the Mesa manager must capture MESA_SHA256 with the version")
+    if "renovate-attachment:" not in renovate:
+        fail("renovate.json: the Mesa manager must match the # renovate-attachment: marker")
+    if "(?!" in renovate or "(?<!" in renovate:
+        fail("renovate.json: custom manager patterns must stay RE2-safe (no lookahead or lookbehind)")
     manual = read(ROOT / "docs" / "wiki" / "build-system.md")
     if "github-release-attachments" not in manual:
         fail("docs/wiki/build-system.md: Mesa's checksum must name the "
              "github-release-attachments manager")
+    if "renovate-attachment:" not in manual:
+        fail("docs/wiki/build-system.md: Mesa's comment marker must be # renovate-attachment:")
 
 
 def check_emscripten_pins() -> None:

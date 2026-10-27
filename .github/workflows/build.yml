@@ -841,7 +841,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
-          # renovate: datasource=github-release-attachments depName=pal1000/mesa-dist-win
+          # renovate-attachment: datasource=github-release-attachments depName=pal1000/mesa-dist-win
           MESA_VERSION: 26.0.3
           MESA_SHA256: de1ec45c906164de2c046288a8969e83cf2d51d031dc8dfd1f9371bb31cd6755
         run: |
