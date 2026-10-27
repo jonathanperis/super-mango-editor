@@ -535,7 +535,7 @@ npm run check-site
 Keep Bun and `bun.lock` as the CI dependency contract. The npm fallback runs the declared scripts; it does not replace the locked install step.
 
 Astro requires Node.js 22.12+; CI uses Node **26.9.0** and Bun **1.4.2**. The
-supported frontend set is Astro **7.3**, `@astrojs/markdown-satteri` **0.4**,
+supported frontend set is Astro **7.4**, `@astrojs/markdown-satteri` **0.4**,
 `@astrojs/sitemap` **3.7**, `@astrojs/check` **0.9**, Tailwind CSS and its Vite
 plugin **4.3**, and TypeScript **6.0**. A lockfile patch bump stays on that
 line. TypeScript 7 is newer but outside Astro Check 0.9's `^5.0.0 || ^6.0.0`

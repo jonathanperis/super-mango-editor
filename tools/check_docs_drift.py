@@ -560,7 +560,7 @@ FRONTEND_VERSION_CLAIMS = [
 
 
 def major_minor(version: str) -> str | None:
-    """`7.3` from `7.3` or `7.3.8`. Anything else is not a release line."""
+    """`7.4` from `7.4` or `7.4.2`. Anything else is not a release line."""
     match = re.fullmatch(r"(\d+)\.(\d+)(?:\.(\d+))?", version)
     if not match:
         return None

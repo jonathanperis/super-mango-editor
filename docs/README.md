@@ -8,7 +8,7 @@ The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** and Bun
 **1.4.2**. Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
-The supported frontend versions are Astro **7.3**, `@astrojs/markdown-satteri`
+The supported frontend versions are Astro **7.4**, `@astrojs/markdown-satteri`
 **0.4**, `@astrojs/sitemap` **3.7**, `@astrojs/check` **0.9**, Tailwind CSS
 and its Vite plugin **4.3**, and TypeScript **6.0**. A lockfile patch bump
 stays on that line. TypeScript 7 is newer, but Astro Check 0.9 requires
