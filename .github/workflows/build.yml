@@ -842,8 +842,8 @@ jobs:
         shell: pwsh
         env:
           # renovate-attachment: datasource=github-release-attachments depName=pal1000/mesa-dist-win
-          MESA_VERSION: 26.0.3
-          MESA_SHA256: de1ec45c906164de2c046288a8969e83cf2d51d031dc8dfd1f9371bb31cd6755
+          MESA_VERSION: 26.0.8
+          MESA_SHA256: a438c26c2752726916e455f9ad121f8a7e3cfecf8626251abf8e5b3e129d8497
         run: |
           $archive = Join-Path $env:RUNNER_TEMP 'mesa.7z'
           $url = "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z"
