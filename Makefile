@@ -239,7 +239,7 @@ TEST_SOURCE_DIR  = $(TEST_OBJDIR)/tests
 TEST_SOURCE_OBJS = $(patsubst %.c,$(TEST_OBJDIR)/%.o,$(filter-out tests/fuzz_%.c tests/parser_allocation_test.c,$(wildcard tests/*.c)))
 # tools/level_check.c (validate-levels) is compiled the same way, with CFLAGS.
 TOOL_OBJS = $(OBJDIR)/tools/level_check.o
-PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,asset_cache.o audio.o depth.o graphics.o platform.o text.o texture.o) $(OBJDIR)/src/input/input_backend.o
+PLATFORM_OBJS = $(addprefix $(OBJDIR)/src/shared/,asset_cache.o audio.o depth.o graphics.o model.o models.o platform.o text.o texture.o) $(OBJDIR)/src/input/input_backend.o
 # Every TEST_*_OBJ / TEST_*_OBJS variable above, so new ones need no extra list.
 TEST_OBJECTS := $(foreach name,$(filter %_OBJ %_OBJS,$(filter TEST_%,$(.VARIABLES))),$($(name)))
 TEST_DEPS           = $(patsubst %.o,%.d,$(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)))

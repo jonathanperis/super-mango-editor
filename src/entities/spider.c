@@ -6,6 +6,7 @@
  * sprite is flipped horizontally to face the direction of travel.
  * No player collision is handled here; that comes in a later pass.
  */
+#include "../shared/models.h" /* 3D models drawn in place of sprites */
 #include "spider.h"
 #include "../game_constants.h"      /* FLOOR_Y, GAME_W, FLOOR_GAP_W */
 #include "../core/entity_utils.h"  /* patrol_update, patrol_gap_reverse, animate_frame_ms */
@@ -74,6 +75,12 @@ void spiders_render(const Spider *spiders, int count,
          * walks right (vx > 0).
          */
         if (!on_screen_x(dst.x, dst.w)) continue;
+        /* The 3D spider, with its shadow under it, where the model exists
+         * (shared/models.h); otherwise the sprite. Its art sits in the
+         * middle of the 64-pixel frame slot. */
+        float centre = s->x - (float)cam_x + SPIDER_FRAME_W / 2.0f;
+        models_draw_shadow(centre, (float)FLOOR_Y, 13.0f, 0.75f, 1.0f);
+        if (models_draw_spider(centre, (float)FLOOR_Y, s->vx <= 0.0f, s->frame_index, 1.0f)) continue;
         int flip = s->vx > 0.0f ? SPRITE_FLIP_X : SPRITE_NORMAL;
         sprite_draw(tex, &src, &dst, 0, flip, WHITE);
     }

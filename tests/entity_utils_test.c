@@ -2,6 +2,8 @@
 
 #include "core/entity_utils.h"
 #include "shared/depth.h"
+#include "shared/model.h"
+#include <string.h>
 
 static int expect_int(const char *name, int actual, int expected)
 {
@@ -217,8 +219,54 @@ static int outline_follows_the_opaque_pixels(void)
     return failed;
 }
 
+/* One triangle, written byte by byte as tools/models/kit.py writes it. */
+static int build_triangle_file(unsigned char *out)
+{
+    static const float corners[3][3] = {{0, 0, 0}, {16, 0, 0}, {0, 8, -4}};
+    int at = 0;
+    memcpy(out, "SMM1", 4); at = 4;
+    out[at++] = 3; out[at++] = 0; out[at++] = 0; out[at++] = 0;   /* vertices */
+    out[at++] = 3; out[at++] = 0; out[at++] = 0; out[at++] = 0;   /* indices  */
+    for (int i = 0; i < 3; i++) {
+        memcpy(out + at, corners[i], 12); at += 12;   /* tests run little-endian */
+        out[at++] = 200; out[at++] = 100; out[at++] = 50; out[at++] = 255;
+    }
+    for (int i = 0; i < 3; i++) { out[at++] = (unsigned char)i; out[at++] = 0; }
+    return at;
+}
+
+/* The model loader accepts a well-formed file and refuses damaged ones. */
+static int model_loader_checks_its_input(void)
+{
+    unsigned char file[128];
+    int size = build_triangle_file(file);
+    Model3D *model = model_parse(file, size);
+    if (!model) { fprintf(stderr, "entity_utils_test: valid model rejected\n"); return 1; }
+    int failed = expect_int("vertices", model->vertex_count, 3) ||
+                 expect_int("indices", model->index_count, 3) ||
+                 expect_float("x", model->vertices[1].x, 16.0f) ||
+                 expect_float("z", model->vertices[2].z, -4.0f) ||
+                 expect_int("green", model->vertices[0].g, 100);
+    model_unload(model);
+    if (failed) return 1;
+
+    unsigned char bad[128];
+    memcpy(bad, file, sizeof(bad)); bad[0] = 'X';              /* wrong magic      */
+    if (model_parse(bad, size)) { fprintf(stderr, "entity_utils_test: bad magic accepted\n"); return 1; }
+    if (model_parse(file, size - 1)) { fprintf(stderr, "entity_utils_test: short file accepted\n"); return 1; }
+    memcpy(bad, file, sizeof(bad)); bad[8] = 4;                /* not whole triangles */
+    if (model_parse(bad, size)) { fprintf(stderr, "entity_utils_test: stray index accepted\n"); return 1; }
+    memcpy(bad, file, sizeof(bad)); bad[size - 2] = 9;         /* index past the end */
+    if (model_parse(bad, size)) { fprintf(stderr, "entity_utils_test: wild index accepted\n"); return 1; }
+    memcpy(bad, file, sizeof(bad)); memset(bad + 12, 0xFF, 4); /* x is NaN          */
+    if (model_parse(bad, size)) { fprintf(stderr, "entity_utils_test: NaN accepted\n"); return 1; }
+    if (model_parse(NULL, 0)) return 1;
+    return 0;
+}
+
 int main(void)
 {
+    if (model_loader_checks_its_input() != 0) return 1;
     if (cull_keeps_a_margin_for_slab_sides() != 0) return 1;
     if (solid_frame_is_one_box() != 0) return 1;
     if (outline_follows_the_opaque_pixels() != 0) return 1;

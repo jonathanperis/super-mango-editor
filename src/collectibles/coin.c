@@ -3,6 +3,7 @@
  * from LevelDef data; this file only provides the render function.
  */
 
+#include "../shared/models.h" /* 3D models drawn in place of sprites */
 #include "coin.h"
 #include "../core/entity_utils.h" /* on_screen_x */
 
@@ -59,6 +60,11 @@ void coins_render(const Coin *coins, int count,
          * scaled to COIN_DISPLAY_W × COIN_DISPLAY_H at the screen position.
          */
         if (!on_screen_x(dst.x, dst.w)) continue;
+        /* The 3D coin turns steadily; neighbours are a little out of step
+         * so a row of coins does not flash as one. */
+        float spin = (float)(GetTime() * 200.0) + coins[i].x * 1.7f;
+        if (models_draw_coin(coins[i].x - (float)cam_x + COIN_DISPLAY_W / 2.0f,
+                             coins[i].y + COIN_DISPLAY_H / 2.0f, spin, 1.0f)) continue;
         sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
     }
 }

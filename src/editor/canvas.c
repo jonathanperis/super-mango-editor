@@ -41,6 +41,7 @@
 #include "../levels/level_validate.h" /* level_validate_preview */
 #include "../shared/geometry.h" /* float_same_value */
 #include "../shared/depth.h"    /* the 2.5D view the level is drawn in */
+#include "../shared/models.h"   /* the 3D models the game draws, for the same look */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                                    FLOOR_GAP_W, GRAVITY; MAX_* via level.h */
 
@@ -241,6 +242,8 @@ void canvas_render(EditorState *es) {
      * screen, and scales with the zoom.
      */
     float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    models_set_level(es->level.floor_tile_path, es->level.foreground_layer_count > 0
+                                                    ? es->level.foreground_layers[0].path : NULL);
     depth_begin((DepthView){CANVAS_W / 2.0f, (float)w2s_y(es, DEPTH_EYE_Y), DEPTH_EYE_DIST,
                             zoom, 1.0f, EDITOR_W, EDITOR_H});
 
@@ -564,6 +567,12 @@ static void render_platforms(EditorState *es) {
         EditorRect bounds = { plat_x, plat_y, (float)plat_w, (float)plat_h };
         if (!canvas_shows(es, &bounds)) continue;
 
+        /* The game's 3D pillar, when this one has the level's own look
+         * and a model exists for it (shared/models.h). */
+        if (pp->tile_path[0] == '\0' &&
+            models_draw_pillar((float)w2s_x(es, plat_x), (float)w2s_y(es, plat_y),
+                               (float)plat_w, (float)plat_h, es->camera.zoom)) continue;
+
         /* Select texture based on tile_path */
         Texture2D *tex;
         if (pp->tile_path[0] != '\0') {
@@ -647,6 +656,26 @@ static void render_floor(EditorState *es) {
     int last_tx  = (int)(es->camera.x + (float)CANVAS_W / zoom) + P;
     if (first_tx < 0) first_tx = 0;
     if (last_tx > world_w) last_tx = world_w;
+
+    /* The game's 3D ground, when the tileset has a model: one bank of
+     * earth per unbroken stretch between gaps (as render_floor_models in
+     * game_render.c). */
+    int run_start = -1, drew_models = 1;
+    for (int tx = 0; tx <= world_w && drew_models; tx += P) {
+        int ground = tx < world_w;
+        for (int g = 0; g < es->level.floor_gap_count && ground; g++) {
+            int gx = es->level.floor_gaps[g];
+            if (tx >= gx && tx + P <= gx + FLOOR_GAP_W) ground = 0;
+        }
+        if (ground && run_start < 0) run_start = tx;
+        if (!ground && run_start >= 0) {
+            drew_models = models_draw_floor((float)w2s_x(es, (float)run_start), (float)w2s_x(es, (float)tx),
+                                            (float)w2s_y(es, (float)FLOOR_Y), 1, 1,
+                                            -48.0f * zoom, (float)CANVAS_W + 48.0f * zoom, zoom);
+            run_start = -1;
+        }
+    }
+    if (drew_models) return;
 
     for (int ty = FLOOR_Y; ty < GAME_H; ty += P) {
         /* Choose which row of the 9-slice to sample */
@@ -851,6 +880,10 @@ static void render_float_platforms(EditorState *es) {
             fy -= FPLAT_PIECE_H * 0.5f;
         }
         int   total_w = fp->tile_count * FPLAT_PIECE_W;
+
+        /* The game's 3D platform, when the model exists. */
+        if (models_draw_float_platform((float)w2s_x(es, fx), (float)w2s_y(es, fy),
+                                       (float)total_w, es->camera.zoom)) continue;
 
         if (es->textures.float_platform) {
             /* Draw each piece of the 3-slice platform strip */
@@ -1113,6 +1146,15 @@ static void render_sprites(EditorState *es, const EntityType *types, int count) 
         for (int i = 0; i < editor_entity_count(&es->level, type); i++) {
             EditorRect r;
             if (!editor_entity_bounds(&es->level, type, i, &r)) continue;
+            /* The game's 3D model for the kinds that have one, standing
+             * still: centred in the box, feet on its bottom edge. */
+            float cx = (float)w2s_x(es, r.x + r.w / 2.0f), zoom = es->camera.zoom;
+            if (type == ENT_COIN &&
+                models_draw_coin(cx, (float)w2s_y(es, r.y + r.h / 2.0f), 25.0f, zoom)) continue;
+            if (type == ENT_SPIDER &&
+                models_draw_spider(cx, (float)w2s_y(es, r.y + r.h), 1, 0, zoom)) continue;
+            if (type == ENT_PLAYER_SPAWN &&
+                models_draw_mango(cx, (float)w2s_y(es, r.y + r.h), 0, -1.0f, 0.0f, WHITE, zoom)) continue;
             draw_tex(es, tex, src, r.x, r.y, (int)r.w, (int)r.h);
         }
     }

@@ -2,6 +2,7 @@
  * float_platform.c — FloatPlatform: hovering, crumbling, and rail-riding surfaces.
  */
 
+#include "../shared/models.h" /* 3D models drawn in place of sprites */
 #include "../shared/graphics.h"
 #include <stdio.h>
 
@@ -216,6 +217,8 @@ void float_platform_render(const FloatPlatform *fp,
     int n_pieces = fp->w / FLOAT_PLATFORM_PIECE_W;   /* total horizontal pieces */
     int screen_x = (int)fp->x - cam_x;               /* left edge in screen space */
     if (!on_screen_x(screen_x, fp->w)) return;
+    /* The 3D model where there is one (shared/models.h), else the tiles. */
+    if (models_draw_float_platform(fp->x - (float)cam_x, fp->y, (float)fp->w, 1.0f)) return;
 
     for (int i = 0; i < n_pieces; i++) {
         /* Select source slice: 0 = left cap, 2 = right cap, 1 = center fill */

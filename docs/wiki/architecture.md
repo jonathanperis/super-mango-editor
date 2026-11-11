@@ -341,6 +341,36 @@ Three more things make the slabs read as one lit scene:
   of focus; `draw_sunlight` adds warm light from the upper right over the
   finished level. The high-contrast setting turns haze and sunlight off.
 
+#### 3D models
+
+Some things are no longer sprites at all. The ground and pillars of the
+grass tileset, floating platforms, coins, spiders, the player and the water
+are 3D models drawn in the same view (`src/shared/models.c`); everything
+else is still a slab made from its sprite, and is being replaced kind by
+kind.
+
+- **Where models come from.** `tools/models/build.py` describes each model
+  in code and runs inside Blender
+  (`blender --background --python tools/models/build.py`). Blender lights
+  the model with a sun and a soft sky and *bakes* the result: every vertex
+  gets the colour it has once lit and shaded. The script writes
+  `assets/models/<name>.smm`, a short binary format documented in
+  `src/shared/model.h`.
+- **Drawing needs no lighting code.** `model_draw` emits the triangles with
+  their baked colours, so a model looks the same on desktop, in the browser
+  and in the tests' software renderer, and no shader is involved.
+- **Terrain is tiled.** The floor, a pillar and a platform are each built
+  long in Blender, baked whole, then cut into a left end, a repeating
+  middle tile and a right end, so each piece is shaded as if its neighbours
+  were there. `models_draw_floor` lays the pieces side by side.
+- **Characters are posed in code.** The Mango is a body and a foot model;
+  `models_draw_mango` turns the body toward where it walks, swings the feet
+  and stretches the body with its vertical speed.
+- **A sprite is the fallback.** Each sprite module asks for its model first
+  (`models_draw_coin`, `models_draw_spider`, ...) and draws the sprite when
+  that returns 0: a missing file, a tileset without a model, or drawing
+  outside the 2.5D view.
+
 Draw order still matters. Each layer's fronts sit a hair nearer the eye than
 the layer before, so a later layer covers an earlier one as it always did;
 the depth buffer only sorts out the walls. The level editor's canvas opens

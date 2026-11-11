@@ -380,6 +380,11 @@ int depth_active(void)
     return s_depth.active;
 }
 
+float depth_coords(void)
+{
+    return s_depth.open ? s_depth.view.coords : 1.0f;
+}
+
 static void set_style(int flat, float thickness, int rim)
 {
     if (!s_depth.open) return;

@@ -16,6 +16,7 @@
  * context. Read session_apply_*_route for transitions and session_step for
  * the frame order; low-level drawing belongs to the screens/render modules.
  */
+#include "../shared/models.h" /* models_unload_all */
 #include "app_session.h"
 #include "../shared/platform.h"  /* str_copy */
 #include "../shared/geometry.h"  /* float_same_value */
@@ -160,6 +161,7 @@ static void session_runtime_cleanup(AppSession *session)
     game_web_input_clear_touch();
     input_close();
     audio_close();
+    models_unload_all();
     if (IsWindowReady()) CloseWindow();
     session_emit(session, APP_SESSION_EVENT_RUNTIME_CLEANED, NULL);
 }

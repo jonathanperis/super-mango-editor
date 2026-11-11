@@ -90,6 +90,9 @@ void depth_resume(void);
 
 /* Whether sprite_draw is currently handing sprites to depth_sprite. */
 int depth_active(void);
+/* The open view's DepthView.coords (1 when no view is open): what a caller
+ * multiplies a depth in drawing units by to get the view's z. */
+float depth_coords(void);
 
 /* How the sprites that follow are drawn. Each call also moves the fronts a
  * hair toward the eye, so a later layer still covers an earlier one. */

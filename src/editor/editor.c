@@ -5,6 +5,7 @@
  * audio device. editor_frame.c shows the input → update → draw frame order;
  * editor_events.c translates commands into document/history operations.
  */
+#include "../shared/models.h" /* models_unload_all */
 #include "editor.h"
 #include "dialog_choice.h"    /* dialog_choice_attach */
 #include "editor_campaign.h"  /* editor_campaign_free */
@@ -106,5 +107,6 @@ void editor_cleanup(EditorState *es)
     es->prompt_backdrop = (RenderTexture2D){0};
     /* Restore backend callbacks before destroying the window they belong to. */
     input_close();
+    models_unload_all();
     if (IsWindowReady()) CloseWindow();
 }

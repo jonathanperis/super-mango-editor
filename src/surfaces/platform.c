@@ -6,6 +6,7 @@
  * landing zone — collision logic lives in player_update (player.c).
  */
 
+#include "../shared/models.h" /* 3D models drawn in place of sprites */
 #include "../shared/graphics.h"
 #include "../core/entity_utils.h" /* on_screen_x */
 #include <stdio.h>
@@ -44,6 +45,10 @@ void platforms_render(const Platform *platforms, int count,
         /* Use per-platform texture if set, otherwise fall back to default */
         Texture2D *tex = p->tex ? p->tex : default_tex;
         if (!tex || !on_screen_x((int)p->x - cam_x, p->w)) continue;
+        /* A pillar with the level's own look is a 3D model where one
+         * exists (shared/models.h); otherwise the tiles below. */
+        if (!p->tex && models_draw_pillar(p->x - (float)cam_x, p->y, (float)p->w, (float)p->h, 1.0f))
+            continue;
 
         /*
          * Walk every 16×16 piece position inside the pillar bounding box.

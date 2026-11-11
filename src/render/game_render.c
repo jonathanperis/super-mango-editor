@@ -27,6 +27,8 @@
 #include "../core/game_ghost.h"
 #include "../core/game_overlay.h"
 #include "../screens/hud.h"
+#include "../shared/models.h"      /* 3D models for the ground, shadows */
+#include "../levels/level.h"       /* LevelDef: which tileset and liquid the level uses */
 #include "../shared/depth.h"       /* the 2.5D view the level layers are drawn in */
 #include "../core/entity_utils.h"  /* SCREEN_CULL_MARGIN */
 
@@ -163,9 +165,42 @@ static void render_platforms(GameState *gs, int cam_x)
  * column just behind cam_x, and stop once tx is off the right edge
  * of the screen. dst.x = tx - cam_x converts world → screen.
  */
+/* Whether the floor piece starting at world x `tx` lies inside a gap. */
+static int floor_piece_in_gap(const GameState *gs, int tx)
+{
+    for (int g = 0; g < gs->world.floor_gap_count; g++) {
+        int gx = gs->world.floor_gaps[g];
+        if (tx >= gx && tx + FLOOR_PIECE_W <= gx + FLOOR_GAP_W) return 1;
+    }
+    return 0;
+}
+
+/*
+ * The floor as 3D models (shared/models.h): each unbroken stretch of ground
+ * between two gaps is one bank of earth with rounded ends. Returns 0 when
+ * the level's tileset has no model yet; render_floor then draws the tiles.
+ */
+static int render_floor_models(GameState *gs, int cam_x)
+{
+    const int P = FLOOR_PIECE_W;
+    int world_w = gs->world.runtime.world_w;
+    int run_start = -1;   /* world x where the current stretch began */
+    for (int tx = 0; tx <= world_w; tx += P) {
+        int ground = tx < world_w && !floor_piece_in_gap(gs, tx);
+        if (ground && run_start < 0) run_start = tx;
+        if (!ground && run_start >= 0) {
+            if (!models_draw_floor((float)(run_start - cam_x), (float)(tx - cam_x), (float)FLOOR_Y,
+                                   1, 1, -48.0f, (float)GAME_W + 48.0f, 1.0f)) return 0;
+            run_start = -1;
+        }
+    }
+    return 1;
+}
+
 static void render_floor(GameState *gs, int cam_x)
 {
     const int P = FLOOR_PIECE_W;   /* 9-slice piece size: 16 px */
+    if (render_floor_models(gs, cam_x)) return;
 
     /* The level's own tileset, or the shared default when it names none. */
     Texture2D *tileset = gs->world.floor_tile ? gs->world.floor_tile
@@ -573,9 +608,41 @@ static Player shown_player(const GameState *gs)
     return shown;
 }
 
+/*
+ * The height of whatever is under the point (wx, feet_y): the floor, a
+ * pillar or a floating platform, whichever is nearest below. Negative when
+ * there is nothing (over a floor gap). Used only to place a shadow.
+ */
+static float surface_below(const GameState *gs, float wx, float feet_y)
+{
+    float best = -1.0f;
+    int tx = ((int)wx / FLOOR_PIECE_W) * FLOOR_PIECE_W;
+    if (wx >= 0.0f && wx < (float)gs->world.runtime.world_w && !floor_piece_in_gap(gs, tx) &&
+        (float)FLOOR_Y >= feet_y - 2.0f) best = (float)FLOOR_Y;
+    for (int i = 0; i < gs->world.platform_count; i++) {
+        const Platform *p = &gs->world.platforms[i];
+        if (wx >= p->x && wx <= p->x + (float)p->w && p->y >= feet_y - 2.0f &&
+            (best < 0.0f || p->y < best)) best = p->y;
+    }
+    for (int i = 0; i < gs->world.float_platform_count; i++) {
+        const FloatPlatform *fp = &gs->world.float_platforms[i];
+        if (fp->active && wx >= fp->x && wx <= fp->x + (float)fp->w && fp->y >= feet_y - 2.0f &&
+            (best < 0.0f || fp->y < best)) best = fp->y;
+    }
+    return best;
+}
+
 static void render_player(GameState *gs, int cam_x)
 {
     Player shown = shown_player(gs);
+    /* A soft shadow on whatever is below, fainter the higher the jump: it
+     * shows where the player will land. */
+    float feet_x = shown.x + shown.w / 2.0f, feet_y = shown.y + (float)shown.h - PLAYER_FLOOR_SINK;
+    float below = surface_below(gs, feet_x, feet_y);
+    if (below >= 0.0f) {
+        float height = below - feet_y;
+        models_draw_shadow(feet_x - (float)cam_x, below, 9.0f, 0.85f * (1.0f - height / 110.0f), 1.0f);
+    }
     player_render(&shown, cam_x, reduced_motion(gs));
 }
 
@@ -846,6 +913,11 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
         if (gs->screen.route == GAME_ROUTE_NONE) gs->screen.route = GAME_ROUTE_FATAL;
         return 0;
     }
+
+    /* Which look the level's ground and liquid have (shared/models.h). */
+    const LevelDef *def = gs->world.level_def;
+    models_set_level(def ? def->floor_tile_path : NULL,
+                     def && def->foreground_layer_count > 0 ? def->foreground_layers[0].path : NULL);
 
     /* The canvas is stored at the window's pixel density (game_window.c);
      * this camera lets everything below keep drawing in logical pixels. */

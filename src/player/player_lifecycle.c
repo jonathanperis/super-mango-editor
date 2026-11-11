@@ -4,6 +4,8 @@
 
 #include <stdio.h>
 
+#include <math.h>
+#include "../shared/models.h" /* 3D models drawn in place of sprites */
 #include "player.h"
 #include "player_internal.h"
 #include "../game_constants.h" /* FLOOR_Y, TILE_SIZE — spawn/reset placement */
@@ -187,6 +189,20 @@ void player_render(const Player *player, int cam_x, int reduced_motion)
         .w = player->w,
         .h = player->h
     };
+
+    /* The 3D Mango where the model exists (shared/models.h). Its feet go
+     * where the sprite's are: PLAYER_FLOOR_SINK above the frame's bottom. */
+    float feet_x = player->x - (float)cam_x + player->w / 2.0f;
+    float feet_y = player->y + (float)player->h - PLAYER_FLOOR_SINK;
+    float stride = -1.0f, rise = 0.0f;
+    if (!player->on_ground && !player->on_vine) {
+        rise = player->vy != 0.0f ? player->vy : 1.0f;
+    } else if (player->on_ground && fabsf(player->vx) > 8.0f && !reduced_motion) {
+        /* One stride per 26 pixels walked, whatever the speed. */
+        double strides = GetTime() * (double)fabsf(player->vx) / 26.0;
+        stride = (float)(strides - floor(strides));
+    }
+    if (models_draw_mango(feet_x, feet_y, player->facing_left, stride, rise, tint, 1.0f)) return;
 
     int flip = player->facing_left ? SPRITE_FLIP_X : SPRITE_NORMAL;
     sprite_draw(player->texture, &player->frame, &dst, 0, flip, tint);

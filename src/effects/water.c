@@ -3,6 +3,7 @@
  *
  * See water.h for sprite layout details and rendering strategy.
  */
+#include "../shared/models.h" /* 3D models drawn in place of sprites */
 #include "water.h"
 #include "game_constants.h" /* GAME_W, GAME_H */
 #include <stdio.h>
@@ -67,6 +68,12 @@ void water_render(const Water *w)
      * scroll_x advances rightward the entire pattern shifts, wrapping
      * seamlessly so the canvas is always gapless.
      */
+    /* A rippling 3D surface inside the 2.5D view (shared/models.h); the
+     * sprite strip below is what the menu and plain 2D still draw. Its
+     * surface sits a few pixels under the top of the strip's wave crests. */
+    if (models_draw_water(-32.0f, (float)GAME_W + 32.0f, (float)(GAME_H - WATER_ART_H + 5),
+                          (float)GAME_H + 8.0f, (float)GetTime(), 1.0f)) return;
+
     int dest_y    = GAME_H - WATER_ART_H;
     int period    = WATER_PERIOD;                      /* 128 px          */
     int pattern_x = (int)w->scroll_x % period - period; /* start off left */
