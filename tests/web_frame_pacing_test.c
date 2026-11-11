@@ -5,6 +5,7 @@
 #define __EMSCRIPTEN__ 1
 #define display_open web_pacing_display_open
 #define display_present web_pacing_display_present
+#define display_present_canvas web_pacing_display_present_canvas
 #define display_viewport web_pacing_display_viewport
 #define display_scale_fit web_pacing_display_scale_fit
 #define display_keep_on_monitor web_pacing_display_keep_on_monitor

@@ -13,6 +13,10 @@
  * display_present letterboxes it at a whole-number scale. */
 int display_open(int width, int height, const char *title, int hidden, int resizable);
 void display_present(RenderTexture2D target);
+/* The same, for a target stored at a higher density than the canvas it
+ * holds: canvas_w x canvas_h is the logical size the window is fitted to
+ * (and that input_pointer_to_logical inverts). */
+void display_present_canvas(RenderTexture2D target, int canvas_w, int canvas_h);
 /* Where display_present draws a canvas_w x canvas_h canvas inside a
  * window_w x window_h window, in window units. At 1x or more it is the
  * largest whole-number scale that fits, centred on whole-pixel offsets;

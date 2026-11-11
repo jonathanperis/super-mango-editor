@@ -29,7 +29,13 @@ typedef struct {
     float eye_y;     /* the row it looks straight at: tops show below it      */
     float eye_dist;  /* how far in front of the picture the eye is, in world
                       * pixels; smaller is a stronger perspective             */
-    float unit;      /* target pixels per world pixel (the editor's zoom)     */
+    float unit;      /* target pixels per world pixel: the editor's zoom, or
+                      * the game's canvas density                             */
+    float coords;    /* target pixels per unit of the coordinates sprites are
+                      * drawn with: 1 when callers already place sprites in
+                      * target pixels (the editor), the canvas density when
+                      * they draw in logical pixels through a camera (the
+                      * game)                                                 */
     int   target_w;  /* size of the render target                             */
     int   target_h;
 } DepthView;
@@ -37,7 +43,7 @@ typedef struct {
 /* The game's own eye: above the middle of the 400x300 screen, so the floor
  * and every platform below it show their top face. */
 #define DEPTH_EYE_Y     96.0f
-#define DEPTH_EYE_DIST  420.0f
+#define DEPTH_EYE_DIST  360.0f
 /* The game's eye also leans a little toward the player: this share of how
  * far they are from the middle of the screen. Fronts do not move (they lie
  * on the picture plane); only the walls swing, as they do when you move
@@ -53,16 +59,16 @@ typedef struct {
  * The floor is the deepest thing in a level. What stands on it is thinner,
  * so it sits on the front of the floor's top face.
  */
-#define DEPTH_FLOOR           28.0f
-#define DEPTH_WATER           26.0f   /* fills the floor gaps, just short
+#define DEPTH_FLOOR           44.0f
+#define DEPTH_WATER           42.0f   /* fills the floor gaps, just short
                                        * of the floor's own back edge      */
-#define DEPTH_PLATFORM        20.0f   /* the pillars                       */
-#define DEPTH_FLOAT_PLATFORM  18.0f
-#define DEPTH_SPIKE_PLATFORM  18.0f
-#define DEPTH_BRIDGE          16.0f
-#define DEPTH_SPIKE_BLOCK     14.0f
-#define DEPTH_BOUNCEPAD       12.0f
-#define DEPTH_SPIKE_ROW        8.0f
+#define DEPTH_PLATFORM        32.0f   /* the pillars                       */
+#define DEPTH_FLOAT_PLATFORM  26.0f
+#define DEPTH_SPIKE_PLATFORM  26.0f
+#define DEPTH_BRIDGE          22.0f
+#define DEPTH_SPIKE_BLOCK     16.0f
+#define DEPTH_BOUNCEPAD       14.0f
+#define DEPTH_SPIKE_ROW       10.0f
 #define DEPTH_CREATURE         6.0f   /* the player, spiders               */
 #define DEPTH_FLYER            5.0f   /* birds and fish                    */
 #define DEPTH_AXE_TRAP         4.0f
@@ -89,6 +95,11 @@ int depth_active(void);
  * hair toward the eye, so a later layer still covers an earlier one. */
 void depth_solid(float thickness);
 void depth_flat(void);
+/* depth_solid, plus a strip of light along the top and left edges of each
+ * front and of shade along the bottom and right ones, so a single sprite
+ * (a creature, a coin) looks rounded. Not for tiles: every tile of a wall
+ * would get its own lit border. */
+void depth_solid_lit(float thickness);
 
 /* One sprite. source is the unflipped region of the texture; dest is its
  * top-left based rectangle; flip is SPRITE_FLIP_X / SPRITE_FLIP_Y bits. */

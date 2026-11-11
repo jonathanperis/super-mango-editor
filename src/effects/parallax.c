@@ -66,6 +66,19 @@ static const struct {
  * texture, which the render function uses to compute the tile offset and
  * ensure full horizontal coverage of the canvas.
  */
+/*
+ * Scenery is filtered smoothly while the level's own sprites keep hard
+ * pixels. On a canvas stored at the window's density (core/game_window.c)
+ * that leaves the background slightly out of focus, the way a camera
+ * focused on the foreground shows what is far behind it. Clamping stops
+ * the filter from blending the top row with the bottom one.
+ */
+static void parallax_soften(Texture2D *texture)
+{
+    SetTextureFilter(*texture, TEXTURE_FILTER_BILINEAR);
+    SetTextureWrap(*texture, TEXTURE_WRAP_CLAMP);
+}
+
 void parallax_init(ParallaxSystem *ps, AssetCache *cache)
 {
     ps->count = LAYER_COUNT;
@@ -94,6 +107,7 @@ void parallax_init(ParallaxSystem *ps, AssetCache *cache)
          * These are stored per-layer so the render function can compute the
          * correct tile repeat period without knowing the source asset size.
          */
+        parallax_soften(layer->texture);
         layer->tex_w = layer->texture->width;
         layer->tex_h = layer->texture->height;
     }
@@ -128,6 +142,7 @@ void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
             continue;
         }
 
+        parallax_soften(layer->texture);
         layer->tex_w = layer->texture->width;
         layer->tex_h = layer->texture->height;
     }

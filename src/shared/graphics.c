@@ -135,12 +135,16 @@ IntRect display_keep_on_monitor(IntRect window, IntRect monitor)
 
 void display_present(RenderTexture2D target)
 {
+    display_present_canvas(target, target.texture.width, target.texture.height);
+}
+
+void display_present_canvas(RenderTexture2D target, int canvas_w, int canvas_h)
+{
     /* Return from the logical render target to the real window framebuffer. */
     EndTextureMode();
     ClearBackground(BLACK);
     /* Input applies the inverse of this same mapping. */
-    Rectangle dest = display_viewport(GetScreenWidth(), GetScreenHeight(),
-                                      target.texture.width, target.texture.height);
+    Rectangle dest = display_viewport(GetScreenWidth(), GetScreenHeight(), canvas_w, canvas_h);
     /* Render textures have the opposite Y orientation to ordinary textures.
      * A negative source height flips this completed image for presentation. */
     Rectangle source = {0, 0, (float)target.texture.width, -(float)target.texture.height};

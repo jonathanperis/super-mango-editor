@@ -18,6 +18,7 @@
 
 #include "game_render.h"
 #include "../core/game_timing.h"      /* game_timing_render_view, game_timing_view_point */
+#include "../core/game_window.h"      /* game_window_fit */
 #include "../core/game_checkpoint.h"  /* game_checkpoint_clock_ms */
 #include "../screens/settings_menu.h"
 
@@ -99,6 +100,13 @@ static const void *movers_between_steps(void *shown, const void *src, int count,
         row += stride;
     }
     return shown;
+}
+
+/* A one-pixel outline in logical pixels. DrawRectangleLines draws GL lines,
+ * which stay one real pixel wide however much the canvas is magnified. */
+static void outline_rect(int x, int y, int w, int h, Color color)
+{
+    DrawRectangleLinesEx((Rectangle){(float)x, (float)y, (float)w, (float)h}, 1.0f, color);
 }
 
 /* The player's reduced-motion setting (no profile means "off"). */
@@ -548,8 +556,8 @@ static void render_ghost(GameState *gs, int cam_x)
     if (high_contrast) {
         /* The player's hitbox sits at the same offset inside every frame. */
         IntRect body = player_get_hitbox(&gs->world.player);
-        DrawRectangleLines(dest.x + body.x - (int)gs->world.player.x, dest.y + body.y - (int)gs->world.player.y,
-                           body.w, body.h, (Color){0, 230, 255, 255});
+        outline_rect(dest.x + body.x - (int)gs->world.player.x, dest.y + body.y - (int)gs->world.player.y,
+                     body.w, body.h, (Color){0, 230, 255, 255});
     }
 }
 
@@ -592,8 +600,8 @@ static void draw_high_contrast_aids(GameState *gs, int cam_x)
         Player shown = shown_player(gs);  /* the outline follows the sprite */
         IntRect hit = player_get_hitbox(&shown);
         hit.x -= cam_x;
-        DrawRectangleLines(hit.x-1,hit.y-1,hit.w+2,hit.h+2,BLACK);
-        DrawRectangleLines(hit.x,hit.y,hit.w,hit.h,WHITE);
+        outline_rect(hit.x-1,hit.y-1,hit.w+2,hit.h+2,BLACK);
+        outline_rect(hit.x,hit.y,hit.w,hit.h,WHITE);
         DrawRectangle(0,0,GAME_W,22,BLACK);
     }
 }
@@ -721,6 +729,17 @@ static const RenderLayer s_render_layers[] = {
 #define LAYER_FLAT    0.0f
 #define LAYER_SCREEN (-1.0f)
 
+/* Layers made of single sprites (a creature, a coin, a trap) also get lit
+ * edges (depth_solid_lit). Layers built from tiles do not: each tile of a
+ * floor or a pillar would show its own lit border. */
+static int layer_is_lit(int layer)
+{
+    return (layer >= 8 && layer <= 10) ||   /* bouncepads            */
+           (layer >= 15 && layer <= 20) ||  /* pickups, flames, fish */
+           (layer >= 22 && layer <= 28) ||  /* hazards and enemies   */
+           layer == 30;                     /* the player            */
+}
+
 static const float s_layer_depth[RENDER_LAYER_COUNT + 1] = {
     [1]  = LAYER_SCREEN,          /* background           */
     [2]  = DEPTH_PLATFORM,        /* platforms            */
@@ -774,6 +793,35 @@ static void draw_overlay(GameState *gs)
 }
 
 /* ------------------------------------------------------------------ */
+/* Air and light                                                       */
+/* ------------------------------------------------------------------ */
+
+/*
+ * draw_haze — Pale air between the background and the level. It thickens
+ * toward the ground, as distant things fade in real air, so the level's
+ * slabs stand out in front of the scenery instead of sitting on it. The
+ * high-contrast setting leaves it out.
+ */
+static void draw_haze(void)
+{
+    const Color clear = {255, 240, 220, 0}, thick = {255, 240, 220, 84};
+    DrawRectangleGradientV(0, GAME_H / 5, GAME_W, GAME_H - GAME_H / 5, clear, thick);
+}
+
+/*
+ * draw_sunlight — Warm light from the upper right, added over the finished
+ * level (additive blending only ever brightens). It ties the slabs and the
+ * scenery into one lit scene. The high-contrast setting leaves it out.
+ */
+static void draw_sunlight(void)
+{
+    BeginBlendMode(BLEND_ADDITIVE);
+    DrawCircleGradient((Vector2){GAME_W * 0.86f, -GAME_H * 0.10f}, GAME_W * 0.80f,
+                       (Color){255, 214, 150, 64}, (Color){255, 214, 150, 0});
+    EndBlendMode();
+}
+
+/* ------------------------------------------------------------------ */
 /* Main render function                                               */
 /* ------------------------------------------------------------------ */
 
@@ -799,13 +847,20 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
         return 0;
     }
 
+    /* The canvas is stored at the window's pixel density (game_window.c);
+     * this camera lets everything below keep drawing in logical pixels. */
+    game_window_fit(gs);
+    float scale = (float)(gs->screen.frame_scale > 0 ? gs->screen.frame_scale : 1);
+
     BeginDrawing();
     BeginTextureMode(gs->screen.frame_target);
     ClearBackground(BLACK);
+    BeginMode2D((Camera2D){.zoom = scale});
 
     /* Back to front: each layer covers what the ones before it drew. The
      * level's own layers are drawn inside the 2.5D view, the rest flat. */
-    DepthView view = {GAME_W / 2.0f, DEPTH_EYE_Y, DEPTH_EYE_DIST, 1.0f, GAME_W, GAME_H};
+    DepthView view = {GAME_W / 2.0f, DEPTH_EYE_Y, DEPTH_EYE_DIST, 1.0f, 1.0f, GAME_W, GAME_H};
+    int plain = gs->screen.profile && gs->screen.profile->data.settings.high_contrast;
     if (!reduced_motion(gs)) {
         /* Lean the eye toward the player (see DEPTH_EYE_FOLLOW_X). Reduced
          * motion keeps it still, so walls move only when the level scrolls. */
@@ -814,16 +869,28 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
         view.eye_x += (px - GAME_W / 2.0f) * DEPTH_EYE_FOLLOW_X;
         view.eye_y += (py - GAME_H / 2.0f) * DEPTH_EYE_FOLLOW_Y;
     }
+    /* The view works in the canvas's real pixels. */
+    view.eye_x *= scale;
+    view.eye_y *= scale;
+    view.unit = scale;
+    view.coords = scale;
+    view.target_w = gs->screen.frame_target.texture.width;
+    view.target_h = gs->screen.frame_target.texture.height;
     for (size_t i = 0; i < RENDER_LAYER_COUNT; i++) {
         float depth = s_layer_depth[s_render_layers[i].layer];
         if (depth < 0.0f) {
+            /* Leaving the level's layers: light the finished scene. */
+            if (depth_active() && !plain) { depth_end(); draw_sunlight(); }
             depth_end();
         } else {
             depth_begin(view);   /* does nothing while the view is open */
-            if (depth > 0.0f) depth_solid(depth);
-            else depth_flat();
+            if (depth <= 0.0f) depth_flat();
+            else if (layer_is_lit(s_render_layers[i].layer)) depth_solid_lit(depth);
+            else depth_solid(depth);
         }
         s_render_layers[i].render(gs, cam_x);
+        /* Haze over the background, before anything of the level. */
+        if (i == 0 && !plain) draw_haze();
     }
     depth_end();
 
@@ -840,6 +907,7 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      */
     settings_menu_render(gs->screen.settings_menu, gs->screen.profile, gs->screen.hud.font,
                          gs->screen.controller);
-    display_present(gs->screen.frame_target);
+    EndMode2D();
+    display_present_canvas(gs->screen.frame_target, GAME_W, GAME_H);
     return 1;
 }

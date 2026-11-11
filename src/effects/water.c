@@ -71,13 +71,13 @@ void water_render(const Water *w)
     int period    = WATER_PERIOD;                      /* 128 px          */
     int pattern_x = (int)w->scroll_x % period - period; /* start off left */
 
-    /* One art tile past each edge: in the 2.5D view the water is a slab,
+    /* Two art tiles past each edge: in the 2.5D view the water is a slab,
      * and the back of a tile just off screen still reaches into view. */
-    while (pattern_x < GAME_W + WATER_ART_W) {
+    while (pattern_x < GAME_W + 2 * WATER_ART_W) {
         for (int f = 0; f < WATER_FRAMES; f++) {
             int dest_x = pattern_x + f * WATER_ART_W;
-            if (dest_x + WATER_ART_W <= -WATER_ART_W) continue; /* off left edge  */
-            if (dest_x >= GAME_W + WATER_ART_W)       break;    /* off right edge */
+            if (dest_x + WATER_ART_W <= -2 * WATER_ART_W) continue; /* off left edge  */
+            if (dest_x >= GAME_W + 2 * WATER_ART_W)   break;    /* off right edge */
 
             IntRect src = {
                 f * WATER_FRAME_W + WATER_ART_DX,

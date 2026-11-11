@@ -362,6 +362,7 @@ typedef struct {
 typedef struct {
     /* ---- Canvas, HUD and controller ------------------------------------- */
     RenderTexture2D frame_target; /* owned logical canvas; session owns window */
+    int           frame_scale; /* target pixels per logical pixel (game_window.c) */
     Hud           hud;         /* HUD display: hearts, lives, score           */
     int           controller;  /* raylib device index + 1; zero means none    */
 

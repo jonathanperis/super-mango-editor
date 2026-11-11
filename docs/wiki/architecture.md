@@ -316,12 +316,30 @@ No 3D models are stored. The PNGs in `assets/sprites/` are the only art, and
 `texture_load` hands their pixels to `depth_mask_set` as they load.
 
 `s_layer_depth` in `game_render.c` gives each layer its thickness in pixels
-from the `DEPTH_*` values in `src/shared/depth.h`: the floor is 28 deep,
-pillars 20, the player 6, a coin 3. Two values are special. `LAYER_FLAT`
+from the `DEPTH_*` values in `src/shared/depth.h`: the floor is 44 deep,
+pillars 32, the player 6, a coin 3. Two values are special. `LAYER_FLAT`
 keeps a layer in the view without walls (the translucent ghost).
 `LAYER_SCREEN` draws it outside the view as plain 2D: the background, which
 already suggests distance by scrolling slower, and the fog, HUD and debug
 overlay, which belong to the screen.
+
+Three more things make the slabs read as one lit scene:
+
+- **A canvas as sharp as the window.** Everything is still placed in 400×300
+  logical pixels, but `game_window_fit` stores the canvas at the density the
+  window shows it (1600×1200 for the default window on a Retina display) and
+  the frame is drawn through a camera that magnifies to match. Pixel art
+  looks the same; slanted walls and gradients get the extra detail.
+- **Lit edges.** Layers made of single sprites (creatures, pickups, traps,
+  the player) are drawn with `depth_solid_lit`: a strip of light along the
+  top and left edges of each front and of shade along the bottom and right,
+  so a flat front looks rounded. Tiled layers are left out, or every tile of
+  a wall would show its own border.
+- **Air and light.** `draw_haze` lays pale air over the background, thicker
+  toward the ground, so the level stands in front of the scenery;
+  background layers are filtered smoothly, which leaves them slightly out
+  of focus; `draw_sunlight` adds warm light from the upper right over the
+  finished level. The high-contrast setting turns haze and sunlight off.
 
 Draw order still matters. Each layer's fronts sit a hair nearer the eye than
 the layer before, so a later layer covers an earlier one as it always did;

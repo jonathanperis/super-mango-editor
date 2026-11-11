@@ -242,7 +242,7 @@ void canvas_render(EditorState *es) {
      */
     float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
     depth_begin((DepthView){CANVAS_W / 2.0f, (float)w2s_y(es, DEPTH_EYE_Y), DEPTH_EYE_DIST,
-                            zoom, EDITOR_W, EDITOR_H});
+                            zoom, 1.0f, EDITOR_W, EDITOR_H});
 
     /* ---- Layer 2: Platforms (pillars) — behind the floor ---- */
     depth_solid(DEPTH_PLATFORM);

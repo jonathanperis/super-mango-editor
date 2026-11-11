@@ -287,6 +287,8 @@ static struct {
     int   flat;        /* current style: no walls, no depth writes          */
     float thickness;   /* current slab depth, in target pixels              */
     float front;       /* z of the current fronts, in target pixels         */
+    int   rim;         /* current style: light the fronts' edges            */
+    Matrix outer;      /* the 2D transform in force when the view opened    */
 } s_depth;
 
 static void view_enter(void)
@@ -297,6 +299,8 @@ static void view_enter(void)
     double k = near_plane / dist;
 
     rlDrawRenderBatchActive();
+    /* Whatever 2D camera the caller draws through comes back afterwards. */
+    s_depth.outer = rlGetMatrixModelview();
     /* An off-centre frustum: the z = 0 plane fills the target exactly, x to
      * the right and y down, wherever the eye point is. Row 0 maps to the
      * top of the frustum, the same way BeginTextureMode's own projection
@@ -311,6 +315,7 @@ static void view_enter(void)
     rlLoadIdentity();
     rlScalef(1.0f, -1.0f, 1.0f);
     rlTranslatef(-v->eye_x, -v->eye_y, -(float)dist);
+    rlScalef(v->coords, v->coords, 1.0f);   /* depth stays in target pixels */
     rlEnableDepthTest();
     /* The y flip above reverses every triangle's winding, and walls are
      * seen from whichever side faces the eye. */
@@ -319,8 +324,11 @@ static void view_enter(void)
     s_depth.active = 1;
 }
 
+static void rims_flush(void);
+
 static void view_leave(void)
 {
+    rims_flush();
     rlDrawRenderBatchActive();
     rlEnableDepthMask();
     rlEnableBackfaceCulling();
@@ -329,6 +337,10 @@ static void view_leave(void)
     rlPopMatrix();
     rlMatrixMode(RL_MODELVIEW);
     rlLoadIdentity();
+    const Matrix m = s_depth.outer;
+    const float outer[16] = {m.m0, m.m1, m.m2, m.m3, m.m4, m.m5, m.m6, m.m7,
+                             m.m8, m.m9, m.m10, m.m11, m.m12, m.m13, m.m14, m.m15};
+    rlMultMatrixf(outer);
     s_depth.active = 0;
 }
 
@@ -336,9 +348,11 @@ void depth_begin(DepthView view)
 {
     if (s_depth.open || view.target_w <= 0 || view.target_h <= 0 ||
         !(view.eye_dist > 0.0f) || !(view.unit > 0.0f)) return;
+    if (!(view.coords > 0.0f)) view.coords = 1.0f;
     s_depth.view = view;
     s_depth.open = 1;
     s_depth.flat = 0;
+    s_depth.rim = 0;
     s_depth.thickness = 0.0f;
     s_depth.front = 0.0f;
     view_enter();
@@ -366,9 +380,12 @@ int depth_active(void)
     return s_depth.active;
 }
 
-static void set_style(int flat, float thickness)
+static void set_style(int flat, float thickness, int rim)
 {
     if (!s_depth.open) return;
+    /* The edge lights of the layer that just ended go over its fronts. */
+    if (s_depth.active) rims_flush();
+    s_depth.rim = rim;
     s_depth.front += LAYER_STEP * s_depth.view.unit;
     s_depth.thickness = thickness * s_depth.view.unit;
     if (flat == s_depth.flat) return;
@@ -382,12 +399,17 @@ static void set_style(int flat, float thickness)
 
 void depth_solid(float thickness)
 {
-    set_style(!(thickness > 0.0f), thickness > 0.0f ? thickness : 0.0f);
+    set_style(!(thickness > 0.0f), thickness > 0.0f ? thickness : 0.0f, 0);
+}
+
+void depth_solid_lit(float thickness)
+{
+    set_style(!(thickness > 0.0f), thickness > 0.0f ? thickness : 0.0f, thickness > 0.0f);
 }
 
 void depth_flat(void)
 {
-    set_style(1, 0.0f);
+    set_style(1, 0.0f, 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -485,6 +507,93 @@ static void emit_wall(const SpritePlace *p, DepthEdge e, float front, float back
     emit_vertex(p, bx, by, front, bu, bv);
 }
 
+/* ------------------------------------------------------------------ */
+/* Edge lights                                                         */
+/* ------------------------------------------------------------------ */
+
+/*
+ * A slab drawn with depth_solid_lit gets a thin strip of light along the
+ * top and left edges of its front and a strip of shade along the bottom
+ * and right ones, each fading out toward the middle. On a flat front that
+ * reads as a rounded edge catching light from the upper left.
+ *
+ * The strips are plain colour, not sprite texels, so they are kept in a
+ * list and drawn together when the layer ends: one switch of texture per
+ * layer instead of two per sprite.
+ */
+#define RIM_LIGHT_ALPHA 84
+#define RIM_SHADE_ALPHA 78
+#define RIM_MAX 1024
+
+typedef struct { Vector2 at[4]; float z; Color edge, inner; } RimQuad;
+
+static RimQuad s_rims[RIM_MAX];
+static int s_rim_count;
+
+static void rims_flush(void)
+{
+    if (s_rim_count == 0) return;
+    rlDrawRenderBatchActive();
+    rlDisableDepthMask();   /* light on a surface, not a surface of its own */
+    rlSetTexture(rlGetTextureIdDefault());
+    rlBegin(RL_QUADS);
+    for (int i = 0; i < s_rim_count; i++) {
+        const RimQuad *q = &s_rims[i];
+        /* at[0], at[3] lie on the edge; at[1], at[2] toward the middle. */
+        rlColor4ub(q->edge.r, q->edge.g, q->edge.b, q->edge.a);
+        rlTexCoord2f(0.0f, 0.0f); rlVertex3f(q->at[0].x, q->at[0].y, q->z);
+        rlColor4ub(q->inner.r, q->inner.g, q->inner.b, q->inner.a);
+        rlTexCoord2f(0.0f, 1.0f); rlVertex3f(q->at[1].x, q->at[1].y, q->z);
+        rlTexCoord2f(1.0f, 1.0f); rlVertex3f(q->at[2].x, q->at[2].y, q->z);
+        rlColor4ub(q->edge.r, q->edge.g, q->edge.b, q->edge.a);
+        rlTexCoord2f(1.0f, 0.0f); rlVertex3f(q->at[3].x, q->at[3].y, q->z);
+    }
+    rlEnd();
+    rlSetTexture(0);
+    rlDrawRenderBatchActive();
+    if (!s_depth.flat) rlEnableDepthMask();
+    s_rim_count = 0;
+}
+
+/* Queue the strip for one edge run. It reaches as far in as the run stays
+ * opaque (e.paint), so a one-pixel-thin shape gets a one-pixel strip. */
+static void rim_add(const SpritePlace *p, DepthEdge e, float z, unsigned char alpha)
+{
+    if (s_rim_count == RIM_MAX) return;   /* a crowded layer: the rest go unlit */
+    int side = e.side;
+    if (p->flip & SPRITE_FLIP_Y) {
+        if (side == DEPTH_EDGE_TOP) side = DEPTH_EDGE_BOTTOM;
+        else if (side == DEPTH_EDGE_BOTTOM) side = DEPTH_EDGE_TOP;
+    }
+    if (p->flip & SPRITE_FLIP_X) {
+        if (side == DEPTH_EDGE_LEFT) side = DEPTH_EDGE_RIGHT;
+        else if (side == DEPTH_EDGE_RIGHT) side = DEPTH_EDGE_LEFT;
+    }
+    int lit = side == DEPTH_EDGE_TOP || side == DEPTH_EDGE_LEFT;
+    float strength = (side == DEPTH_EDGE_TOP || side == DEPTH_EDGE_BOTTOM) ? 1.0f : 0.6f;
+    unsigned char tone = lit ? 255 : 0;
+    float a = (float)(lit ? RIM_LIGHT_ALPHA : RIM_SHADE_ALPHA) * strength * (float)alpha / 255.0f;
+
+    int low_side = e.side == DEPTH_EDGE_TOP || e.side == DEPTH_EDGE_LEFT;
+    float edge_at = (float)e.line + (low_side ? 0.0f : 1.0f);
+    float inner_at = (float)e.paint + (low_side ? 1.0f : 0.0f);
+    RimQuad *q = &s_rims[s_rim_count++];
+    if (e.side == DEPTH_EDGE_TOP || e.side == DEPTH_EDGE_BOTTOM) {
+        q->at[0] = place_point(p, e.from, edge_at);
+        q->at[1] = place_point(p, e.from, inner_at);
+        q->at[2] = place_point(p, e.to, inner_at);
+        q->at[3] = place_point(p, e.to, edge_at);
+    } else {
+        q->at[0] = place_point(p, edge_at, e.from);
+        q->at[1] = place_point(p, inner_at, e.from);
+        q->at[2] = place_point(p, inner_at, e.to);
+        q->at[3] = place_point(p, edge_at, e.to);
+    }
+    q->z = z;
+    q->edge = (Color){tone, tone, tone, (unsigned char)a};
+    q->inner = (Color){tone, tone, tone, 0};
+}
+
 void depth_sprite(const Texture2D *texture, Rectangle source, Rectangle dest,
                   Vector2 pivot, float angle, int flip, Color tint)
 {
@@ -530,4 +639,10 @@ void depth_sprite(const Texture2D *texture, Rectangle source, Rectangle dest,
     }
     rlEnd();
     rlSetTexture(0);
+
+    if (shape && s_depth.rim) {
+        /* A hair in front of the front, well inside one layer step. */
+        float z = front + LAYER_STEP * s_depth.view.unit * 0.25f;
+        for (int i = 0; i < shape->edge_count; i++) rim_add(&place, shape->edges[i], z, tint.a);
+    }
 }

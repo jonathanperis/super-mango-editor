@@ -35,7 +35,7 @@
  * the screen than its front, so a platform whose front has just left the
  * screen still shows a sliver of its side.
  */
-#define SCREEN_CULL_MARGIN 16
+#define SCREEN_CULL_MARGIN 32
 
 static inline int on_screen_x(int screen_x, int w)
 {
