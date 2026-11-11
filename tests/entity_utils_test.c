@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "core/entity_utils.h"
+#include "shared/depth.h"
 
 static int expect_int(const char *name, int actual, int expected)
 {
@@ -139,8 +140,88 @@ static int pans_with_screen_position(void)
     return 0;
 }
 
+/* The render cull keeps a margin, so a slab just off screen still draws
+ * the side that reaches back into view (2.5D view, shared/depth.h). */
+static int cull_keeps_a_margin_for_slab_sides(void)
+{
+    if (expect_int("on screen", on_screen_x(10, 16), 1) != 0) return 1;
+    if (expect_int("just off left", on_screen_x(-16 - SCREEN_CULL_MARGIN + 1, 16), 1) != 0) return 1;
+    if (expect_int("past left margin", on_screen_x(-16 - SCREEN_CULL_MARGIN, 16), 0) != 0) return 1;
+    if (expect_int("just off right", on_screen_x(GAME_W + SCREEN_CULL_MARGIN - 1, 16), 1) != 0) return 1;
+    if (expect_int("past right margin", on_screen_x(GAME_W + SCREEN_CULL_MARGIN, 16), 0) != 0) return 1;
+    return 0;
+}
+
+static int count_edges(const DepthShape *shape, int side)
+{
+    int count = 0;
+    for (int i = 0; i < shape->edge_count; i++) count += shape->edges[i].side == side;
+    return count;
+}
+
+/* A fully opaque frame is one front rectangle and one wall per side, and
+ * each wall is painted from two pixels inside the edge. */
+static int solid_frame_is_one_box(void)
+{
+    unsigned char alpha[8 * 8];
+    for (int i = 0; i < 64; i++) alpha[i] = 1;
+    DepthShape shape;
+    if (expect_int("build", depth_shape_build(&shape, alpha, 8, 8, 8), 1) != 0) return 1;
+    int failed = expect_int("rects", shape.rect_count, 1) ||
+                 expect_int("edges", shape.edge_count, 4);
+    if (!failed) {
+        failed = expect_int("rect x1", shape.rects[0].x1, 8) || expect_int("rect y1", shape.rects[0].y1, 8);
+        for (int i = 0; i < shape.edge_count && !failed; i++) {
+            const DepthEdge *e = &shape.edges[i];
+            int inward = (e->side == DEPTH_EDGE_TOP || e->side == DEPTH_EDGE_LEFT) ? 2 : 5;
+            failed = expect_int("run from", e->from, 0) || expect_int("run to", e->to, 8) ||
+                     expect_int("paint line", e->paint, inward);
+        }
+    }
+    depth_shape_free(&shape);
+    return failed;
+}
+
+/* An L of pixels inside a wider row stride: the fronts cover exactly the
+ * opaque pixels, and an edge appears wherever opaque meets empty. */
+static int outline_follows_the_opaque_pixels(void)
+{
+    /* 4 wide, 3 tall, stride 6 (two unused bytes per row):
+     *   X . . .
+     *   X . . .
+     *   X X X .                                                        */
+    const unsigned char alpha[] = {
+        1,0,0,0, 9,9,
+        1,0,0,0, 9,9,
+        1,1,1,0, 9,9,
+    };
+    DepthShape shape;
+    if (expect_int("build", depth_shape_build(&shape, alpha, 6, 4, 3), 1) != 0) return 1;
+    int area = 0;
+    for (int i = 0; i < shape.rect_count; i++)
+        area += (shape.rects[i].x1 - shape.rects[i].x0) * (shape.rects[i].y1 - shape.rects[i].y0);
+    int failed = expect_int("front area", area, 5) ||
+                 expect_int("front pieces", shape.rect_count, 2) ||
+                 expect_int("top edges", count_edges(&shape, DEPTH_EDGE_TOP), 2) ||
+                 expect_int("bottom edges", count_edges(&shape, DEPTH_EDGE_BOTTOM), 1) ||
+                 expect_int("left edges", count_edges(&shape, DEPTH_EDGE_LEFT), 1) ||
+                 expect_int("right edges", count_edges(&shape, DEPTH_EDGE_RIGHT), 2);
+    depth_shape_free(&shape);
+    if (failed) return 1;
+
+    /* Nothing opaque: nothing to draw. */
+    const unsigned char empty[4] = {0};
+    if (expect_int("empty build", depth_shape_build(&shape, empty, 2, 2, 2), 1) != 0) return 1;
+    failed = expect_int("empty rects", shape.rect_count, 0) || expect_int("empty edges", shape.edge_count, 0);
+    depth_shape_free(&shape);
+    return failed;
+}
+
 int main(void)
 {
+    if (cull_keeps_a_margin_for_slab_sides() != 0) return 1;
+    if (solid_frame_is_one_box() != 0) return 1;
+    if (outline_follows_the_opaque_pixels() != 0) return 1;
     if (advances_animation_and_preserves_leftover_time() != 0) return 1;
     if (pans_with_screen_position() != 0) return 1;
     if (fixed_steps_keep_fractional_milliseconds() != 0) return 1;

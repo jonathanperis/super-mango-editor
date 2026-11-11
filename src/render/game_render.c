@@ -26,6 +26,8 @@
 #include "../core/game_ghost.h"
 #include "../core/game_overlay.h"
 #include "../screens/hud.h"
+#include "../shared/depth.h"       /* the 2.5D view the level layers are drawn in */
+#include "../core/entity_utils.h"  /* SCREEN_CULL_MARGIN */
 
 /* Effect headers */
 #include "../effects/parallax.h"
@@ -161,8 +163,10 @@ static void render_floor(GameState *gs, int cam_x)
     Texture2D *tileset = gs->world.floor_tile ? gs->world.floor_tile
                                               : gs->assets.textures.floor_tile;
 
-    /* First piece column at or before the left edge of the viewport */
-    int floor_start_tx = (cam_x / P) * P;
+    /* First piece column at or before the left edge of the viewport, and
+     * one more on each side: in the 2.5D view the top and the back of a
+     * piece just off screen still reach into the picture. */
+    int floor_start_tx = (cam_x / P) * P - SCREEN_CULL_MARGIN;
 
     for (int ty = FLOOR_Y; ty < GAME_H; ty += P) {
         /* Choose which row of the 9-slice to sample */
@@ -171,7 +175,7 @@ static void render_floor(GameState *gs, int cam_x)
         else if (ty + P >= GAME_H) piece_row = 2;  /* bottom: base edge  */
         else                       piece_row = 1;  /* middle: dirt fill  */
 
-        for (int tx = floor_start_tx; tx < cam_x + GAME_W; tx += P) {
+        for (int tx = floor_start_tx; tx < cam_x + GAME_W + SCREEN_CULL_MARGIN; tx += P) {
             /*
              * Skip this piece if it falls inside any sea gap.
              * A piece at tx is inside a gap when:
@@ -697,6 +701,63 @@ static const RenderLayer s_render_layers[] = {
 #define RENDER_LAYER_COUNT (sizeof(s_render_layers) / sizeof(s_render_layers[0]))
 
 /*
+ * s_layer_depth — how each layer is drawn in the 2.5D view (shared/depth.h),
+ * indexed by layer number.
+ *
+ * A positive number is a thickness in pixels (the DEPTH_* values in
+ * depth.h): the layer's sprites become slabs that deep, running back into
+ * the screen from where the 2D game drew them.
+ *
+ * LAYER_FLAT keeps the layer inside the view but without thickness: the
+ * ghost is see-through, and a see-through slab would show its own back
+ * walls. The water is a slab like the floor: behind the floor's front it is
+ * hidden, and in a floor gap its surface runs back between the gap's walls.
+ *
+ * LAYER_SCREEN is drawn outside the view, as plain 2D. The background
+ * already fakes its distance by scrolling slower; fog, HUD and debug text
+ * belong to the screen, not the level. The view therefore opens before the
+ * first layer that is not LAYER_SCREEN and closes after the last one.
+ */
+#define LAYER_FLAT    0.0f
+#define LAYER_SCREEN (-1.0f)
+
+static const float s_layer_depth[RENDER_LAYER_COUNT + 1] = {
+    [1]  = LAYER_SCREEN,          /* background           */
+    [2]  = DEPTH_PLATFORM,        /* platforms            */
+    [3]  = DEPTH_FLOOR,           /* floor                */
+    [4]  = DEPTH_FLOAT_PLATFORM,  /* float platforms      */
+    [5]  = DEPTH_SPIKE_ROW,       /* spike rows           */
+    [6]  = DEPTH_SPIKE_PLATFORM,  /* spike platforms      */
+    [7]  = DEPTH_BRIDGE,          /* bridges              */
+    [8]  = DEPTH_BOUNCEPAD,       /* bouncepads (medium)  */
+    [9]  = DEPTH_BOUNCEPAD,       /* bouncepads (small)   */
+    [10] = DEPTH_BOUNCEPAD,       /* bouncepads (high)    */
+    [11] = DEPTH_THIN,            /* rails                */
+    [12] = DEPTH_THIN,            /* vines                */
+    [13] = DEPTH_LADDER,          /* ladders              */
+    [14] = DEPTH_THIN,            /* ropes                */
+    [15] = DEPTH_PICKUP,          /* coins                */
+    [16] = DEPTH_PICKUP,          /* health stars         */
+    [17] = DEPTH_LAST_STAR,       /* last star            */
+    [18] = DEPTH_THIN,            /* blue and fire flames */
+    [19] = DEPTH_FLYER,           /* fish                 */
+    [20] = DEPTH_FLYER,           /* faster fish          */
+    [21] = DEPTH_WATER,           /* water                */
+    [22] = DEPTH_SPIKE_BLOCK,     /* spike blocks         */
+    [23] = DEPTH_AXE_TRAP,        /* axe traps            */
+    [24] = DEPTH_SAW,             /* circular saws        */
+    [25] = DEPTH_CREATURE,        /* spiders              */
+    [26] = DEPTH_CREATURE,        /* jumping spiders      */
+    [27] = DEPTH_FLYER,           /* birds                */
+    [28] = DEPTH_FLYER,           /* faster birds         */
+    [29] = LAYER_FLAT,            /* time-trial ghost     */
+    [30] = DEPTH_CREATURE,        /* player               */
+    [31] = LAYER_SCREEN,          /* fog                  */
+    [32] = LAYER_SCREEN,          /* HUD                  */
+    [33] = LAYER_SCREEN,          /* debug overlay        */
+};
+
+/*
  * draw_overlay — The player-facing overlay (level complete, game over or
  * pause), if one is up. It is not a layer of the level: it covers them all.
  */
@@ -742,10 +803,29 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
     BeginTextureMode(gs->screen.frame_target);
     ClearBackground(BLACK);
 
-    /* Back to front: each layer covers what the ones before it drew. */
+    /* Back to front: each layer covers what the ones before it drew. The
+     * level's own layers are drawn inside the 2.5D view, the rest flat. */
+    DepthView view = {GAME_W / 2.0f, DEPTH_EYE_Y, DEPTH_EYE_DIST, 1.0f, GAME_W, GAME_H};
+    if (!reduced_motion(gs)) {
+        /* Lean the eye toward the player (see DEPTH_EYE_FOLLOW_X). Reduced
+         * motion keeps it still, so walls move only when the level scrolls. */
+        float px = s_view.player_x + gs->world.player.w / 2.0f - (float)cam_x;
+        float py = s_view.player_y + gs->world.player.h / 2.0f;
+        view.eye_x += (px - GAME_W / 2.0f) * DEPTH_EYE_FOLLOW_X;
+        view.eye_y += (py - GAME_H / 2.0f) * DEPTH_EYE_FOLLOW_Y;
+    }
     for (size_t i = 0; i < RENDER_LAYER_COUNT; i++) {
+        float depth = s_layer_depth[s_render_layers[i].layer];
+        if (depth < 0.0f) {
+            depth_end();
+        } else {
+            depth_begin(view);   /* does nothing while the view is open */
+            if (depth > 0.0f) depth_solid(depth);
+            else depth_flat();
+        }
         s_render_layers[i].render(gs, cam_x);
     }
+    depth_end();
 
     /* On top of all the layers: the level-complete, game-over or pause
      * overlay, if one is up. */

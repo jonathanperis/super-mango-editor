@@ -34,7 +34,13 @@ Texture2D *texture_own(Texture2D value)
 
 Texture2D *texture_load(const char *path)
 {
-    Texture2D value = LoadTexture(path);
+    /* Decode to memory first: the 2.5D view (depth.h) keeps a note of which
+     * pixels are opaque, and the GPU copy cannot be read back on the Web. */
+    Image image = LoadImage(path);
+    if (!IsImageValid(image)) return NULL;
+    Texture2D value = LoadTextureFromImage(image);
+    if (IsTextureValid(value)) depth_mask_set(value.id, &image);
+    UnloadImage(image);
     if (!IsTextureValid(value)) return NULL;
 #ifdef MANGO_TESTING
     s_test_loads++;
@@ -47,6 +53,7 @@ void texture_unload(Texture2D *texture)
     if (!texture) return;
     /* A UI cache eviction can occur before EndDrawing flushes queued draws. */
     rlDrawRenderBatchActive();
+    depth_mask_forget(texture->id);
     UnloadTexture(*texture);
     free(texture);
 #ifdef MANGO_TESTING

@@ -5,6 +5,7 @@
 #include <raylib.h>
 #include <stdlib.h>
 #include "geometry.h"
+#include "depth.h"
 
 /* Open the process's one window at width x height. hidden: an unseen
  * window for tests and smoke runs. resizable: the user may resize it, down
@@ -88,6 +89,11 @@ static inline void sprite_draw_pivot(const Texture2D *texture, const IntRect *so
     if (!texture || !dest || dest->w <= 0 || dest->h <= 0) return;
     Rectangle src = source ? rect_to_raylib(*source) :
         (Rectangle){0, 0, (float)texture->width, (float)texture->height};
+    /* Inside the 2.5D view the sprite becomes a slab (depth.h). */
+    if (depth_active()) {
+        depth_sprite(texture, src, rect_to_raylib(*dest), pivot, angle, flip, tint);
+        return;
+    }
     /* Negative source dimensions mirror the sampled image. WHITE leaves
      * its original color/alpha unchanged; another tint affects this draw only. */
     if (flip & SPRITE_FLIP_X) src.width = -src.width;

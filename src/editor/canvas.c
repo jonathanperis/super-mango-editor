@@ -40,6 +40,7 @@
 #include "../levels/level_loader.h"
 #include "../levels/level_validate.h" /* level_validate_preview */
 #include "../shared/geometry.h" /* float_same_value */
+#include "../shared/depth.h"    /* the 2.5D view the level is drawn in */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                                    FLOOR_GAP_W, GRAVITY; MAX_* via level.h */
 
@@ -232,10 +233,23 @@ void canvas_render(EditorState *es) {
     /* ---- Layer 1: Sky background ---- */
     render_sky(es);
 
+    /*
+     * Everything that is part of the level is drawn in the 2.5D view
+     * (shared/depth.h), with the game's own eye and slab depths, so the
+     * preview has the thickness the game will show.  The eye looks at the
+     * middle of the canvas, as the game's looks at the middle of its
+     * screen, and scales with the zoom.
+     */
+    float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
+    depth_begin((DepthView){CANVAS_W / 2.0f, (float)w2s_y(es, DEPTH_EYE_Y), DEPTH_EYE_DIST,
+                            zoom, EDITOR_W, EDITOR_H});
+
     /* ---- Layer 2: Platforms (pillars) — behind the floor ---- */
+    depth_solid(DEPTH_PLATFORM);
     render_platforms(es);
 
     /* ---- Layer 3: Floor (9-slice with sea gap edge caps) ---- */
+    depth_solid(DEPTH_FLOOR);
     render_floor(es);
 
     /* ---- Layer 4: Water in sea gaps ---- */
@@ -244,26 +258,39 @@ void canvas_render(EditorState *es) {
     /* ---- Layer 5: Entities in game render order (back to front) ---- */
 
     /* Rail paths — drawn first as background guides */
+    depth_solid(DEPTH_THIN);
     render_rails(es);
 
     /* Surfaces — floating platforms, spikes, bridges, bouncepads */
+    depth_solid(DEPTH_FLOAT_PLATFORM);
     render_float_platforms(es);
+    depth_solid(DEPTH_SPIKE_ROW);
     render_spike_rows(es);
+    depth_solid(DEPTH_SPIKE_PLATFORM);
     render_spike_platforms(es);
+    depth_solid(DEPTH_BRIDGE);
     render_bridges(es);
+    depth_solid(DEPTH_BOUNCEPAD);
     render_bouncepads(es);
 
     /* Climbables — vines, ladders, ropes */
+    depth_solid(DEPTH_THIN);
     render_vines(es);
+    depth_solid(DEPTH_LADDER);
     render_ladders(es);
+    depth_solid(DEPTH_THIN);
     render_ropes(es);
 
-    /* Collectibles and the player spawn, then the checkpoint markers */
+    /* Collectibles and the player spawn, then the checkpoint markers,
+     * which are flat lines drawn over the level. */
     render_sprites(es, s_pickup_sprites, ARRAY_LEN(s_pickup_sprites));
+    depth_suspend();
     render_checkpoints(es);
+    depth_resume();
 
     /* Hazards, then enemies (water enemies first, then ground, then air) */
     render_sprites(es, s_hazard_and_enemy_sprites, ARRAY_LEN(s_hazard_and_enemy_sprites));
+    depth_end();
 
     /* Fog over the level, when asked for; then the space outside it. */
     if (es->show_fog) render_fog(es);
@@ -1045,6 +1072,26 @@ static void render_ropes(EditorState *es) {
 /* ---- Plain sprites ----------------------------------------------- */
 
 /*
+ * sprite_depth — How thick a plain sprite is in the 2.5D view: the same
+ * depth the game's layer table (s_layer_depth in game_render.c) gives it.
+ */
+static float sprite_depth(EntityType type) {
+    switch (type) {
+    case ENT_COIN: case ENT_STAR_YELLOW: case ENT_STAR_GREEN: case ENT_STAR_RED:
+        return DEPTH_PICKUP;
+    case ENT_LAST_STAR:    return DEPTH_LAST_STAR;
+    case ENT_BLUE_FLAME: case ENT_FIRE_FLAME:
+        return DEPTH_THIN;
+    case ENT_SPIKE_BLOCK:  return DEPTH_SPIKE_BLOCK;
+    case ENT_AXE_TRAP:     return DEPTH_AXE_TRAP;
+    case ENT_CIRCULAR_SAW: return DEPTH_SAW;
+    case ENT_FISH: case ENT_FASTER_FISH: case ENT_BIRD: case ENT_FASTER_BIRD:
+        return DEPTH_FLYER;
+    default:               return DEPTH_CREATURE;   /* player spawn, spiders */
+    }
+}
+
+/*
  * render_sprites — Draw every placement of each listed type, in order.
  *
  * Where and how big each sprite is comes from editor_entity_bounds:
@@ -1057,6 +1104,7 @@ static void render_ropes(EditorState *es) {
 static void render_sprites(EditorState *es, const EntityType *types, int count) {
     for (int t = 0; t < count; t++) {
         EntityType type = types[t];
+        depth_solid(sprite_depth(type));
         const EditorEntityPreview *preview = editor_entity_preview(type);
         Texture2D *tex = editor_entity_texture(&es->textures, type);
         /* A type without a preview row draws its whole texture. */
@@ -1071,6 +1119,7 @@ static void render_sprites(EditorState *es, const EntityType *types, int count) 
 }
 
 /* ---- Authored checkpoints ---------------------------------------- */
+
 
 static void render_checkpoints(EditorState *es)
 {

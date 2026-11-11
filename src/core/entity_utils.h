@@ -29,10 +29,17 @@
  * GAME_W-wide canvas.  Renderers skip what this rejects: raylib would
  * still batch and upload a quad that the GPU then clips away, and a long
  * level keeps most of its objects off screen.
+ *
+ * The canvas counts as SCREEN_CULL_MARGIN wider on each side.  In the 2.5D
+ * view (shared/depth.h) the back of a slab is drawn nearer the middle of
+ * the screen than its front, so a platform whose front has just left the
+ * screen still shows a sliver of its side.
  */
+#define SCREEN_CULL_MARGIN 16
+
 static inline int on_screen_x(int screen_x, int w)
 {
-    return screen_x + w > 0 && screen_x < GAME_W;
+    return screen_x + w > -SCREEN_CULL_MARGIN && screen_x < GAME_W + SCREEN_CULL_MARGIN;
 }
 
 /* ------------------------------------------------------------------ */

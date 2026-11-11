@@ -289,6 +289,46 @@ through the table.
 The pause, game-over and completion overlays and the settings panel are drawn
 after these 33 layers.
 
+### The 2.5D View
+
+The game is played on one flat plane: positions, hitboxes and collision are
+the same numbers a flat 2D game would use. Only the picture has depth. Layers
+2 to 30 are drawn inside a perspective view (`src/shared/depth.c`), where each
+sprite becomes a slab instead of a flat picture:
+
+- **The front stays put.** The view's projection maps its z = 0 plane onto
+  the 400×300 canvas pixel for pixel, and every sprite's front lies on that
+  plane, so the front of a sprite is exactly where the 2D game drew it.
+- **The outline becomes walls.** `depth_shape_build` reads the sprite frame's
+  alpha channel once and keeps two lists: front rectangles covering the opaque
+  pixels, and the runs of edge between an opaque pixel and an empty one.
+  `depth_sprite` draws one wall per run, from the front back into the screen,
+  painted with the colours two pixels inside the edge (past the art's dark
+  outline) and shaded by which way it faces: tops bright, sides darker,
+  undersides darkest, all fading a little toward the back.
+- **The eye decides what shows.** It sits above the middle of the screen
+  (`DEPTH_EYE_Y`), so the floor and anything below it show their top face and
+  anything above shows its underside. Things left of the middle show their
+  right side, and the other way round. The eye also leans a little toward the
+  player; the reduced-motion setting keeps it still.
+
+No 3D models are stored. The PNGs in `assets/sprites/` are the only art, and
+`texture_load` hands their pixels to `depth_mask_set` as they load.
+
+`s_layer_depth` in `game_render.c` gives each layer its thickness in pixels
+from the `DEPTH_*` values in `src/shared/depth.h`: the floor is 28 deep,
+pillars 20, the player 6, a coin 3. Two values are special. `LAYER_FLAT`
+keeps a layer in the view without walls (the translucent ghost).
+`LAYER_SCREEN` draws it outside the view as plain 2D: the background, which
+already suggests distance by scrolling slower, and the fog, HUD and debug
+overlay, which belong to the screen.
+
+Draw order still matters. Each layer's fronts sit a hair nearer the eye than
+the layer before, so a later layer covers an earlier one as it always did;
+the depth buffer only sorts out the walls. The level editor's canvas opens
+the same view with the same depths, scaled by its zoom, so the preview shows
+the thickness the game will.
+
 ### Level Completion and Terminal Actions
 
 Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While it is active, gameplay update pauses. Its action list is **Next Level**, **Replay**, **Level Select**, **Exit** when a phase is pending; otherwise it is **Replay**, **Level Select**, **Exit**. Up/Down or D-pad moves the focused row with wraparound. Enter/Space/Start confirms it (controller A also confirms). Esc/Back exits immediately (controller B is equivalent).

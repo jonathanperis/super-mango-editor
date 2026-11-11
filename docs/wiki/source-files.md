@@ -99,6 +99,7 @@ src/
 ├── shared/
 │   ├── graphics.h / .c          Window and icon, sprite pivots and logical presentation; declares the texture handles
 │   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles
+│   ├── depth.h / .c             The 2.5D view: sprites drawn as slabs, their walls built from each PNG's outline
 │   ├── asset_cache.h / .c       Session's reference-counted cache of level files, player sheet, HUD icon, font, menu logo and sound
 │   ├── geometry.h              Integer hitboxes and half-open intersection
 │   ├── raymath_inline.h        raylib's raymath as static inline (Clamp and friends, project flags)
@@ -625,6 +626,7 @@ reports it, resident memory in MB.
 |---|---|
 | `shared/graphics.h`, `shared/graphics.c` | Window setup (including its icon), sprite pivots/flips and logical-canvas presentation |
 | `shared/texture.c` | Texture ownership: a malloc'd handle, `NULL` on failure, one owner unloads it |
+| `shared/depth.h`, `shared/depth.c` | The 2.5D view: a projection whose front plane matches the 2D canvas, an outline traced from alpha, and walls drawn with rlgl |
 | `shared/asset_cache.h`, `shared/asset_cache.c` | A reference count: holders per file, idle entries, and why freeing waits for `asset_cache_trim` |
 | `shared/geometry.h` | Integer, half-open hitboxes; overflow-safe edge arithmetic |
 | `shared/raymath_inline.h` | Why raymath is included static inline, and when using it would change replay numbers |

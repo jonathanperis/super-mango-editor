@@ -51,6 +51,8 @@ file to learn the tools.
 | Panel | 384 × 656 px | Level config (at most half the column), entity palette and properties inspector, as collapsible sections that follow the tool: with an entity selected and the Select or Delete tool, the palette folds to its title (clicking it takes up Place) and the selection's properties fill the rest of the column, scrolling when they are taller; with Place, the palette fills the column above a 200 px properties panel |
 | Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message (a message too long for the bar ends in `...`; rest the pointer on it to read all of it, as with a long validation message in the side panel); under the canvas, in its bottom rows, the [minimap](#minimap) |
 
+The canvas draws the level in the game's [2.5D view](../architecture/#the-25d-view): floor, platforms, hazards and creatures are slabs with the same depths the game gives them, seen from an eye that looks at the middle of the canvas and scales with the zoom. Fronts are where the flat picture had them, so clicking, dragging, snapping and the grid work on the same positions as before; the selection outline, placement ghost, grid and checkpoint markers are drawn flat on top.
+
 The window opens at 1280 × 720 and can be resized or maximised, but not made
 smaller than that. The layout does not reflow: the editor always draws this
 1280 × 720 layout and scales the whole of it by the largest whole number that

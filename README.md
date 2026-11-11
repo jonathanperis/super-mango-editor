@@ -37,6 +37,7 @@ code a learner can trace over a shorter version that hides a step.
 ## What is in it
 
 - A side-scrolling platformer with multi-screen TOML worlds, 33 render layers and fixed 1/60 s physics steps (`make timing-lab` shows why)
+- A 2.5D picture from 2D pixel art: every sprite is drawn as a solid slab with tops and sides, built at load time from the same PNGs, while play stays on one flat plane
 - Six enemy types, seven hazard types, coins (score and bonus lives), health stars and an end-of-level star
 - Vines, ladders, ropes, three bouncepad sizes, crumbling bridges and float platforms
 - Authored `[[checkpoints]]`, or automatic screen-boundary respawns for levels without them
