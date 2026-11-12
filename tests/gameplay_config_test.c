@@ -115,11 +115,57 @@ static int level_physics_resets_stale_overrides(void)
     return 0;
 }
 
+/*
+ * game_camera_reveal_right is how far right the camera could be showing.
+ * It must never be less than the right edge of the real camera's target
+ * (or a spike block would wake on screen) and never more than the camera
+ * can reach (or one would start moving off screen).  At the spawn the
+ * camera cannot leave the first screen, so the edge is exactly GAME_W.
+ */
+static int reveal_edge_matches_the_camera(void)
+{
+    LevelDef def;
+    GameState gs = {0};
+
+    level_def_init_defaults(&def);
+    gs.world.runtime.current_level = &def;
+    gs.world.runtime.world_w = WORLD_W;
+    gs.world.player.w = 48;
+
+    gs.world.player.x = 80.0f;                       /* the usual spawn */
+    if (game_camera_reveal_right(&gs) != GAME_W) {
+        fprintf(stderr, "gameplay_config_test: reveal at the spawn is %d, expected %d\n",
+                game_camera_reveal_right(&gs), GAME_W);
+        return 1;
+    }
+    gs.world.player.x = (float)WORLD_W - 60.0f;      /* the far end */
+    if (game_camera_reveal_right(&gs) != WORLD_W) {
+        fprintf(stderr, "gameplay_config_test: reveal at the end is %d, expected %d\n",
+                game_camera_reveal_right(&gs), WORLD_W);
+        return 1;
+    }
+    /* Everywhere between, running right at full speed (the most lookahead
+     * there is), the target's right edge is the reveal edge. */
+    for (float x = 0.0f; x < (float)WORLD_W; x += 7.0f) {
+        gs.world.player.x = x;
+        gs.world.player.vx = 10000.0f;
+        game_camera_snap(&gs);                       /* the camera at its target */
+        int target_right = (int)gs.world.camera.x + GAME_W;
+        if (game_camera_reveal_right(&gs) != target_right) {
+            fprintf(stderr, "gameplay_config_test: at x %.0f the reveal edge is %d, "
+                    "the camera's %d\n", x, game_camera_reveal_right(&gs), target_right);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int main(void)
 {
     if (camera_uses_default_for_negative_sentinel() != 0) return 1;
     if (camera_allows_zero_override() != 0) return 1;
     if (level_physics_resets_stale_overrides() != 0) return 1;
+    if (reveal_edge_matches_the_camera() != 0) return 1;
 
     puts("gameplay_config_test: ok");
     return 0;

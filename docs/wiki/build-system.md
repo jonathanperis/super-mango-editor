@@ -690,9 +690,13 @@ Five workflow files handle automated builds, docs checks, analysis and fuzzing; 
 | Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
 
 Every job sets `timeout-minutes`. The build legs, the sanitizers and the two
-extra Windows jobs take 1 to 6 minutes and stop after 20; their long test steps
-have limits of their own (10 minutes, 5 for the Windows Memory-backend tests),
-so a test that hangs ends early with its output in the log. Every native leg (Clang and GCC) passes
+extra Windows jobs take 1 to 6 minutes when raylib comes from the cache, but a
+pull request that changes the cache key builds raylib from source on every
+push (only `main` saves caches), so the jobs keep room for that: 60 minutes for
+the build legs and Windows Clang, 45 for the sanitizers and the desktop
+backend. Their long test steps have limits of their own (10 minutes, 5 for the
+Windows Memory-backend tests), so a test that hangs still ends early with its
+output in the log. Every native leg (Clang and GCC) passes
 `EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
 The release job needs the legs that ship an archive (`build`), the
 `Sanitizers (Linux x86_64)` job (which used to be part of the Linux leg) and

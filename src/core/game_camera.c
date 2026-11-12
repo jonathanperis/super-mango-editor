@@ -53,9 +53,16 @@ static float game_camera_target(const GameState *gs)
 int game_camera_reveal_right(const GameState *gs)
 {
     const LevelDef *cam_def = (const LevelDef *)gs->world.runtime.current_level;
-    float left = (gs->world.player.x + gs->world.player.w * 0.5f) - (GAME_W * 0.5f);
-    if (left < 0.0f) left = 0.0f;   /* the view stops at the world's left edge */
-    return (int)(left + level_camera_lookahead_max(cam_def)) + GAME_W;
+    /* The same steps as game_camera_target, in the same order: push the
+     * view ahead first, then keep it inside the world.  Clamping first
+     * and adding the lookahead after would reveal up to a lookahead past
+     * the first screen at the spawn, where the real camera cannot go. */
+    float left = (gs->world.player.x + gs->world.player.w * 0.5f) - (GAME_W * 0.5f)
+               + level_camera_lookahead_max(cam_def);
+    if (left < 0.0f) left = 0.0f;
+    if (left > gs->world.runtime.world_w - GAME_W)
+        left = (float)(gs->world.runtime.world_w - GAME_W);
+    return (int)left + GAME_W;
 }
 
 int game_camera_update(GameState *gs, float dt)
