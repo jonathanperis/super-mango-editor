@@ -445,10 +445,11 @@ static int resize_target_exists(const EditorState *es)
            es->resize_index < editor_entity_count(&es->level, es->resize_type);
 }
 
-/* How many candidates the level was asked about (a test reads it). */
+#ifdef MANGO_TESTING
+/* How many candidates the level was asked about (a test reads it). Only
+ * test builds keep the count: elsewhere nothing would ever read it. */
 static int resize_validations;
 
-#ifdef MANGO_TESTING
 int editor_resize_test_validations(void)
 {
     return resize_validations;
@@ -465,7 +466,9 @@ static int try_placement(EditorState *es, const PlacementData *candidate)
     PlacementData shown = editor_snapshot_entity(&es->level, es->resize_type,
                                                  es->resize_index);
 
+#ifdef MANGO_TESTING
     resize_validations++;
+#endif
     (void)editor_entity_write(&es->level, es->resize_type, es->resize_index, candidate);
     if (editor_edit_kept_level(&es->level, &resize_issues, NULL, 0) == 0) return 1;
     (void)editor_entity_write(&es->level, es->resize_type, es->resize_index, &shown);
