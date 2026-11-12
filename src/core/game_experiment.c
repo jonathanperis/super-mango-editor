@@ -4,7 +4,7 @@
  * a "record it again" error (EXPERIMENT_FORMAT_VERSION says why for each).
  * Replays require unchanged level bytes and the same engine version. */
 #include "game_experiment.h"
-#include "../shared/platform.h"  /* str_copy */
+#include "../shared/platform.h"  /* str_copy, path_copy_checked */
 #include "game_random.h"
 #include "game_camera.h"
 #include "game_completion.h"
@@ -148,11 +148,17 @@ ExperimentExportResult game_experiment_export_at(GameState *gs, const char *fold
                                                  long long stamp, char *path, size_t size)
 {
     const GameExperiment *tape = gs->screen.experiment;
+    char checked[SERIALIZER_IO_PATH_MAX];
     if (!tape || !tape->count) return EXPERIMENT_EXPORT_NOTHING;
+    /* The folder comes from HOME or XDG_DATA_HOME: write only below one
+     * that is a usable path. The web build's folder is "", which is fine. */
+    if (folder[0] == '\0') checked[0] = '\0';
+    else if (path_copy_checked(checked, folder, sizeof(checked)) != 0)
+        return EXPERIMENT_EXPORT_WRITE_FAILED;
     for (int attempt = 1; attempt <= EXPERIMENT_EXPORT_ATTEMPTS; attempt++) {
         int length = attempt == 1
-            ? snprintf(path, size, "%smango-experiment-%lld.toml", folder, stamp)
-            : snprintf(path, size, "%smango-experiment-%lld-%d.toml", folder, stamp, attempt);
+            ? snprintf(path, size, "%smango-experiment-%lld.toml", checked, stamp)
+            : snprintf(path, size, "%smango-experiment-%lld-%d.toml", checked, stamp, attempt);
         if (length < 0 || (size_t)length >= size) return EXPERIMENT_EXPORT_WRITE_FAILED;
         SerializerPathStatus status = serializer_probe_path_utf8(path);
         if (status == SERIALIZER_PATH_EXISTING) continue;

@@ -12,6 +12,14 @@ void clock_wait(unsigned int milliseconds);
  * stops before a partial codepoint. Neither function allocates storage. */
 size_t str_copy(char *dest, const char *source, size_t capacity);
 size_t utf8_copy(char *dest, const char *source, size_t capacity);
+/* path_copy_checked — Copy `path` into out (capacity bytes) when it is a
+ * path the program may write to: not empty, short enough, and free of
+ * control characters (a line break, a tab, DEL), which no file name the
+ * program shows or types back can hold. Returns 0, or -1 with out empty.
+ * The copy goes byte by byte through a function that returns each byte as
+ * a number, which is also what CodeQL's cpp/path-injection query treats as
+ * a new value rather than outside text passed along. */
+int path_copy_checked(char *out, const char *path, size_t capacity);
 /* Allocated UTF-8 results, including a trailing separator; caller frees them.
  * preference_path creates organization/application folders under the OS user
  * data root. application_path returns the executable's containing directory. */
