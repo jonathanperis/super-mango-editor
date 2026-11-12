@@ -32,6 +32,7 @@
 #include "editor_clipboard.h"  /* editor_clipboard_forget_rails */
 #include "file_dialog.h"       /* file_dialog_open */
 #include "../shared/asset_root.h"  /* asset_root_absolute */
+#include "../shared/platform.h"    /* path_copy_checked */
 #include "../shared/serializer.h"    /* shared level format */
 #include "../shared/serializer_io.h" /* UTF-8 file I/O */
 #include "undo.h"              /* undo_clear */
@@ -527,50 +528,21 @@ void editor_open_level_file(EditorState *es)
 }
 
 /*
- * checked_path_char — One byte of a path a Save may write, as a number, or
- * -1 for a byte no level file name holds: a control character (a line
- * break, a tab, DEL).  Such a name could not be shown in the status bar or
- * typed back into the path prompt, and the pickers' own names are refused
- * for the same reason (file_dialog_read_path).
- */
-static int checked_path_char(char c)
-{
-    unsigned char byte = (unsigned char)c;
-
-    if (byte < 0x20 || byte == 0x7f) return -1;
-    return byte;
-}
-
-/*
  * editor_checked_write_path — Copy `path` into out (out_size bytes) when it
- * is a path a Save may write to: not empty, short enough, and made of
- * printable bytes (checked_path_char).  Returns 0, or -2 with out empty.
+ * is a path a Save may write to (path_copy_checked: not empty, short
+ * enough, no control characters such as a line break, which could not be
+ * shown in the status bar or typed back into the path prompt; the pickers'
+ * own names are refused for the same reason, file_dialog_read_path).
+ * Returns 0, or -2 with out empty.
  *
  * The document's path can come from the command line, so it is checked
  * here, at the one place every plain Save takes its file name from
  * (editor_document_write_target), rather than trusted because an earlier
- * step opened it.  Copying it byte by byte through checked_path_char also
- * makes the check visible to CodeQL's cpp/path-injection query: the query
- * treats the number a function returns as a new value, not as user text
- * passed along, so the copy is no longer "a command-line argument".
+ * step opened it.
  */
 static int editor_checked_write_path(const char *path, char *out, size_t out_size)
 {
-    size_t length = 0;
-
-    if (!out || out_size == 0) return -2;
-    out[0] = '\0';
-    if (!path || path[0] == '\0') return -2;
-    for (; path[length] != '\0'; length++) {
-        int byte = checked_path_char(path[length]);
-        if (byte < 0 || length + 1 >= out_size) {
-            out[0] = '\0';
-            return -2;
-        }
-        out[length] = (char)byte;
-    }
-    out[length] = '\0';
-    return 0;
+    return path_copy_checked(out, path, out_size) == 0 ? 0 : -2;
 }
 
 /*

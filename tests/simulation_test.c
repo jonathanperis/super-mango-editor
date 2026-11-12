@@ -1,4 +1,7 @@
 /* Multi-frame behavior proofs using stable fixtures and production update paths. */
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L  /* mkdir, rmdir under -std=c11 */
+#endif
 #include "core/game_experiment.h"
 #include "core/game_inspector.h"
 #include "core/game_overlay.h"
@@ -22,6 +25,11 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef _WIN32
+#include <errno.h>     /* EEXIST */
+#include <sys/stat.h>  /* mkdir */
+#include <unistd.h>    /* rmdir */
+#endif
 
 #define CHECK(test) do { if (!(test)) { fprintf(stderr, "simulation_test:%d: %s\n", __LINE__, #test); failed = 1; goto done; } } while (0)
 #define NEAR(a,b) (fabsf((a)-(b)) < 0.001f)
@@ -153,6 +161,21 @@ static int inspection_and_replay(void)
         gs.screen.experiment = NULL;
         CHECK(game_experiment_export_at(&gs, TEST_OUT, 1001, exported, sizeof(exported)) == EXPERIMENT_EXPORT_NOTHING);
         gs.screen.experiment = tape;
+        /* A folder holding a control character (from a crafted HOME or
+         * XDG_DATA_HOME) is refused before anything is written, even when
+         * that folder exists and could take the file. */
+        CHECK(path_copy_checked(expected, TEST_OUT "bad\tfolder/", sizeof(expected)) == -1 &&
+              expected[0] == '\0');
+        CHECK(path_copy_checked(expected, TEST_OUT, sizeof(expected)) == 0 &&
+              strcmp(expected, TEST_OUT) == 0);
+#ifndef _WIN32
+        CHECK(mkdir(TEST_OUT "bad\tfolder", 0700) == 0 || errno == EEXIST);
+#endif
+        CHECK(game_experiment_export_at(&gs, TEST_OUT "bad\tfolder/", 1002, exported,
+                                        sizeof(exported)) == EXPERIMENT_EXPORT_WRITE_FAILED);
+#ifndef _WIN32
+        CHECK(rmdir(TEST_OUT "bad\tfolder") == 0);
+#endif
         remove_exports();
     }
     CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment.toml") == 0);

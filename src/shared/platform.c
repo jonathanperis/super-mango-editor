@@ -39,6 +39,34 @@ void clock_wait(unsigned int milliseconds)
 #endif
 }
 
+/* One byte of a writable path as a number, or -1 for a control character. */
+static int path_byte(char c)
+{
+    unsigned char byte = (unsigned char)c;
+
+    if (byte < 0x20 || byte == 0x7f) return -1;
+    return byte;
+}
+
+int path_copy_checked(char *out, const char *path, size_t capacity)
+{
+    size_t length = 0;
+
+    if (!out || capacity == 0) return -1;
+    out[0] = '\0';
+    if (!path || path[0] == '\0') return -1;
+    for (; path[length] != '\0'; length++) {
+        int byte = path_byte(path[length]);
+        if (byte < 0 || length + 1 >= capacity) {
+            out[0] = '\0';
+            return -1;
+        }
+        out[length] = (char)byte;
+    }
+    out[length] = '\0';
+    return 0;
+}
+
 size_t str_copy(char *dest, const char *source, size_t capacity)
 {
     size_t size = strlen(source);
