@@ -41,7 +41,7 @@ With defaults, every 1000 points (10 coins) earns a bonus life. Both `coin_score
 **Sprite:** `assets/sprites/collectibles/star_yellow.png` — 16×16 px display size  
 **Pickup:** AABB overlap. Restores 1 heart (up to `MAX_HEARTS`, 3). No score awarded.
 
-The three colours are one collectible: a single `HealthStar` struct, `health_stars_render()` and `health_star_get_hitbox()`, and one `collect_health_stars()` loop in `src/collision/game_collision.c`. The level file and `GameState` still keep a separate array and texture per colour.
+The three colours are one collectible: a single `HealthStar` struct, `health_stars_render()` and `health_star_get_hitbox()`, and one `collect_health_stars()` loop in `src/collision/game_collision.c`. The level file and `GameState` still keep a separate array and texture per colour. A player who already has `MAX_HEARTS` leaves a star where it is: it is picked up only when there is a heart to restore, so running past one at full health does not waste it.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

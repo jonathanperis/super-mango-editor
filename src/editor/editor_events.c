@@ -4,6 +4,7 @@
 #include "canvas.h"
 #include "editor_campaign.h"
 #include "editor_clipboard.h"
+#include "editor_entity_list.h"
 #include "editor_files.h"
 #include "editor_recovery.h"
 #include "editor_panels.h"
@@ -145,6 +146,11 @@ static void open_dropped_level(EditorState *es, const char *path)
      * editor_key_while_dragging); a load would pull the level out from under it. */
     if (es->dragging) {
         editor_set_status(es, "Release the mouse to finish the move first (Esc cancels it)");
+        return;
+    }
+    /* So does a row being painted: its undo group is still open. */
+    if (es->painting) {
+        editor_set_status(es, "Release the mouse to finish placing first (Esc stops it)");
         return;
     }
     if (!path) {
@@ -332,6 +338,8 @@ static void editor_key_while_dragging(EditorState *es, int key)
     else if (!is_modifier_key(key))
         editor_set_status(es, es->painting
             ? "Release the mouse to finish the row first (Esc ends it)"
+            : es->resizing
+            ? "Release the mouse to finish the resize first (Esc cancels it)"
             : "Release the mouse to finish the move first (Esc cancels it)");
 }
 
@@ -474,21 +482,13 @@ static void editor_ctrl_shortcut(EditorState *es, int key, int shift)
         if (editor_confirm_discard_changes(es, "create a new level")) editor_reset_new_level(es);
         break;
     case KEY_R:
-        if (!editor_finish_field_edit(es)) break;
-        if (es->recovery_entry_count) {
-            int selected = editor_choose_recovery(es);
-            uint64_t id = selected >= 0 ? es->pending_recovery_id : 0;
-            if (id && editor_confirm_discard_changes(es, "recover autosave"))
-                (void)editor_recover_entry_by_id(es, id);
-            else
-                es->pending_recovery_id = 0;
-        } else
-            editor_set_status(es, "Recovery copy not found");
+        editor_open_recovery_picker(es);
         break;
     case KEY_ONE: case KEY_TWO: case KEY_THREE: case KEY_FOUR: case KEY_FIVE: {
         int index = key-KEY_ONE;
         if (index < es->recent_file_count && editor_confirm_discard_changes(es, "open a recent level"))
-            if (editor_load_level(es, es->recent_files[index])) editor_set_status(es, "Failed to load recent file");
+            /* A failed load has already put its reason in the status bar. */
+            (void)editor_load_level(es, es->recent_files[index]);
         break;
     }
     case KEY_Z:
@@ -519,6 +519,10 @@ static void editor_ctrl_shortcut(EditorState *es, int key, int shift)
     case KEY_M:
         (void)editor_campaign_open(es, NULL);
         break;
+    case KEY_F:
+        /* Find: open the Entities list with the caret in its search field. */
+        if (editor_finish_field_edit(es)) editor_entity_list_open(es);
+        break;
     default:
         break;
     }
@@ -535,6 +539,7 @@ static void editor_plain_key(EditorState *es, int key, int shift)
         if (es->ui.active_id) ui_cancel_active_edit(&es->ui);
         else if (es->box_selecting) tools_cancel_drag(es);
         else if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) es->tool = TOOL_SELECT;
+        else if (es->entity_list_open) editor_entity_list_close(es);
         else if (es->selection.index >= 0) {
             editor_select_none(es);
         }
@@ -749,9 +754,13 @@ static void editor_mouse_down(EditorState *es, const InputEvent *event, float wx
         es->mouse_right_down = 1;
         /* Right-click deletes. During a left-button drag that would shift
          * the array under drag_index, so the drag would then overwrite a
-         * different entity. Finish (release) the drag first. The same
-         * goes for a click under an open dropdown list. */
-        if (!es->dragging && es->ui.dropdown_open_id == 0 && !es->campaign &&
+         * different entity. Finish (release) the drag first. A row being
+         * painted with the Place tool owns the document the same way: its
+         * undo group is open, and a delete now would be folded into the
+         * "Placed N" step (or, with the group full, left out of history
+         * altogether). The same goes for a click under an open dropdown
+         * list. */
+        if (!es->dragging && !es->painting && es->ui.dropdown_open_id == 0 && !es->campaign &&
             canvas_contains(event->x, event->y) &&
             editor_finish_field_edit(es))
             tools_right_click(es, wx, wy);

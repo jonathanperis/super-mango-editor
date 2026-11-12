@@ -268,6 +268,7 @@ static int resume_codec_and_migration(void)
         {4, "score = -1\n"},
         {5, "level_score_start = 121\n"},            /* more than the score */
         {7, "lives = -1\n"},
+        {7, "lives = 1000\n"},                      /* GAME_RESUME_LIVES_MAX is 999 */
         {8, "respawn_x = nan\n"},
         {10, "elapsed = -1.0\n"},
         {10, "elapsed = 41.25\nextra = 1\n"},        /* unknown key */
@@ -670,6 +671,72 @@ static int persistent_session(void)
     return 0;
 fail:
     session_destroy(&session); remove(path); remove(lock_path); return 1;
+}
+
+/* 1 when the file at path contains needle (0 when it does not exist). */
+static int file_contains(const char *path, const char *needle)
+{
+    char text[8192];
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return 0;
+    size_t size = fread(text, 1, sizeof(text) - 1, fp);
+    fclose(fp);
+    text[size] = '\0';
+    return strstr(text, needle) != NULL;
+}
+
+/*
+ * Crossing a checkpoint records the Continue point at once, in memory, but
+ * a native build writes the profile file at the next quiet moment (here, a
+ * pause): the write is synchronous and ends in an fsync, which would
+ * otherwise land in the middle of play.
+ */
+static int checkpoint_continue_point_is_written_at_the_next_pause(void)
+{
+    char path[160], lock_path[176];
+    snprintf(path, sizeof(path), TEST_OUT "profile-deferred-%llu.toml", (unsigned long long)clock_millis());
+    snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    const char *level = "levels/00_sandbox_01.toml";
+    AppSessionConfig config = {.level_path = level, .profile_enabled = 1, .profile_path = path};
+    AppSession *session = session_create(&config);
+    CHECK(session && session->game);
+    GameState *game = session->game;
+
+    /* Into the third screen, still playing: the point exists... */
+    game->world.player.x = 2.0f * GAME_W + 50.0f;
+    game_checkpoint_update(game);
+    session_frame(session);
+    const GameResume *saved = game_profile_resume(&session->profile, level);
+    CHECK(saved && saved->legacy_screen == 2);
+#ifndef __EMSCRIPTEN__
+    /* ...but nothing was written during play. */
+    CHECK(session->resume_save_deferred == 1);
+    CHECK(!file_contains(path, "[resume]"));
+    session_frame(session);
+    CHECK(!file_contains(path, "[resume]"));
+#endif
+
+    /* The pause is the quiet moment: now it is on disk. */
+    game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 1);
+    session_frame(session);
+    CHECK(file_contains(path, "[resume]"));
+    CHECK(session->resume_save_deferred == 0);
+
+    /* Leaving without ever pausing writes it too (the exit always saves). */
+    game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 0);
+    game->world.player.x = 3.0f * GAME_W + 50.0f;
+    game_checkpoint_update(game);
+    session_frame(session);
+    session_destroy(&session);
+    CHECK(file_contains(path, "legacy_screen = 3"));
+    remove(path);
+    remove(lock_path);
+    return 0;
+fail:
+    if (session) session_destroy(&session);
+    remove(path);
+    remove(lock_path);
+    return 1;
 }
 
 /*
@@ -1261,6 +1328,7 @@ int game_profile_contract_test(void)
     if (persistent_session()) return 1;
     puts("profile: continue round trip");
     if (continue_round_trip()) return 1;
+    if (checkpoint_continue_point_is_written_at_the_next_pause()) return 1;
     puts("profile: ghost codec and session");
     if (ghost_codec_and_paths()) return 1;
     if (ghost_session_keeps_the_fastest_run()) return 1;

@@ -51,8 +51,10 @@
 typedef struct {
     float             dt;      /* seconds this step advances (1/60 in play)   */
     int               cam_x;   /* camera left edge when the step began: some
-                                  kinds wait for the camera to reveal them,
-                                  or stay silent while off-screen             */
+                                  kinds stay silent while off-screen. Only
+                                  sound may depend on it, never movement:
+                                  the camera follows the Reduced motion
+                                  setting                                     */
     PlayerStepSupport support; /* the float platform and the bridge the
                                   player landed on in this step (-1 = none)   */
 } StepInputs;
@@ -118,10 +120,13 @@ static void update_faster_fish(GameState *gs, const StepInputs *in)
 /* Moving hazards and surfaces                                         */
 /* ------------------------------------------------------------------ */
 
-/* Spike blocks wait until the camera reveals them, then ride their rail. */
+/* Spike blocks wait until the player is close enough to see them, then
+ * ride their rail. The limit comes from the player's position, not from
+ * the camera, so the Reduced motion setting cannot change the run. */
 static void update_spike_blocks(GameState *gs, const StepInputs *in)
 {
-    spike_blocks_update(gs->world.spike_blocks, gs->world.spike_block_count, in->dt, in->cam_x);
+    spike_blocks_update(gs->world.spike_blocks, gs->world.spike_block_count, in->dt,
+                        game_camera_reveal_right(gs));
 }
 
 /* Float platforms move, and a rail platform carries the player who

@@ -337,6 +337,17 @@ int redo_pop(UndoStack *stack, Command *out);
 int undo_group_begin(UndoStack *stack, int size);
 void undo_group_end(UndoStack *stack);
 
+/*
+ * undo_trim_group --- Give back the room the newest step reserved but did
+ * not use.  `group` is the number undo_group_begin returned; nothing happens
+ * unless the newest applied step is that group's.  Call it after
+ * undo_group_end for an action that reserves far more than it usually
+ * needs (a painted row reserves UNDO_GROUP_MAX entries and is most often a
+ * single click).  Do NOT call it for a step later pushes will join (a
+ * held-arrow nudge relies on the room it reserved).
+ */
+void undo_trim_group(UndoStack *stack, int group);
+
 /* Group of the entry undo_pop / redo_pop would return next (0 when that
  * entry stands alone or the stack is empty). */
 int undo_top_group(const UndoStack *stack);

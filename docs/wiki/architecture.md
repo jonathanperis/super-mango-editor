@@ -55,7 +55,7 @@ session_destroy(session) / browser terminal cleanup
 
 ## App Session and Game Frame
 
-`AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation and event polling. Native visible windows use its **60 FPS** limiter; hidden smoke runs are uncapped and retain fixed simulation steps. Each click on the native close button is reported once, as an Exit request; it replaces a Play, Continue, Next Level, Replay or Level Select route chosen earlier in the same frame (a fatal error still wins), so a close is never lost to a screen change.
+`AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation and event polling. Native visible windows use its frame limiter, set to one frame per refresh of the display the window opened on (`display_frame_cap` in `src/shared/graphics.c`; 60 when the system cannot say), so a 144 Hz display shows a new blended frame on every refresh instead of holding 60 Hz frames for an uneven two or three. Hidden smoke runs and Memory-backend test runs are uncapped. The simulation takes fixed steps at any of these rates. Each click on the native close button is reported once, as an Exit request; it replaces a Play, Continue, Next Level, Replay or Level Select route chosen earlier in the same frame (a fatal error still wins), so a close is never lost to a screen change.
 
 On Web, Emscripten's animation-frame callback owns scheduling. `display_open`
 sets raylib's target FPS to zero so `EndDrawing` returns to the browser instead
@@ -71,7 +71,7 @@ On native macOS, the pinned dependency wakes its partial-busy sleep 1 ms earlier
 so the existing short busy wait can meet the same frame deadline despite sleep
 coalescing. This does not change simulation time or add another limiter. The
 debug counter rounds **measured** FPS to the nearest integer; genuine slow frames
-remain visible. A 60 FPS target cannot prevent stalls caused by the OS or work
+remain visible. A frame-rate target cannot prevent stalls caused by the OS or work
 that exceeds the frame budget.
 
 There are two distinct notions of input. GLFW callbacks capture **ordered
@@ -164,25 +164,32 @@ in one step (a respawn, a camera snap, a new level) is shown where it lands.
 Debug mode (whose hitbox outlines must sit on the sprite) and smoke, replay
 and experiment runs draw the latest step itself. The time-trial ghost is
 blended the same way between its last two samples (`game_timing_view_point`),
-so a run that matches the best one draws both in the same place. Spiders,
-jumping spiders, birds, fish and their faster variants, circular saws, spike
-blocks and float platforms are blended the same way from the positions
-`game_timing_note_step` stored before the step. A bird's height stays on its
+so a run that matches the best one draws both in the same place. The moving
+world objects are blended from the values `game_timing_note_step` stored before
+the step, through one table: each row of `s_movers` in `src/core/game_movers.c`
+names a kind's array and the floats to blend (spiders, jumping spiders, birds,
+fish and their faster variants, circular saws, spike blocks and float
+platforms by position; an axe trap by its angle, the shorter way round; a
+flame by its height and flip angle; a bridge by each falling brick's drop). A
+kind that is not in the table would move in 60 Hz jumps beside smooth
+neighbours, so a new mover gets a row there and one `game_movers_shown` call
+in its render layer. A bird's height stays on its
 sine wave because only its x is blended and the wave is computed from that x.
 A step that moves any of them more than 48 px is shown where it is now. A
-saw's patrol position is blended; its spin angle stays on the latest step, as
-do axe swings, flame eruptions, bouncepad squashes and crumbling bridge
-bricks. The player is not carried by those. The accumulator restarts half a step full after pauses and loads, which
+saw's patrol position is blended; its spin angle and a bouncepad's squash
+frames stay on the latest step, which are sprite animations rather than
+movement. The accumulator restarts half a step full after pauses and loads, which
 absorbs sub-millisecond vsync jitter. Frame time is clamped to 0.25 s and at most
 5 steps run per frame; excess time is dropped (below 12 FPS the game slows down
 instead of spiralling). Smoke and scripted replays feed exactly one step per
-frame regardless of the wall clock. Experiment captures (`format_version = 3`)
+frame regardless of the wall clock. Experiment captures (`format_version = 4`)
 store one row per fixed step, `[input bits, physics values...]`, with no
 duration column; a `format_version = 1` capture from the variable-timestep
 engine, or a `format_version = 2` one from before the camera snapped to the
-level start and the respawn point (waiting spike blocks start when the camera
-reveals them, so they could start on other steps), is rejected with a request
-to record it again. Completion, game over or
+level start and the respawn point, or a `format_version = 3` one from when a
+waiting spike block started from the camera's position (which follows the
+Reduced motion setting) and jump input could replace or shorten a bouncepad
+launch, is rejected with a request to record it again. Completion, game over or
 a route stops the remaining steps of that frame. The debug inspector's freeze,
 single-step and slow-motion keys ([Controls](../controls/#debug-inspector-keys))
 only change how much real time reaches the accumulator. They never override the
@@ -215,7 +222,7 @@ the same names in the same order, each row calling the function listed here.
 | 4 | faster birds | `faster_birds_update` | flap sound, player x, camera |
 | 5 | fish | `fish_update` | world width |
 | 6 | faster fish | `faster_fish_update` | world width |
-| 7 | spike blocks | `spike_blocks_update` | camera (a block waits until it is on screen) |
+| 7 | spike blocks | `spike_blocks_update` | the player's x (a block waits until the camera could show it) |
 | 8 | float platforms | `game_float_platforms_update` | the float platform the player landed on; moves a rail rider |
 | 9 | bridges | `game_bridges_update` | the bridge the player landed on, player x |
 | 10 | axe traps | `axe_traps_update` | axe sound, player x, camera |

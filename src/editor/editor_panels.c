@@ -5,6 +5,7 @@
 #include "editor_panels.h"
 
 #include "canvas.h"        /* canvas_center_on */
+#include "editor_entity_list.h" /* the Entities list, in place of config + palette */
 #include "editor_layout.h" /* editor_config_total_height */
 #include "editor_session.h" /* editor_finish_field_edit, editor_set_status */
 #include "entity_meta.h"   /* editor_selection_reconcile */
@@ -20,6 +21,26 @@ void editor_side_panel_layout(const EditorState *es, EditorSideLayout *out)
     const int right_bottom = EDITOR_H - STATUS_H;
     int max_config = (EDITOR_H - STATUS_H - TOOLBAR_H) / 2;
     int selected = es->selection.index >= 0;
+
+    out->list_open = 0;
+    out->list_y = TOOLBAR_H;
+    out->list_h = 0;
+    /* The Entities list covers Level Config and the palette.  (With the
+     * Place tool it is on its way out: editor_render_side_panels closes
+     * it, because placing needs the palette.) */
+    if (es->entity_list_open && es->tool != TOOL_PLACE) {
+        out->list_open = 1;
+        out->props_h = selected ? (es->panel_open ? PROPS_SHORT_H : SECTION_HDR) : 0;
+        out->list_h = right_bottom - TOOLBAR_H - out->props_h;
+        out->props_y = out->list_y + out->list_h;
+        out->config_y = TOOLBAR_H;
+        out->config_h = 0;
+        out->config_total_h = 0;
+        out->palette_y = out->props_y;
+        out->palette_h = 0;
+        out->palette_folded = 0;
+        return;
+    }
 
     out->config_y = TOOLBAR_H;
     out->config_total_h = es->config_open ? editor_config_total_height(es) : SECTION_HDR;
@@ -54,7 +75,18 @@ void editor_render_side_panels(EditorState *es)
     EditorSideLayout layout;
 
     editor_selection_reconcile(es);
+    /* Placing needs the palette, which the Entities list would cover. */
+    if (es->entity_list_open && es->tool == TOOL_PLACE) editor_entity_list_close(es);
     editor_side_panel_layout(es, &layout);
+    if (layout.list_open) {
+        editor_entity_list_render(es, layout.list_y, layout.list_h);
+        /* A click in the list may have selected or deselected something,
+         * which changes where the properties go: measure again. */
+        editor_side_panel_layout(es, &layout);
+        if (es->selection.index >= 0 && layout.list_open)
+            properties_render(es, layout.props_y, layout.props_h);
+        return;
+    }
     level_config_render(es, layout.config_y, layout.config_h, layout.config_total_h);
     palette_render(es, layout.palette_y, layout.palette_h);
     if (es->selection.index >= 0) properties_render(es, layout.props_y, layout.props_h);
@@ -73,6 +105,18 @@ int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, float wheel
         return 0;
     }
 
+    /* Over the Entities list, one notch scrolls one row. */
+    EditorSideLayout layout;
+    editor_side_panel_layout(es, &layout);
+    if (layout.list_open && (layout.props_h == 0 || my < layout.props_y)) {
+        (void)ui_scroll_wheel(&es->entity_list_scroll, wheel_y, (float)ENTITY_LIST_ROW_H);
+        return 1;
+    }
+    if (layout.list_open) {
+        (void)ui_scroll_wheel(&es->props_scroll, wheel_y, 20.0f);
+        return 1;
+    }
+
     /* Over a validation list longer than its window, the wheel scrolls the
      * list one row per notch (config_validation clamps it). Elsewhere one
      * notch scrolls a panel 20 px. Each UIScroll keeps a trackpad's
@@ -82,8 +126,6 @@ int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, float wheel
         return 1;
     }
 
-    EditorSideLayout layout;
-    editor_side_panel_layout(es, &layout);
     UIScroll *scroll = &es->palette_scroll;
     if (my < layout.palette_y) scroll = &es->config_scroll;
     else if (layout.props_h > 0 && my >= layout.props_y) scroll = &es->props_scroll;
@@ -131,6 +173,8 @@ int editor_focus_validation_issue(EditorState *es, int message)
         return 1;
     }
     if (properties_focus_config(es, where)) {
+        /* The field is in Level Config, which the Entities list covers. */
+        editor_entity_list_close(es);
         editor_set_status(es, "Level Config: %s", text);
         return 1;
     }

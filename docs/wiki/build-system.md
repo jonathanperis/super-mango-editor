@@ -43,7 +43,7 @@ DEPS    = $(OBJS:.o=.d)
 ```
 
 This abbreviated source-list example omits platform detection and build-mode flags.
-Both applications include `src/shared/serializer_load_checkpoints.c` and the other shared serializer/UI modules.
+Both applications include `src/shared/serializer_parse.c` and the other shared serializer/UI modules.
 
 raylib **6.2** is fetched from the source/checksum pin in `vendor/raylib/manifest.json`.
 `tools/build_raylib.py` verifies the archive, applies the documented replacements
@@ -174,7 +174,12 @@ under `out/release/`. Release builds on Linux/macOS add `-fstack-protector-stron
 `-D_FORTIFY_SOURCE=2`; Linux also links PIE with full RELRO (`-pie -Wl,-z,relro,-z,now`)
 against a position-independent release raylib. MSYS2/MinGW keeps plain `-O2`.
 Linux and Windows release executables link with `-s` (no symbol table, about 230 KB
-less each); macOS keeps its symbols, because its ad-hoc signature is made after the link.
+less each); on macOS, where the linker deprecates `-s`, `-Wl,-x` drops the local symbols
+during the link, before the ad-hoc signature is made. Release builds also leave out code
+nothing calls: Linux and Windows compile with `-ffunction-sections -fdata-sections` (the
+release raylib too) and link with `-Wl,--gc-sections`, and macOS links with
+`-Wl,-dead_strip`. `-ffile-prefix-map=<checkout>=.` keeps the builder's folder name out
+of the binaries. There is no link-time optimisation.
 Their object directories never overlap. Changing flags inside one `OUTDIR` is
 safe (the [flag stamps](#flag-stamps) rebuild what changed), but switching back
 and forth recompiles each time, so give long-lived flag combinations their own
@@ -303,14 +308,30 @@ Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.
 make web
 ```
 
-Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). Each source compiles once into `out/obj/web/` (with `-MMD -MP` header tracking) and links once. The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Both compile with `-Os` (`WEB_OPT`), and the link sets `ENVIRONMENT=web`: download size matters more than speed for this light 2D game, and against `-O2` the `.wasm` shrank from 469 KB to 371 KB (190 KB to 166 KB gzipped). Uses a custom shell template from `web/shell.html`. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
+Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). Each source compiles once into `out/obj/web/` (with `-MMD -MP` header tracking) and links once. The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Both compile with `-Os` (`WEB_OPT`), and the link sets `ENVIRONMENT=web`: download size matters more than speed for this light 2D game, and against `-O2` the `.wasm` shrank from 469 KB to 371 KB (190 KB to 166 KB gzipped). The page around the game comes from `web/shell.html`: before the link, `tools/web_shell.py` writes the shell emcc uses (`out/obj/web/shell.html`), pasting in `web/boot.js`, the one boot sequence that this page and the website's home page share. `WEB_ASSET_VERSION=<commit>` (CI passes the commit; empty by default) makes the page load `super-mango.js?v=<commit>`, `.wasm?v=<commit>` and `.data?v=<commit>`, in the script tag, the two preload links and `Module.locateFile`, so a browser that cached an older deploy cannot pair an old file with a new one. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
 
 The Web frame callback returns to Emscripten's animation-frame scheduler rather
 than using raylib's blocking FPS limiter. Asyncify is not required by this loop.
 Artifact compilation and HTTP delivery checks do not execute browser frames;
 startup/render changes also need the browser checks in [Testing](../testing/).
 
-The target also produces `out/super-mango-debug.html` for direct debug HTML launches. It is not linked separately: `tools/web_debug_page.py` copies the built `super-mango.html`, inlines `web/debug-boot.js` (which sets `Module.__superMangoDebug`, so the shell passes `--debug`) just before the `super-mango.js` tag, and re-pins the CSP. Both pages therefore load the same `super-mango.js`, `.wasm` and `.data`; the debug page used to link byte-identical copies of them. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
+**What the page does when something goes wrong.** `web/boot.js` sends every
+failure through one function, `fail()`: the game script or one of the preloaded
+files (`super-mango.wasm`, `super-mango.data`) does not download ("Failed to
+load game files"), `main()` or the runtime aborts ("Game startup failed"), the
+game ends with an error, or the browser takes the WebGL context away
+(`webglcontextlost`: "WebGL context lost. Reload to continue."). Each host page
+only decides how to show the message and whether to offer a Reload button. On
+the standalone page the text lives in `#status-text`, which has
+`role="status"` and `aria-live="polite"`, so a screen reader reads each change
+(loading, running, failed) without interrupting; the download counter
+("(3/7)") is cut from the text so it is announced once per stage. The spinner
+beside it is `aria-hidden` and stops turning under
+`prefers-reduced-motion: reduce`. `tests/boot_test.cjs` runs these paths
+against a fake page, and `tools/check_web_boot_contract.py` fails the build if
+a host page grows boot logic of its own.
+
+The target also produces `out/super-mango-debug.html` for direct debug HTML launches. It is not linked separately: `tools/web_debug_page.py` copies the built `super-mango.html`, inlines `web/debug-boot.js` (which sets `Module.__superMangoDebug`, so `web/boot.js` passes `--debug`) just before the `super-mango.js` tag, and re-pins the CSP. Both pages therefore load the same `super-mango.js`, `.wasm` and `.data`; the debug page used to link byte-identical copies of them. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
 
 For release confidence, the **GitHub Actions WebAssembly build is authoritative**. Report local SDK/cache failures separately from application failures, and require the CI `make web`, artifact checks and Pages assembly checks. JavaScript syntax/WASM validation requires real Node.js; if a local `node` wrapper launches Bun, set `NODE` to the Node executable explicitly.
 
@@ -343,13 +364,24 @@ Current test binaries (18):
 - `out/gameplay-mechanics-test`
 - `out/editor-ui-test`
 
-`make test` also runs `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`, `tests/coverage_baseline_test.py`, `tests/clang_tidy_report_test.py` and `tests/doctor_test.py`.
+`make test` also runs the Python tests in the Makefile's `PYTHON_TESTS` list: `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`, `tests/fuzz_dict_test.py`, `tests/coverage_baseline_test.py`, `tests/clang_tidy_report_test.py`, `tests/doctor_test.py`, `tests/build_raylib_test.py`, `tests/gen_compile_commands_test.py`, `tests/roadmap_quality_test.py` and `tests/import_raygui_icons_test.py`.
 Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
-Node tests `tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
-`tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs` and
-`tests/audio_unlock_test.cjs`, then `tests/web_debug_page_test.py`,
-`tests/package_release_test.py` and `tests/filter_codeql_sarif_test.py`
-(`make web-host-contract` runs them alone). `tests/docs_checks_test.py` runs from
+six Node tests in `NODE_TESTS` (`tests/boot_test.cjs`, `tests/web_host_test.cjs`,
+`tests/profile_storage_test.cjs`, `tests/touch_controls_test.cjs`,
+`tests/keyboard_scope_test.cjs` and `tests/audio_unlock_test.cjs`), then the
+Python tests in `WEB_PYTHON_TESTS` (`tests/web_boot_contract_test.py`,
+`tests/web_shell_test.py`, `tests/web_debug_page_test.py`,
+`tests/wasm_artifacts_test.py`, `tests/package_release_test.py` and
+`tests/filter_codeql_sarif_test.py`; `make web-host-contract` runs them alone).
+`make validate-levels` runs `tests/schema_parity_test.py` after the level checks.
+
+Adding a native test takes one name in `TEST_TARGETS` and, when the program
+links more than its own `tests/<name>_test.c`, one line of extra objects in the
+Makefile's "Native test programs" section: the run line in `make test` and the
+link rule are generated from that list (`TEST_ENV_<program>` adds environment
+to one program's run line). Adding a Python or Node test takes its path in one
+of the three lists above; `make docs-drift` fails while a test file in `tests/`
+is not run by any target. `tests/docs_checks_test.py` runs from
 `bun run check-site` instead. The native list above is the complete
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
 into existing harnesses rather than separate binaries.
@@ -407,7 +439,8 @@ make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
 Runs `tools/doctor.py`. Required failures are a missing C compiler, a `c++`
 that cannot link the C++ standard library (the probe raylib's CMake build
 runs), CMake, Make, Python 3.11+, Node.js 22.12+, or a Linux X11/GL
-development header. zenity (Linux file dialogs), Bun (the docs site), `emcc`
+development header. zenity (Linux file dialogs), Bun (the docs site; compared
+with the `packageManager` pin in `docs/package.json`), `emcc`
 (compared with the Makefile's `EMSCRIPTEN_VERSION`, not a second copy of the
 pin) and a playback device are printed and do not fail. Headless `make test`
 needs none of those four.
@@ -418,7 +451,9 @@ make doctor
 
 ### `make tidy`
 
-Writes `compile_commands.json` (`make compile-commands`), then runs clang-tidy with the checks in `.clang-tidy` over `src/` and `tools/` through `tools/run_clang_tidy.py`. It prints the findings and exits 0; `CLANG_TIDY=` picks the program. `static-analysis.yml` runs the same script in CI. See [Testing](../testing/#static-analysis).
+`make compile-commands` writes `compile_commands.json` for clangd, IDEs (`.vscode/c_cpp_properties.json` points the VS Code C/C++ extension at it) and clang-tidy. The Makefile hands `tools/gen_compile_commands.py` the flags it compiles with (`CFLAGS`, `PROJECT_INCLUDES`, `TEST_CFLAGS` and the per-object `TEST_OBJ_FLAGS_*`), so the database describes the command line you ran: `make compile-commands RAYLIB_PLATFORM=memory OUTDIR=out/headless` lists `-DMANGO_RAYLIB_MEMORY` and that tree's raylib headers. Game sources that the tests compile a second time get a second entry with the test flags, so code inside `#ifdef MANGO_TESTING` is analysed too. The `.c` files in `tests/editor_ui/` and `tests/editor_validation/` are `#include`d into their test programs and are covered there, not listed.
+
+`make tidy` writes that database, then runs clang-tidy with the checks in `.clang-tidy` over `src/` and `tools/` through `tools/run_clang_tidy.py`. It prints the findings and exits 0; `CLANG_TIDY=` picks the program. `static-analysis.yml` runs the same script in CI. See [Testing](../testing/#static-analysis).
 
 ### `make fuzz-corpus` / `make fuzz`
 
@@ -450,6 +485,19 @@ Regenerates `docs/wiki/overlay-snapshots.md` from the canonical overlay strings 
 
 ```sh
 make overlay-snapshots
+```
+
+### `make raygui-icons`
+
+Regenerates `vendor/raygui/raygui_icons.h`, the editor's toolbar icons, from the
+pinned `raygui.h` with `tools/import_raygui_icons.py`. Nothing runs it
+automatically; run it after adding an icon to the script's `ICONS` table or
+changing the pin in `vendor/raygui/manifest.json`. It downloads `raygui.h` and
+checks its SHA-256; `RAYGUI_SOURCE=<file>` reads a local copy instead. See
+`vendor/raygui/README.md`.
+
+```sh
+make raygui-icons
 ```
 
 ### `make roadmap-quality`
@@ -535,6 +583,10 @@ npm run check-site
 Keep Bun and `bun.lock` as the CI dependency contract. The npm fallback runs the declared scripts; it does not replace the locked install step.
 
 Astro requires Node.js 22.12+; CI uses Node **26.9.0** and Bun **1.4.2**. The
+Node version is the single line of the repository's `.node-version` file, which
+every workflow reads (`node-version-file`); the Bun version is also recorded as
+`packageManager` in `docs/package.json`, and `make doctor` warns when the local
+Bun is a different release. The
 supported frontend set is Astro **7.4**, `@astrojs/markdown-satteri` **0.4**,
 `@astrojs/sitemap` **3.7**, `@astrojs/check` **0.9**, Tailwind CSS and its Vite
 plugin **4.3**, and TypeScript **6.0**. A lockfile patch bump stays on that
@@ -633,11 +685,14 @@ Five workflow files handle automated builds, docs checks, analysis and fuzzing; 
 | Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (a required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); Linux scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format); a `Coverage (Linux x86_64)` job runs `make coverage` on the Memory backend with a line-coverage floor and a per-file check against `tools/coverage_baseline.txt` (no file may drop more than 2 points), posts the per-file table and the baseline comparison to the job summary and uploads `summary.txt` as the `coverage-summary` artifact; the three Windows jobs each cover something the others do not (comments in `build.yml`): the GCC build leg ships and checks the release zip, the Clang job catches Clang warnings in `_WIN32`-only code, and `Desktop backend` runs the real GLFW/OpenGL backend and the scripted smoke; on `main` pushes a `Release freshness` job warns when `main` is more than 50 commits past the latest `v*` tag. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` (the tag is `v` plus the `VERSION` file; routine releases stay on 2.0.x) |
 | Docs | `docs.yml` | Relevant pull requests, weekly, manual | Frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows. `make docs-drift` is left to the always-on `Docs drift` job, and on `main` the `Pages build` job lints, builds and checks the site, so neither runs twice. The weekly run audits the lockfile against new advisories. Superseded PR runs are cancelled |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis; superseded PR runs are cancelled. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
-| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 60 seconds per harness) on the level loader, the editor's save → load round trip and the profile and ghost decoders. Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
+| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 300 seconds per harness) on the level loader, the editor's save → load round trip, the profile and ghost decoders, and the campaign manifest loader and experiment capture decoder. The inputs each run discovers are kept in the Actions cache for the next run. Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
 | Static analysis | `static-analysis.yml` | Push to `main`, pull requests, manual | `clang-tidy (informational)`: builds the pinned raylib for its headers, writes `compile_commands.json` and runs `tools/run_clang_tidy.py` with the checks in `.clang-tidy` (Clang static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/` only. Findings go to the job summary; the job never fails on them and is not a required check |
 | Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
 
-Every job sets `timeout-minutes`. Every native leg (Clang and GCC) passes
+Every job sets `timeout-minutes`. The build legs, the sanitizers and the two
+extra Windows jobs take 1 to 6 minutes and stop after 20; their long test steps
+have limits of their own (10 minutes, 5 for the Windows Memory-backend tests),
+so a test that hangs ends early with its output in the log. Every native leg (Clang and GCC) passes
 `EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
 The release job needs the legs that ship an archive (`build`), the
 `Sanitizers (Linux x86_64)` job (which used to be part of the Linux leg) and
@@ -659,11 +714,13 @@ workflows before suspecting this one.
 
 **Toolchain drift under `-Werror`.** Linux/macOS use the runner image's
 compilers and the WebAssembly leg pins Emscripten 6.0.13, but Windows uses
-MSYS2, a rolling distribution: `setup-msys2` runs with `update: true` and
-`pacman` installs the current GCC/Clang. MSYS2 cannot reliably install older
+MSYS2, a rolling distribution: the local `setup-msys2-toolchain` action runs
+`setup-msys2` with `update: true` and installs the current GCC/Clang through the
+action's `install:` input (which also lets the action's package cache cover
+them). MSYS2 cannot reliably install older
 package versions, so these are not pinned. A new compiler release can add a
 warning and fail a Windows leg with no source change. Each Windows job prints
-`--version` and `pacman -Q` output in its "Record ... toolchain versions" step;
+`--version` and `pacman -Q` output in that action's "Record rolling MSYS2 toolchain versions" step;
 when a Windows-only `-Werror` failure appears, compare that output with the last
 green run before changing code. A Clang-only failure shows up in the job named
 `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` and does not block
@@ -672,20 +729,33 @@ the Windows archive.
 GCC's `-Wformat-truncation` is stricter than Clang's: label code formats long
 paths through `editor_path_for_display()` and checks `snprintf` results where
 truncation would change behaviour. Build jobs use Python 3.12 from
-`actions/setup-python` on Linux/macOS (MSYS2 supplies Python on Windows) and
-restore the pinned raylib source archive from `actions/cache` via
-`RAYLIB_ARCHIVE`; the archive is SHA-256 verified on every use. Every job that
-compiles raylib caches the compiled tree: each native build leg (Linux, macOS
-and Windows) its debug trees (`out/raylib`, plus `out/headless/raylib` for the
-Memory-backend tests), and the sanitizers, coverage, Windows Clang, Desktop
-backend and CodeQL C/C++ jobs their own trees. The release tree that ships
+`actions/setup-python` on Linux/macOS (MSYS2 supplies Python on Windows).
+
+**Shared steps and caches.** Steps that several jobs repeat live in local
+composite actions under `.github/actions/`: `install-linux-deps` (the one apt
+package list), `setup-linux-display` (Xvfb and the PulseAudio null sink),
+`setup-msys2-toolchain` and `raylib-cache`. `raylib-cache` restores the pinned
+raylib source archive (`RAYLIB_ARCHIVE`; SHA-256 verified on every use) and,
+for every job that compiles raylib, the compiled tree: each native build leg
+(Linux, macOS and Windows) its debug trees (`out/raylib`, plus
+`out/headless/raylib` for the Memory-backend tests), and the sanitizers,
+coverage, Windows Clang and Desktop backend jobs their own trees. The Linux
+clang debug tree is the same in the Linux build leg, CodeQL, clang-tidy and the
+fuzz job, so those four share one cache entry (`linux-clang-debug`) instead of
+storing it under four names. Only runs on `main` save a cache; pull requests
+and tags restore what `main` saved, so a pull request no longer stores its own
+copy of each tree (a pull request that changes the raylib pin or the toolchain
+builds raylib from source on every push until it is merged). The release tree that ships
 (`dist-native`) is never cached, and neither is the WebAssembly leg's
 `out/raylib-web`: the Emscripten SDK is installed under a new temporary folder
 on every run, so a restored CMake tree would name an `emcc` that is gone.
 CMake records absolute paths and per-compiler settings, so the key must match
 exactly: it covers the pin, patches, `tools/build_raylib.py`, the Makefile's
-raylib option definitions (printed by `make raylib-options`), runner image,
-workspace path and the job's compiler and CMake versions.
+raylib option definitions (printed by `make raylib-options`), the runner's
+operating system release, workspace path and the job's compiler and CMake
+versions (`.github/actions/raylib-cache/fingerprint.sh`). The runner image's
+own version is not in the key: it changes about weekly and used to discard
+every cache while the compiler and CMake stayed the same.
 Hashing only the option definitions, not the whole `Makefile`, keeps the caches
 across unrelated Makefile edits. `make` still runs `build_raylib.py` on a
 restored tree, which re-verifies the archive and re-runs CMake; CMake then
@@ -698,7 +768,12 @@ the Emscripten SDK (the setup-emsdk `version` in `build.yml`, `EMSCRIPTEN_VERSIO
 in the Makefile and every version quoted in the docs, grouped into one pull
 request; `make docs-drift` fails if they disagree), Mesa for the `Desktop
 backend` job, the raylib tag and commit in `vendor/raylib/manifest.json`, and
-the vendored tomlc17 release. None of them automerge. Mesa's `MESA_SHA256` is
+the vendored tomlc17 release. None of them automerge, and they are rebased
+only when they conflict with `main` (`rebaseWhen: conflicted`), not each time
+`main` moves. Renovate's own managers cover the rest: the Action pins in the
+workflows and in the composite actions under `.github/actions/`, the Node.js
+version in `.node-version`, and the docs site's npm packages, which arrive as
+one pull request (`docs site dependencies`). Mesa's `MESA_SHA256` is
 the digest of `mesa3d-<version>-release-msvc.7z`; the
 `github-release-attachments` manager replaces it when the version changes, and
 the Desktop backend job still fails closed if the pin and the archive disagree.

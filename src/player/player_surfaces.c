@@ -5,6 +5,7 @@
 #include "player_surfaces.h"
 
 #include "player_internal.h"
+#include "player_jump.h"        /* player_cancel_jump_state */
 #include "../game_constants.h" /* FLOOR_Y, FLOOR_GAP_W */
 #include "../shared/raymath_inline.h" /* Clamp */
 #include "../shared/geometry.h"       /* span_find */
@@ -30,8 +31,9 @@ void player_resolve_floor_collision(Player *player,
                                     const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                                     const int *floor_gaps, int floor_gap_count,
                                     float prev_center_x, float prev_bottom,
-                                    int *out_bounce_idx) {
-    *out_bounce_idx = -1;
+                                    int *out_bounce_list, int *out_bounce_index) {
+    *out_bounce_list = -1;
+    *out_bounce_index = -1;
 
     /*
      * Floor collision — snap to the grass surface.
@@ -87,10 +89,9 @@ void player_resolve_floor_collision(Player *player,
         player->y = ground_snap;   /* snap to floor in all cases */
 
         int bounced = 0;
-        int flat_index = 0;   /* counts pads across all lists, in list order */
         for (int l = 0; l < bouncepad_list_count && !bounced; l++) {
             const BouncepadList *list = &bouncepad_lists[l];
-            for (int i = 0; i < list->count; i++, flat_index++) {
+            for (int i = 0; i < list->count; i++) {
                 const Bouncepad *bp = &list->pads[i];
 
                 /*
@@ -110,7 +111,12 @@ void player_resolve_floor_collision(Player *player,
                  */
                 player->vy        = bp->launch_vy;
                 player->on_ground = 0;
-                *out_bounce_idx   = flat_index;
+                /* The launch is the pad's, not a jump: a press inside the
+                 * coyote window must not swap it for JUMP_VY, and letting
+                 * go of jump must not cut it short. */
+                player_cancel_jump_state(player);
+                *out_bounce_list  = l;   /* which list ... */
+                *out_bounce_index = i;   /* ... and which pad in it */
                 bounced           = 1;
                 break;   /* first pad wins */
             }

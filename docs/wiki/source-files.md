@@ -38,7 +38,9 @@ src/
 │   ├── game_ghost_file.c         Ghost text format and its native file / browser storage
 │   ├── game_inspector.h / .c     Simulation stepping, slow motion, tuning, status panel and F5 key help
 │   ├── game_experiment.h / .c    Bounded capture/export/replay with level fingerprints
-│   ├── game_random.h / .c        Reproducible unsigned PRNG for native/WASM
+│   ├── game_experiment_file.c    Strict decoder for a capture's text (no GameState; fuzzed)
+│   ├── game_movers.h / .c        Table of things drawn between two steps (positions, angles, bridge bricks)
+│   ├── game_random.h / .c        Two reproducible PRNG streams (gameplay, cosmetic) for native/WASM
 │   ├── debug.h / .c              Debug overlay: FPS/frame budget/memory, hitboxes, event log
 │   ├── entity_utils.h / .c       Shared entity helper functions
 │   ├── game_state.h / .c         GameState reset helpers
@@ -84,6 +86,8 @@ src/
 │   ├── editor_layout.h / .c      Editor layout metrics
 │   ├── editor_minimap.h / .c     Level overview strip in the status bar: entities by category, the view's frame, click/drag to scroll
 │   ├── editor_shortcuts.h / .c   The shortcut table: toolbar tooltips and the F1 shortcut list drawn from it
+│   ├── editor_handles.h / .c     Patrol ranges and resize handles on the canvas, and the resize drag
+│   ├── editor_entity_list.h / .c The Entities list (Ctrl+F): every entity by type, with a search field
 │   ├── editor_textures.h / .c    Editor texture loading/cleanup
 │   ├── editor_files.h / .c       Open/save, playtest copies, recent files; saving through a symlink keeps the link
 │   ├── editor_recovery.h / .c    Autosave snapshots and crash recovery (find, offer, load and retire them)
@@ -117,18 +121,9 @@ src/
 │   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
 │   ├── serializer_io.h / .c      UTF-8 path I/O, size-limited whole-file reads, temp-file-then-rename saves, symlink checks
 │   ├── serializer_load.c         `level_load_toml` staged parse orchestration
-│   ├── serializer_load_header.h / .c        TOML header/meta and floor-gap parsing
-│   ├── serializer_load_checkpoints.h / .c   Strict authored checkpoint parsing
-│   ├── serializer_load_geometry.h / .c      Rails and platforms parsing
-│   ├── serializer_load_collectibles.h / .c  Coin, star, last-star, next-phase parsing
-│   ├── serializer_load_enemies.h / .c       Enemy placement parsing
-│   ├── serializer_load_hazards.h / .c       Hazard placement parsing
-│   ├── serializer_load_surfaces.h / .c      Surface placement parsing
-│   ├── serializer_load_climbables.h / .c    Vine, ladder, rope parsing
-│   ├── serializer_load_layers.h / .c        Background/fog/foreground layer parsing
-│   ├── serializer_load_config.h / .c        Optional rule/config parsing
-│   ├── serializer_parse.h / .c  Shared TOML parse utilities
-│   ├── serializer_save.c        TOML save: write_level_toml calls one writer per section family
+│   ├── serializer_load_header.h / .c        The format_version check
+│   ├── serializer_parse.h / .c  Schema table (keys, types, storage, defaults), v1 checks, and the one loader and writer for every key and table of a level
+│   ├── serializer_save.c        TOML save: write_level_toml walks two order lists and calls the schema writer for each name
 │   └── serializer_types.h / .c  Enum/string conversion helpers
 ├── effects/
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
@@ -389,7 +384,7 @@ top to bottom by one loop, with one small function per row above it:
 |-------|------|-----------|-------|
 | `s_level_loaders` | `levels/level_loader.c` | `level_apply` (every row), `level_reset` (the `LOAD_EVERY_LIFE` rows) | `{ load_spiders, LOAD_EVERY_LIFE }` |
 | `s_update_steps` | `core/game_update.c` | `game_update_active`, once per fixed step, after the player has moved | `{ "spiders", update_spiders }` |
-| `s_damage_sources` | `collision/game_collision.c` | `game_collide`, until the first hit | `{ "spider", WORLD_COUNT(spider_count), spider_touches }` |
+| `s_damage_sources` | `collision/game_collision.c` | `game_collide`, until the first hit | `{ "spider", WORLD_COUNT(spider_count), spider_hitbox, NULL }` |
 | `s_render_layers` | `render/game_render.c` | `game_render_frame`, once per frame | `{ 25, "spiders", render_spiders }` |
 
 `core/game_update.c` holds `StepInputs` (the step time, the camera x and what

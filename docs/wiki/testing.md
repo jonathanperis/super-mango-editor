@@ -59,17 +59,29 @@ archive contents, editor inclusion, reserve-asset exclusion and license notices.
 - `gameplay-mechanics-test`
 - `editor-ui-test`
 
-It also runs `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`,
-`tests/coverage_baseline_test.py`, `tests/clang_tidy_report_test.py` and
-`tests/doctor_test.py`. The
-`web-host-contract` prerequisite adds `tools/check_web_boot_contract.py`,
-`tests/web_host_test.cjs`, `tests/profile_storage_test.cjs`,
-`tests/touch_controls_test.cjs`, `tests/keyboard_scope_test.cjs`,
-`tests/audio_unlock_test.cjs`, `tests/web_debug_page_test.py`,
+It also runs the Python tests of the build and docs tools:
+`tests/validate_levels_test.py`, `tests/gen_sounds_test.py`,
+`tests/fuzz_dict_test.py`, `tests/coverage_baseline_test.py`,
+`tests/clang_tidy_report_test.py`, `tests/doctor_test.py`,
+`tests/build_raylib_test.py` (the raylib source unpacking),
+`tests/gen_compile_commands_test.py` (the compile database),
+`tests/roadmap_quality_test.py` and `tests/import_raygui_icons_test.py`, and the
+parser encoding probe `tests/parser_validator_test.py`. (`make validate-levels`
+runs one more, `tests/schema_parity_test.py`, which compares the level schema in
+`tools/validate_levels.py` with the C table that `level-check --dump-schema` prints.) The
+`web-host-contract` prerequisite adds `tools/check_web_boot_contract.py`, six
+Node tests (`tests/boot_test.cjs`, `tests/web_host_test.cjs`,
+`tests/profile_storage_test.cjs`, `tests/touch_controls_test.cjs`,
+`tests/keyboard_scope_test.cjs`, `tests/audio_unlock_test.cjs`) and
+`tests/web_boot_contract_test.py`, `tests/web_shell_test.py`,
+`tests/web_debug_page_test.py`, `tests/wasm_artifacts_test.py`,
 `tests/package_release_test.py` and `tests/filter_codeql_sarif_test.py`. These
-cover static boot wiring, host lifecycle, storage conflicts, touch ownership,
-canvas keyboard scoping, keyboard audio unlock, the derived debug page, native/WASM archive contracts and the CodeQL SARIF
-filter without a browser. Native harnesses cover parser/serializer, validation, runtime, editor,
+cover the shared boot script (`web/boot.js`: one start of `main()`, versioned
+file addresses, a failed download, a lost WebGL context), the rule that neither
+page carries boot logic of its own, host lifecycle, storage conflicts, touch
+ownership, canvas keyboard scoping, keyboard audio unlock, the standalone
+page's shell and derived debug page, the WebAssembly artifact checker,
+native/WASM archive contracts and the CodeQL SARIF filter without a browser. Native harnesses cover parser/serializer, validation, runtime, editor,
 profile, checkpoint, simulation and session behavior. The session, profile and
 mechanics cases include the Continue point (its codec, migration and round trip, and
 refusing a point the level no longer fits), the time-trial ghost (codec, paths,
@@ -96,7 +108,8 @@ level, settings open). It also replays
 `--replay-script` scripts (from a `--replay-dir` under the test output) and
 rejects malformed ones. `editor-ui-test` drives the editor with input events
 (palette picks, place, select, drag, delete, undo, wheel zoom/pan, property
-and config panel clicks, box and Shift selection acting on the group, arrow-key
+and config panel clicks, box and Shift selection acting on the group, resize
+handles and patrol ranges, the Entities list, layer rows moving, arrow-key
 nudges, Ctrl+D, the snap toggle, Alt+click cycling, text-field caret and Tab,
 Up/Down stepping number fields, validation messages that select the problem,
 the Campaign view, Playtest from here, a level dropped on the window, the
@@ -299,7 +312,8 @@ units and owner/borrower contracts still need their existing regression checks.
 - every constant the docs place in a particular `src/` header (written as the constant name, "in", then the header path) is really defined there, and so are the camera constants;
 - every function the docs place in a particular `src/` file (written as `name()`, or a list such as `a()` and `b()`, then "in" or "(" and the file path) is defined or declared in that file;
 - the README's workflow trigger summary matches each workflow's `on:` block, and no page credits the drift check to the Docs workflow (only `build.yml` runs it);
-- the README prerequisites name Node.js (`make test` runs Node tests) with the Node version CI uses;
+- the README prerequisites name Node.js (`make test` runs Node tests) with the Node version CI uses (the `.node-version` file, which every workflow reads);
+- every `tests/*.cjs` and `tests/*_test.py` file is run by a `make` target (or, for `tests/docs_checks_test.py`, by `bun run check-site`), every such file the Makefile names exists, the README and `STATE.md` quote the right number of Node tests, and `STATE.md`, this page and the Build System page name each of them;
 - level, screen and lab counts in `PRODUCT.md`, the README and `.specs/project/` match `docs/src/generated/project.json` and `levels/`;
 - every render layer count ("N render layers", "N-layer order") in the manual, README, `PRODUCT.md` and `.specs/project/` matches the rows of the [render order table](../architecture/#render-order-back-to-front), numbered 1..N;
 - the Emscripten version is the same in the Makefile, `build.yml` and the files the check lists in `EMSCRIPTEN_MENTIONS` (the READMEs, the Build System page, `vendor/raylib/README.md` and `web/keyboard-scope.js`). Dated reports such as `docs/AUDIT_IMPLEMENTATION.md` keep the version they were written against.

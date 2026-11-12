@@ -14,6 +14,18 @@
 #include "level.h"    /* LevelDef */
 
 #define CAMPAIGN_MANIFEST_VERSION 1
+
+/*
+ * CAMPAIGN_MAX_LEVELS — the most levels one campaign may list.  It matches
+ * PROFILE_LEVEL_COUNT (game_profile.h), the number of levels a profile can
+ * hold results for, so every listed level can have a best time.
+ * tools/validate_levels.py applies the same limit.
+ */
+#define CAMPAIGN_MAX_LEVELS 128
+
+/* The largest manifest file read, in bytes (the file plus one NUL): 128
+ * entries of a 255-byte path are about 33 KB with their punctuation. */
+#define CAMPAIGN_MANIFEST_TEXT_MAX (64 * 1024)
 #define CAMPAIGN_MANIFEST_PATH "levels/campaigns/main.toml"
 #define CAMPAIGN_LEVEL_PATH_SIZE 256
 #define CAMPAIGN_DISPLAY_NAME_SIZE 64
@@ -50,6 +62,15 @@ typedef struct {
  * its own entry unavailable.
  */
 int campaign_catalog_load(const char *manifest_path, CampaignCatalog *catalog);
+
+/*
+ * campaign_catalog_load_text — campaign_catalog_load for manifest bytes
+ * already in memory (size of them at text; no NUL needed).  label stands in
+ * for the file name in messages.  The listed level files are still read
+ * from disk.  The fuzz harness and tests use it.
+ */
+int campaign_catalog_load_text(const char *text, size_t size, const char *label,
+                               CampaignCatalog *catalog);
 
 /*
  * campaign_catalog_read — The parse half of campaign_catalog_load: the

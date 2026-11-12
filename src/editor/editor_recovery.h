@@ -38,6 +38,19 @@ typedef enum {
     EDITOR_RECOVERY_DISCARD_ALL = 5 /* delete every copy offered         */
 } EditorRecoveryAction;
 
+/*
+ * How many recovery copies there are to offer: the entries on disk that are
+ * crash leftovers, which leaves out the snapshot of the document open in
+ * this editor right now (autosave keeps that one, and it is not something
+ * to "recover").  The status bar shows this count for as long as it is not
+ * zero, and Ctrl+R lists exactly these.
+ */
+int editor_recovery_offer_count(const EditorState *es);
+
+/* Ctrl+R, and a click on the status bar's recovery count: show the picker
+ * and recover the chosen copy (after asking about unsaved changes). */
+void editor_open_recovery_picker(EditorState *es);
+
 /* Show the native recovery picker (Cancel / Recover / Discard, with
  * "More..." for Discard... / Next when there are several copies, and
  * Discard... asking "this copy or all of them").  Returns the chosen
@@ -86,4 +99,8 @@ int editor_path_is_recovery(const char *path);
  * appends another for the next question (up to four in all). */
 void editor_test_set_recovery_choice(int action);
 void editor_test_queue_recovery_choice(int action);
+/* How many times the recovery folder has been read (editor_discover_recoveries)
+ * since the program started: a test checks that autosave does not re-read
+ * it for a document that is already registered. */
+int editor_test_recovery_folder_scans(void);
 #endif

@@ -55,8 +55,12 @@ static int climb_step(Player *p, unsigned int input,
                       const LadderDecor *ladders, int ladder_count,
                       const RopeDecor *ropes, int rope_count)
 {
-    player_handle_input(p, NULL, input, 0, vines, vine_count,
-                        ladders, ladder_count, ropes, rope_count);
+    const PlayerSurfaces surfaces = {
+        .vines = vines, .vine_count = vine_count,
+        .ladders = ladders, .ladder_count = ladder_count,
+        .ropes = ropes, .rope_count = rope_count,
+    };
+    player_handle_input(p, NULL, input, 0, &surfaces);
     return player_update_climbing(p, GAME_FIXED_STEP, vines, ladders, ropes, TEST_WORLD_W);
 }
 
@@ -243,41 +247,41 @@ int climb_controls_follow_the_input(void)
 {
     int failed = 0;
     const RopeDecor rope = {100.0f, 40.0f, 4};
+    /* The one rope is all there is to grab. */
+    const PlayerSurfaces on_rope = { .ropes = &rope, .rope_count = 1 };
 
     /* No Up: standing in reach does not grab. */
     Player p = player_at(108.0f, 70.0f);
-    player_handle_input(&p, NULL, 0, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, 0, 0, &on_rope);
     CHECK(!p.on_vine);
     /* Up grabs and starts climbing at once. */
-    player_handle_input(&p, NULL, PLAYER_INPUT_UP, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, PLAYER_INPUT_UP, 0, &on_rope);
     CHECK(p.on_vine && p.climb_source == 2 && p.vy == -CLIMB_SPEED && p.vx == 0.0f);
-    player_handle_input(&p, NULL, PLAYER_INPUT_DOWN, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, PLAYER_INPUT_DOWN, 0, &on_rope);
     CHECK(p.vy == CLIMB_SPEED);
-    player_handle_input(&p, NULL, 0, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, 0, 0, &on_rope);
     CHECK(p.on_vine && p.vx == 0.0f && p.vy == 0.0f);
-    player_handle_input(&p, NULL, PLAYER_INPUT_LEFT, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, PLAYER_INPUT_LEFT, 0, &on_rope);
     CHECK(p.vx == -CLIMB_SPEED && p.facing_left);
-    player_handle_input(&p, NULL, 0, PLAYER_INPUT_RIGHT | PLAYER_INPUT_UP,
-                        NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, 0, PLAYER_INPUT_RIGHT | PLAYER_INPUT_UP, &on_rope);
     CHECK(p.vx == CLIMB_SPEED && !p.facing_left && p.vy == -CLIMB_SPEED);
 
     /* Jump lets go with the normal jump impulse. */
-    player_handle_input(&p, NULL, PLAYER_INPUT_JUMP, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, PLAYER_INPUT_JUMP, 0, &on_rope);
     CHECK(!p.on_vine && p.vy == JUMP_VY && p.jump_held);
 
     /* Up together with Jump does not grab. */
     p = player_at(108.0f, 70.0f);
-    player_handle_input(&p, NULL, PLAYER_INPUT_UP | PLAYER_INPUT_JUMP, 0,
-                        NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, PLAYER_INPUT_UP | PLAYER_INPUT_JUMP, 0, &on_rope);
     CHECK(!p.on_vine);
 
     /* Just hit: no grab during the lock, a grab once it has passed. */
     p = player_at(108.0f, 70.0f);
     p.hurt_timer = PLAYER_HURT_TIME;
-    player_handle_input(&p, NULL, PLAYER_INPUT_UP, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, PLAYER_INPUT_UP, 0, &on_rope);
     CHECK(!p.on_vine);
     p.hurt_timer = PLAYER_HURT_TIME - PLAYER_KNOCKBACK_GRAB_LOCK - 0.01f;
-    player_handle_input(&p, NULL, PLAYER_INPUT_UP, 0, NULL, 0, NULL, 0, &rope, 1);
+    player_handle_input(&p, NULL, PLAYER_INPUT_UP, 0, &on_rope);
     CHECK(p.on_vine);
 done:
     return failed;

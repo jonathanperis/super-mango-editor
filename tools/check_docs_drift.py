@@ -110,6 +110,11 @@ def check_source_file_map() -> None:
         if path.suffix not in {".c", ".h"}:
             continue
         rel = path.relative_to(ROOT).as_posix()
+        # .gitignore lists src/levels/exported/*.c and *.h: files an old
+        # export workflow may have left in a checkout. They are not part of
+        # the tree and no target builds them, so the map need not name them.
+        if rel.startswith("src/levels/exported/"):
+            continue
         stem = path.stem
         # The docs often group headers and sources as `name.h / .c`; accepting
         # the stem keeps the check semantic without forcing verbose duplicate rows.
@@ -164,15 +169,25 @@ def check_runtime_error_docs() -> None:
 
 
 def check_collectible_source_guards() -> None:
-    parser = read(ROOT / "src" / "shared" / "serializer_load_collectibles.c")
-    required_pairs = {
-        "star_greens": "MAX_STAR_GREENS",
-        "star_reds": "MAX_STAR_REDS",
+    """Each star colour is loaded into its own array with its own limit.
+
+    The serializer's schema table names the LevelDef array and count a TOML
+    array is loaded into (ROOT_TABLES(key, fields, array, count)); the limit
+    is then that array's length. A row pointing "star_reds" at the yellow
+    array would compile and silently load into the wrong place.
+    """
+    parser = read(ROOT / "src" / "shared" / "serializer_parse.c")
+    required_rows = {
+        "star_greens": ("star_greens", "star_green_count"),
+        "star_reds": ("star_reds", "star_red_count"),
     }
-    for toml_key, max_token in required_pairs.items():
-        pattern = rf'LOAD_XY_ARRAY\("{toml_key}",\s*[^,]+,\s*{max_token},'
+    for toml_key, (array, count) in required_rows.items():
+        pattern = rf'ROOT_TABLES\("{toml_key}",\s*XY_FIELDS,\s*{array},\s*{count}\)'
         if not re.search(pattern, parser, re.S):
-            fail(f"src/shared/serializer_load_collectibles.c: `{toml_key}` must use `{max_token}`")
+            fail(
+                f"src/shared/serializer_parse.c: `{toml_key}` must load into "
+                f"`{array}` / `{count}`"
+            )
 
 
 def check_layer_snippets() -> None:
@@ -382,6 +397,23 @@ def check_developer_context_docs() -> None:
             fail(f"{rel}: missing current project context token `{token}`")
 
 
+def check_test_count_mentions() -> None:
+    """The two other pages that say how many programs `make test` builds.
+
+    build-system.md, developer-guide.md and README.md are checked above;
+    the testing page and the project state file state the same number in
+    their own words, and used to be left behind when a program was added.
+    """
+    expected_count = len(makefile_test_targets())
+    mentions = [
+        (ROOT / "docs" / "wiki" / "testing.md", f"Builds and runs {expected_count} native regression binaries"),
+        (ROOT / ".specs" / "project" / "STATE.md", f"`make test` runs {expected_count} native binaries"),
+    ]
+    for path, phrase in mentions:
+        if phrase not in read(path):
+            fail(f"{path.relative_to(ROOT)}: stale make test count; expected \"{phrase}\"")
+
+
 def check_public_readme_docs() -> None:
     expected_count = len(makefile_test_targets())
     readme = read(ROOT / "README.md")
@@ -442,6 +474,71 @@ def check_native_test_counts() -> None:
             if int(count) != len(targets):
                 fail(f"Makefile:{line_no}: says {count}-regression-binary; "
                      f"TEST_TARGETS has {len(targets)}")
+
+
+# Script tests that no make target runs, with the file whose command does.
+SCRIPT_TESTS_RUN_ELSEWHERE = {
+    "tests/docs_checks_test.py": ("docs/package.json", "../tests/docs_checks_test.py"),
+}
+# "four JavaScript host-contract tests", "six Node tests", "6 Node tests".
+NODE_COUNT_RE = re.compile(
+    rf"\b(\d+|{SCREEN_WORD_PATTERN}) (?:Node|JavaScript)(?:\.js)?(?: host-contract)? tests\b", re.I)
+# Pages that list the script tests one by one.
+SCRIPT_TEST_LISTS = ["docs/wiki/testing.md", "docs/wiki/build-system.md"]
+
+
+def makefile_script_tests() -> tuple[list[str], list[str]]:
+    """(Node tests, Python tests) the Makefile names, as tests/<file> paths."""
+    makefile = read(ROOT / "Makefile")
+    node = sorted(set(re.findall(r"\btests/[\w-]+\.cjs\b", makefile)))
+    python = sorted(set(re.findall(r"\btests/[\w-]+_test\.py\b", makefile)))
+    return node, python
+
+
+def check_script_test_counts() -> None:
+    """The Node and Python tests on disk, in the Makefile and in the docs are one list.
+
+    The README once said "four" Node tests while the Makefile ran five, and
+    STATE.md listed half of the Python tests. Three things are compared:
+    the files in tests/, the paths the Makefile runs, and what the docs say.
+    """
+    node, python = makefile_script_tests()
+    wired = set(node) | set(python)
+    on_disk = {path.relative_to(ROOT).as_posix()
+               for pattern in ("*.cjs", "*_test.py") for path in (ROOT / "tests").glob(pattern)}
+    for rel in sorted(on_disk - wired):
+        elsewhere = SCRIPT_TESTS_RUN_ELSEWHERE.get(rel)
+        if elsewhere and elsewhere[1] in read(ROOT / elsewhere[0]):
+            continue
+        fail(f"{rel}: no make target runs this test; add it to PYTHON_TESTS, WEB_PYTHON_TESTS "
+             "or NODE_TESTS in the Makefile")
+    for rel in sorted(wired - on_disk):
+        fail(f"Makefile: runs {rel}, which does not exist")
+
+    for page in doc_pages() + SPEC_PAGES:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for token in NODE_COUNT_RE.findall(line):
+                count = parse_screen_count_token(token)
+                if count is not None and count != len(node):
+                    fail(f"{page_label(page, line_no)}: says {token} Node tests; "
+                         f"the Makefile runs {len(node)} (tests/*.cjs)")
+    readme = read(ROOT / "README.md")
+    if not re.search(r"its \w+ JavaScript host-contract tests", readme):
+        fail("README.md: the Prerequisites must say how many JavaScript host-contract tests `make test` runs")
+
+    state_path = ROOT / ".specs" / "project" / "STATE.md"
+    tests_line = next((line for line in read(state_path).splitlines() if line.startswith("- Tests:")), "")
+    if not NODE_COUNT_RE.search(tests_line):
+        fail(".specs/project/STATE.md: the `- Tests:` line must say how many Node tests run")
+    listed_everywhere = sorted(wired | (on_disk & set(SCRIPT_TESTS_RUN_ELSEWHERE)))
+    for rel in listed_everywhere:
+        if f"`{rel}`" not in tests_line:
+            fail(f".specs/project/STATE.md: the `- Tests:` line does not list `{rel}`")
+    for page in SCRIPT_TEST_LISTS:
+        text = read(ROOT / page)
+        for rel in listed_everywhere:
+            if f"`{rel}`" not in text:
+                fail(f"{page}: does not list `{rel}`, which the Makefile runs")
 
 
 # "`NAME` in `src/file.h`" names the file that defines NAME. When a constant
@@ -633,10 +730,26 @@ def check_readme_prerequisites() -> None:
     # The opening paragraph is the build/test list; a later docs-site note does not count.
     if "Node.js" not in section.strip().split("\n\n", 1)[0]:
         fail("README.md: the Prerequisites list must name Node.js; `make test` runs the Node host-contract tests")
-    ci_node = re.search(r"node-version: '([\d.]+)'", read(ROOT / ".github" / "workflows" / "build.yml"))
-    for version in re.findall(r"CI uses ([\d.]+)", section):
-        if ci_node and version != ci_node.group(1):
-            fail(f"README.md: Prerequisites say CI uses Node.js {version}; build.yml uses {ci_node.group(1)}")
+    # CI's Node.js version is one line in .node-version; every workflow reads
+    # that file, so no workflow may carry a number of its own.
+    pin_path = ROOT / ".node-version"
+    ci_node = read(pin_path).strip() if pin_path.is_file() else ""
+    if not re.fullmatch(r"\d+\.\d+\.\d+", ci_node):
+        fail(".node-version: must hold the Node.js version CI uses, as MAJOR.MINOR.PATCH")
+        return
+    quoted = re.findall(r"CI uses ([\d.]+)", section)
+    if not quoted:
+        fail("README.md: the Prerequisites must say which Node.js version CI uses")
+    for version in quoted:
+        if version != ci_node:
+            fail(f"README.md: Prerequisites say CI uses Node.js {version}; .node-version says {ci_node}")
+    for workflow in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        text = read(workflow)
+        if re.search(r"^\s*node-version:", text, re.M):
+            fail(f".github/workflows/{workflow.name}: use `node-version-file: .node-version`, "
+                 "not a version written in the workflow")
+        if text.count("actions/setup-node@") != text.count("node-version-file: .node-version"):
+            fail(f".github/workflows/{workflow.name}: every actions/setup-node step must read .node-version")
 
 
 # "33 render layers", "33-layer render order", "the full 33-layer order", "these 33 layers".
@@ -1257,11 +1370,13 @@ def main() -> int:
     check_level_prose_counts()
     check_developer_context_docs()
     check_public_readme_docs()
+    check_test_count_mentions()
     check_wasm_authority_docs()
     check_release_version()
     check_emscripten_pins()
     check_mesa_pin()
     check_native_test_counts()
+    check_script_test_counts()
     check_state_stack_claims()
     check_frontend_versions()
     check_constant_locations()

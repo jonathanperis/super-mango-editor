@@ -647,15 +647,43 @@ static int asset_dropdowns_offer_every_asset_file(void)
     CHECK(strcmp(editor_asset_unlisted_name("plain.png"), "plain.png") == 0);
     CHECK(strcmp(editor_asset_unlisted_name(""), "---") == 0);
 
-    /* The canvas has a texture for every platform tile it offers. */
+    /* The canvas shows a platform with the image its tile_path names:
+     * every tile the dropdown offers, and equally one it does not list
+     * (any valid sprite). Each is loaded once and reused; a file that does
+     * not load, and "" (the default), draw the default grass. */
     {
         EditorState es;
         CHECK(open_editor(&es, NULL) == 0);
-        int loaded = es.textures.platform && es.textures.platform_stone &&
-                     es.textures.platform_leaf && es.textures.platform_brick &&
-                     es.textures.platform_grass_rock;
+        Texture2D *grass = es.textures.platform;
+        int offered = grass != NULL && plat->count == 6;
+        for (int i = 0; i < plat->count && offered; i++) {
+            Texture2D *tile = editor_platform_tile_texture(&es, plat->paths[i]);
+            if (!tile || (plat->paths[i][0] != '\0' && tile == grass)) offered = 0;
+        }
+        int cached = es.tile_cache_count;
+        const char *unlisted = "assets/sprites/levels/cloud_tileset.png";
+        Texture2D *custom = editor_platform_tile_texture(&es, unlisted);
+        int custom_ok = custom != NULL && custom != grass &&
+                        editor_platform_tile_texture(&es, unlisted) == custom &&
+                        es.tile_cache_count == cached + 1;
+        int missing_ok =
+            editor_platform_tile_texture(&es, "assets/sprites/levels/no_such_tile.png") == grass &&
+            editor_platform_tile_texture(&es, "assets/sprites/levels/no_such_tile.png") == grass &&
+            es.tile_cache_count == cached + 2 &&
+            editor_platform_tile_texture(&es, "") == grass;
+        /* More files than slots: the cache stays its size and still answers. */
+        char name[64];
+        for (int i = 0; i < EDITOR_TILE_CACHE_SIZE + 3; i++) {
+            snprintf(name, sizeof(name), "assets/sprites/levels/overflow_%d.png", i);
+            (void)editor_platform_tile_texture(&es, name);
+        }
+        int bounded = es.tile_cache_count == EDITOR_TILE_CACHE_SIZE &&
+                      editor_platform_tile_texture(&es, plat->paths[1]) != NULL;
         close_editor(&es);
-        CHECK(loaded && plat->count == 6);
+        CHECK(offered);
+        CHECK(custom_ok);
+        CHECK(missing_ok);
+        CHECK(bounded);
     }
 done:
     return failed;
@@ -1056,6 +1084,56 @@ static int place_drag_paints_a_row(void)
     ui_frame(&es, 100, 300);
     CHECK(es.level.coin_count <= 2);
     key_frame(&es, KEY_Z, INPUT_CTRL);
+
+    /* A single click reserved room for a whole row; once the stroke ends
+     * its step keeps only the one entry it used, inside the step itself. */
+    es.palette_type = ENT_COIN;
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 200, 300);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 200, 300);
+    ui_frame(&es, 200, 300);
+    CHECK(es.level.coin_count == 1 && es.undo->top > 0);
+    CHECK(es.undo->steps[es.undo->top - 1].many == NULL);
+    CHECK(es.undo->steps[es.undo->top - 1].count == 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);     /* redo still works */
+    CHECK(es.level.coin_count == 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    /* A longer row keeps exactly as many entries as it placed. */
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 100, 300);
+    for (int x = 110; x <= 260; x += 10) push_event(INPUT_MOUSE_MOVE, 0, 0, x, 300);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 260, 300);
+    ui_frame(&es, 260, 300);
+    CHECK(es.level.coin_count > 1);
+    CHECK(es.undo->steps[es.undo->top - 1].capacity == es.level.coin_count);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 0);
+
+    /* While a row is being painted (button still down), a right-click
+     * deletes nothing, F1 does not open the sheet and a dropped file is
+     * not opened: each would act inside the row's open undo step. */
+    {
+        int steps_before = es.undo->top;
+        push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 100, 300);
+        push_event(INPUT_MOUSE_MOVE, 0, 0, 140, 300);
+        push_event(INPUT_MOUSE_MOVE, 0, 0, 180, 300);
+        ui_frame(&es, 180, 300);
+        CHECK(es.painting);
+        int coins = es.level.coin_count;
+        CHECK(coins >= 2);
+        push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_RIGHT, 0, 100, 300);   /* on the first coin */
+        push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_RIGHT, 0, 100, 300);
+        push_key(KEY_F1, 0);
+        ui_frame(&es, 180, 300);
+        CHECK(es.painting && es.level.coin_count == coins);
+        CHECK(!es.shortcut_sheet_open);
+        push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 180, 300);
+        ui_frame(&es, 180, 300);
+        CHECK(!es.painting && es.undo->top == steps_before + 1);
+        /* One undo takes the whole row, and only the row, away. */
+        key_frame(&es, KEY_Z, INPUT_CTRL);
+        CHECK(es.level.coin_count == 0 && es.undo->top == steps_before);
+    }
 
     es.palette_type = ENT_PLAYER_SPAWN;
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, 100, 300);

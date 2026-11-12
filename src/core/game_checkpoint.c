@@ -4,6 +4,8 @@
 
 #include "game_checkpoint.h"
 
+#include <math.h>   /* fmodf */
+
 #include "../levels/level.h"
 #include "../hazards/spike.h"          /* SpikeRow, SPIKE_TILE_W */
 #include "../hazards/spike_platform.h" /* SpikePlatform */
@@ -180,6 +182,28 @@ static float legacy_safe_respawn_x(const GameState *gs, float boundary_x)
         if (legacy_respawn_column_is_safe(gs, x)) return x;
     }
     return -1.0f;
+}
+
+/*
+ * game_checkpoint_automatic_point_valid — Could the game itself have saved
+ * respawn x after entering automatic screen `screen`?
+ *
+ * legacy_safe_respawn_x only ever returns a column that
+ *   - is safe to stand in (legacy_respawn_column_is_safe),
+ *   - lies a whole number of LEGACY_CHECKPOINT_STEPs to the left of a
+ *     screen boundary, and GAME_W is itself a multiple of the step, so the
+ *     column is a multiple of the step, and
+ *   - is at or before the boundary of the furthest screen entered.
+ * A Continue point read from a profile must meet the same three rules, or
+ * it was not written by the game: a hand-edited one could otherwise drop
+ * the player over a floor gap or inside a spike row.
+ */
+int game_checkpoint_automatic_point_valid(const GameState *gs, float x, int screen)
+{
+    if (!gs || screen < 1 || screen >= gs->world.runtime.world_w / GAME_W) return 0;
+    if (x < 0.0f || x > (float)(screen * GAME_W)) return 0;
+    if (fmodf(x, LEGACY_CHECKPOINT_STEP) != 0.0f) return 0;
+    return legacy_respawn_column_is_safe(gs, x);
 }
 
 void game_checkpoint_update(GameState *gs)

@@ -194,7 +194,7 @@ count = 4       # number of tiles
 
 **File:** `src/hazards/spike_block.c` / `spike_block.h`  
 **Sprite:** `assets/sprites/hazards/spike_block.png`  
-**Behaviour:** A rotating hazard (24×24 px, 360°/s spin) that travels along a `Rail` path. References a rail by index and can be given an initial offset and speed; 1.5 (slow), 3.0 (normal) and 6.0 (fast) tiles/s cover the useful pacing, and any speed must be above 0 and at most `MAX_RAIL_SPEED` (30). On a closed loop it circulates; on an open rail it bounces at a capped end. On an open rail without an end cap it waits at the start until the camera reaches it, then flies off the far end and falls. The player is pushed on contact.
+**Behaviour:** A rotating hazard (24×24 px, 360°/s spin) that travels along a `Rail` path. References a rail by index and can be given an initial offset and speed; 1.5 (slow), 3.0 (normal) and 6.0 (fast) tiles/s cover the useful pacing, and any speed must be above 0 and at most `MAX_RAIL_SPEED` (30). On a closed loop it circulates; on an open rail it bounces at a capped end. On an open rail without an end cap it waits at the start until the player is close enough for the camera to show it (measured from the player's position, so the Reduced motion setting does not change when it starts), then flies off the far end and falls. The player is pushed on contact.
 
 ```toml
 [[spike_blocks]]

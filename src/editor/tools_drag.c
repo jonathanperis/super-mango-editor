@@ -21,6 +21,7 @@
                                    FLOOR_GAP_W; MAX_* via level.h           */
 #include "../surfaces/rail.h" /* MAX_RAIL_SPEED                            */
 #include "tools_internal.h"
+#include "editor_handles.h" /* resize handles: editor_resize_begin and friends */
 
 /* The errors the level had when the current drag began (one drag at a
  * time): every step and the drop are measured against them. */
@@ -149,6 +150,12 @@ static void start_box(EditorState *es, float world_x, float world_y, int additiv
  *   press on another entity    select it alone and arm a drag of it;
  *                              Alt or a repeat click picks the one below
  *   press on empty space       clear the selection and start a box
+ *
+ * Before any of that, a plain press (no Shift, no Alt) on a resize handle
+ * of the one selected entity starts a resize instead (editor_handles.c).
+ * Shift and Alt presses keep their selection meaning even on a handle, so
+ * an entity lying under one can still be added to the selection or
+ * reached by cycling.
  */
 static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
 {
@@ -160,6 +167,8 @@ static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
 
     es->dragging = 0;
     es->box_selecting = 0;
+
+    if (!shift && !alt && editor_resize_begin(es, world_x, world_y)) return;
 
     if (shift && !alt) {
         es->last_click_valid = 0;
@@ -219,8 +228,10 @@ void delete_at(EditorState *es, float world_x, float world_y)
 void tools_mouse_down(EditorState *es, float world_x, float world_y)
 {
     if (!es) return;
-    /* A row still open (its release never came) ends before a new press. */
+    /* A row still open (its release never came) ends before a new press,
+     * and so does a resize: what it changed is recorded, not left behind. */
     tools_end_paint(es);
+    editor_resize_finish(es);
     if (!tools_can_hit_test(es)) return;
     editor_selection_reconcile(es);
 
@@ -334,6 +345,10 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         finish_box(es);
         return;
     }
+    if (es->resizing) {
+        editor_resize_finish(es);
+        return;
+    }
     if (!es->dragging) return;
     es->dragging = 0;
     if (!drag_targets_exist(es)) return;
@@ -418,6 +433,10 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
         es->box_y1 = world_y;
         return;
     }
+    if (es->resizing) {
+        editor_resize_drag(es, world_x, world_y);
+        return;
+    }
     if (!es->dragging || !drag_targets_exist(es)) return;
 
     /* Ignore small wobbles until the cursor leaves the click threshold.
@@ -466,6 +485,10 @@ void tools_cancel_drag(EditorState *es)
     if (!es) return;
     if (es->box_selecting) {
         es->box_selecting = 0;
+        return;
+    }
+    if (es->resizing) {
+        editor_resize_cancel(es);
         return;
     }
     if (!es->dragging) return;

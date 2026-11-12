@@ -36,6 +36,28 @@ static float game_camera_target(const GameState *gs)
     return cam_target;
 }
 
+/*
+ * game_camera_reveal_right — The furthest right the camera could be showing
+ * for where the player stands now, as a world x.
+ *
+ * It is the right edge of a view centred on the player and pushed ahead by
+ * the level's whole lookahead. The real camera eases toward a target at or
+ * behind that, so it never shows more than this while the player moves
+ * right, and it only moves left once they turn back.
+ *
+ * Things that wait to be revealed (spike blocks on open rails) ask this
+ * instead of the camera, because the camera depends on the Reduced motion
+ * setting and a setting must not change what happens in the level: two
+ * runs with the same input have to stay step-for-step identical.
+ */
+int game_camera_reveal_right(const GameState *gs)
+{
+    const LevelDef *cam_def = (const LevelDef *)gs->world.runtime.current_level;
+    float left = (gs->world.player.x + gs->world.player.w * 0.5f) - (GAME_W * 0.5f);
+    if (left < 0.0f) left = 0.0f;   /* the view stops at the world's left edge */
+    return (int)(left + level_camera_lookahead_max(cam_def)) + GAME_W;
+}
+
 int game_camera_update(GameState *gs, float dt)
 {
     float cam_target = game_camera_target(gs);

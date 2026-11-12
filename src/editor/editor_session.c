@@ -486,6 +486,37 @@ EditorExternalChoice editor_confirm_external_change(EditorState *es)
     return EDITOR_EXTERNAL_CANCEL;
 }
 
+EditorExternalChoice editor_confirm_recovered_save(EditorState *es)
+{
+    const char *buttons[] = {"Cancel", "Replace", "Save As"};
+    char message[EDITOR_PATH_MAX + 160];
+    char shown[96];
+    int button_id = 0;
+
+    if (!es) return EDITOR_EXTERNAL_CANCEL;
+    /* The same scripted answer as the external-change prompt: a test (or
+     * a caller) that says Replace means Replace for either question. */
+    if (editor_test_external_choice != (EditorExternalChoice)-1) { /* NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange) */
+        EditorExternalChoice result = editor_test_external_choice;
+        editor_test_external_choice = (EditorExternalChoice)-1; /* NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange) */
+        return result;
+    }
+    editor_path_for_display(es->file_path, shown, sizeof(shown));
+    snprintf(message, sizeof(message),
+             "This is a recovered copy of %s.\n\n"
+             "Replace that file with the recovered copy, save the copy as another "
+             "file, or cancel.", shown);
+    /* Save As is the default: it never overwrites the original. */
+    if (dialog_choice("Save Recovered Copy", message, buttons, 3, 2, 0, &button_id) != 0) {
+        editor_set_status(es, "Save cancelled: confirmation failed");
+        return EDITOR_EXTERNAL_CANCEL;
+    }
+    if (button_id == 1) return EDITOR_EXTERNAL_REPLACE;
+    if (button_id == 2) return EDITOR_EXTERNAL_SAVE_AS;
+    editor_set_status(es, "Save cancelled: recovered copy not saved");
+    return EDITOR_EXTERNAL_CANCEL;
+}
+
 int editor_frame_rate_for(int hidden, int focused, int idle)
 {
     if (hidden) return 0;

@@ -131,12 +131,20 @@ unsigned int game_input_sample(GameState *gs)
     keyboard_held = (current.keyboard_mask & gs->screen.input_release_keyboard_mask) != 0;
     controller_held = (current.controller_mask & gs->screen.input_release_controller_mask) != 0;
 
-    if (keyboard_held || controller_held) return 0;
-
-    gs->screen.input_release_keyboard_mask = 0;
-    gs->screen.input_release_controller_mask = 0;
-    gs->screen.input_release_latched = 0;
-    return current.keyboard_mask | current.controller_mask;
+    /*
+     * Each device opens its own gate. The keyboard is heard again once the
+     * keys held across the screen change are up, and the controller once
+     * its buttons and stick are back to rest.
+     *
+     * One shared gate would let a controller silence the keyboard: a worn
+     * stick that rests past the dead zone never "releases", so a player
+     * using the keyboard with that pad plugged in could not move at all.
+     */
+    if (!keyboard_held) gs->screen.input_release_keyboard_mask = 0;
+    if (!controller_held) gs->screen.input_release_controller_mask = 0;
+    gs->screen.input_release_latched = keyboard_held || controller_held;
+    return (keyboard_held ? 0u : current.keyboard_mask) |
+           (controller_held ? 0u : current.controller_mask);
 }
 
 void game_input_clear_controller_latch(GameState *gs)

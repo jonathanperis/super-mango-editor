@@ -83,6 +83,17 @@ int properties_focus_config(EditorState *es, const LevelIssueLocation *where);
 void properties_focus_entity_field(EditorState *es, EntityType type, int index,
                                    const char *field);
 
+/*
+ * Where a layer row's three small buttons sit, in pixels from the panel's
+ * left edge: move up, move down, remove (config_layer_row in
+ * properties_config.c).  They fill the space between the speed field and
+ * the panel's scrollbar.  Tests click them by these offsets.
+ */
+#define CONFIG_LAYER_BUTTON_W  16
+#define CONFIG_LAYER_UP_X      328
+#define CONFIG_LAYER_DOWN_X    345
+#define CONFIG_LAYER_REMOVE_X  362
+
 /* Level Config foldout state shared with layout measurement. */
 extern int g_plx_open;
 extern int g_fg_open;

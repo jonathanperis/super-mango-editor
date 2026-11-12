@@ -1,0 +1,6 @@
+# A version-3 capture: refused with "record it again".
+format_version = 3
+level_path = "levels/00_sandbox_01.toml"
+seed = 1
+level_hash = "0123456789abcdef"
+frames = [[0, 800, 100, 250, 750, 600, 550, 100, 350, 180]]

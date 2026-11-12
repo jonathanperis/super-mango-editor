@@ -15,7 +15,11 @@
  *
  * C11 allows the same typedef to appear more than once, so game.h repeats
  * this line when it defines the struct.
+ *
+ * GameWorld (the level being played, one of GameState's parts) is named
+ * here the same way, for headers that take a const GameWorld *.
  */
 #pragma once
 
 typedef struct GameState GameState;
+typedef struct GameWorld GameWorld;

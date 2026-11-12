@@ -199,7 +199,19 @@ int delete_entity(EditorState *es, EntityType type, int index)
     cmd.entity_type  = (int)type;
     cmd.entity_index = index;
     cmd.before       = before;
-    undo_push(es->undo, &cmd);
+    if (!undo_push(es->undo, &cmd)) {
+        /* No room to record the delete (out of memory, or an open undo
+         * group that is already full). An edit that cannot be undone
+         * would shift every later index in the history, so put the entity
+         * back and refuse instead. */
+        if (editor_entity_type_is_singleton(type))
+            (void)editor_entity_write(level, type, 0, &before);
+        else
+            (void)editor_entity_insert(level, type, index, &before);
+        editor_set_status(es, "Cannot delete %s: no room in the undo history",
+                          editor_entity_type_name(type));
+        return -1;
+    }
 
     editor_selection_after_remove(es, type, index);
     editor_refresh_dirty(es);

@@ -263,6 +263,21 @@ static void session_apply_window(const GameSettings *s)
 }
 #endif
 
+/*
+ * session_in_active_play — Is the player moving through a level right now?
+ *
+ * True while a game is open and nothing has stopped it: no pause (the
+ * player's, a lost focus, the settings panel), no completion summary, no
+ * game over. Those are the moments a hitch would be felt.
+ */
+static int session_in_active_play(const AppSession *session)
+{
+    const GameState *game = session->game;
+    return session->screen == APP_SCREEN_GAME && game &&
+           !game->screen.paused && !game->screen.pause_reasons &&
+           !game->screen.completion.complete && !game->screen.game_over;
+}
+
 static void session_apply_preferences(AppSession *session)
 {
     /* Settings edit a profile in memory. Apply a changed revision after the
@@ -288,6 +303,22 @@ static void session_apply_preferences(AppSession *session)
         else music_resume();
         session->settings_were_open = session->settings.open;
     }
+#ifndef __EMSCRIPTEN__
+    /*
+     * A native save is done right here, on the frame's own thread: encode,
+     * lock file, temporary file, fsync, read back, rename. On a slow disk
+     * (or under a virus scanner) that takes long enough to see, and a
+     * Continue point recorded at a checkpoint would put that pause in the
+     * middle of a jump. So that one write waits for the next moment the
+     * game is not being played: a pause, the end of the level, leaving it,
+     * or the exit, which always saves a dirty profile. Until then the
+     * point is in memory; only a crash before that moment loses it, and
+     * then the previous point is still on disk. The browser's save is
+     * asynchronous and has no such cost, so it is not held back.
+     */
+    if (session->resume_save_deferred && session_in_active_play(session)) return;
+    session->resume_save_deferred = 0;
+#endif
     /* A failed save is visible to the user. Retry only after another edit,
      * not every frame; a pending browser save retains its own snapshot. */
     if (!session->settings.open && !session->profile.pending_text && session->profile.dirty &&
@@ -357,6 +388,11 @@ static void session_track_resume(AppSession *session, const GameState *game, int
     if (game_profile_set_resume(profile, &resume))
         TraceLog(LOG_WARNING, "Profile: Continue point for %s was out of range and not saved",
                  game->screen.profile_level_key);
+    /* Recorded only because the respawn point moved (a checkpoint crossed
+     * in mid-play): its write to disk waits for a quiet moment, see
+     * session_apply_preferences. A pause or leaving is such a moment. */
+    else if (!leaving && !pause_began)
+        session->resume_save_deferred = 1;
 }
 
 /*
@@ -690,6 +726,12 @@ static void session_open_next_level(AppSession *session, GameState *game)
  * new one loads, so the WebAssembly heap reuses its blocks instead
  * of growing on every Replay; the files it released wait in the
  * cache, idle, and the new game acquires every one of them again.
+ *
+ * That order means a level that no longer loads (its file was edited or
+ * removed while the game was open) leaves no game to return to. The
+ * session then opens the menu with the reason, as a failed Play does,
+ * instead of ending the whole program. Only when the menu cannot open
+ * either is there nothing left to show, and the session ends.
  */
 static void session_replay_game(AppSession *session, GameState *game)
 {
@@ -701,8 +743,14 @@ static void session_replay_game(AppSession *session, GameState *game)
     copy_path(path, sizeof(path), game->world.level_path);
     game_input_read_physical(game->screen.controller, &inherited);
     session_close_game(session);
-    if (session_open_game(session, path, &inherited)) session_end(session, 1);
-    else session->route = APP_ROUTE_NONE;
+    if (session_open_game(session, path, &inherited)) {
+        if (session_open_menu(session)) {
+            session_end(session, 1);
+            return;
+        }
+        session_show_load_failure(session, path);
+    }
+    session->route = APP_ROUTE_NONE;
 }
 
 /*

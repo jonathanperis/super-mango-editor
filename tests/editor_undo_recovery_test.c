@@ -32,7 +32,9 @@
 #include <direct.h>     /* _mkdir, _rmdir */
 #include <process.h>    /* _getpid */
 #else
-#include <sys/stat.h>   /* mkdir */
+#include <sys/stat.h>   /* mkdir, utimensat: age a file */
+#include <fcntl.h>      /* AT_FDCWD */
+#include <time.h>       /* time */
 #include <sys/wait.h>   /* waitpid */
 #include <unistd.h>     /* fork, pipe, read, getpid, rmdir */
 #endif
@@ -979,7 +981,220 @@ done:
     close_document(&es);
     return failed;
 }
+
+/* Make a file look last written `seconds` ago. The sweep leaves anything
+ * younger than five minutes alone: it may be half of a pair being written. */
+static int age_file(const char *path, long seconds)
+{
+    /* utimensat sets a file's access and modification times; AT_FDCWD
+     * means "path is relative to the working folder, as usual". */
+    struct timespec times[2];
+    times[0].tv_sec = time(NULL) - seconds;
+    times[0].tv_nsec = 0;
+    times[1] = times[0];
+    return utimensat(AT_FDCWD, path, times, 0);
+}
+
+static int write_file(const char *path, const char *text)
+{
+    FILE *fp = fopen(path, "w");
+    if (!fp) return -1;
+    fputs(text, fp);
+    return fclose(fp);
+}
+
+/* The process id of a child that has already exited: a pid nobody runs. */
+static pid_t finished_process_id(void)
+{
+    pid_t child = fork();
+    if (child == 0) _exit(0);
+    if (child > 0) waitpid(child, NULL, 0);
+    return child;
+}
+
+/*
+ * The start-up sweep tidies what a crash can leave in the private folder:
+ * a .meta whose snapshot is gone, a playtest snapshot of an editor that no
+ * longer runs, and a snapshot whose .meta is damaged, which gets a new
+ * .meta (from the destination written inside the snapshot) and is offered
+ * again instead of being hidden for good. Young files, and files of
+ * editors still running, are left alone.
+ */
+static int recovery_folder_leftovers_are_tidied(void)
+{
+    int failed = 0;
+    static EditorState es;
+    char root[EDITOR_PATH_MAX] = {0};
+    char lonely_meta[EDITOR_PATH_MAX + 64], young_meta[EDITOR_PATH_MAX + 64];
+    char dead_playtest[EDITOR_PATH_MAX + 96], own_playtest[EDITOR_PATH_MAX + 96];
+    char young_playtest[EDITOR_PATH_MAX + 96];
+    char hurt_toml[EDITOR_PATH_MAX + 64], hurt_meta[EDITOR_PATH_MAX + 64];
+    const pid_t dead = finished_process_id();
+
+    CHECK(dead > 0);
+    CHECK(make_preference_root(root, sizeof(root)) == 0);
+    CHECK(open_editor_in(&es, root, "Sweeper", "") == 0);
+
+    /* A .meta with no snapshot: old one goes, young one stays. */
+    snprintf(lonely_meta, sizeof(lonely_meta), "%s/editor_recovery_%016llx.meta", root, 0x7001ull);
+    snprintf(young_meta, sizeof(young_meta), "%s/editor_recovery_%016llx.meta", root, 0x7002ull);
+    CHECK(write_file(lonely_meta, "3\t0000000000007001\t1700000000\t0\t0\t-\n") == 0);
+    CHECK(write_file(young_meta, "3\t0000000000007002\t1700000000\t0\t0\t-\n") == 0);
+    CHECK(age_file(lonely_meta, 600) == 0);
+
+    /* Playtest snapshots: a dead editor's old one goes; a young one of the
+     * same dead editor, and this editor's own, stay. */
+    snprintf(dead_playtest, sizeof(dead_playtest), "%s/editor_playtest_%lu_5_1.toml",
+             root, (unsigned long)dead);
+    snprintf(young_playtest, sizeof(young_playtest), "%s/editor_playtest_%lu_6_2.toml",
+             root, (unsigned long)dead);
+    snprintf(own_playtest, sizeof(own_playtest), "%s/editor_playtest_%lu_7_3.toml",
+             root, (unsigned long)getpid());
+    CHECK(write_file(dead_playtest, "name = \"playtest\"\n") == 0);
+    CHECK(write_file(young_playtest, "name = \"playtest\"\n") == 0);
+    CHECK(write_file(own_playtest, "name = \"playtest\"\n") == 0);
+    CHECK(age_file(dead_playtest, 600) == 0);
+    CHECK(age_file(own_playtest, 600) == 0);
+
+    /* A snapshot whose .meta is damaged: hidden from discovery today. */
+    snprintf(hurt_toml, sizeof(hurt_toml), "%s/editor_recovery_%016llx.toml", root, 0x7003ull);
+    snprintf(hurt_meta, sizeof(hurt_meta), "%s/editor_recovery_%016llx.meta", root, 0x7003ull);
+    CHECK(write_file(hurt_toml, "# super_mango_recovery_path = \"levels/hurt.toml\"\n"
+                                "name = \"hurt\"\n") == 0);
+    CHECK(write_file(hurt_meta, "garbage that is not a metadata line\n") == 0);
+    CHECK(age_file(hurt_toml, 600) == 0);
+    CHECK(editor_discover_recoveries(&es) == 0);
+    CHECK(es.recovery_entry_count == 0);
+
+    CHECK(editor_clean_orphan_recoveries(&es) == 2);   /* the .meta and the playtest */
+    CHECK(!editor_file_exists(lonely_meta));
+    CHECK(editor_file_exists(young_meta));
+    CHECK(!editor_file_exists(dead_playtest));
+    CHECK(editor_file_exists(young_playtest));
+    CHECK(editor_file_exists(own_playtest));
+    CHECK(editor_file_exists(hurt_toml));               /* the work is kept */
+
+    /* ...and offered again, with the destination from inside the file. */
+    CHECK(editor_discover_recoveries(&es) == 0);
+    CHECK(es.recovery_entry_count == 1 && es.recovery_entries[0].id == 0x7003ull);
+    CHECK(strcmp(es.recovery_entries[0].source_path, "levels/hurt.toml") == 0);
+    CHECK(es.recovery_entries[0].owner_pid == 0);
+    CHECK(editor_recovery_offer_count(&es) == 1);
+done:
+    remove(young_meta);
+    remove(young_playtest);
+    remove(own_playtest);
+    remove_preference_root(root, (EditorState *[]){&es}, 1);
+    close_document(&es);
+    return failed;
+}
 #endif
+
+/*
+ * Autosave reads the recovery folder once, when a document's snapshot is
+ * first registered (is there room?), and not again for later autosaves of
+ * the same document: that read opens every .meta in the folder, on the
+ * frame's own thread.
+ */
+static int autosave_reads_the_recovery_folder_once(void)
+{
+    int failed = 0;
+    static EditorState es;
+    char root[EDITOR_PATH_MAX] = {0};
+    CHECK(make_preference_root(root, sizeof(root)) == 0);
+    CHECK(open_editor_in(&es, root, "Autosaved", "") == 0);
+
+    int scans = editor_test_recovery_folder_scans();
+    autosave_now(&es);
+    CHECK(es.recovery_entry_count == 1);
+    CHECK(editor_test_recovery_folder_scans() == scans + 1);
+    const uint64_t first_time = es.recovery_entries[0].timestamp;
+
+    scans = editor_test_recovery_folder_scans();
+    snprintf(es.level.name, sizeof(es.level.name), "%s", "Autosaved again");
+    autosave_now(&es);
+    autosave_now(&es);
+    CHECK(editor_test_recovery_folder_scans() == scans);      /* no re-read */
+    CHECK(es.recovery_entry_count == 1);
+    CHECK(es.recovery_entries[0].timestamp >= first_time);
+
+    /* What is on disk agrees with the list kept in memory. */
+    CHECK(editor_discover_recoveries(&es) == 0);
+    CHECK(es.recovery_entry_count == 1);
+    CHECK(es.recovery_entries[0].id == es.recovery_document_id);
+done:
+    remove_preference_root(root, (EditorState *[]){&es}, 1);
+    close_document(&es);
+    return failed;
+}
+
+/*
+ * The snapshot autosave keeps for the document that is open right now is
+ * not a crash leftover: it is not counted for the status bar, Ctrl+R has
+ * nothing to offer, and "discard all" in the picker cannot reach it. A
+ * copy just recovered becomes that document, owned by this process.
+ */
+static int the_open_documents_own_snapshot_is_not_offered(void)
+{
+    int failed = 0;
+    EditorState *crashed = calloc(1, sizeof(*crashed));
+    EditorState *restarted = calloc(1, sizeof(*restarted));
+    char root[EDITOR_PATH_MAX] = {0};
+    const char *source = TEST_OUT "undo_recovery_own_snapshot.toml";
+    CHECK(crashed && restarted);
+    CHECK(make_preference_root(root, sizeof(root)) == 0);
+
+    CHECK(open_editor_in(restarted, root, "Working", "") == 0);
+    autosave_now(restarted);
+    CHECK(restarted->recovery_entry_count == 1);          /* it is on disk */
+    CHECK(editor_recovery_offer_count(restarted) == 0);   /* but not offered */
+    editor_open_recovery_picker(restarted);
+    CHECK(strcmp(restarted->status_message, "Recovery copy not found") == 0);
+    CHECK(strcmp(restarted->level.name, "Working") == 0);
+    CHECK(editor_choose_recovery(restarted) == -1);
+    CHECK(editor_file_exists(restarted->autosave_path));
+
+    /* Another document's copy appears: one to offer, and discarding
+     * "all" removes that one only. */
+    CHECK(open_editor_in(crashed, root, "Crashed work", source) == 0);
+    autosave_now(crashed);
+    CHECK(editor_discover_recoveries(restarted) == 0);
+    CHECK(restarted->recovery_entry_count == 2);
+    CHECK(editor_recovery_offer_count(restarted) == 1);
+    editor_test_set_recovery_choice(EDITOR_RECOVERY_DISCARD_ALL);
+    CHECK(editor_choose_recovery(restarted) == -1);
+    editor_test_set_recovery_choice(-1);
+    CHECK(strcmp(restarted->status_message, "Discarded 1 recovery copy") == 0);
+    CHECK(!editor_file_exists(crashed->autosave_path));
+    CHECK(editor_file_exists(restarted->autosave_path));  /* the open document's stays */
+    CHECK(restarted->recovery_entry_count == 1);
+
+    /* A recovered copy is taken over at once: this process owns it. */
+    autosave_now(crashed);
+    CHECK(editor_recover_entry_by_id(restarted, crashed->recovery_document_id) == 0);
+    CHECK(restarted->source_state == EDITOR_SOURCE_RECOVERED);
+    CHECK(restarted->recovery_entry_count == 1);
+    CHECK(restarted->recovery_entries[0].owner_pid != 0);
+    CHECK(editor_recovery_offer_count(restarted) == 0);
+
+    /* Saving it: the file it belongs to was never created, so Replace
+     * creates it rather than failing on a missing "source". */
+    remove(source);
+    editor_test_set_external_choice(EDITOR_EXTERNAL_REPLACE);
+    CHECK(editor_save_current_level(restarted) == 0);
+    CHECK(editor_file_exists(source) && !restarted->modified);
+    CHECK(restarted->source_state == EDITOR_SOURCE_EXPECTED_EXISTING);
+done:
+    editor_test_set_recovery_choice(-1);
+    remove(source);
+    if (crashed && restarted)
+        remove_preference_root(root, (EditorState *[]){crashed, restarted}, 2);
+    if (crashed) close_document(crashed);
+    if (restarted) close_document(restarted);
+    free(crashed);
+    free(restarted);
+    return failed;
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -1004,8 +1219,11 @@ int main(void)
         CASE(each_document_gets_its_own_snapshot),
         CASE(a_crashed_editors_copy_is_recovered_by_id),
         CASE(recovery_picker_walks_the_copies),
+        CASE(the_open_documents_own_snapshot_is_not_offered),
+        CASE(autosave_reads_the_recovery_folder_once),
 #ifndef _WIN32
         CASE(another_running_editors_copy_is_not_offered),
+        CASE(recovery_folder_leftovers_are_tidied),
 #endif
 #undef CASE
     };

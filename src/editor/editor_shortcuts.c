@@ -17,6 +17,7 @@ static const EditorShortcut s_shortcuts[EDITOR_SHORTCUT_COUNT] = {
     [EDITOR_SHORTCUT_DELETE]        = {"Delete / Backspace", "Delete the selection (Backspace once the canvas has the focus)", NULL, NULL},
     [EDITOR_SHORTCUT_RIGHT_CLICK]   = {"Right-click", "Delete the entity under the pointer, in any tool", NULL, NULL},
     [EDITOR_SHORTCUT_NUDGE]         = {"Arrows (Shift: 16 px)", "Nudge the selection 1 px", NULL, NULL},
+    [EDITOR_SHORTCUT_RESIZE]        = {"Drag a handle", "Resize the one selected entity or its patrol range (Esc cancels)", NULL, NULL},
     [EDITOR_SHORTCUT_COPY_PASTE]    = {"Ctrl+C / Ctrl+X / Ctrl+V", "Copy / cut the selection / paste it, offset", NULL, NULL},
     [EDITOR_SHORTCUT_SELECT_ALL]    = {"Ctrl+A", "Select every entity (64 at most)", NULL, NULL},
     [EDITOR_SHORTCUT_DUPLICATE]     = {"Ctrl+D", "Duplicate the selection (the clipboard stays)", NULL, NULL},
@@ -27,6 +28,7 @@ static const EditorShortcut s_shortcuts[EDITOR_SHORTCUT_COUNT] = {
     [EDITOR_SHORTCUT_PAN]           = {"Wheel / Shift+wheel", "Scroll sideways / up and down (or drag: middle button, Space)", NULL, NULL},
     [EDITOR_SHORTCUT_ZOOM]          = {"Ctrl+wheel", "Zoom around the pointer (1/4x, 1/2x, 1x, 2x, 3x, 5x)", "Zoom", "; F fits the level"},
     [EDITOR_SHORTCUT_FIT]           = {"F", "Zoom to fit the whole level", NULL, NULL},
+    [EDITOR_SHORTCUT_ENTITY_LIST]   = {"Ctrl+F", "Entities list: find by type or coordinate (Esc closes it)", "Entities list", NULL},
     [EDITOR_SHORTCUT_PLAYTEST]      = {"F5", "Playtest the level", "Playtest", "; Shift+F5 from here"},
     [EDITOR_SHORTCUT_PLAYTEST_HERE] = {"Shift+F5", "Playtest from the selected checkpoint or the pointer", NULL, NULL},
     [EDITOR_SHORTCUT_SAVE]          = {"Ctrl+S", "Save", "Save", NULL},
@@ -57,7 +59,10 @@ const char *editor_shortcut_tooltip(EditorShortcutId id)
 
 int editor_shortcut_sheet_event(EditorState *es, const InputEvent *event)
 {
-    if (event->type == INPUT_KEY_DOWN && event->key == KEY_F1 && !es->dragging) {
+    /* Not during a drag or a painted row: the sheet would take the mouse
+     * release that ends it. */
+    if (event->type == INPUT_KEY_DOWN && event->key == KEY_F1 && !es->dragging &&
+        !es->painting) {
         es->shortcut_sheet_open = !es->shortcut_sheet_open;
         return 1;
     }

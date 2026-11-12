@@ -21,7 +21,7 @@
 #define WINDOW_TITLE  "Super Mango"   /* title bar text                */
 #define WINDOW_W      800             /* OS window width  in pixels    */
 #define WINDOW_H      600             /* OS window height in pixels    */
-#define TARGET_FPS    60             /* desired frames per second      */
+#define TARGET_FPS    60             /* simulation steps per second    */
 
 /*
  * GAME_W / GAME_H — the internal (logical) rendering resolution.

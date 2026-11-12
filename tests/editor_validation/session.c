@@ -99,12 +99,151 @@ static void touch_level_during_load(const char *path)
     fclose(fp);
 }
 
+/*
+ * The editor knows a document by its absolute path, however it was named
+ * when opened: that path is kept across sessions (recent list, recovery
+ * snapshot), and a relative one would name another file from another
+ * working folder. Opening the same file under two spellings lists it once.
+ */
+static int documents_are_known_by_absolute_path(void)
+{
+    const char *relative = TEST_OUT "test_editor_absolute_path.toml";
+    EditorState es = {0};
+    LevelDef fixture;
+    char absolute[EDITOR_PATH_MAX];
+    char root[EDITOR_PATH_MAX] = {0};
+    int result = 1;
+
+    ensure_out_dir();
+    editor_level_init_defaults(&fixture);
+    if (level_save_toml(&fixture, relative) != 0 ||
+        editor_absolute_path(relative, absolute, sizeof(absolute)) != 0 ||
+        make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0) return 1;
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+
+    if (expect_int("absolute form is absolute", absolute[0] == '/' || absolute[1] == ':', 1) != 0 ||
+        expect_int("relative load", editor_load_level(&es, relative), 0) != 0 ||
+        expect_string("document path is absolute", es.file_path, absolute) != 0 ||
+        expect_string("recovery destination is absolute", es.recovery_original_path[0]
+                          ? es.recovery_original_path : absolute, absolute) != 0 ||
+        expect_int("one recent entry", es.recent_file_count, 1) != 0 ||
+        expect_string("recent entry is absolute", es.recent_files[0], absolute) != 0)
+        goto cleanup;
+    /* The status line shows it relative to the working folder: short. */
+    if (expect_int("status shows the short form",
+                   strstr(es.status_message, relative) != NULL &&
+                   strstr(es.status_message, absolute) == NULL, 1) != 0) goto cleanup;
+
+    /* The same file again by its absolute path: still one entry. */
+    if (expect_int("absolute load", editor_load_level(&es, absolute), 0) != 0 ||
+        expect_int("still one recent entry", es.recent_file_count, 1) != 0) goto cleanup;
+
+    /* An entry an older build stored relative is found and rewritten. */
+    strcpy(es.recent_files[0], relative);
+    if (expect_int("load over an old relative entry", editor_load_level(&es, relative), 0) != 0 ||
+        expect_int("old entry replaced, not doubled", es.recent_file_count, 1) != 0 ||
+        expect_string("stored in full again", es.recent_files[0], absolute) != 0) goto cleanup;
+    result = 0;
+
+cleanup:
+    cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    remove(relative);
+    return result;
+}
+
+/*
+ * What the status bar says about files:
+ *   - a long path is shown as "..." plus its end, so the file name always
+ *     fits the one line (the start of a path is the part every file shares);
+ *   - a recent file that no longer loads keeps the reason the loader gave,
+ *     instead of a general "failed to load";
+ *   - a level that opened, but whose crash-recovery snapshot has nowhere to
+ *     go, is reported as loaded (with that caveat): the document WAS
+ *     replaced, and saying "Load failed" told the caller it was not.
+ */
+static int status_bar_names_files_usefully(void)
+{
+    const char *level_path = TEST_OUT "test_editor_status_level.toml";
+    EditorState es = {0};
+    LevelDef fixture;
+    char root[EDITOR_PATH_MAX] = {0};
+    char long_path[600];
+    InputEvent open_first_recent;
+    int result = 1;
+    size_t used;
+
+    ensure_out_dir();
+    editor_level_init_defaults(&fixture);
+    strncpy(fixture.name, "Status", sizeof(fixture.name) - 1);
+    if (level_save_toml(&fixture, level_path) != 0 ||
+        make_test_preference_root(root, sizeof(root)) != 0 ||
+        editor_set_preference_root(&es, root) != 0 ||
+        editor_init_persistence_paths(&es) != 0) return 1;
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    editor_level_init_defaults(&es.level);
+
+    /* A path far longer than the status line, ending in a file name. */
+    used = (size_t)snprintf(long_path, sizeof(long_path), "/no-such-folder");
+    while (used < 400) used += (size_t)snprintf(long_path + used, sizeof(long_path) - used,
+                                                "/a-very-long-folder-name");
+    snprintf(long_path + used, sizeof(long_path) - used, "/the_level_file.toml");
+    if (expect_int("long missing path fails", editor_load_level(&es, long_path), -1) != 0 ||
+        expect_prefix("it says so", es.status_message, "Load failed:") != 0 ||
+        expect_int("the file name is in the message",
+                   strstr(es.status_message, "the_level_file.toml") != NULL, 1) != 0 ||
+        expect_int("the path was shortened", strstr(es.status_message, "...") != NULL, 1) != 0 ||
+        expect_int("the message fits the line",
+                   strlen(es.status_message) < sizeof(es.status_message) - 1, 1) != 0)
+        goto cleanup;
+
+    /* Ctrl+1 on a recent file that is gone: the loader's own reason stays. */
+    es.recent_file_count = 1;
+    snprintf(es.recent_files[0], sizeof(es.recent_files[0]), "%s", "/no-such-folder/gone.toml");
+    memset(&open_first_recent, 0, sizeof(open_first_recent));
+    open_first_recent.type = INPUT_KEY_DOWN;
+    open_first_recent.key = KEY_ONE;
+    open_first_recent.mods = INPUT_CTRL;
+    editor_handle_event(&es, &open_first_recent);
+    if (expect_prefix("the reason is the loader's", es.status_message, "Load failed:") != 0 ||
+        expect_int("it names the file", strstr(es.status_message, "gone.toml") != NULL, 1) != 0)
+        goto cleanup;
+
+    /* No room for a recovery snapshot path (a preference folder whose name
+     * leaves no space for the file name): the level still opens. */
+    {
+        char saved_root[EDITOR_PATH_MAX];
+        memcpy(saved_root, es.preference_root, sizeof(saved_root));
+        memset(es.preference_root, 'r', EDITOR_PATH_MAX - 8);
+        es.preference_root[0] = '/';
+        es.preference_root[EDITOR_PATH_MAX - 8] = '\0';
+        es.recovery_root_path[0] = '\0';
+        int loaded = editor_load_level(&es, level_path);
+        memcpy(es.preference_root, saved_root, sizeof(saved_root));
+        if (expect_int("the load is reported as a success", loaded, 0) != 0 ||
+            expect_string("the level is open", es.level.name, "Status") != 0 ||
+            expect_prefix("the caveat is stated", es.status_message, "Loaded ") != 0 ||
+            expect_int("autosave is named", strstr(es.status_message, "autosave") != NULL, 1) != 0)
+            goto cleanup;
+    }
+    result = 0;
+
+cleanup:
+    cleanup_test_preference_root(root, &es, 1);
+    undo_destroy(es.undo);
+    remove(level_path);
+    return result;
+}
+
 static int load_fingerprints_the_bytes_it_parsed(void)
 {
     const char *path = TEST_OUT "test_editor_load_race.toml";
     EditorState es = {0};
     LevelDef fixture;
-    SerializerFileFingerprint on_disk;
+    SerializerFileFingerprint on_disk, before_load;
     char root[EDITOR_PATH_MAX] = {0};
     int result = 1;
 
@@ -116,23 +255,21 @@ static int load_fingerprints_the_bytes_it_parsed(void)
     es.undo = undo_create();
     if (!es.undo) return 1;
 
-    /* One change during the first read: the retry reads stable bytes and
-     * the Save baseline matches the file as it is now. */
+    /* Another program rewrites the file while the editor is loading it.
+     * The editor read the file once and hashed those same bytes, so the
+     * load succeeds and its Save baseline describes what was parsed: the
+     * file as it was, not as it is now. Save will therefore notice the
+     * change and ask before replacing it. */
+    if (serializer_fingerprint_utf8(path, &before_load) != 1) goto cleanup;
     touches_left = 1;
     editor_test_set_load_hook(touch_level_during_load);
-    if (expect_int("load retries after change", editor_load_level(&es, path), 0) != 0 ||
+    if (expect_int("load succeeds", editor_load_level(&es, path), 0) != 0 ||
         serializer_fingerprint_utf8(path, &on_disk) != 1 ||
-        expect_int("baseline matches file",
-                   serializer_fingerprint_equal(&es.source_fingerprint, &on_disk), 1) != 0)
+        expect_int("baseline is the parsed bytes",
+                   serializer_fingerprint_equal(&es.source_fingerprint, &before_load), 1) != 0 ||
+        expect_int("the later change is visible to Save",
+                   serializer_fingerprint_equal(&es.source_fingerprint, &on_disk), 0) != 0)
         goto cleanup;
-
-    /* A file that keeps changing is refused rather than half-trusted. */
-    strncpy(es.level.name, "Kept", sizeof(es.level.name) - 1);
-    touches_left = 2;
-    if (expect_int("changing file refused", editor_load_level(&es, path), -1) != 0 ||
-        expect_prefix("changing file status", es.status_message, "Load failed:") != 0 ||
-        expect_int("status explains", strstr(es.status_message, "kept changing") != NULL, 1) != 0 ||
-        expect_string("document untouched", es.level.name, "Kept") != 0) goto cleanup;
     result = 0;
 
 cleanup:
@@ -836,6 +973,46 @@ static int group_steps_cost_one_slot_each(void)
     if (expect_int("refused paste adds nothing", es.level.coin_count, 2) != 0 ||
         expect_string("refused paste says why", es.status_message,
                       "Paste cancelled: cannot allocate undo history") != 0) goto done;
+
+    /*
+     * One entity deleted or placed on its own needs no memory, but inside
+     * an open group it joins that group's step, which has to grow.  When
+     * it cannot, the change is taken back, because an entity the history
+     * does not know about would shift every later index in it.
+     */
+    {
+        PlacementData coin;
+        char expected[96];
+
+        if (expect_int("a group of one opens", undo_group_begin(es.undo, 1) != 0, 1) != 0)
+            goto done;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.type = CMD_MOVE;
+        cmd.entity_type = ENT_COIN;
+        if (expect_int("its one entry is used", undo_push(es.undo, &cmd), 1) != 0) goto done;
+        undo_test_limit_allocations(0);            /* the step cannot grow */
+
+        before = es.level;
+        snprintf(expected, sizeof(expected), "Cannot delete %s: no room in the undo history",
+                 editor_entity_type_name(ENT_COIN));
+        if (expect_int("delete without room is refused", delete_entity(&es, ENT_COIN, 0), -1) != 0 ||
+            expect_int("the coin count is kept", es.level.coin_count, before.coin_count) != 0 ||
+            expect_int("the coin is put back where it was",
+                       memcmp(es.level.coins, before.coins, sizeof(before.coins)), 0) != 0 ||
+            expect_string("refused delete names the reason", es.status_message, expected) != 0)
+            goto done;
+
+        coin = editor_snapshot_entity(&es.level, ENT_COIN, 0);
+        snprintf(expected, sizeof(expected), "Cannot place %s: no room in the undo history",
+                 editor_entity_type_name(ENT_COIN));
+        if (expect_int("placement without room is refused",
+                       editor_add_placement(&es, ENT_COIN, &coin, "place"), -1) != 0 ||
+            expect_int("nothing was added", es.level.coin_count, before.coin_count) != 0 ||
+            expect_string("refused placement names the reason", es.status_message, expected) != 0)
+            goto done;
+        undo_test_limit_allocations(-1);
+        undo_group_end(es.undo);
+    }
     failed = 0;
 done:
     undo_test_limit_allocations(-1);

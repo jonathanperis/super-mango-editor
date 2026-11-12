@@ -117,7 +117,7 @@ each is walked by one `for` loop, top to bottom:
 | `s_render_layers` | `src/render/game_render.c` | the frame's 33 render layers, back to front |
 
 A row names a small function written beside the others like it
-(`load_spiders`, `update_spiders`, `spider_touches`, `render_spiders`). The
+(`load_spiders`, `update_spiders`, `spider_hitbox`, `render_spiders`). The
 update and render ones call the entity's module with the inputs that kind
 needs. To change *when* something happens, move its row. To change *what*
 happens, edit the module. Moving a row in `s_level_loaders` or

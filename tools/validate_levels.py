@@ -40,6 +40,9 @@ CAMPAIGN_MANIFEST_FIELDS = {"format_version", "levels"}
 # Mirrors CAMPAIGN_LEVEL_PATH_SIZE in src/levels/campaign_catalog.h: the game
 # keeps each entry in a 256-byte C buffer, so 255 UTF-8 bytes plus the NUL.
 CAMPAIGN_LEVEL_PATH_SIZE = 256
+# Mirrors CAMPAIGN_MAX_LEVELS in the same header: the most levels one
+# campaign may list.
+CAMPAIGN_MAX_LEVELS = 128
 
 COUNT_LIMITS = {
     "floor_gaps": "MAX_FLOOR_GAPS",
@@ -80,7 +83,7 @@ PATH_KEYS = {"music_path", "floor_tile_path", "tile_path", "path", "next_phase"}
 
 ASSET_LITERAL_RE = re.compile(r'"(assets/[^"\n]+\.(?:png|qoa|wav|ttf))"')
 
-# Mirrors rename_shipped_wav_loop() in src/shared/serializer_load_config.c:
+# Mirrors rename_shipped_wav_loop() in src/shared/serializer_load.c:
 # the ambient loops shipped as WAV before they became QOA, and the loader
 # reads those three old names as the QOA files.  The shipped levels keep the
 # old names on purpose (their bytes key players' ghosts and Continue points),
@@ -100,6 +103,25 @@ def loaded_music_path(value: str) -> str:
 # (see the module docstring); levels are validated by the C loader.  Fields
 # remain optional because the C loader supplies LevelDef defaults for absent
 # values; present v1 values must still use the exact compatible TOML type.
+#
+# They are a second copy of facts the C schema table states, so
+# tests/schema_parity_test.py compares every key, type, enum value, capacity
+# and array limit here with `level-check --dump-schema`: a field added to
+# the C table without its line here fails `make validate-levels`.
+
+# Bytes a string value may occupy, including the final NUL: the size of the
+# C char array it is copied into.  Keys not listed use the default.
+# The largest finite C float (FLT_MAX in <float.h>).
+FLT_MAX = 3.4028234663852886e38
+
+STRING_CAPACITY_DEFAULT = 64
+STRING_CAPACITIES = {"description": 4096, "generated_by": 128, "next_phase": 256}
+
+
+def string_capacity(key: str) -> int:
+    return STRING_CAPACITIES.get(key, STRING_CAPACITY_DEFAULT)
+
+
 XY_FIELDS = {"x": "number", "y": "number"}
 SCHEMA_TABLE_FIELDS = {
     "last_star": {**XY_FIELDS, "next_phase": "string"},
@@ -265,7 +287,11 @@ def _is_finite_number(value) -> bool:
         return False
     try:
         numeric = float(value)
-        return math.isfinite(numeric) and math.isfinite(ctypes.c_float(numeric).value)
+        # The C loader refuses fabs(v) > FLT_MAX before narrowing to float
+        # (serializer_parse.c). Rounding to a C float first, as this used
+        # to, accepts a double slightly above FLT_MAX that rounds down to
+        # it, which the game then rejects.
+        return math.isfinite(numeric) and abs(numeric) <= FLT_MAX
     except (OverflowError, ValueError):
         return False
 
@@ -285,7 +311,7 @@ def _validate_schema_value(value, expected, path: str) -> list[str]:
         if not isinstance(value, str):
             return [f"{path} has type {_schema_type(value)}, expected string"]
         key = path.rsplit(".", 1)[-1]
-        capacity = {"description": 4096, "generated_by": 128, "next_phase": 256}.get(key, 64)
+        capacity = string_capacity(key)
         if len(value.encode("utf-8")) >= capacity:
             return [f"{path} exceeds its {capacity - 1}-byte storage"]
         return []
@@ -540,6 +566,12 @@ def campaign_manifest_entries(
     if not isinstance(listed, list) or not listed:
         errors.append(f"{manifest_label}: levels must be a nonempty array")
         return [], errors
+    if len(listed) > CAMPAIGN_MAX_LEVELS:
+        errors.append(
+            f"{manifest_label}: lists {len(listed)} levels "
+            f"(at most {CAMPAIGN_MAX_LEVELS})"
+        )
+        return [], errors
 
     seen: set[str] = set()
     for index, value in enumerate(listed):
@@ -686,6 +718,10 @@ def validate_source_asset_literals(asset_manifest: set[str]) -> list[str]:
     errors: list[str] = []
 
     for source_path in sorted((ROOT / "src").rglob("*.[ch]")):
+        # .gitignore lists src/levels/exported/: leftovers of an old export
+        # workflow that no target builds. They are not the game's source.
+        if "exported" in source_path.relative_to(ROOT / "src").parts[:2]:
+            continue
         rel_source = source_path.relative_to(ROOT)
         for line_no, line in enumerate(source_path.read_text(encoding="utf-8").splitlines(), 1):
             for value in ASSET_LITERAL_RE.findall(line):

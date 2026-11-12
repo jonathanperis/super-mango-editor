@@ -54,7 +54,7 @@ RELEASE_PLATFORM=super-mango-wasm make dist-wasm
 python3 tools/check_wasm_artifacts.py --zip dist/super-mango-wasm.zip
 ```
 
-The verifier checks that the normal and debug `out/super-mango*.html`, `.js`, `.wasm`, and `.data` files exist, that the generated JavaScript references the expected asset basenames and does not depend on `emscripten_sleep`, that each HTML shell's pinned Content-Security-Policy matches its inline boot script, that Node accepts the generated JavaScript syntax, and that `WebAssembly.compile` can compile the generated `.wasm` binary. With `--zip`, it also verifies the WebAssembly release archive includes those eight files, `README.txt`, `LICENSE`, `THIRD_PARTY_NOTICES.md` and `licenses/tomlc17.txt`.
+The verifier checks that the normal and debug `out/super-mango*.html`, `.js`, `.wasm`, and `.data` files exist, that the generated JavaScript references the expected asset basenames and does not depend on `emscripten_sleep`, that each HTML shell's pinned Content-Security-Policy matches its inline boot script, that each page names its game files with one version (the script tag, both preload links and the boot script's `assetQuery` carry the same `?v=<commit>`), that Node accepts the generated JavaScript syntax, and that `WebAssembly.compile` can compile the generated `.wasm` binary. With `--zip`, it also verifies the WebAssembly release archive includes those eight files, `README.txt`, `LICENSE`, `THIRD_PARTY_NOTICES.md` and `licenses/tomlc17.txt`.
 
 Report local SDK/cache failures separately from application failures and require green CI WebAssembly/artifact/Pages checks. Native rendered checks need graphics and audio services; Linux CI supplies Xvfb/Mesa and a PulseAudio null sink. A missing desktop device is an explicit verification gap, not a passing test.
 
@@ -138,9 +138,12 @@ A separate `Checksums and provenance` job (the only one holding
 release (`build` and `Sanitizers (Linux x86_64)`), so no attestation is minted
 for archives a failing gate keeps unpublished. It writes `SHA256SUMS` for the four
 archives and creates a GitHub build provenance attestation for each. The
-release job re-checks the archives against `SHA256SUMS`, creates a draft,
-uploads the four archives plus `SHA256SUMS` without overwriting existing
-assets, then publishes it. A dispatch on another branch builds/checks
+release job re-checks the archives against `SHA256SUMS`, creates a draft
+release holding the four archives plus `SHA256SUMS` with the GitHub CLI
+(`gh release create --draft`), then publishes it. It runs no third-party
+action, and `gh release create` refuses a tag that already has a release, so
+existing assets are never overwritten; after a failed run, delete the leftover
+draft before dispatching again. A dispatch on another branch builds/checks
 but does not publish. Verify the release event's own build matrix, not an older
 green run.
 

@@ -10,6 +10,8 @@
 
 #include <string.h>  /* memcmp, strchr */
 
+#include "../shared/utf8.h"  /* utf8_valid */
+
 /* ASCII-only case folding; locale-aware tolower() would vary by machine. */
 static unsigned char ascii_upper(unsigned char ch)
 {
@@ -57,32 +59,43 @@ static int is_windows_device_stem(const char *stem, size_t len)
     return 0;
 }
 
+int level_file_name_portable(const char *name, size_t length)
+{
+    size_t stem_len = 0;
+
+    if (!name || length == 0) return 0;
+    for (size_t i = 0; i < length; i++) {
+        unsigned char ch = (unsigned char)name[i];
+        /* '/' would mean a subdirectory; the rest are invalid on Windows
+         * (':' also names an NTFS stream: "a:b.png" is stream b of file a). */
+        if (ch < 0x20 || ch == 0x7F || strchr("/\\<>:\"|?*", ch) != NULL)
+            return 0;
+    }
+
+    /* The stem ends at the first dot: "nul.x.toml" has stem "nul". */
+    while (stem_len < length && name[stem_len] != '.') stem_len++;
+    if (stem_len == 0) return 0;
+    return !is_windows_device_stem(name, stem_len);
+}
+
 int level_ref_valid(const char *ref, size_t length)
 {
     static const char prefix[] = "levels/";
     static const char suffix[] = ".toml";
     const size_t prefix_len = sizeof(prefix) - 1;
     const size_t suffix_len = sizeof(suffix) - 1;
-    const char *name;
-    size_t name_len;
-    size_t stem_len = 0;
 
     if (!ref || length <= prefix_len + suffix_len) return 0;
     if (memcmp(ref, prefix, prefix_len) != 0 ||
         memcmp(ref + length - suffix_len, suffix, suffix_len) != 0)
         return 0;
+    /*
+     * A reference is also a key: the profile stores results under it and
+     * the browser build passes it to JavaScript as text. Bytes that are
+     * not UTF-8 would be rewritten on that trip (and can never name a file
+     * on Windows), so the same level would be filed under two keys.
+     */
+    if (!utf8_valid(ref, length)) return 0;
 
-    name = ref + prefix_len;
-    name_len = length - prefix_len;
-    for (size_t i = 0; i < name_len; i++) {
-        unsigned char ch = (unsigned char)name[i];
-        /* '/' would mean a subdirectory; the rest are invalid on Windows. */
-        if (ch < 0x20 || ch == 0x7F || strchr("/\\<>:\"|?*", ch) != NULL)
-            return 0;
-    }
-
-    /* The stem ends at the first dot: "nul.x.toml" has stem "nul". */
-    while (stem_len < name_len && name[stem_len] != '.') stem_len++;
-    if (stem_len == 0) return 0;
-    return !is_windows_device_stem(name, stem_len);
+    return level_file_name_portable(ref + prefix_len, length - prefix_len);
 }

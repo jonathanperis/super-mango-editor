@@ -15,18 +15,9 @@
 #include <string.h>  /* strstr, strlen */
 
 #include "serializer.h"
-#include "serializer_load_climbables.h"
-#include "serializer_load_checkpoints.h"
-#include "serializer_load_collectibles.h"
-#include "serializer_load_config.h"
-#include "serializer_load_enemies.h"
-#include "serializer_load_geometry.h"
-#include "serializer_load_hazards.h"
 #include "serializer_load_header.h"
-#include "serializer_load_layers.h"
 #include "serializer_parse.h"
 #include "serializer_io.h"
-#include "serializer_load_surfaces.h"
 #include "../../vendor/tomlc17/tomlc17.h" /* tomlc17 API */
 #include "../levels/level.h"              /* LevelDef, all placement types */
 #include "../levels/level_loader.h"       /* level_validate_runtime */
@@ -42,6 +33,7 @@ typedef struct {
     LevelLoadProblemFn report;  /* NULL: nobody (plain level_load_toml) */
     void *context;
     toml_datum_t top;           /* the parsed tree, for line lookups     */
+    const char *label;          /* the file's name, for stderr           */
 } LoadProblems;
 
 PRINTF_FORMAT(3, 4)
@@ -95,26 +87,75 @@ static void report_runtime_issue(void *context, const char *message,
     report_problem(problems, serializer_toml_line(problems->top, message), "%s", message);
 }
 
+/* serializer_legacy_warnings hands each skipped key or value here. It goes
+ * to stderr and, marked "warning:", to whoever is listening: the level
+ * did load, so the listener must be able to tell this from a failure. */
+static void report_legacy_warning(void *context, const char *message)
+{
+    LoadProblems *problems = context;
+    fprintf(stderr, "serializer: warning in '%s': %s (no format_version)\n",
+            problems->label, message);
+    report_problem(problems, serializer_toml_line(problems->top, message),
+                   "warning: %s", message);
+}
+
 /* ================================================================== */
 /* The section loaders                                                 */
 /* ================================================================== */
 
 /*
+ * The shipped ambient loops were WAV files until they became QOA. A level
+ * saved before then names a file that no longer ships, so those three
+ * names, and only those, are read as their QOA replacements: the level
+ * keeps its music, and the editor saves the new name. Any other .wav path
+ * is the level's own sound and is left alone.
+ *
+ * The bundled levels still name the old files on purpose: ghosts and
+ * Continue points are keyed by a hash of the level file's bytes
+ * (serializer_fingerprint_utf8), so renaming them would orphan every
+ * player's records.  tools/validate_levels.py mirrors this mapping.
+ *
+ * This is the one step of loading that is not a row of the schema table:
+ * it does not read a key, it rewrites a value that was already read.
+ */
+static void rename_shipped_wav_loop(char *path)
+{
+    static const char dir[] = "assets/sounds/levels/";
+    static const char *const loops[] = {"water.wav", "lava.wav", "winds.wav"};
+    const size_t dir_len = sizeof(dir) - 1;
+
+    if (strncmp(path, dir, dir_len) != 0) return;
+    for (size_t i = 0; i < sizeof(loops) / sizeof(loops[0]); i++) {
+        if (strcmp(path + dir_len, loops[i]) == 0) {
+            memcpy(path + strlen(path) - 3, "qoa", 3);
+            return;
+        }
+    }
+}
+
+/*
  * s_section_loaders — the parts of a level file, in the order they are read.
  *
- * Each row is a serializer_load_<section>() function (one per
- * serializer_load_*.c file) and the name of the section for the error
- * message.  `load` is a function pointer: the row stores which function to
- * call, and level_load_toml_explained calls it through the pointer, the
- * way game_update.c walks s_update_steps and level_loader.c walks
+ * Each row is a function and the name of the part for the error message.
+ * `load` is a function pointer: the row stores which function to call, and
+ * level_load_toml_text calls it through the pointer, the way
+ * game_update.c walks s_update_steps and level_loader.c walks
  * s_level_loaders.  Every loader has the same shape (SectionLoadFn): it
  * reads its keys from `top`, the parsed TOML root, into `def`, and returns
  * 0, or -1 when a value cannot be used.
  *
+ * There are only two, because every value of a level (the level-wide
+ * keys, [physics], [last_star], floor_gaps and every [[array]] of tables)
+ * is read by one loop over the schema table (serializer_load_schema in
+ * serializer_parse.c).  The other row is the format_version check, which
+ * decides whether the file may be read at all.
+ *
  * The rows run top to bottom and the first one that fails ends the load,
- * so the order decides which problem is reported when several sections
- * are bad.  Reading a new section means one serializer_load_<section>()
- * file and one row here.
+ * so the order decides which problem is reported when several parts are
+ * bad.  A new key is a row of the schema table (of an entity's field
+ * table, or a ROOT_INT / ROOT_FLOAT / ROOT_TEXT row for a level-wide key); a
+ * new kind of entity is a field table and one ROOT_TABLES row there, and
+ * nothing here.
  */
 typedef int (*SectionLoadFn)(toml_datum_t top, LevelDef *def);
 
@@ -124,16 +165,10 @@ typedef struct {
 } SectionLoader;
 
 static const SectionLoader s_section_loaders[] = {
-    /* load                          name            */
-    { serializer_load_header,        "header"        },
-    { serializer_load_geometry,      "geometry"      },
-    { serializer_load_checkpoints,   "checkpoints"   },
-    { serializer_load_collectibles,  "collectibles"  },
-    { serializer_load_enemies,       "enemies"       },
-    { serializer_load_hazards,       "hazards"       },
-    { serializer_load_surfaces,      "surfaces"      },
-    { serializer_load_climbables,    "climbables"    },
-    { serializer_load_layers,        "layers"        },
+    /* load                          name                    */
+    { serializer_load_header,        "format version"        },
+    /* Every other key and table, in one loop over the schema table. */
+    { serializer_load_schema,        "settings and tables"   },
 };
 
 #define SECTION_LOADER_COUNT (sizeof(s_section_loaders) / sizeof(s_section_loaders[0]))
@@ -150,28 +185,64 @@ int level_load_toml(const char *path, LevelDef *def)
 int level_load_toml_explained(const char *path, LevelDef *def,
                               LevelLoadProblemFn report, void *context)
 {
-    LoadProblems problems = { report, context, {0} };
+    return level_load_toml_file(path, def, report, context, NULL);
+}
 
+int level_load_toml_file(const char *path, LevelDef *def,
+                         LevelLoadProblemFn report, void *context,
+                         SerializerFileFingerprint *fingerprint)
+{
+    LoadProblems problems = { report, context, {0}, NULL };
+    char *text = NULL;
+    size_t size = 0;
+    int too_large = 0;
+    int result;
+
+    if (fingerprint) memset(fingerprint, 0, sizeof(*fingerprint));
     if (!path || !def) return -1;
+
+    /*
+     * Read the whole file once, with a size limit, before anything looks
+     * at its contents (serializer_read_bytes; UTF-8 paths work on Windows
+     * too).  The hash and the parse below both use this one buffer.
+     */
+    if (serializer_read_bytes(path, LEVEL_TEXT_MAX, &text, &size, &too_large) !=
+        SERIALIZER_PATH_EXISTING) {
+        if (too_large) {
+            fprintf(stderr, "serializer: '%s' is larger than %zu bytes\n",
+                    path, LEVEL_TEXT_MAX - 1);
+            report_problem(&problems, 0, "the file is larger than %zu bytes",
+                           LEVEL_TEXT_MAX - 1);
+        } else {
+            fprintf(stderr, "serializer: cannot open '%s' for reading\n", path);
+            report_problem(&problems, 0, "cannot open the file for reading");
+        }
+        return -1;
+    }
+    if (fingerprint) serializer_fingerprint_bytes(text, size, fingerprint);
+    result = level_load_toml_text(text, size, path, def, report, context);
+    free(text);
+    return result;
+}
+
+int level_load_toml_text(const char *text, size_t size, const char *label,
+                         LevelDef *def, LevelLoadProblemFn report, void *context)
+{
+    LoadProblems problems = { report, context, {0}, NULL };
+    const char *path = label ? label : "(memory)";
+
+    if (!text || !def || size >= LEVEL_TEXT_MAX) return -1;
 
     LevelDef *caller_def = def;
 
     /*
-     * serializer_fopen_utf8 opens the file (UTF-8 paths work on Windows
-     * too), then toml_parse_file parses the open stream.
-     *
-     * toml_parse_file returns a toml_result_t.  If parsing fails, r.ok is
-     * false and r.errmsg contains a human-readable error description.  On
+     * toml_parse returns a toml_result_t.  If parsing fails, r.ok is false
+     * and r.errmsg contains a human-readable error description.  On
      * success, r.toptab is the root TOML table we can query with toml_get().
+     * The tree keeps its own copies of the strings, so the caller may free
+     * text as soon as this function returns.
      */
-    FILE *fp = serializer_fopen_utf8(path, "rb");
-    if (!fp) {
-        fprintf(stderr, "serializer: cannot open '%s' for reading\n", path);
-        report_problem(&problems, 0, "cannot open the file for reading");
-        return -1;
-    }
-    toml_result_t r = toml_parse_file(fp);
-    fclose(fp);
+    toml_result_t r = toml_parse(text, (int)size);
     if (!r.ok) {
         fprintf(stderr, "serializer: TOML parse error in '%s': %s\n",
                 path, r.errmsg);
@@ -224,10 +295,8 @@ int level_load_toml_explained(const char *path, LevelDef *def,
         }
     }
 
-    /* The level-wide settings come last.  Their loader cannot fail (it has
-     * no arrays to overflow, and a missing value falls back to a default),
-     * so it returns nothing and is not a row of the table. */
-    serializer_load_config(top, def);
+    /* One value is changed after it is read (see the function). */
+    rename_shipped_wav_loop(def->music_path);
 
     {
         char err[128];
@@ -243,8 +312,13 @@ int level_load_toml_explained(const char *path, LevelDef *def,
         }
     }
 
+    /* A file without format_version was read leniently; say what that
+     * skipped, so a misspelt key is not lost in silence. */
+    problems.label = path;
+    (void)serializer_legacy_warnings(top, report_legacy_warning, &problems);
+
     /*
-     * toml_free — release all memory allocated by toml_parse_file.
+     * toml_free — release all memory allocated by toml_parse.
      * The LevelDef struct now holds its own copies of all data, so
      * the TOML tree is safe to destroy.
      */

@@ -51,7 +51,7 @@ The 400×300 raylib render target is presented with point filtering at 800×600,
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `TARGET_FPS` | `60` | Simulation steps per second; also the native window's frame limit |
+| `TARGET_FPS` | `60` | Simulation steps per second. The native window draws one frame per refresh of its display instead (`display_frame_cap` in `src/shared/graphics.c`, 60 when the rate is unknown) |
 
 `TARGET_FPS` sets the fixed simulation step. The step and loop limits live in
 `src/core/game_timing.h`:
@@ -70,7 +70,7 @@ Debug experiment captures (`src/core/game_experiment.h`):
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `EXPERIMENT_FORMAT_VERSION` | `3` | One row per fixed step, `[input, physics...]`, no duration column; version 1 (variable timestep) and version 2 (camera panned in at a level start and after a lost life) captures are rejected |
+| `EXPERIMENT_FORMAT_VERSION` | `4` | One row per fixed step, `[input, physics...]`, no duration column; version 1 (variable timestep), version 2 (camera panned in at a level start and after a lost life) and version 3 (waiting spike blocks started from the camera, bouncepad launches answered to jump input) captures are rejected |
 | `EXPERIMENT_MAX_FRAMES` | `36000` | Steps one capture can hold (10 minutes at 60 steps/s) |
 
 ### Tiles and Floor

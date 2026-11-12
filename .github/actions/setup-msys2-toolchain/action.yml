@@ -1,0 +1,60 @@
+name: Set up the MSYS2 UCRT64 toolchain
+description: >-
+  Installs MSYS2's UCRT64 environment with the compiler and build tools the
+  Windows jobs use, and makes `shell: msys2 {0}` available to later steps.
+
+inputs:
+  clang:
+    description: "'true' also installs UCRT64 Clang (the windows-clang job)."
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    # install: the packages go through the action's own input, not a later
+    # `pacman -S` step. The action keeps pacman's downloaded packages in the
+    # Actions cache, and it saves that cache as soon as its own install
+    # finishes, so packages installed by a later step were downloaded again
+    # on every run (about 100 s per job).
+    #
+    # update: true stays. MSYS2 is a rolling distribution: its mirrors only
+    # keep the newest build of each package, so the package list that ships
+    # inside the installer goes stale and installing from it starts to fail
+    # with 404s. `update: true` refreshes that list (pacman -Syuu) first.
+    # It is also the point of the windows-clang job, which exists to meet a
+    # new Clang's warnings early. The cost is that the toolchain is whatever
+    # MSYS2 ships today; the versions step below prints it for triage.
+    #
+    # path-type: inherit keeps the runner's own PATH inside the MSYS2 shell,
+    # which is how the steps there find Node.js.
+    - name: Install MSYS2 and the toolchain packages
+      uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
+      with:
+        msystem: UCRT64
+        update: true
+        path-type: inherit
+        # make: MSYS2's own make, which runs the project Makefile.
+        # gcc / clang: the C compilers. python: runs tools/*.py.
+        # cmake and mingw-w64 make: build the pinned raylib.
+        install: >-
+          make
+          mingw-w64-ucrt-x86_64-gcc
+          mingw-w64-ucrt-x86_64-python
+          mingw-w64-ucrt-x86_64-cmake
+          mingw-w64-ucrt-x86_64-make
+          ${{ inputs.clang == 'true' && 'mingw-w64-ucrt-x86_64-clang' || '' }}
+
+    # Record the exact compiler, so a new -Werror failure can be traced to a
+    # toolchain update.
+    - name: Record rolling MSYS2 toolchain versions
+      shell: msys2 {0}
+      env:
+        WITH_CLANG: ${{ inputs.clang }}
+      run: |
+        gcc --version
+        pacman -Q mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake
+        if [ "$WITH_CLANG" = "true" ]; then
+          clang --version
+          pacman -Q mingw-w64-ucrt-x86_64-clang
+        fi

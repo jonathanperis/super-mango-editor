@@ -16,8 +16,11 @@ mango-experiment-*.toml
 
 # Linker output
 *.ilk
-*.map
 *.exp
+# A linker map (-Wl,-Map=name.map) written next to the Makefile. Only the
+# top folder: a blanket *.map would also hide the browser source maps
+# (file.js.map, file.css.map) that belong with web code.
+/*.map
 
 # Precompiled Headers
 *.gch
@@ -49,15 +52,6 @@ mango-experiment-*.toml
 *.idb
 *.pdb
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
 # debug information files
 *.dwo
 
@@ -77,16 +71,21 @@ compile_commands.json
 # Docs generation
 node_modules/
 
-# Local specifications. The files already tracked under .specs/ stay tracked
-# on purpose, but any NEW file there is silently ignored: add it with
-# `git add -f .specs/<path>` or it never reaches the repository.
-.specs/
+# Specifications. Everything in a subfolder of .specs/ (project/, features/,
+# archive/, and any new one) is ordinary tracked content: a new spec file
+# shows up in `git status` like any other file. Two places are for local
+# notes and experiments and stay out of the repository:
+#   .specs/scratch/   the folder to use for new scratch work
+#   .specs/<file>     loose files directly in .specs/, where older scratch
+#                     scripts and drafts still live
+# The second line below re-includes every subfolder that the first one
+# ignored; the third ignores the scratch folder again.
+/.specs/*
+!/.specs/*/
+/.specs/scratch/
 
-# Local Claude Code agent worktrees and settings
+# Local Claude Code agent worktrees, checkouts and settings. Not part of the game.
 .claude/
 
 # Task-owned browser verification artifacts
 playwright-evidence/
-
-# Local agent checkouts. Not part of the game.
-.claude/

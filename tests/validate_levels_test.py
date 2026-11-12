@@ -172,6 +172,7 @@ def main() -> int:
         "bad_levels_key_embedded_nul.toml",
         "bad_path_embedded_nul.toml",
         "bad_path_too_long.toml",
+        "too_many_levels.toml",
     ):
         _, errors = validate_levels.campaign_manifest_entries(
             CAMPAIGN_FIXTURE_DIR / name

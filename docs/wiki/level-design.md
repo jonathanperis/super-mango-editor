@@ -33,7 +33,7 @@ make run-editor
 
 ## Top-Level Scalars
 
-New checked-in levels must declare `format_version = 1`. Other root fields have loader defaults, but should be authored explicitly when they matter to the level. Files without a version use the legacy reader; new examples use strict v1.
+New checked-in levels must declare `format_version = 1`. Other root fields have loader defaults, but should be authored explicitly when they matter to the level. Files without a version use the legacy reader; new examples use strict v1. The legacy reader skips a key it does not know and a value of the wrong type, which is what lets old files load; so that a misspelt key (`[[plataforms]]`) is not lost in silence, it reports each one as a warning with its line (on stderr, and in the editor's status bar after Open), because the editor's next save writes `format_version = 1` and would make the loss permanent.
 
 ```toml
 format_version = 1                       # required level-schema version
@@ -159,7 +159,7 @@ Rail layouts:
 | `RECT` | Closed rectangular loop | Continuous-circuit spike blocks / float platforms |
 | `HORIZ` | Open horizontal line | Spike block that bounces left–right; `w` = length in tiles |
 
-`w` and `h` are 2–128 tiles (16 px each), a `RECT` loop may have at most 128 tiles in total (`2w + 2(h − 2)`), and the whole rail must lie inside the world. The `end_cap` flag (`0` or `1`) only applies to open (`HORIZ`) rails. With `end_cap = 1` a spike block bounces back; with `end_cap = 0` it waits at the start until the camera reaches it, then falls off the far end as a projectile. Float platforms on an open rail always bounce at both ends.
+`w` and `h` are 2–128 tiles (16 px each), a `RECT` loop may have at most 128 tiles in total (`2w + 2(h − 2)`), and the whole rail must lie inside the world. The `end_cap` flag (`0` or `1`) only applies to open (`HORIZ`) rails. With `end_cap = 1` a spike block bounces back; with `end_cap = 0` it waits at the start until the player is close enough for the camera to show it, then falls off the far end as a projectile. Float platforms on an open rail always bounce at both ends.
 
 Riders name a rail by its position in the `[[rails]]` list (`rail_index`, 0-based), and their `t_offset` must lie on that rail. Reordering rails in a text editor therefore changes which rail each rider uses; the editor renumbers references for you.
 
@@ -240,7 +240,7 @@ Single-instance. Triggers the level-complete event when collected. Displayed at 
 - The path is a direct child of `levels/` ending in `.toml`: `levels/<name>.toml`. Subdirectories such as `levels/labs/` are rejected, so every chained phase can also be listed in a campaign and record profile results. Labs are standalone examples opened with `--level`.
 - `<name>` must not contain `/`, `\`, control characters (including DEL) or the Windows-reserved characters `< > : " | ? *`.
 - The stem before the first dot must be nonempty and must not be a Windows device name, in any letter case (trailing spaces ignored): `CON`, `PRN`, `AUX`, `NUL`, `COM0`–`COM9`, `LPT0`–`LPT9`, or `COM`/`LPT` followed by `¹`, `²` or `³`. `levels/con.toml` and `levels/nul.x.toml` are both rejected; `levels/console.toml` is fine.
-- The whole path is valid UTF-8 and at most 255 bytes: `next_phase`, campaign entries and profile keys are each stored in a 256-byte C buffer.
+- The whole path is valid UTF-8 (a path with other bytes is refused, not just one that is too long) and at most 255 bytes: `next_phase`, campaign entries and profile keys are each stored in a 256-byte C buffer.
 
 Collecting the last star snapshots elapsed time and coin totals, then shows the level-completion summary. With `next_phase`, its actions are **Next Level**, **Replay**, **Level Select**, and **Exit**; without one, the actions are **Replay**, **Level Select**, and **Exit**. Use Up/Down or D-pad to focus an action, Enter/Space/Start (or A) to confirm it, and Esc/Back (or B) to exit without advancing. See [Controls & Input](../controls/) for native level-select and browser-replay behavior.
 
@@ -268,6 +268,8 @@ levels = [
 | Progression | Each non-final listed level must set `[last_star].next_phase` to the next manifest entry. The final listed level must omit `next_phase`. |
 
 The manifest order drives the native selector and generated [Level Catalog](../level-catalog/): Creator's Playground, then Volcanic Depths 1 and 2. `make validate-levels` checks the manifest, campaign levels and `levels/labs/*.toml`. The editor's [Campaign view](../level-editor/#campaign-view) (`Ctrl+M`) edits the manifest with the same rules: reorder, add, remove and rename levels, and relink every `next_phase` to the order in one step.
+
+A manifest may list at most 128 levels (`CAMPAIGN_MAX_LEVELS`, the number of levels a profile can hold results for) and is read with a 64 KiB size limit; a level file is read with a 1 MiB limit (`LEVEL_TEXT_MAX`). Both are far above anything hand-written and exist so a crafted or mistaken file is refused before it is parsed.
 
 At runtime, breaking the Version, Membership or Paths rules rejects the whole manifest. A listed file that is missing or invalid, or that breaks Progression, only disables its own entry: the menu lists it greyed out as "Unavailable: <reason>" (`level file not found`, `level file is invalid`, `next_phase is out of campaign order`, `final level has a next_phase`) and keeps every other level playable. A disabled entry is not reachable through the campaign at all: the previous level's **Next Level** refuses it with "Next level is unavailable in the campaign", and `--continue` opens the selector instead. A manifest with no playable entry is rejected. `--level <path>` bypasses the selector and the manifest, and can open any valid TOML file, a disabled entry's included. The mechanics museum remains a separate collection of standalone examples.
 
@@ -560,7 +562,7 @@ path = "assets/sprites/foregrounds/fog_1.png"
 path = "assets/sprites/foregrounds/fog_2.png"
 ```
 
-Background layers are drawn in array order (first = furthest back). Up to 8 background layers, 8 foreground layers and 4 fog layers are supported; every path must match `assets/sprites/*.png` and fit in 63 bytes. Speed `0.0` tiles the image but does not scroll; speed `1.0` would scroll at the same rate as the camera (appears fixed in world space). Most parallax layers use `0.1`–`0.5`. `foreground_layers` select the water/lava foreground strip texture, while `fog_layers` configure semi-transparent atmospheric overlays loaded by the fog system.
+Background layers are drawn in array order (first = furthest back). Up to 8 background layers, 8 foreground layers and 4 fog layers are supported; every path must match `assets/sprites/*.png` and fit in 63 bytes, and every folder and file name in an asset path (music, floor tile, platform tile and layer paths alike) follows the same portable-name rule as a [level reference](#level-references): no Windows-reserved character and no Windows device name such as `con.png`, so a level that loads on one system loads on all of them. Speed `0.0` tiles the image but does not scroll; speed `1.0` would scroll at the same rate as the camera (appears fixed in world space). Most parallax layers use `0.1`–`0.5`. `foreground_layers` select the water/lava foreground strip texture, while `fog_layers` configure semi-transparent atmospheric overlays loaded by the fog system.
 
 Common background images in `assets/sprites/backgrounds/` (the folder also has `smoke_*` layers and `*_lightened` variants):
 

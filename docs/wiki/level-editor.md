@@ -46,7 +46,7 @@ file to learn the tools.
 
 | Area | Size | Contents |
 |------|------|----------|
-| Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, Campaign (lit while the [Campaign View](#campaign-view) is open; clicking it then closes the view), Contrast (lit while on: every panel, button and field switches to a high-contrast style, black with white outlines and text at 7:1 or more; the level canvas keeps its colours; remembered for the next session), Fog (lit while the fog layers are drawn over the canvas), file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs). The current tool and every toggle that is on (Grid, Debug, Campaign, Contrast) are drawn in the selected colour, with a yellow outline in high contrast |
+| Toolbar | 1280 × 32 px | Tool selector (Select / Place / Delete), Grid and Debug toggles, zoom dropdown, Campaign (lit while the [Campaign View](#campaign-view) is open; clicking it then closes the view), Contrast (lit while on: every panel, button and field switches to a high-contrast style, black with white outlines and text at 7:1 or more; the level canvas keeps its colours; remembered for the next session), Fog (lit while the fog layers are drawn over the canvas), Entities (lit while the [Entities list](#entities-list) is open), file buttons (New, Open, Save As, Save), Play (Stop while a playtest runs). The current tool and every toggle that is on (Grid, Debug, Campaign, Contrast, Fog, Entities) are drawn in the selected colour, with a yellow outline in high contrast |
 | Canvas | 896 × 656 px | Scrollable level view with zoom. All entity types drawn at game-accurate sizes, over the level's background layers drawn as the game draws them (each scrolls with the view at its own speed); the toolbar's **Fog** toggle adds the fog layers (held still); the space outside the level (left of 0, past its last screen, below its height) is darkened |
 | Panel | 384 × 656 px | Level config (at most half the column), entity palette and properties inspector, as collapsible sections that follow the tool: with an entity selected and the Select or Delete tool, the palette folds to its title (clicking it takes up Place) and the selection's properties fill the rest of the column, scrolling when they are taller; with Place, the palette fills the column above a 200 px properties panel |
 | Status bar | 1280 × 32 px | Cursor world coordinates, snap-to-grid state, active tool, validation summary, entity count (every placement except the player spawn), current filename with ` *` when modified, latest status message (a message too long for the bar ends in `...`; rest the pointer on it to read all of it, as with a long validation message in the side panel); under the canvas, in its bottom rows, the [minimap](#minimap) |
@@ -70,7 +70,7 @@ input, so autosave, tooltips and the playtest status check work as before;
 they time themselves by the clock, not by frames. A hidden window (the
 `--smoke-test` render) keeps its own pacing.
 
-The mouse pointer changes with what it is over: an I-beam on a field you can type in, four-way arrows while entities are being dragged, and up-down arrows while a scrollbar's thumb is held.
+The mouse pointer changes with what it is over: an I-beam on a field you can type in, four-way arrows while entities are being dragged, up-down arrows while a scrollbar's thumb is held, and on a [resize handle](#patrol-ranges-and-resize-handles) arrows along the way it moves (left-right, up-down, or diagonal for a rail's corner).
 
 ### Minimap
 
@@ -174,6 +174,56 @@ bridge, pad, ladder or rope: `level_validate_preview`) pauses the canvas:
 clicks then report `Canvas paused: <error>` in the status bar until you fix the
 field in the side panel or press Ctrl+Z.
 
+### Patrol Ranges and Resize Handles
+
+The canvas draws the range of every patrolling enemy (spiders, jumping
+spiders, birds, faster birds, fish, faster fish) and of every circular saw: a
+thin amber line with a dark edge and a tick at each end, at the middle of the
+entity's height. The ranges of selected entities are drawn at full strength
+and all the others faintly; there is no toggle. A range that is outside the
+view is not drawn. The line covers the stretch the sprite travels, which is
+the meaning level validation gives the stored fields: an enemy turns round
+when its left edge reaches `patrol_x0` and when its right edge reaches
+`patrol_x1`, so the line runs from one to the other. A saw moves its own `x`
+between the two, so its line ends one sprite width (32 px) past `patrol_x1`.
+
+With exactly one entity selected and the Select tool active, the canvas also
+draws small square handles on it (8 canvas pixels, white with a black edge, at
+every zoom). Drag one with the left button:
+
+| Entity | Handle | What the drag changes |
+|--------|--------|-----------------------|
+| Spider, Jumping Spider, Bird, Faster Bird, Fish, Faster Fish, Circular Saw | Each end of the range line | `patrol_x0` / `patrol_x1` |
+| Platform | Middle of the right edge; middle of the top edge | `tile_width`; `tile_height` (a pillar grows upward) |
+| Spike Row | Middle of the right edge | `count` |
+| Spike Platform, Float Platform | Middle of the right edge | `tile_count` (a platform on a rail grows on both sides of its rail point) |
+| Bridge | Middle of the right edge | `brick_count` |
+| Vine, Ladder, Rope | Middle of the bottom edge | `tile_count` |
+| Rail | Bottom-right corner | `w` and `h` together (`w` alone for a horizontal rail) |
+
+- Sizes change by whole tiles: the count is the one whose edge is nearest the
+  pointer. A patrol end follows the pointer in whole pixels, or lands on the
+  nearest 48 px grid line while snap is on (`S`); holding `Shift` during the
+  drag turns that the other way, as it does for a move.
+- The drag starts once the pointer has moved 3 canvas pixels, so a click on a
+  handle changes nothing. A press counts as on the handle up to 6 canvas
+  pixels from its centre, whatever the zoom.
+- The value never leaves what level validation accepts: a size stops at the
+  last tile count the level is still valid with (16 spikes, a vine that ends
+  at the bottom of the level, a rail no smaller than 2 × 2 and no shorter than
+  the riders on it need), and a patrol end stays inside the world, on its own
+  side of the entity, at least one sprite width from the other end. The right
+  end also stays at or past the sprite's right edge.
+- The status bar shows the value while you drag (`Spider patrol: 150 to 430
+  (280 px)`, `Rail: 6 x 4 tiles`).
+- Releasing the button records one undo step (`Undid: changed Rail`). `Esc`
+  during the drag cancels it and restores the value. Until the release,
+  keyboard commands and right-click wait, as during a move.
+- Only a plain press takes a handle. `Shift+click` and `Alt+click` there keep
+  their selection meaning, so an entity lying under a handle can still be
+  added to the selection or reached by cycling. With several entities
+  selected, or with the Place or Delete tool, there are no handles.
+
 ---
 
 ## Entity Palette
@@ -193,9 +243,47 @@ Palette rows are text labels; clicking one selects that type and switches to the
 
 ---
 
+## Entities List
+
+`Ctrl+F`, or the toolbar's **Entities** button, opens a list of every entity in
+the level. It takes the place of Level Config and the palette in the right
+column until it is closed; the selection's properties keep 200 px under it.
+The caret starts in the **Find** field.
+
+- Rows are grouped by type, in the order of the `EntityType` list (floor gaps
+  first, the player spawn last), under a heading with the
+  type's name and how many are listed. Each row reads `Type #index (x, y)`,
+  for example `Coin #3 (120, 96)`: the index is the entity's place in its TOML
+  array and the position is the top-left corner of the entity as the canvas
+  draws it, in whole world pixels (a checkpoint shows its own `x` and `y`, a
+  flame its own `x`). A rail rider whose rail is missing reads `(no rail)`.
+- The **Find** text narrows the rows as you type. It is split into words at
+  spaces, commas and brackets, and every word has to fit: a whole number fits
+  entities whose listed x or y is that number (`96`, or `120 96` for both), and
+  any other word fits types whose name contains it, in any case (`spi` lists
+  Spider, Jumping Spider, Spike Row, Spike Platform and Spike Block). The
+  title bar says how many entities are listed.
+- Clicking a row selects that entity with the Select tool and centres the
+  canvas on it. `Shift+click` adds the entity to the selection, or takes it
+  out, and leaves the view where it is. Selected rows are highlighted.
+- The mouse wheel scrolls the rows, one row per notch; the scrollbar on the
+  right can be dragged.
+- `Esc` closes the list (the first `Esc` gives up text being typed in **Find**),
+  and so does a click on its title bar or on the toolbar button. Choosing the
+  Place tool closes it too, because placing needs the palette, and opening the
+  list from the Place tool switches to Select. Clicking a validation message
+  about a Level Config field closes it to show that field.
+
+The rows are read from the level on every frame, never stored, so they are
+right after undo, redo, delete, paste and opening another level. Each entity
+array has a fixed capacity (`MAX_*`), so the list is at most a few hundred
+rows.
+
+---
+
 ## Properties Inspector
 
-When one entity is selected with the Select tool, the Properties panel displays its editable fields (with several selected it shows how many of each type instead). All fields match the TOML schema exactly — what you see in the inspector is what gets written to the file. The labels read as words (`Patrol left:` for `patrol_x0`, `Start frame:` for `frame_index`); resting the pointer on one shows what the value means, its unit and the TOML key, for example `Left end of the patrol, in pixels (patrol_x0)`.
+When one entity is selected with the Select tool, the Properties panel displays its editable fields (with several selected of different types it shows how many of each type instead; with several of **one** type it shows that type's fields with the primary entity's values, and a value typed into a field is given to every selected entity as one undo step, or to none of them, with the reason in the status bar, when it would add a validation error to any). All fields match the TOML schema exactly — what you see in the inspector is what gets written to the file. The labels read as words (`Patrol left:` for `patrol_x0`, `Start frame:` for `frame_index`); resting the pointer on one shows what the value means, its unit and the TOML key, for example `Left end of the patrol, in pixels (patrol_x0)`.
 
 **Example — Spider:**
 - `x`, `vx`, `patrol_x0`, `patrol_x1`, `frame_index`
@@ -258,6 +346,14 @@ level-wide fields are:
 - `initial_hearts` (0–3), `initial_lives` (0 in either means the game's default of 3)
 - `score_per_life`, `coin_score` (0 = the defaults, 1000 and 100)
 - A collapsible Movement Physics group for the optional `[physics]` overrides
+- Collapsible Background Layers, Foreground Layers and Fog Layers lists (up
+  to 8, 8 and 4 rows). Each row has the layer's image, its scroll speed and
+  three small buttons: `^` moves the row up, `v` moves it down and `x` removes
+  that row. Layers are drawn in list order, first row furthest back, so moving
+  a row changes the canvas preview at once. `^` is switched off on the first
+  row and `v` on the last. Under the rows, `+ Add` appends a layer and
+  `- Remove Last` drops the last one. Every one of these clicks is one undo
+  step (`Undid: changed level settings`).
 
 The player start and the floor gaps are canvas entities: move the Player Spawn
 marker, and place or delete Floor Gap entities. A floor gap's `x` field rounds
@@ -343,7 +439,9 @@ The [Campaign View](#campaign-view) keeps a separate, smaller history for its ow
 
 The editor keeps recent files (the last 5), its settings (`editor_settings.txt`: the Contrast toggle) and recovery snapshots for modified levels in its OS preference directory, retaining the `Super Mango/Editor/` organization/application suffix. Autosave runs every 30 seconds while the level is modified. Recovery snapshots must load through the same validation as any level, so while the current level has validation errors autosave writes the most recent valid version of the document instead ("Autosaved last valid version"); if nothing newer than the saved file is valid, it skips that round. Every attempt, successful or not, restarts the 30-second timer, so a failing autosave reports `Autosave failed; retrying in 30 s` at most once per interval.
 
-The folder holds at most 32 recovery copies. When leftover copies fill it, autosave pauses with `Autosave paused: 32 old recovery copies fill the folder; Ctrl+R to recover or discard them` instead of failing silently. `Ctrl+R` shows one copy at a time (source file and time) with **Cancel / Recover / Discard**; with several copies the third button is **More...**, which offers **Back / Discard... / Next**, and **Discard...** asks **Back / This copy / All N copies**. Discard deletes that copy's files; **All N copies** deletes every copy offered (never another running editor's live copy) and closes the picker. Each copy records the process id of the editor that wrote it and when that editor started: a copy whose editor is still running (a second editor window, say) is that editor's live work and is never offered or deleted by another one. The start time tells a crashed editor from an unrelated program that later got the same process id, so such a crash copy is still offered, on Windows, Linux and macOS alike. Only when the system will not tell the editor that start time (a program run by another user, on macOS and Windows) is the process id compared alone, and the copy reappears once that program ends. A snapshot file that lost its `.meta` description can never be offered, so the editor deletes such orphans when it starts, once they are more than five minutes old (a younger one may be another editor's first snapshot, whose `.meta` is written right after it).
+The folder holds at most 32 recovery copies. When leftover copies fill it, autosave pauses with `Autosave paused: 32 old recovery copies fill the folder; Ctrl+R to recover or discard them` instead of failing silently. `Ctrl+R` shows one copy at a time (source file and time) with **Cancel / Recover / Discard**; with several copies the third button is **More...**, which offers **Back / Discard... / Next**, and **Discard...** asks **Back / This copy / All N copies**. Discard deletes that copy's files; **All N copies** deletes every copy offered (never another running editor's live copy) and closes the picker. Each copy records the process id of the editor that wrote it and when that editor started: a copy whose editor is still running (a second editor window, say) is that editor's live work and is never offered or deleted by another one. The start time tells a crashed editor from an unrelated program that later got the same process id, so such a crash copy is still offered, on Windows, Linux and macOS alike. Only when the system will not tell the editor that start time (a program run by another user, on macOS and Windows) is the process id compared alone, and the copy reappears once that program ends. A snapshot file that lost its `.meta` description can never be offered, so the editor deletes such orphans when it starts, once they are more than five minutes old (a younger one may be another editor's first snapshot, whose `.meta` is written right after it). The same start-up sweep removes a `.meta` whose snapshot is gone and a playtest snapshot left by an editor that is no longer running, and it rewrites a damaged `.meta` from the destination stored inside its snapshot, so that copy is offered again rather than hidden.
+
+While any leftover copy is waiting, the status bar shows **Recovery: N (Ctrl+R)**; it stays until the copies are recovered or discarded, and a click on it opens the picker. The snapshot of the document that is open right now is not a leftover: it is neither counted nor offered. A recovered copy becomes the open document at once (this editor takes ownership of its snapshot), and its first Save asks **Cancel / Replace / Save As** with the words "This is a recovered copy of <path>"; Replace creates the file when the original no longer exists.
 
 ---
 
@@ -440,7 +538,9 @@ The ` *` in the title compares the view with the files, so it follows the histor
 
 The title bar and status bar show an asterisk (`*`) after the filename when there are unsaved changes. New, Open, a recent file, a dropped level, recovery and quit first ask **Save / Discard / Cancel** when the level has been modified; Save continues only if the save succeeds.
 
-These questions, and the editor's other two- and three-button ones (an invalid field value, replacing a file, a file changed on disk, the Recover picker, skipping an Undo step), are asked inside the editor window: the editor dims behind a box with the question and its buttons. The highlighted button starts on the safe default and `Enter` (or `Space`) presses it; `Tab`, `Shift+Tab` and the arrow keys move the highlight; `Esc`, or closing the window, cancels; a click (press and release on the same button) chooses that button. The editor waits until one is chosen. Only the file pickers (Open, Save As) are still the system's own dialogs.
+These questions, and the editor's other two- and three-button ones (an invalid field value, replacing a file, a file changed on disk, the Recover picker, skipping an Undo step), are asked inside the editor window: the editor dims behind a box with the question and its buttons. The highlighted button starts on the safe default and `Enter` (or `Space`) presses it; `Tab`, `Shift+Tab` and the arrow keys move the highlight; `Esc`, or closing the window, cancels; a click (press and release on the same button) chooses that button. The editor waits until one is chosen. Only the file pickers (Open, Save As) are still the system's own dialogs. On Linux the picker is `zenity`, or `kdialog` when zenity is not installed; with neither, the editor asks for the path in the same kind of in-window box, with one line to type into (`Enter` accepts, `Esc` cancels, `Ctrl+V` pastes), so a level can always be opened and saved.
+
+The editor knows a document by its absolute path, however it was named when opened; that is the path kept in the recent list and in recovery snapshots, so neither can point at another file from another working folder. The status bar shows a path inside the working folder relative to it, and shortens a long one to its end, so the file name is always readable.
 
 A drop opens a level only when it is exactly one file ending in `.toml` (in any letter case); two files, or a picture, leave the document alone and the status bar says `Drop one .toml level to open it`. Drops are ignored while a playtest runs. If the Campaign view has unsaved changes, the first drop only warns (`Save them, or drop the level again to discard them`) and a second drop closes the view and opens the level. raylib copies a dropped path into a fixed buffer (256 bytes on Windows, 4096 elsewhere) and cuts a longer one short, so a path that fills it is refused; open such a file with `Ctrl+O`.
 
@@ -472,6 +572,8 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `editor_chrome.c`, `editor_panels.c`, `editor_layout.c` | Toolbar, status bar and side-panel layout |
 | `editor_minimap.c` | The [minimap](#minimap) strip in the status bar: drawing and click/drag scrolling |
 | `editor_shortcuts.c` | The shortcut table behind the toolbar tooltips and the F1 shortcut list |
+| `editor_handles.c` / `editor_handles.h` | [Patrol ranges and resize handles](#patrol-ranges-and-resize-handles): where they are, and the resize drag (begin, motion, release, Esc); `canvas.c` draws them and `tools_drag.c` routes the mouse to them |
+| `editor_entity_list.c` / `editor_entity_list.h` | The [Entities list](#entities-list): its rows, the search and the clicks |
 | `editor_files.c`, `editor_session.c` | Open/save/Save As, playtest copies and recent files; dirty tracking, document hash and confirmation prompts; the focus-dependent frame cap (`editor_pace_frames`, called by the editor's frame and a prompt's) |
 | `editor_recovery.c` | Autosave every 30 s while dirty, and crash recovery: finding leftover snapshots, the Recover picker, loading and retiring them |
 | `editor_playtest.c` | Launching, stopping and reaping the playtest game process |
@@ -489,7 +591,7 @@ The editor uses focused modules in `src/editor/` and shared persistence/UI code 
 | `undo.c` / `undo.h` | Undo stack and `PlacementData` clipboard union |
 | `src/shared/serializer.h`, `serializer_load.c`, `serializer_load_*.c` | Public TOML API and staged parsing into `LevelDef`, including strict checkpoints |
 | `src/shared/serializer_save.c`, `serializer_emit.c`, `serializer_io.c` | TOML emission and atomic file persistence |
-| `file_dialog.c` | Native OS file pickers for Open and Save As (macOS `osascript`, Linux `zenity`, Windows PowerShell) |
+| `file_dialog.c` | Native OS file pickers for Open and Save As (macOS `osascript`, Linux `zenity` or `kdialog`, Windows PowerShell), falling back to the in-window path prompt when there is none |
 | `dialog_choice.c` / `dialog_choice.h` | The two- and three-button prompts, drawn in the editor window by a small frame loop of their own (`dialog_choice`) |
 
 The `EditorState` struct mirrors the game's `GameState` design: one container passed by pointer to every function, owning its raylib render target, textures, level data, camera, tools, undo history and UI state. Text uses raylib's built-in font, which the UI borrows and never unloads. The standalone editor owns its process window; native file pickers use the existing OS-dialog boundary, and confirmations are drawn in that window.

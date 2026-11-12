@@ -201,7 +201,7 @@ static int resume_valid(const GameResume *r)
         r->checkpoint < -1 || r->checkpoint >= MAX_CHECKPOINTS ||
         r->legacy_screen < 0 || r->legacy_screen > 1000 ||
         r->score < 0 || r->level_score_start < 0 || r->level_score_start > r->score ||
-        r->score_life_next < 0 || r->lives < 0 ||
+        r->score_life_next < 0 || r->lives < 0 || r->lives > GAME_RESUME_LIVES_MAX ||
         !isfinite(r->respawn_x) || !isfinite(r->respawn_y) ||
         r->respawn_x < -1e6f || r->respawn_x > 1e6f || r->respawn_y < -1e6f || r->respawn_y > 1e6f ||
         !isfinite(r->elapsed) || r->elapsed < 0 || r->elapsed > 1e9f) return 0;

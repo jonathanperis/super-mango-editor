@@ -3,9 +3,12 @@
  * Everything below the title screen: the playable cabinet, what is in the
  * game, how to learn from it, the manual index and the downloads.
  *
- * The inline script at the bottom boots the WebAssembly build. It relies on
- * these ids and classes, which must keep their names: #play (with
- * data-asset-base), #game-viewport, #canvas, #game-status,
+ * Two inline scripts at the bottom start the WebAssembly build. The first is
+ * web/boot.js, pasted in whole: the boot sequence this page shares with the
+ * standalone page (web/shell.html). The second is this page's own part: the
+ * Play buttons and the status text. It relies on these ids and classes,
+ * which must keep their names: #play (with data-asset-base and
+ * data-asset-query), #game-viewport, #canvas, #game-status,
  * .cabinet-standby, .cabinet-standby-note, #play-btn, #debug-btn,
  * #touch-controls and the [data-start-game] buttons.
  */
@@ -15,9 +18,25 @@ import { art } from '@/lib/art';
 import { DOCS_META, SECTION_CATEGORIES } from '@/lib/docsSidebar';
 import facts from '../../generated/project.json';
 import gameLoopSource from '../../../../src/core/game_loop.c?raw';
+import bootSource from '../../../../web/boot.js?raw';
 import { sourceExcerpt } from '@/lib/sourceExcerpt';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+// The Pages build passes the commit being deployed. The page then asks for
+// the game files as super-mango.js?v=<commit> (and .wasm, .data), so a
+// browser that cached an older deploy cannot pair an old file with a new
+// one. Unset in local builds and pull request checks: plain file names.
+const assetVersion = String(import.meta.env.PUBLIC_GAME_ASSET_VERSION ?? '').trim();
+if (assetVersion && !/^[0-9A-Za-z._-]{1,64}$/.test(assetVersion)) {
+    throw new Error(`PUBLIC_GAME_ASSET_VERSION may only hold letters, digits, ".", "_" and "-": ${assetVersion}`);
+}
+const assetQuery = assetVersion ? `?v=${assetVersion}` : '';
+// The boot script is pasted into a script element, so it must not contain
+// text that would end that element early.
+if (/<\/?script|<!--/i.test(bootSource)) {
+    throw new Error('web/boot.js must not contain script tags or HTML comment openers');
+}
 
 const loopExcerpt = sourceExcerpt('src/core/game_loop.c', gameLoopSource, 'int steps = game_inspector_steps', '\n\n    /* ---- 4. Render');
 
@@ -51,7 +70,7 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
 }));
 ---
 
-<section id="play" class="section play-section" data-asset-base={`${base}/`} aria-labelledby="play-title">
+<section id="play" class="section play-section" data-asset-base={`${base}/`} data-asset-query={assetQuery} aria-labelledby="play-title">
     <div class="section-head">
         <Sprite sheet={art.coin} scale={3} />
         <div>
@@ -69,7 +88,7 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
                     aria-label="Super Mango game canvas - press Play to start"
                 ></canvas>
                 <p id="game-status">
-                    <span class="cabinet-standby">Ready when you are</span>
+                    <span class="cabinet-standby" role="status" aria-live="polite">Ready when you are</span>
                     <span class="cabinet-standby-note">The game downloads only when you press play: about {facts.assetMiB} MB of art and sound plus the engine.</span>
                     <button id="play-btn" type="button" data-start-game="play">&#9654; Play</button>
                     <button id="debug-btn" type="button" data-start-game="debug">Play with the debug inspector</button>
@@ -194,6 +213,7 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
     </div>
 </section>
 
+<script is:inline set:html={bootSource}></script>
 <script is:inline>
     const canvas = document.getElementById('canvas');
     const statusEl = document.getElementById('game-status');
@@ -203,12 +223,26 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
     const statusMessage = statusEl?.querySelector('.cabinet-standby');
     const statusNote = statusEl?.querySelector('.cabinet-standby-note');
     const gameAssetBase = document.getElementById('play')?.dataset.assetBase || './';
+    const gameAssetQuery = document.getElementById('play')?.dataset.assetQuery || '';
 
     canvas?.addEventListener('contextmenu', (event) => event.preventDefault());
 
     let gameBooted = false;
     let reloadRequired = false;
-    let touchControls = null;
+
+    // The game is not running. Bring the buttons back and say why. After
+    // most failures only a reload helps; a failed download can be retried.
+    function showFailure(message, needsReload) {
+        gameBooted = false;
+        reloadRequired = needsReload;
+        statusEl.style.display = '';
+        if (statusMessage) statusMessage.textContent = message;
+        playBtn.style.display = 'inline-block';
+        playBtn.disabled = false;
+        playBtn.textContent = needsReload ? 'Reload game' : 'Retry normal run';
+        if (debugBtn) { debugBtn.style.display = 'inline-block'; debugBtn.disabled = false; }
+        playBtn.focus();
+    }
 
     function startGame(debug = false) {
         if (reloadRequired) { window.location.reload(); return; }
@@ -218,66 +252,24 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
         playBtn.disabled = true;
         if (debugBtn) debugBtn.disabled = true;
         playBtn.textContent = debug ? 'Loading diagnostics...' : 'Loading run...';
-        canvas.tabIndex = 0;
         statusEl.dataset.mode = debug ? 'debug' : 'play';
         playBtn.style.display = 'none';
         if (debugBtn) debugBtn.style.display = 'none';
         if (statusNote) statusNote.style.display = 'none';
         if (statusMessage) statusMessage.textContent = debug ? 'Booting developer diagnostics...' : 'Downloading normal game data...';
 
-        // Replay restarts the level inside the running game, so the page
-        // always boots the sandbox level.
-        const args = ['--level', 'levels/00_sandbox_01.toml'];
-        if (debug) args.push('--debug');
-
-        const handleContextLoss = (event) => {
-            event.preventDefault();
-            showFailure('WebGL context lost. Reload to continue.', true);
-        };
-        canvas.addEventListener('webglcontextlost', handleContextLoss, false);
-
-        const handleKeyDown = (event) => {
-            if (document.activeElement !== canvas) return;
-            // Run before the canvas backend listeners: leaving default handling to
-            // them would consume Tab and trap focus inside the canvas.
-            const modifierOnly = /^(Control|Meta)(Left|Right)$/.test(event.code);
-            if (event.code === 'Tab' || ((event.ctrlKey || event.metaKey) && !modifierOnly)) {
-                event.stopImmediatePropagation();
-                return;
-            }
-            if (!event.ctrlKey && !event.metaKey) event.preventDefault();
-        };
-        document.addEventListener('keydown', handleKeyDown, true);
-
-        function showFailure(message, needsReload) {
-            if (touchControls) touchControls.setEnabled(false);
-            gameBooted = false;
-            reloadRequired = needsReload;
-            canvas.setAttribute('aria-label', 'Super Mango game canvas - not running');
-            document.removeEventListener('keydown', handleKeyDown, true);
-            canvas.removeEventListener('webglcontextlost', handleContextLoss);
-            statusEl.style.display = '';
-            if (statusMessage) statusMessage.textContent = message;
-            playBtn.style.display = 'inline-block';
-            playBtn.disabled = false;
-            playBtn.textContent = needsReload ? 'Reload game' : 'Retry normal run';
-            if (debugBtn) { debugBtn.style.display = 'inline-block'; debugBtn.disabled = false; }
-            playBtn.focus();
-        }
-
-        const moduleConfig = {
-            arguments: args,
+        // Everything about starting the game itself (Emscripten's settings,
+        // the script tag, the keyboard scope, lost WebGL contexts, failed
+        // downloads) lives in web/boot.js. This page only reacts.
+        window.SuperMangoBoot.start({
             canvas,
-            print(text) { console.log(`[Super Mango] ${text}`); },
-            printErr(text) {
-                console.error(`[Super Mango] ${text}`);
-            },
-            onAbort() { showFailure('Game startup failed. Reload to retry.', true); },
-            onGameEnded(fatal, profileError) {
-                showFailure(fatal ? 'Game ended with an error.' : profileError
-                    ? 'Run ended. Profile changes were not saved.' : 'Run ended. Play again?', true);
-            },
-            setStatus(text) {
+            touchRoot: document.getElementById('touch-controls'),
+            assetBase: gameAssetBase,
+            assetQuery: gameAssetQuery,
+            debug,
+            injectScript: true,
+            logPrefix: '[Super Mango] ',
+            onStatus(text) {
                 if (!text) {
                     statusEl.style.display = 'none';
                     playBtn.style.display = 'none';
@@ -286,73 +278,21 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
                     statusEl.style.display = '';
                 }
             },
-            monitorRunDependencies(left) {
-                if (left === 0) {
-                    moduleConfig.setStatus('Launching run...');
-                }
+            // Keep the game in view: when it starts, and when a touch
+            // button is pressed after the page was scrolled.
+            onRunning() { gameViewport?.scrollIntoView({block: 'start', behavior: 'instant'}); },
+            onTouch(action, pressed) {
+                if (pressed) gameViewport?.scrollIntoView({block: 'start', behavior: 'instant'});
             },
-            onRuntimeInitialized() {
-                if (!touchControls) touchControls = window.SuperMangoTouch.mount(
-                    document.getElementById('touch-controls'), canvas,
-                    (action, pressed) => {
-                        if (pressed) gameViewport?.scrollIntoView({block: 'start', behavior: 'instant'});
-                        return moduleConfig._game_web_input_touch(action, pressed);
-                    });
-                moduleConfig.clearTouchInput = () => touchControls.clear();
-                canvas.focus({preventScroll: true});
-                moduleConfig.setStatus('');
-                window.setTimeout(() => {
-                    if (moduleConfig.__superMangoMainStarted) return;
-                    moduleConfig.__superMangoMainStarted = true;
-                    try {
-                        const code = moduleConfig.callMain(moduleConfig.arguments || []);
-                        if (code) showFailure('Game startup failed. Reload to retry.', true);
-                        else {
-                            touchControls.setEnabled(true);
-                            canvas.setAttribute('aria-label', 'Super Mango game canvas - running; F1 opens settings');
-                            gameViewport?.scrollIntoView({block: 'start', behavior: 'instant'});
-                        }
-                    } catch (error) {
-                        console.error('[Super Mango] startup failed', error);
-                        showFailure('Game startup failed. Reload to retry.', true);
-                    }
-                }, 0);
-            },
-        };
-
-        window.Module = moduleConfig;
-
-        const script = document.createElement('script');
-        script.src = `${gameAssetBase}super-mango.js`;
-        script.onerror = () => {
-            if (touchControls) { touchControls.destroy(); touchControls = null; }
-            script.remove();
-            showFailure('Failed to load game files. Retry the download.', false);
-        };
-        document.body.appendChild(script);
+            onFailure: showFailure,
+        });
     }
 
-    // The .wasm and .data files are most of the download, and super-mango.js
-    // asks for them only once it has loaded and run. Starting them on the
-    // click lets them download during the scroll and the script's own
-    // download. Emscripten fetches both in CORS mode with same-origin
-    // credentials, which crossorigin gives a preload, so it reuses them.
-    function preloadGameFiles() {
-        for (const name of ['super-mango.wasm', 'super-mango.data']) {
-            const href = `${gameAssetBase}${name}`;
-            if (document.head.querySelector(`link[rel="preload"][href="${href}"]`)) continue;
-            const link = document.createElement('link');
-            link.rel = 'preload';
-            link.as = 'fetch';
-            link.crossOrigin = 'anonymous';
-            link.href = href;
-            document.head.appendChild(link);
-        }
-    }
-
+    // Starting the two big downloads on the click lets them run during the
+    // scroll and the script's own download (see preload in web/boot.js).
     function requestGameStart(debug = false) {
         const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-        preloadGameFiles();
+        window.SuperMangoBoot.preload(document, gameAssetBase, gameAssetQuery);
         document.getElementById('play')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
         // The script compiles the game on the main thread; give the smooth
         // scroll a moment to start first.

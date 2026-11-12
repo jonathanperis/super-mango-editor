@@ -8,6 +8,7 @@
 #define display_viewport web_pacing_display_viewport
 #define display_scale_fit web_pacing_display_scale_fit
 #define display_keep_on_monitor web_pacing_display_keep_on_monitor
+#define display_frame_cap web_pacing_display_frame_cap
 #define SetTraceLogLevel web_pacing_trace
 #define SetConfigFlags web_pacing_flags
 #define InitWindow web_pacing_init
@@ -40,6 +41,19 @@ int web_frame_pacing_contract_test(void)
             requested_fps != 0) {
             fprintf(stderr, "Web pacing: hidden=%d requested blocking FPS=%d\n",
                     hidden, requested_fps);
+            return 1;
+        }
+    }
+    /* A native window draws one frame per refresh of its display; a rate
+     * the system cannot report, or an impossible one, falls back to 60. */
+    static const struct { int refresh_hz, cap; } cases[] = {
+        {60, 60}, {75, 75}, {120, 120}, {144, 144}, {240, 240}, {360, 360},
+        {30, 30}, {0, 60}, {-1, 60}, {29, 60}, {361, 60}, {100000, 60},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        if (web_pacing_display_frame_cap(cases[i].refresh_hz) != cases[i].cap) {
+            fprintf(stderr, "Frame cap: %d Hz gave %d, expected %d\n", cases[i].refresh_hz,
+                    web_pacing_display_frame_cap(cases[i].refresh_hz), cases[i].cap);
             return 1;
         }
     }

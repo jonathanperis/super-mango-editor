@@ -372,9 +372,19 @@ static int canvas_place_select_drag_delete_and_undo(void)
     }
     CHECK(es.panel_open == 1);
 
-    /* Two full-size frames through editor_run_frame itself. */
-    editor_run_frame(&es);
-    editor_run_frame(&es);
+    /* Two full-size frames through editor_run_frame itself. After each,
+     * the frame just shown is the prompts' backdrop and the next one is
+     * drawn into the other texture: the two trade places, nothing is
+     * copied. */
+    {
+        unsigned int first = es.frame_target.id, second = es.prompt_backdrop.id;
+        CHECK(first != 0 && second != 0 && first != second);
+        editor_run_frame(&es);
+        CHECK(es.prompt_backdrop.id == first && es.frame_target.id == second);
+        CHECK(es.drawing_target == NULL);
+        editor_run_frame(&es);
+        CHECK(es.prompt_backdrop.id == second && es.frame_target.id == first);
+    }
     CHECK(es.running && es.validation_cache_valid);
 done:
     clear_dialog_seams();

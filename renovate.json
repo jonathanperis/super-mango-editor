@@ -56,9 +56,16 @@
   ],
   "packageRules": [
     {
-      "description": "Toolchain and vendored-source pins change generated code or still need a maintainer to finish them (raylib's checksum and patches), so they are never automerged",
+      "description": "Toolchain and vendored-source pins change generated code or still need a maintainer to finish them (raylib's checksum and patches), so they are never automerged. They wait for a person, so Renovate rebases them only when they conflict with main, not every time main moves (each rebase re-ran the whole CI matrix).",
       "matchManagers": ["custom.regex"],
-      "automerge": false
+      "automerge": false,
+      "rebaseWhen": "conflicted"
+    },
+    {
+      "description": "One pull request for the docs site's npm packages (docs/package.json and docs/bun.lock) instead of one per package. Major versions still arrive in a pull request of their own.",
+      "matchManagers": ["npm", "bun"],
+      "matchFileNames": ["docs/**"],
+      "groupName": "docs site dependencies"
     },
     {
       "description": "One pull request for every Emscripten pin and mention",

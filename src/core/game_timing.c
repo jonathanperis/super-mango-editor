@@ -10,27 +10,8 @@
  */
 
 #include "game_timing.h"
-#include <stddef.h>    /* offsetof: which float in a mover is its x or y */
+#include "game_movers.h"   /* game_movers_note */
 #include <stdio.h>
-#include <string.h>    /* memcpy: copy that float without a cast */
-
-/* Copy x and, when y_off >= 0, y out of each record before the step moves
- * them. The simulation keeps the records; the picture reads the copies.
- * y_off < 0 marks a mover whose picture height is not a stored coordinate. */
-static void note_positions(RenderPrev *dst, int count, int max,
-                           const void *base, size_t stride,
-                           size_t x_off, int y_off)
-{
-    if (count < 0) count = 0;
-    if (count > max) count = max;
-    const char *record = base;
-    for (int i = 0; i < count; i++) {
-        memcpy(&dst[i].x, record + x_off, sizeof(dst[i].x));
-        dst[i].y = 0.0f;
-        if (y_off >= 0) memcpy(&dst[i].y, record + (size_t)y_off, sizeof(dst[i].y));
-        record += stride;
-    }
-}
 
 float game_timing_frame_seconds(GameState *gs)
 {
@@ -77,31 +58,9 @@ void game_timing_note_step(GameState *gs)
     loop->prev_camera_x = world->camera.x;
     loop->has_prev = 1;
     /* Same instant as the player, so a rider and the platform under them
-     * are blended from one pair of steps. Float platforms also keep their
-     * own prev_x/prev_y for the landing test; those stay simulation state. */
-    note_positions(loop->prev_spider, world->spider_count, MAX_SPIDERS,
-                   world->spiders, sizeof(Spider), offsetof(Spider, x), -1);
-    note_positions(loop->prev_jumping_spider, world->jumping_spider_count, MAX_JUMPING_SPIDERS,
-                   world->jumping_spiders, sizeof(JumpingSpider),
-                   offsetof(JumpingSpider, x), (int)offsetof(JumpingSpider, y));
-    note_positions(loop->prev_bird, world->bird_count, MAX_BIRDS,
-                   world->birds, sizeof(Bird), offsetof(Bird, x), -1);
-    note_positions(loop->prev_faster_bird, world->faster_bird_count, MAX_FASTER_BIRDS,
-                   world->faster_birds, sizeof(FasterBird), offsetof(FasterBird, x), -1);
-    note_positions(loop->prev_fish, world->fish_count, MAX_FISH,
-                   world->fish, sizeof(Fish), offsetof(Fish, x), (int)offsetof(Fish, y));
-    note_positions(loop->prev_faster_fish, world->faster_fish_count, MAX_FASTER_FISH,
-                   world->faster_fish, sizeof(FasterFish),
-                   offsetof(FasterFish, x), (int)offsetof(FasterFish, y));
-    note_positions(loop->prev_spike_block, world->spike_block_count, MAX_SPIKE_BLOCKS,
-                   world->spike_blocks, sizeof(SpikeBlock),
-                   offsetof(SpikeBlock, x), (int)offsetof(SpikeBlock, y));
-    note_positions(loop->prev_float_platform, world->float_platform_count, MAX_FLOAT_PLATFORMS,
-                   world->float_platforms, sizeof(FloatPlatform),
-                   offsetof(FloatPlatform, x), (int)offsetof(FloatPlatform, y));
-    note_positions(loop->prev_saw, world->circular_saw_count, MAX_CIRCULAR_SAWS,
-                   world->circular_saws, sizeof(CircularSaw),
-                   offsetof(CircularSaw, x), (int)offsetof(CircularSaw, y));
+     * are blended from one pair of steps: every kind in the movers table
+     * (game_movers.c) is noted here, in one loop. */
+    game_movers_note(gs);
 }
 
 /* from + (to - from) * t, or to itself when the step jumped too far. */

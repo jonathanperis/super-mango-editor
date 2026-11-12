@@ -9,13 +9,23 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-MANGO_INLINE_SCRIPT_HASHES'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Mango</title>
+    <meta name="description" content="Super Mango, a 2D platformer written in C, running in your browser as WebAssembly. Keyboard, gamepad and touch controls.">
+    <!-- This bare page shows the same game as the website's home page. Search
+         engines should list that page, which explains what the game is, and
+         not this one or the copies people serve from a release archive. -->
+    <meta name="robots" content="noindex">
     <!-- The .wasm and .data files are most of the download, and
          super-mango.js asks for them only once it has loaded and run. Start
          both now. Emscripten fetches them in CORS mode with same-origin
          credentials, which is what crossorigin gives a preload, so it
-         reuses these responses instead of downloading again. -->
-    <link rel="preload" href="super-mango.wasm" as="fetch" crossorigin>
-    <link rel="preload" href="super-mango.data" as="fetch" crossorigin>
+         reuses these responses instead of downloading again.
+         The MANGO_ASSET_QUERY marker (written between two @ signs) is filled
+         in by tools/web_shell.py when the page is built: it becomes
+         "?v=<commit>" (or nothing in a local build), the
+         same text the boot script appends to every game file's address, so a
+         browser that cached an older deploy cannot mix old and new files. -->
+    <link rel="preload" href="super-mango.wasm@MANGO_ASSET_QUERY@" as="fetch" crossorigin>
+    <link rel="preload" href="super-mango.data@MANGO_ASSET_QUERY@" as="fetch" crossorigin>
     <style>
         body {
             margin: 0;
@@ -113,23 +123,53 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        /* People who ask their system for less motion get a still ring: the
+           text beside it already says that the game is loading. */
+        @media (prefers-reduced-motion: reduce) {
+            .spinner { animation: none; }
+        }
+        #status button {
+            display: block;
+            margin: 12px auto 0;
+            padding: 6px 14px;
+            font: inherit;
+            font-size: 14px;
+            color: #fff;
+            background: #2a2a4a;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #status button:focus-visible {
+            outline: 2px solid #ffd700;
+            outline-offset: 2px;
+        }
     </style>
 </head>
 <body>
     <div id="canvas-container">
         <canvas id="canvas" role="application" aria-label="Super Mango game canvas - loading"></canvas>
         <div id="touch-controls"></div>
+        <!-- role="status" with aria-live="polite" makes a screen reader read
+             the text whenever it changes (loading, running, failed) without
+             interrupting what it was saying. The spinner is decoration. -->
         <div id="status">
-            <div class="spinner"></div>
-            <div>Loading Super Mango...</div>
+            <div class="spinner" aria-hidden="true"></div>
+            <div id="status-text" role="status" aria-live="polite">Loading Super Mango...</div>
         </div>
     </div>
     <button id="fullscreen-btn" type="button" hidden>Fullscreen</button>
 
+    <!-- tools/web_shell.py replaces the marker comment below with the whole of
+         web/boot.js, the boot sequence this page shares with the website's
+         home page. What follows it is only what this page owns: its
+         Fullscreen button and its status text. -->
     <script>
+        /*MANGO_BOOT_JS*/
         (function() {
         var gameCanvas = document.getElementById('canvas');
-        var touchControls = null;
+        var status = document.getElementById('status');
+        var statusText = document.getElementById('status-text');
         // A page may enter fullscreen only while handling the player's own
         // click or key press, so the game cannot do it from its settings
         // menu; this button does. Browsers without element fullscreen
@@ -146,20 +186,12 @@
                 gameCanvas.focus({preventScroll: true});
             });
         }
-        document.addEventListener('keydown', function(event) {
-            if (document.activeElement !== gameCanvas) return;
-            var modifierOnly = /^(Control|Meta)(Left|Right)$/.test(event.code);
-            if (event.code === 'Tab' || ((event.ctrlKey || event.metaKey) && !modifierOnly)) {
-                event.stopImmediatePropagation();
-                return;
-            }
-            if (!event.ctrlKey && !event.metaKey) event.preventDefault();
-        }, true);
+        // The game is not running: say why, and offer the one thing that
+        // helps on this page, loading it again.
         function showRestart(message) {
-            if (touchControls) touchControls.setEnabled(false);
-            gameCanvas.setAttribute('aria-label', 'Super Mango game canvas - not running');
-            var status = document.getElementById('status');
-            status.textContent = message + ' ';
+            var spinner = status.querySelector('.spinner');
+            if (spinner) spinner.style.display = 'none';
+            statusText.textContent = message;
             status.style.display = '';
             status.style.pointerEvents = 'auto';
             var retry = document.createElement('button');
@@ -169,47 +201,18 @@
             status.appendChild(retry);
             retry.focus();
         }
-        var moduleConfig = {
-            canvas: document.getElementById('canvas'),
-            onAbort: function() { showRestart('Game startup failed.'); },
-            onGameEnded: function(fatal, profileError) {
-                showRestart(fatal ? 'Game ended with an error.' : profileError
-                    ? 'Run ended. Profile changes were not saved.' : 'Run ended.');
+        window.SuperMangoBoot.start({
+            canvas: gameCanvas,
+            touchRoot: document.getElementById('touch-controls'),
+            assetQuery: '@MANGO_ASSET_QUERY@',
+            // emcc writes this page's script tag for super-mango.js.
+            injectScript: false,
+            onStatus: function(text) {
+                if (text) statusText.textContent = text;
+                status.style.display = text ? '' : 'none';
             },
-            onRuntimeInitialized: function() {
-                if (!touchControls) touchControls = window.SuperMangoTouch.mount(
-                    document.getElementById('touch-controls'), gameCanvas,
-                    function(action, pressed) { return moduleConfig._game_web_input_touch(action, pressed); });
-                moduleConfig.clearTouchInput = function() { touchControls.clear(); };
-                gameCanvas.tabIndex = 0;
-                gameCanvas.focus({preventScroll: true});
-                if (moduleConfig.__superMangoDebug) moduleConfig.arguments.push('--debug');
-                document.getElementById('status').style.display = 'none';
-                setTimeout(function() {
-                    if (moduleConfig.__superMangoMainStarted) return;
-                    moduleConfig.__superMangoMainStarted = true;
-                    try {
-                        var result = moduleConfig.callMain(moduleConfig.arguments || []);
-                        if (result) showRestart('Game startup failed.');
-                        else {
-                            touchControls.setEnabled(true);
-                            gameCanvas.setAttribute('aria-label', 'Super Mango game canvas - running; F1 opens settings');
-                        }
-                    } catch (error) {
-                        console.error('Super Mango: startup failed', error);
-                        showRestart('Game startup failed.');
-                    }
-                }, 0);
-            },
-            print: function(text) {
-                console.log(text);
-            },
-            printErr: function(text) {
-                console.error(text);
-            }
-        };
-        moduleConfig.arguments = ['--level', 'levels/00_sandbox_01.toml'];
-        window.Module = moduleConfig;
+            onFailure: showRestart
+        });
         })();
     </script>
     {{{ SCRIPT }}}

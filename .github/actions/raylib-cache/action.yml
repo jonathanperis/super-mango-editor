@@ -1,0 +1,95 @@
+name: Cache raylib
+description: >-
+  Restores the checksum-pinned raylib source archive and, when `variant` is
+  given, the compiled raylib tree for this job's toolchain. Runs on main save
+  what they built; every other run (pull requests, tags) only restores.
+
+inputs:
+  variant:
+    description: >-
+      Names the compiled tree in the cache key, for example linux-clang-debug.
+      Jobs that build the same tree pass the same name and share one cache
+      entry. Leave empty to cache only the source archive.
+    required: false
+    default: ''
+  paths:
+    description: >-
+      The raylib build directories to cache, one per line. Jobs that share a
+      variant must pass the same text: actions/cache only matches entries
+      whose path list is identical.
+    required: false
+    default: |
+      out/raylib
+      out/headless/raylib
+  cc:
+    description: The compiler this job builds raylib with (part of the fingerprint).
+    required: false
+    default: clang
+
+# Who may save. A cache entry cannot be overwritten, and pull requests can
+# read the entries that main wrote. Letting every pull request save its own
+# copy only stored the same ~760 MB again for each one, so runs on main save
+# (actions/cache: restore now, save when the job ends) and every other run
+# restores (actions/cache/restore: no save). A pull request that changes the
+# raylib pin or the toolchain builds raylib from source on each push until it
+# is merged.
+#
+# Why a restored tree is safe to reuse: make still runs tools/build_raylib.py,
+# which re-verifies the archive checksum, re-applies the patches (a no-op when
+# present) and re-runs CMake, and CMake rebuilds whatever its own dependency
+# tracking finds stale. The key must match exactly (no restore-keys): it
+# covers the pin, the patches, the build script that chooses the CMake flags,
+# and the fingerprint written by fingerprint.sh (see that file). Even a stale
+# hit cannot link old objects: the restored tree carries its make-options.txt
+# stamp, and options that differ from it re-run build_raylib.py.
+runs:
+  using: composite
+  steps:
+    # The archive only changes with the pin; build_raylib.py re-verifies its
+    # SHA-256 on every use, so a restored copy cannot inject other sources.
+    - name: Cache pinned raylib source archive (main saves)
+      if: github.ref == 'refs/heads/main'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .cache/raylib
+        key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+    - name: Restore pinned raylib source archive (other runs)
+      if: github.ref != 'refs/heads/main'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .cache/raylib
+        key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+    # The fingerprint asks the compiler for its version, so on Windows it
+    # runs in the MSYS2 shell, where that compiler is (setup-msys2-toolchain
+    # must have run first). The two steps are the same script in two shells.
+    - name: Fingerprint the raylib toolchain
+      id: fingerprint
+      if: inputs.variant != '' && runner.os != 'Windows'
+      shell: bash
+      env:
+        MANGO_FINGERPRINT_CC: ${{ inputs.cc }}
+      run: sh .github/actions/raylib-cache/fingerprint.sh >> "$GITHUB_OUTPUT"
+
+    - name: Fingerprint the raylib toolchain (Windows, MSYS2 shell)
+      id: fingerprint-windows
+      if: inputs.variant != '' && runner.os == 'Windows'
+      shell: msys2 {0}
+      env:
+        MANGO_FINGERPRINT_CC: ${{ inputs.cc }}
+      run: sh .github/actions/raylib-cache/fingerprint.sh >> "$GITHUB_OUTPUT"
+
+    - name: Cache compiled raylib (main saves)
+      if: inputs.variant != '' && github.ref == 'refs/heads/main'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.paths }}
+        key: raylib-build-${{ inputs.variant }}-${{ steps.fingerprint.outputs.id || steps.fingerprint-windows.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+
+    - name: Restore compiled raylib (other runs)
+      if: inputs.variant != '' && github.ref != 'refs/heads/main'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.paths }}
+        key: raylib-build-${{ inputs.variant }}-${{ steps.fingerprint.outputs.id || steps.fingerprint-windows.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}

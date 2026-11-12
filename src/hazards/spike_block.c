@@ -74,7 +74,7 @@ void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed) {
  *      direction (speed tiles/s × RAIL_TILE_W px/tile).  fall_vy starts at 0
  *      and gravity accumulates from the next frame onward.
  */
-void spike_block_update(SpikeBlock *sb, float dt, int cam_x) {
+void spike_block_update(SpikeBlock *sb, float dt, int reveal_x) {
     if (!sb->active) return;
 
     /*
@@ -85,24 +85,26 @@ void spike_block_update(SpikeBlock *sb, float dt, int cam_x) {
     sb->spin_angle += SPIKE_SPIN_DEG_PER_SEC * dt;
     if (sb->spin_angle >= 360.0f) sb->spin_angle -= 360.0f;
 
-    /* ---- Waiting state: hold at start until the rail enters the viewport - */
+    /* ---- Waiting state: hold at start until the rail can be seen ------- */
     /*
      * A fall-off rail (open, no end cap) keeps the block frozen at t=0 until
-     * the camera reveals it.  This guarantees the player always witnesses the
-     * block's full run from the left end, making the hazard predictable and
-     * fair.
+     * the player is close enough for the camera to show it.  This guarantees
+     * the player always witnesses the block's full run from the left end,
+     * making the hazard predictable and fair.
      *
-     * Visibility test: the block's world-space rect overlaps the camera window
-     * [cam_x, cam_x + GAME_W).  Because the block starts at the left end of
-     * the rail and the player approaches from the left, the trigger fires as
-     * soon as the block's left edge scrolls into the right side of the screen.
+     * reveal_x is the world x of the furthest-right pixel the camera could
+     * be showing for the player's position (game_camera_reveal_right).  It
+     * comes from the player, not from the camera itself: the camera's
+     * lookahead is switched off by the Reduced motion setting, and a
+     * setting must not decide when a hazard starts moving.  The block
+     * starts at the left end of its rail and the player approaches from the
+     * left, so it wakes as its left edge comes inside that limit.
      */
     if (sb->waiting) {
-        int block_screen_x = (int)sb->x - cam_x;   /* screen-space left edge */
-        if (block_screen_x < GAME_W) {
-            sb->waiting = 0;   /* now visible — begin moving */
+        if ((int)sb->x < reveal_x) {
+            sb->waiting = 0;   /* about to be seen: begin moving */
         } else {
-            return;            /* still off-screen — stay frozen */
+            return;            /* still out of sight: stay frozen */
         }
     }
 
@@ -184,9 +186,9 @@ void spike_block_update(SpikeBlock *sb, float dt, int cam_x) {
     sb->y = cy - sb->h * 0.5f;
 }
 
-void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int cam_x) {
+void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int reveal_x) {
     for (int i = 0; i < count; i++)
-        spike_block_update(&blocks[i], dt, cam_x);
+        spike_block_update(&blocks[i], dt, reveal_x);
 }
 
 /* ------------------------------------------------------------------ */

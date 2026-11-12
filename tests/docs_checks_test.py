@@ -65,6 +65,9 @@ class DocsChecksTest(unittest.TestCase):
              drift.check_content_counts, "says 34 render layers"),
             ("architecture.md", "| 33 | Debug overlay", "| 34 | Debug overlay",
              drift.check_content_counts, "must number its layers 1..N"),
+            ("testing.md", "Builds and runs %d native regression binaries" % len(drift.makefile_test_targets()),
+             "Builds and runs %d native regression binaries" % (len(drift.makefile_test_targets()) - 1),
+             drift.check_test_count_mentions, "docs/wiki/testing.md: stale make test count"),
         ]
         original_read = drift.read
         for name, old, new, check, expected in cases:
@@ -159,6 +162,89 @@ class DocsChecksTest(unittest.TestCase):
                     check()
                 self.assertTrue(any(expected in error for error in drift.FAILURES), drift.FAILURES)
         drift.FAILURES.clear()
+
+    def test_script_test_lists_must_match_the_makefile(self):
+        """Node/Python tests: files in tests/, Makefile lists and docs agree."""
+        real_read = drift.read
+
+        def failures_with(replacements):
+            def read(path):
+                text = real_read(path)
+                for rel, old, new in replacements:
+                    if path == ROOT / rel:
+                        self.assertIn(old, text, f"test is stale: {old!r} is not in {rel}")
+                        text = text.replace(old, new)
+                return text
+            with patch.object(drift, "read", read), patch.object(drift, "FAILURES", []):
+                drift.check_script_test_counts()
+                return list(drift.FAILURES)
+
+        own = [item for item in failures_with([])]
+        self.assertEqual(own, [], "the repository's own test lists are out of step")
+        node, python = drift.makefile_script_tests()
+        self.assertIn("tests/boot_test.cjs", node)
+        self.assertIn("tests/parser_validator_test.py", python)
+        self.assertNotIn("tests/docs_checks_test.py", python, "it runs from bun run check-site")
+
+        cases = [
+            # The drift this check was written for: the README's count.
+            ([("README.md", "its six JavaScript host-contract tests", "its four JavaScript host-contract tests")],
+             f"says four Node tests; the Makefile runs {len(node)}"),
+            ([(".specs/project/STATE.md", "six Node tests", "5 Node tests")],
+             f"says 5 Node tests; the Makefile runs {len(node)}"),
+            # A test file that exists but that no target runs.
+            ([("Makefile", "tests/audio_unlock_test.cjs", "")],
+             "tests/audio_unlock_test.cjs: no make target runs this test"),
+            ([("Makefile", "tests/doctor_test.py", "")],
+             "tests/doctor_test.py: no make target runs this test"),
+            # A path in the Makefile with no file behind it.
+            ([("Makefile", "tests/doctor_test.py", "tests/doctors_test.py")],
+             "Makefile: runs tests/doctors_test.py, which does not exist"),
+            # A test the docs forgot (STATE.md once listed half of them).
+            ([(".specs/project/STATE.md", "`tests/coverage_baseline_test.py`, ", "")],
+             "STATE.md: the `- Tests:` line does not list `tests/coverage_baseline_test.py`"),
+            ([("docs/wiki/testing.md", "`tests/boot_test.cjs`", "`tests/boot.cjs`")],
+             "docs/wiki/testing.md: does not list `tests/boot_test.cjs`"),
+            ([("docs/wiki/build-system.md", "`tests/wasm_artifacts_test.py`", "the artifact test")],
+             "docs/wiki/build-system.md: does not list `tests/wasm_artifacts_test.py`"),
+            # The one test that runs from the docs site's check-site script.
+            ([("docs/package.json", "../tests/docs_checks_test.py", "../tests/other.py")],
+             "tests/docs_checks_test.py: no make target runs this test"),
+        ]
+        for replacements, expected in cases:
+            with self.subTest(expected=expected):
+                found = failures_with(replacements)
+                self.assertTrue(any(expected in item for item in found), found)
+
+    def test_ci_node_version_has_one_source(self):
+        """README and workflows follow .node-version."""
+        real_read = drift.read
+
+        def failures_with(rel, old, new):
+            def read(path):
+                text = real_read(path)
+                if path == ROOT / rel:
+                    self.assertIn(old, text, f"test is stale: {old!r} is not in {rel}")
+                    text = text.replace(old, new)
+                return text
+            with patch.object(drift, "read", read), patch.object(drift, "FAILURES", []):
+                drift.check_readme_prerequisites()
+                return list(drift.FAILURES)
+
+        pin = (ROOT / ".node-version").read_text(encoding="utf-8").strip()
+        self.assertEqual(failures_with("README.md", "README", "README"), [])
+        cases = [
+            ("README.md", f"CI uses {pin}", "CI uses 1.2.3", f"CI uses Node.js 1.2.3; .node-version says {pin}"),
+            (".node-version", pin, "latest", ".node-version: must hold the Node.js version CI uses"),
+            (".github/workflows/docs.yml", "node-version-file: .node-version", "node-version: '20.0.0'",
+             "docs.yml: use `node-version-file: .node-version`"),
+            (".github/workflows/build.yml", "node-version-file: .node-version", "check-latest: true",
+             "build.yml: every actions/setup-node step must read .node-version"),
+        ]
+        for rel, old, new, expected in cases:
+            with self.subTest(expected=expected):
+                found = failures_with(rel, old, new)
+                self.assertTrue(any(expected in item for item in found), found)
 
     def test_function_locations_on_the_current_manual(self):
         # Every "`foo()` in `src/...`" claim in the manual holds today, and the

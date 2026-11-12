@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -84,18 +85,53 @@ def check_js_asset_references(js_path: Path) -> int:
     return 0
 
 
+# The script tag emcc writes for the program, with or without the "?v=<commit>"
+# that tools/web_shell.py adds, quoted or not (emcc minifies the page).
+MAIN_SCRIPT = re.compile(r"<script\b[^>]*\bsrc\s*=\s*[\"']?super-mango\.js(?:\?v=[0-9A-Za-z._-]+)?[\"']?[\s>]", re.I)
+# Every game file a tag of the page loads (src= or href=), with its optional
+# version. The bare names inside the inline boot script are not addresses:
+# the script joins them with assetQuery when it runs.
+ASSET_REFERENCE = re.compile(
+    r"\b(?:src|href)\s*=\s*[\"']?super-mango\.(?:js|wasm|data)(\?v=[0-9A-Za-z._-]+)?", re.I)
+LINK_TAG = re.compile(r"<link\b[^>]*>", re.I)
+ASSET_QUERY_SETTING = re.compile(r"assetQuery\s*:\s*[\"'](\?v=[0-9A-Za-z._-]+)?[\"']")
+
+
 def check_debug_page(html_path: Path) -> int:
     # The debug page shares the normal page's program: it must load
     # super-mango.js and set the debug marker before that script runs.
     text = html_path.read_text(encoding="utf-8")
     marker = text.find("__superMangoDebug = true")
-    program = text.find("src=super-mango.js")
-    if program < 0:
-        program = text.find('src="super-mango.js"')
-    if marker < 0 or program < 0 or marker > program:
+    program = MAIN_SCRIPT.search(text)
+    if marker < 0 or not program or marker > program.start():
         return fail(f"{display(html_path)} must set the debug marker before loading super-mango.js")
     if "super-mango-debug.js" in text:
         return fail(f"{display(html_path)} still loads a separate debug program")
+    return 0
+
+
+def check_asset_version(html_path: Path) -> int:
+    """One version for every game file a page names.
+
+    The page asks for super-mango.js, .wasm and .data as <name>?v=<commit>
+    so that a browser holding an older deploy cannot mix old and new files.
+    That only works when the script tag, the two preload links and the
+    assetQuery the boot script appends all carry the same text; a preload
+    with another address would also be downloaded and then thrown away.
+    """
+    text = html_path.read_text(encoding="utf-8")
+    queries = {match.group(1) or "" for match in ASSET_REFERENCE.finditer(text)}
+    setting = ASSET_QUERY_SETTING.search(text)
+    if not setting:
+        return fail(f"{display(html_path)} does not pass assetQuery to the boot script")
+    queries.add(setting.group(1) or "")
+    if len(queries) != 1:
+        shown = ", ".join(sorted(query or "(none)" for query in queries))
+        return fail(f"{display(html_path)} names game files with different versions: {shown}")
+    preloads = [tag for tag in LINK_TAG.findall(text) if re.search(r"\brel\s*=\s*[\"']?preload", tag, re.I)]
+    for name in ("super-mango.wasm", "super-mango.data"):
+        if not any(name in tag for tag in preloads):
+            return fail(f"{display(html_path)} does not preload {name}")
     return 0
 
 
@@ -134,6 +170,10 @@ def main() -> int:
     rc = check_debug_page(out_dir / "super-mango-debug.html")
     if rc != 0:
         return rc
+    for name in ("super-mango.html", "super-mango-debug.html"):
+        rc = check_asset_version(out_dir / name)
+        if rc != 0:
+            return rc
     rc = check_js_asset_references(out_dir / "super-mango.js")
     if rc != 0:
         return rc

@@ -9,6 +9,8 @@ import json
 import os
 import shutil
 from pathlib import Path
+import platform
+import re
 import subprocess
 import tarfile
 import urllib.request
@@ -61,10 +63,8 @@ def main() -> None:
         os.replace(partial, archive)
     if hashlib.sha256(archive.read_bytes()).hexdigest() != pin["sha256"]:
         raise SystemExit("raylib archive checksum mismatch")
-    source = build / ("raylib-" + pin["commit"])
-    if not source.is_dir():
-        with tarfile.open(archive, "r:gz") as package:
-            package.extractall(build, filter="data")
+    source = extract_source(archive, build, pin["commit"])
+    prune_old_sources(build, source.name)
     patches = json.loads((ROOT / "vendor/raylib/patches.json").read_text(encoding="utf-8"))
     for name, replacements in patches.items():
         path = source / name
@@ -140,6 +140,12 @@ def main() -> None:
         # the Memory backend's software rasterizer and miniaudio's resampler
         # take over half the CPU time of every test, smoke and replay run.
         flags += ["-O2"]
+    if args.mode == "release" and args.platform != "web" and platform.system() != "Darwin":
+        # One section per function and per global, so the Makefile's
+        # -Wl,--gc-sections can drop the raylib code the game never calls
+        # (see GC_CFLAGS there). Apple's linker strips unused code per
+        # symbol (-dead_strip) and needs no compile flag for it.
+        flags += ["-ffunction-sections", "-fdata-sections"]
     if args.sanitize:
         flags += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
     if flags:
@@ -156,6 +162,87 @@ def main() -> None:
     # to rebuild, the library keeps its old timestamp, so the game objects that
     # depend on it are not recompiled. The Makefile records a successful run in
     # its own build-done.stamp file instead.
+
+
+# What the build reads from the source archive: the library sources (with the
+# bundled GLFW and the other single-file dependencies under src/external/),
+# the CMake helper scripts, and the files at the top of the archive
+# (CMakeLists.txt, CMakeOptions.txt, LICENSE and friends). The archive also
+# carries examples/ (72 MB unpacked) and projects/ (9 MB), which nothing here
+# compiles: BUILD_EXAMPLES is OFF.
+BUILT_FOLDERS = ("src", "cmake")
+OLD_SOURCE_NAME = re.compile(r"raylib-[0-9a-f]{40}")
+
+
+def is_built_member(name: str, top: str, is_dir: bool) -> bool:
+    """True when an archive member is part of what CMake builds.
+
+    `top` is the archive's single top folder, raylib-<commit>. A member is
+    kept when it is that folder itself, a file directly inside it, or
+    anything in one of BUILT_FOLDERS. The other folders (examples/,
+    projects/, parser/ ...) are not even created.
+    """
+    parts = name.rstrip("/").split("/")
+    if parts[0] != top:
+        return False
+    if len(parts) == 1:
+        return True
+    if len(parts) == 2 and not is_dir:
+        return True
+    return parts[1] in BUILT_FOLDERS
+
+
+def extract_source(archive: Path, build: Path, commit: str) -> Path:
+    """Unpack the parts of the pinned archive that are built; return the tree.
+
+    The tree is build/raylib-<commit>. An existing one is reused as it is
+    (the caller re-applies the patches, which is a no-op when present). A new
+    one is unpacked into a scratch folder first and renamed into place at the
+    end, so an interrupted run never leaves a half-unpacked tree that the
+    next run would take for a complete one.
+
+    filter="data" is tarfile's own safety check: it refuses absolute paths,
+    "..", links that point outside the destination and device files.
+    """
+    top = "raylib-" + commit
+    source = build / top
+    if source.is_dir():
+        return source
+    scratch = build / f".extract-{os.getpid()}"
+    shutil.rmtree(scratch, ignore_errors=True)
+    try:
+        with tarfile.open(archive, "r:gz") as package:
+            members = [member for member in package.getmembers()
+                       if is_built_member(member.name, top, member.isdir())]
+            package.extractall(scratch, members=members, filter="data")
+        if not (scratch / top / "CMakeLists.txt").is_file() or not (scratch / top / "src").is_dir():
+            raise SystemExit(f"raylib archive has no {top}/CMakeLists.txt and {top}/src")
+        os.replace(scratch / top, source)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    return source
+
+
+def prune_old_sources(build: Path, keep: str) -> list[str]:
+    """Delete the source trees of other pins from this build directory.
+
+    Every raylib upgrade unpacks a new raylib-<commit> folder and the old
+    one was never removed, so a long-lived build directory (or a CI cache)
+    kept growing. Only folders directly inside `build` whose name is
+    raylib-<40 hex digits> are touched; anything else a person put there
+    stays. Returns the names removed, for the caller's log and the tests.
+    """
+    removed = []
+    for entry in sorted(build.iterdir()):
+        if entry.name == keep or not OLD_SOURCE_NAME.fullmatch(entry.name):
+            continue
+        if entry.is_symlink() or not entry.is_dir():
+            continue
+        shutil.rmtree(entry)
+        removed.append(entry.name)
+    for name in removed:
+        print(f"build_raylib: removed the unpacked source of an older pin, {name}")
+    return removed
 
 
 MAPPING_PLATFORMS = (("WIN32", "platform:Windows"), ("COCOA", "platform:Mac OS X"),

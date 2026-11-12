@@ -329,7 +329,7 @@ collision lab has one coin.
 ```text
 (lldb) c
 * thread #1, queue = 'com.apple.main-thread', stop reason = breakpoint 2.1
-    frame #0: ... super-mango`player_update(player=0x00000074bbdb0230, dt=0.0166666675, ..., world_w=800) at player.c:58:32
+    frame #0: ... super-mango`player_update(player=0x00000074bbdb0230, dt=0.0166666675, ..., landed=0x000000016fdfe2c0) at player.c:58:32
 (lldb) bt
   * frame #0: ... super-mango`player_update(player=0x00000074bbdb0230, dt=0.0166666675, ...) at player.c:58:32
     frame #1: ... super-mango`game_player_step(gs=0x00000074bbdb0000, dt=0.0166666675) at game_player_step.c:30:5
@@ -358,7 +358,8 @@ Things to notice:
 
 - `dt=0.0166666675` is 1/60 s as a `float`: the fixed simulation step.
   It is the same on every call, whatever your monitor's refresh rate.
-- `player_update()` only receives a `Player *`, not the whole `GameState`.
+- `player_update()` only receives a `Player *` and a `PlayerSurfaces *` (the
+  level's surfaces as borrowed arrays), not the whole `GameState`.
   To see `gs`, step up one frame to `game_player_step()`, which has it.
 - `p gs->world.player` prints the struct by value because `Player` is stored by
   value inside `GameState`. lldb shortens long structs with `...`; print one

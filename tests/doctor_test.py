@@ -31,7 +31,9 @@ class FakeHost:
         self.headers_ok = True
         self.sinks = "1\tmango\tmodule-null-sink.c\tSUSPENDED\n"
         self.cards = None
-        self.files = {str(ROOT / "Makefile"): self.makefile}
+        self.bun_version = "1.4.4"
+        self.files = {str(ROOT / "Makefile"): self.makefile,
+                      str(ROOT / "docs" / "package.json"): '{\n    "packageManager": "bun@1.4.4"\n}\n'}
 
     def which(self, name: str):
         return self.bins.get(name)
@@ -67,7 +69,7 @@ class FakeHost:
         if program == "node":
             return 0, self.node_version
         if program == "bun":
-            return 0, "1.4.4"
+            return 0, self.bun_version
         if program == "emcc":
             return 0, self.emcc_version
         if program == "pactl":
@@ -150,6 +152,30 @@ def main() -> None:
     mismatch.emcc_version = "emcc (Emscripten) 6.0.0"
     emcc = by_name(doctor.collect(mismatch))["emcc"]
     assert emcc.status == "warn" and "9.9.9" in emcc.detail and "6.0.0" in emcc.detail, emcc.detail
+
+    # Bun is compared with the release docs/package.json pins (CI's version).
+    pinned = by_name(doctor.collect(FakeHost()))["Bun"]
+    assert pinned.status == "ok" and "pin 1.4.4" in pinned.detail, pinned.detail
+    old_bun = FakeHost()
+    old_bun.bun_version = "1.3.12"
+    bun = by_name(doctor.collect(old_bun))["Bun"]
+    assert bun.status == "warn" and "1.3.12" in bun.detail and "1.4.4" in bun.detail, bun.detail
+    assert "bun.lock" in bun.detail
+    # 1.4.40 is another release, not "1.4.4 with something after it".
+    near = FakeHost()
+    near.bun_version = "1.4.40"
+    assert by_name(doctor.collect(near))["Bun"].status == "warn"
+    assert "bun@1.4.4" in notes["Bun"].detail, "a missing Bun should name the version to install"
+    unpinned = FakeHost()
+    unpinned.files.pop(str(ROOT / "docs" / "package.json"))
+    assert by_name(doctor.collect(unpinned))["Bun"].status == "ok"
+    assert doctor.bun_pin('{"packageManager": "pnpm@9.0.0"}') == ""
+    # The real file pins the release the workflows install.
+    real_pin = doctor.bun_pin((ROOT / "docs" / "package.json").read_text(encoding="utf-8"))
+    assert real_pin, "docs/package.json has no packageManager bun pin"
+    for workflow in ("build.yml", "docs.yml"):
+        text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+        assert f"bun-version: {real_pin}\n" in text, f"{workflow} does not install bun {real_pin}"
 
     alsa = FakeHost()
     alsa.bins.pop("pactl")

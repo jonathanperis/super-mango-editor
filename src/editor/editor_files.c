@@ -31,6 +31,7 @@
 #include "editor_session.h"    /* editor status/title/persist helpers */
 #include "editor_clipboard.h"  /* editor_clipboard_forget_rails */
 #include "file_dialog.h"       /* file_dialog_open */
+#include "../shared/asset_root.h"  /* asset_root_absolute */
 #include "../shared/serializer.h"    /* shared level format */
 #include "../shared/serializer_io.h" /* UTF-8 file I/O */
 #include "undo.h"              /* undo_clear */
@@ -47,6 +48,7 @@ static void (*editor_test_load_hook)(const char *path);
 
 static int editor_save_recent_files(const EditorState *es);
 static int editor_recent_path_storable(const char *path);
+
 static void editor_add_recent_file(EditorState *es, const char *path);
 static void editor_replace_texture(Texture2D **slot, char *loaded_path,
                                    size_t loaded_path_size, const char *path);
@@ -56,6 +58,56 @@ static int editor_save_current_level_as_validated(EditorState *es);
 static int editor_source_changed(EditorState *es);
 static int editor_finalize_save(EditorState *es, const char *path,
                                 const char *status_prefix);
+
+/*
+ * Copy path into one row of the recent-files list, cutting it to fit.
+ * The length is measured first and memcpy moves exactly that many bytes,
+ * so the row always ends in a NUL (strncpy would leave it out when the
+ * path fills the row, which GCC reports as -Wstringop-truncation).
+ */
+static void set_recent_row(char row[EDITOR_PATH_MAX], const char *path)
+{
+    size_t len = strlen(path);
+
+    if (len >= EDITOR_PATH_MAX) len = EDITOR_PATH_MAX - 1;
+    memcpy(row, path, len);
+    row[len] = '\0';
+}
+
+/*
+ * STATUS_PATH_MAX — how much of a path a status message shows.
+ *
+ * The status bar holds one line (EditorState.status_message, 160 bytes),
+ * and a full path can be far longer than that. Cut at the end, the
+ * message would lose the file name, the one part the designer needs: the
+ * temporary file a failed save left the level in, say. So a long path is
+ * shown as "..." plus its last STATUS_PATH_MAX - 4 bytes, which always
+ * include the file name (editor_path_for_display).
+ */
+#define STATUS_PATH_MAX 64
+
+/*
+ * status_path — path as a status message shows it, written into the
+ * caller's buffer.
+ *
+ * A document inside the working folder is shown relative to it
+ * ("levels/a.toml"): the editor keeps the absolute path, but the part
+ * every path here shares is noise in a one-line message.
+ */
+static const char *status_path(const char *path, char shown[STATUS_PATH_MAX])
+{
+    char folder[EDITOR_PATH_MAX];
+
+    /* The absolute form of "." is the working folder followed by "/.":
+     * dropping the final '.' leaves the prefix every path inside it has. */
+    if (path && editor_absolute_path(".", folder, sizeof(folder)) == 0) {
+        size_t prefix = strlen(folder) - 1;
+        if (prefix > 1 && strncmp(path, folder, prefix) == 0 && path[prefix] != '\0')
+            path += prefix;
+    }
+    editor_path_for_display(path, shown, STATUS_PATH_MAX);
+    return shown;
+}
 
 /*
  * editor_report_save_failure — Explain a failed level save in the status bar.
@@ -76,6 +128,8 @@ static int editor_finalize_save(EditorState *es, const char *path,
 void editor_report_save_failure(EditorState *es, int result, const char *path,
                                 const char *lead, const char *kept_path)
 {
+    char shown[STATUS_PATH_MAX], kept[STATUS_PATH_MAX];
+
     if (!lead) lead = "";
     if (result == -2) {
         /* level_save_toml_checked found the file different from the copy
@@ -83,21 +137,42 @@ void editor_report_save_failure(EditorState *es, int result, const char *path,
          * program changed it.  Nothing was written; the next Save asks
          * whether to replace it or save under another name. */
         editor_set_status(es, "%sSave stopped: %s changed on disk; nothing was "
-                          "written. Save again to replace it or Save As", lead, path);
+                          "written. Save again to replace it or Save As", lead,
+                          status_path(path, shown));
     } else if (result == SERIALIZER_REPLACE_TEMP_KEPT && kept_path) {
         editor_set_status(es, "%sSave incomplete: the new %s is safe in %s",
-                          lead, path, kept_path);
+                          lead, status_path(path, shown), status_path(kept_path, kept));
     } else if (result == SERIALIZER_REPLACE_TEMP_KEPT) {
         editor_set_status(es, "%sSave incomplete: your level is safe in %s",
-                          lead, level_save_kept_temp_path());
+                          lead, status_path(level_save_kept_temp_path(), kept));
     } else {
-        editor_set_status(es, "%sSave failed: %s", lead, path);
+        editor_set_status(es, "%sSave failed: %s", lead, status_path(path, shown));
     }
 }
 
 int editor_path_fits(const char *path)
 {
     return path && strlen(path) < EDITOR_PATH_MAX;
+}
+
+int editor_absolute_path(const char *path, char *out, size_t out_size)
+{
+    char *absolute;
+    size_t length;
+
+    if (!path || !out || out_size == 0) return -1;
+    /* asset_root_absolute returns a malloc'd copy: the path itself when it
+     * is already absolute, else the working folder joined to it. */
+    absolute = asset_root_absolute(path);
+    if (!absolute) return -1;
+    length = strlen(absolute);
+    if (length >= out_size || length >= EDITOR_PATH_MAX) {
+        free(absolute);
+        return -1;
+    }
+    memcpy(out, absolute, length + 1);
+    free(absolute);
+    return 0;
 }
 
 void editor_path_for_display(const char *path, char *out, size_t out_size)
@@ -174,50 +249,35 @@ void editor_test_set_load_hook(void (*hook)(const char *path))
  *
  * The fingerprint is the baseline Save later uses to detect that someone
  * else changed the file.  Another program (a text editor, a git checkout)
- * may be rewriting the file while we read it, so a fingerprint taken
- * before *or* after parsing alone could describe different bytes than the
- * ones parsed.  Like the game's read_stable_level, fingerprint before and
- * after and require both to match.  A writer usually finishes quickly, so
- * one retry is allowed.
+ * may be rewriting the file while we read it, so the file is read once
+ * (level_load_toml_file) and that one buffer is both hashed and parsed:
+ * the baseline cannot describe other bytes than the ones on screen.  If
+ * the file changes afterwards, the baseline no longer matches it and Save
+ * asks before replacing, which is exactly what should happen.
  *
- * Returns EDITOR_LOAD_OK, EDITOR_LOAD_PARSE_ERROR (stable but invalid
- * bytes), EDITOR_LOAD_IO_ERROR (cannot fingerprint) or EDITOR_LOAD_CHANGING
- * (the file changed during both attempts).
+ * Returns EDITOR_LOAD_OK, EDITOR_LOAD_PARSE_ERROR (readable but invalid
+ * bytes) or EDITOR_LOAD_IO_ERROR (cannot read the file).
  */
 enum {
     EDITOR_LOAD_OK = 0,
     EDITOR_LOAD_PARSE_ERROR,
-    EDITOR_LOAD_IO_ERROR,
-    EDITOR_LOAD_CHANGING
+    EDITOR_LOAD_IO_ERROR
 };
 
 static int editor_read_stable_level(const char *path, LevelDef *level,
                                     SerializerFileFingerprint *fingerprint,
                                     EditorLoadReport *problems)
 {
-    for (int attempt = 0; attempt < 2; attempt++) {
-        SerializerFileFingerprint before;
-        SerializerFileFingerprint after;
-        int parsed;
+    int parsed;
 
-        if (serializer_fingerprint_utf8(path, &before) != 1)
-            return EDITOR_LOAD_IO_ERROR;
-        /* Only the last attempt's problems describe the bytes on disk. */
-        memset(problems, 0, sizeof(*problems));
-        parsed = level_load_toml_explained(path, level, editor_load_report_add,
-                                           problems) == 0;
-        if (editor_test_load_hook) editor_test_load_hook(path);
-        if (serializer_fingerprint_utf8(path, &after) != 1)
-            return EDITOR_LOAD_IO_ERROR;
-        if (serializer_fingerprint_equal(&before, &after)) {
-            if (!parsed) return EDITOR_LOAD_PARSE_ERROR;
-            *fingerprint = after;
-            return EDITOR_LOAD_OK;
-        }
-        /* The bytes changed under us (a parse error may just be a half-
-         * written file); try once more. */
-    }
-    return EDITOR_LOAD_CHANGING;
+    memset(problems, 0, sizeof(*problems));
+    parsed = level_load_toml_file(path, level, editor_load_report_add,
+                                  problems, fingerprint) == 0;
+    if (editor_test_load_hook) editor_test_load_hook(path);
+    if (parsed) return EDITOR_LOAD_OK;
+    /* No fingerprint means the bytes never arrived (missing, unreadable or
+     * over the size limit); otherwise they did and the level is invalid. */
+    return fingerprint->valid ? EDITOR_LOAD_PARSE_ERROR : EDITOR_LOAD_IO_ERROR;
 }
 
 int editor_load_level(EditorState *es, const char *path)
@@ -228,6 +288,8 @@ int editor_load_level(EditorState *es, const char *path)
     /* Static: an EditorLoadReport is about 3 KB, and the editor is single
      * threaded.  It is copied into es->load_report only when the load fails. */
     static EditorLoadReport problems;
+    char absolute[EDITOR_PATH_MAX];
+    char shown[STATUS_PATH_MAX];
     int result;
     memset(&new_level, 0, sizeof(new_level));
 
@@ -235,11 +297,25 @@ int editor_load_level(EditorState *es, const char *path)
         if (es) editor_set_status(es, "Load failed: path too long");
         return -1;
     }
+    /*
+     * From here on the document is known by its absolute path. A path typed
+     * as "levels/a.toml" means a different file once the working folder is
+     * another checkout, and this path outlives the session: it goes into
+     * the recent list and into the recovery snapshot. A recovery copy
+     * opened from a second checkout would otherwise save over that
+     * checkout's levels/a.toml, and the recent list would hold the same
+     * file twice under two spellings.
+     */
+    if (editor_absolute_path(path, absolute, sizeof(absolute)) != 0) {
+        editor_set_status(es, "Load failed: path too long");
+        return -1;
+    }
+    path = absolute;
 
     /* Resolve a symlink once and read that file, so file_target names
      * exactly the bytes shown, even if the link is repointed meanwhile. */
     if (serializer_resolve_save_target(path, target, sizeof(target)) != 0) {
-        editor_set_status(es, "Load failed: cannot resolve %s", path);
+        editor_set_status(es, "Load failed: cannot resolve %s", status_path(path, shown));
         return -1;
     }
 
@@ -255,16 +331,16 @@ int editor_load_level(EditorState *es, const char *path)
             editor_set_status(es, "Load failed: %s: %s", es->load_report.file,
                               problems.messages[0]);
         else
-            editor_set_status(es, "Load failed: %s", path);
+            editor_set_status(es, "Load failed: %s", status_path(path, shown));
         return -1;
     }
     if (result == EDITOR_LOAD_IO_ERROR) {
-        editor_set_status(es, "Load failed: cannot fingerprint %s", path);
-        return -1;
-    }
-    if (result == EDITOR_LOAD_CHANGING) {
-        editor_set_status(es, "Load failed: %s kept changing while it was read; try again",
-                          path);
+        /* The reader said why (cannot open, or larger than the limit). */
+        if (problems.count > 0)
+            editor_set_status(es, "Load failed: %s: %s", status_path(path, shown),
+                              problems.messages[0]);
+        else
+            editor_set_status(es, "Load failed: cannot read %s", status_path(path, shown));
         return -1;
     }
 
@@ -275,18 +351,54 @@ int editor_load_level(EditorState *es, const char *path)
     editor_retire_current_recovery(es);
     editor_apply_loaded_level(es, &new_level, path, 0, 1);
     memcpy(es->file_target, target, strlen(target) + 1);
-    if (editor_set_recovery_document(es, path) != 0) {
-        editor_set_status(es, "Load failed: recovery path unavailable");
-        return -1;
-    }
     es->source_fingerprint = fingerprint;
     es->source_state = EDITOR_SOURCE_EXPECTED_EXISTING;
+    if (editor_set_recovery_document(es, path) != 0) {
+        /* The level IS open: the document was replaced above. Only its
+         * crash-recovery snapshot has nowhere to go. Reporting a failed
+         * load here would tell the caller the old document is still
+         * there, so say what is really wrong and return success. */
+        editor_set_status(es, "Loaded %s, but autosave is unavailable "
+                          "(no recovery folder)", status_path(path, shown));
+        return 0;
+    }
 
     fprintf(stderr, "Loaded %s (%d entities)\n", path,
             es->level.coin_count + es->level.spider_count +
             es->level.platform_count + es->level.rail_count +
             es->level.bird_count + es->level.fish_count);
-    editor_set_status(es, "Loaded %s", path);
+    /* A file without format_version loads leniently; the reader lists what
+     * it skipped. Say so, because the next save writes format_version = 1
+     * and would make the loss permanent. */
+    if (problems.total > 0)
+        editor_set_status(es, "Loaded with %d ignored value%s: %s", problems.total,
+                          problems.total == 1 ? "" : "s", problems.messages[0]);
+    else
+        editor_set_status(es, "Loaded %s", status_path(path, shown));
+    return 0;
+}
+
+int editor_refresh_saved_level(EditorState *es)
+{
+    static LevelDef fresh;   /* about 16 KB; the editor is single threaded */
+    SerializerFileFingerprint fingerprint;
+    char target[EDITOR_PATH_MAX];
+
+    if (!es || es->file_path[0] == '\0' || es->modified) return -1;
+    if (serializer_resolve_save_target(es->file_path, target, sizeof(target)) != 0 ||
+        level_load_toml_file(target, &fresh, NULL, NULL, &fingerprint) != 0)
+        return -1;
+    /*
+     * Only the level and what describes the file on disk change. The undo
+     * history, the selection and the recovery identity stay: this is the
+     * same document, which the editor itself just rewrote. The steps in
+     * history name entities by type and index, and those did not move.
+     */
+    es->level = fresh;
+    memcpy(es->file_target, target, strlen(target) + 1);
+    es->source_fingerprint = fingerprint;
+    es->source_state = EDITOR_SOURCE_EXPECTED_EXISTING;
+    editor_set_document_save_point(es);
     return 0;
 }
 
@@ -407,8 +519,10 @@ void editor_open_level_file(EditorState *es)
         editor_set_status(es, "Open cancelled");
     } else if (dialog_result == FILE_DIALOG_INVALID_PATH) {
         editor_set_status(es, "Open failed: file names with line breaks are not supported");
+    } else if (dialog_result == FILE_DIALOG_UNAVAILABLE) {
+        editor_set_status(es, "Open failed: no file picker (install zenity or kdialog)");
     } else {
-        editor_set_status(es, "Open failed: dialog error");
+        editor_set_status(es, "Open failed: the file picker reported an error");
     }
 }
 
@@ -464,11 +578,26 @@ int editor_save_current_level(EditorState *es)
         return -1;
     }
     if (source_status > 0) {
-        choice = editor_confirm_external_change(es);
+        /* A recovered copy gets its own question: nothing "changed on
+         * disk", the file there was simply never read by this session. */
+        int recovered = es->source_state == EDITOR_SOURCE_RECOVERED;
+        choice = recovered ? editor_confirm_recovered_save(es)
+                           : editor_confirm_external_change(es);
         if (choice == EDITOR_EXTERNAL_SAVE_AS) {
             return editor_save_current_level_as_validated(es);
         }
         if (choice != EDITOR_EXTERNAL_REPLACE) return -1;
+        if (recovered && serializer_probe_path_utf8(target) == SERIALIZER_PATH_MISSING) {
+            /* The original is gone (deleted, or the crash came before its
+             * first save): put the recovered copy there as a new file. */
+            int result = level_save_toml_with_policy(&es->level, target,
+                                                     SERIALIZER_SAVE_CREATE_ONLY);
+            if (result != 0) {
+                editor_report_save_failure(es, result, es->file_path, NULL, NULL);
+                return -1;
+            }
+            return editor_finalize_save(es, es->file_path, "Saved");
+        }
         {
             SerializerFileFingerprint replace_expected;
             if (serializer_fingerprint_utf8(target,
@@ -529,13 +658,28 @@ static int editor_save_current_level_as_validated(EditorState *es)
         editor_set_status(es, "Save failed: file names with line breaks are not supported");
         return -1;
     }
+    if (dialog_result == FILE_DIALOG_UNAVAILABLE) {
+        editor_set_status(es, "Save failed: no file picker (install zenity or kdialog)");
+        return -1;
+    }
     if (dialog_result != FILE_DIALOG_SELECTED) {
-        editor_set_status(es, "Save failed: dialog error");
+        editor_set_status(es, "Save failed: the file picker reported an error");
         return -1;
     }
     if (!editor_path_fits(path)) {
         editor_set_status(es, "Save failed: path too long");
         return -1;
+    }
+    /* A native picker returns an absolute path; one typed into the
+     * in-window prompt may not be. The document is always known by its
+     * absolute path (see editor_load_level). */
+    {
+        char absolute[EDITOR_PATH_MAX];
+        if (editor_absolute_path(path, absolute, sizeof(absolute)) != 0) {
+            editor_set_status(es, "Save failed: path too long");
+            return -1;
+        }
+        memcpy(path, absolute, strlen(absolute) + 1);
     }
     /*
      * A new destination is never followed through a symlink.  Following it
@@ -549,7 +693,7 @@ static int editor_save_current_level_as_validated(EditorState *es)
      */
     if (serializer_path_is_symlink(path)) {
         editor_set_status(es, "Save failed: %s is a symbolic link; choose another name",
-                          path);
+                          status_path(path, (char[STATUS_PATH_MAX]){0}));
         return -1;
     }
     if (editor_path_is_private(es, path)) {
@@ -602,7 +746,7 @@ static int editor_save_current_level_as_validated(EditorState *es)
     }
     editor_set_document_save_point(es);
     editor_add_recent_file(es, es->file_path);
-    editor_set_status(es, "Saved as %s", es->file_path);
+    editor_set_status(es, "Saved as %s", status_path(es->file_path, (char[STATUS_PATH_MAX]){0}));
     return 0;
 }
 
@@ -619,7 +763,9 @@ static int editor_source_changed(EditorState *es)
     int result;
 
     if (!es || es->file_path[0] == '\0') return -1;
-    if (es->source_state == EDITOR_SOURCE_UNKNOWN) return 1;
+    /* Neither state has a baseline to compare with: always ask. */
+    if (es->source_state == EDITOR_SOURCE_UNKNOWN ||
+        es->source_state == EDITOR_SOURCE_RECOVERED) return 1;
     if (es->source_state == EDITOR_SOURCE_EXPECTED_MISSING) {
         result = serializer_probe_path_utf8(es->file_path);
         if (result == SERIALIZER_PATH_ERROR) return -1;
@@ -650,7 +796,7 @@ static int editor_finalize_save(EditorState *es, const char *path,
     }
     editor_set_document_save_point(es);
     editor_add_recent_file(es, path);
-    editor_set_status(es, "%s %s", status_prefix, path);
+    editor_set_status(es, "%s %s", status_prefix, status_path(path, (char[STATUS_PATH_MAX]){0}));
     return 0;
 }
 
@@ -858,10 +1004,21 @@ static void editor_add_recent_file(EditorState *es, const char *path)
 {
     int existing = -1;
 
-    if (!path || !editor_recent_path_storable(path) || !editor_path_fits(path) ||
+    char absolute[EDITOR_PATH_MAX];
+
+    /* The list is kept across sessions, so it stores absolute paths: a
+     * relative one would name another file from another working folder.
+     * An entry written by an older build may still be relative; comparing
+     * absolute forms finds it, and it is then stored again in full, so
+     * one file is never listed under two spellings. */
+    if (!path || editor_absolute_path(path, absolute, sizeof(absolute)) != 0) return;
+    path = absolute;
+    if (!editor_recent_path_storable(path) || !editor_path_fits(path) ||
         editor_path_is_private(es, path)) return;
     for (int i = 0; i < es->recent_file_count; i++) {
-        if (strcmp(es->recent_files[i], path) == 0) {
+        char listed[EDITOR_PATH_MAX];
+        if (editor_absolute_path(es->recent_files[i], listed, sizeof(listed)) == 0 &&
+            strcmp(listed, path) == 0) {
             existing = i;
             break;
         }
@@ -884,9 +1041,12 @@ static void editor_add_recent_file(EditorState *es, const char *path)
             memcpy(es->recent_files[i], es->recent_files[i - 1],
                    sizeof(es->recent_files[i]));
         }
-        strncpy(es->recent_files[0], path, sizeof(es->recent_files[0]) - 1);
-        es->recent_files[0][sizeof(es->recent_files[0]) - 1] = '\0';
+        set_recent_row(es->recent_files[0], path);
         if (es->recent_file_count < EDITOR_RECENT_MAX) es->recent_file_count++;
+    }
+    if (existing >= 0) {
+        /* Found under an older, relative spelling perhaps: keep the full one. */
+        set_recent_row(es->recent_files[0], path);
     }
 
     /* The in-memory list stays updated either way; only persistence for

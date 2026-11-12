@@ -7,14 +7,30 @@
 
 #include "serializer.h"
 #include "serializer_emit.h"
+#include "serializer_parse.h"   /* serializer_write_entry */
 #include "serializer_io.h"
 #include "serializer_types.h"
 #include "../levels/level_loader.h"
 
 /*
- * write_header_and_config — Recovery comment, header, level-wide settings,
- * floor gaps, checkpoints and physics: the plain keys that must come before
- * any [[array]] table.
+ * s_key_order — the level-wide keys, in the order a saved level lists
+ * them, then the floor gaps and the checkpoints.  format_version is not
+ * here: it is written first, by hand, because it is a constant.
+ */
+static const char *const s_key_order[] = {
+    /* Header. */
+    "name", "description", "generated_by", "screen_count",
+    /* Level-wide configuration. */
+    "player_start_x", "player_start_y", "music_path", "music_volume",
+    "floor_tile_path", "initial_hearts", "initial_lives", "score_per_life",
+    "coin_score",
+    /* Geometry and authored respawn points. */
+    "floor_gaps", "checkpoints",
+};
+
+/*
+ * write_header_and_config — Recovery comment, format_version, then the
+ * level-wide keys, floor gaps, checkpoints and physics.
  */
 static void write_header_and_config(FILE *fp, const LevelDef *def,
                                     const char *original_path)
@@ -34,52 +50,16 @@ static void write_header_and_config(FILE *fp, const LevelDef *def,
     /* Keep the schema marker first among top-level scalar fields. */
     fprintf(fp, "format_version = %d\n", LEVEL_FORMAT_VERSION);
 
-    /* ---- Header fields ------------------------------------------- */
-
-    write_toml_key_string(fp, "name", def->name[0] ? def->name : "Untitled");
-
-    if (def->description[0] != '\0') {
-        write_toml_key_string(fp, "description", def->description);
-    }
-
-    if (def->generated_by[0] != '\0') {
-        write_toml_key_string(fp, "generated_by", def->generated_by);
-    }
-
-    fprintf(fp, "screen_count = %d\n", def->screen_count);
-
-    /* ---- Level-wide configuration (must come before [[arrays]]) --- */
-
-    fprintf(fp, "player_start_x = %s\n", fmt_float(def->player_start_x));
-    fprintf(fp, "player_start_y = %s\n", fmt_float(def->player_start_y));
-    write_toml_key_string(fp, "music_path", def->music_path);
-    fprintf(fp, "music_volume = %d\n", def->music_volume);
-    write_toml_key_string(fp, "floor_tile_path", def->floor_tile_path);
-    fprintf(fp, "initial_hearts = %d\n", def->initial_hearts);
-    fprintf(fp, "initial_lives = %d\n", def->initial_lives);
-    fprintf(fp, "score_per_life = %d\n", def->score_per_life);
-    fprintf(fp, "coin_score = %d\n", def->coin_score);
-
-    /* ---- Floor gaps (plain integer array) ------------------------- */
-
-    if (def->floor_gap_count > 0) {
-        fprintf(fp, "floor_gaps = [");
-        for (int i = 0; i < def->floor_gap_count; i++) {
-            if (i > 0) fprintf(fp, ", ");
-            fprintf(fp, "%d", def->floor_gaps[i]);
-        }
-        fprintf(fp, "]\n");
-    }
-
-    /* ---- Authored checkpoints -------------------------------------- */
-
-    for (int i = 0; i < def->checkpoint_count; i++) {
-        const CheckpointPlacement *cp = &def->checkpoints[i];
-        fprintf(fp, "[[checkpoints]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(cp->x));
-        fprintf(fp, "y = %s\n", fmt_float(cp->y));
-        fprintf(fp, "\n");
-    }
+    /* ---- Level-wide keys, floor gaps and checkpoints ---------------- */
+    /*
+     * Each name is a row of the schema table in serializer_parse.c, which
+     * knows the key's type, where its value lives in LevelDef and when it
+     * is left out (an empty description, an empty floor_gaps).  Plain keys
+     * must come before the first [table], or TOML would read them as keys
+     * of that table.
+     */
+    for (size_t i = 0; i < sizeof(s_key_order) / sizeof(s_key_order[0]); i++)
+        serializer_write_entry(fp, def, s_key_order[i]);
 
     /* ---- Player movement physics ---------------------------------- */
     /*
@@ -88,382 +68,36 @@ static void write_header_and_config(FILE *fp, const LevelDef *def,
      * -1.0 means "use the #define default".  Set a field to -1.0 in the
      * editor to let the engine pick its own value for that parameter.
      */
-    fprintf(fp, "\n[physics]\n");
-    fprintf(fp, "walk_max_speed       = %s\n", fmt_float(def->physics.walk_max_speed));
-    fprintf(fp, "run_max_speed        = %s\n", fmt_float(def->physics.run_max_speed));
-    fprintf(fp, "walk_ground_accel    = %s\n", fmt_float(def->physics.walk_ground_accel));
-    fprintf(fp, "run_ground_accel     = %s\n", fmt_float(def->physics.run_ground_accel));
-    fprintf(fp, "ground_friction      = %s\n", fmt_float(def->physics.ground_friction));
-    fprintf(fp, "ground_counter_accel = %s\n", fmt_float(def->physics.ground_counter_accel));
-    fprintf(fp, "air_accel_walk       = %s\n", fmt_float(def->physics.air_accel_walk));
-    fprintf(fp, "air_accel_run        = %s\n", fmt_float(def->physics.air_accel_run));
-    fprintf(fp, "air_friction         = %s\n", fmt_float(def->physics.air_friction));
-    fprintf(fp, "cam_lookahead_vx_factor = %s\n", fmt_float(def->physics.cam_lookahead_vx_factor));
-    fprintf(fp, "cam_lookahead_max    = %s\n", fmt_float(def->physics.cam_lookahead_max));
-    fprintf(fp, "\n");
+    fputc('\n', fp);
+    serializer_write_entry(fp, def, "physics");
 }
 
-/* write_world_and_collectibles — Rails, pillars, coins, stars, last star. */
-static void write_world_and_collectibles(FILE *fp, const LevelDef *def)
-{
-    /* ---- Rails --------------------------------------------------- */
-
-    for (int i = 0; i < def->rail_count; i++) {
-        const RailPlacement *r = &def->rails[i];
-        fprintf(fp, "[[rails]]\n");
-        write_toml_key_string(fp, "layout", serializer_rail_layout_to_str(r->layout));
-        fprintf(fp, "x = %d\n", r->x);
-        fprintf(fp, "y = %d\n", r->y);
-        fprintf(fp, "w = %d\n", r->w);
-        fprintf(fp, "h = %d\n", r->h);
-        fprintf(fp, "end_cap = %d\n", r->end_cap);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Platforms ------------------------------------------------ */
-
-    for (int i = 0; i < def->platform_count; i++) {
-        const PlatformPlacement *p = &def->platforms[i];
-        fprintf(fp, "[[platforms]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(p->x));
-        fprintf(fp, "tile_height = %d\n", p->tile_height);
-        fprintf(fp, "tile_width = %d\n", p->tile_width);
-        if (p->tile_path[0] != '\0') {
-            write_toml_key_string(fp, "tile_path", p->tile_path);
-        }
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Coins --------------------------------------------------- */
-
-    for (int i = 0; i < def->coin_count; i++) {
-        const CoinPlacement *c = &def->coins[i];
-        fprintf(fp, "[[coins]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(c->x));
-        fprintf(fp, "y = %s\n", fmt_float(c->y));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Star yellows --------------------------------------------- */
-
-    for (int i = 0; i < def->star_yellow_count; i++) {
-        const StarYellowPlacement *s = &def->star_yellows[i];
-        fprintf(fp, "[[star_yellows]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(s->x));
-        fprintf(fp, "y = %s\n", fmt_float(s->y));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Star greens ---------------------------------------------- */
-
-    for (int i = 0; i < def->star_green_count; i++) {
-        const StarGreenPlacement *s = &def->star_greens[i];
-        fprintf(fp, "[[star_greens]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(s->x));
-        fprintf(fp, "y = %s\n", fmt_float(s->y));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Star reds ------------------------------------------------ */
-
-    for (int i = 0; i < def->star_red_count; i++) {
-        const StarRedPlacement *s = &def->star_reds[i];
-        fprintf(fp, "[[star_reds]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(s->x));
-        fprintf(fp, "y = %s\n", fmt_float(s->y));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Last star (single table, not array) --------------------- */
-
-    {
-        const LastStarPlacement *ls = &def->last_star;
-        fprintf(fp, "[last_star]\n");
-        fprintf(fp, "x = %s\n", fmt_float(ls->x));
-        fprintf(fp, "y = %s\n", fmt_float(ls->y));
-        if (def->next_phase[0] != '\0') {
-            write_toml_key_string(fp, "next_phase", def->next_phase);
-        }
-        fprintf(fp, "\n");
-    }
-}
-
-/* write_bird_tables — One [[table]] per bird, under the given table name. */
-static void write_bird_tables(FILE *fp, const char *table,
-                              const BirdPlacement *birds, int count)
-{
-    for (int i = 0; i < count; i++) {
-        const BirdPlacement *b = &birds[i];
-        fprintf(fp, "[[%s]]\n", table);
-        fprintf(fp, "x = %s\n", fmt_float(b->x));
-        fprintf(fp, "base_y = %s\n", fmt_float(b->base_y));
-        fprintf(fp, "vx = %s\n", fmt_float(b->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(b->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(b->patrol_x1));
-        fprintf(fp, "frame_index = %d\n", b->frame_index);
-        fprintf(fp, "\n");
-    }
-}
-
-/* write_fish_tables — One [[table]] per fish, under the given table name. */
-static void write_fish_tables(FILE *fp, const char *table,
-                              const FishPlacement *fish, int count)
-{
-    for (int i = 0; i < count; i++) {
-        const FishPlacement *f = &fish[i];
-        fprintf(fp, "[[%s]]\n", table);
-        fprintf(fp, "x = %s\n", fmt_float(f->x));
-        fprintf(fp, "vx = %s\n", fmt_float(f->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(f->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(f->patrol_x1));
-        fprintf(fp, "\n");
-    }
-}
-
-/* write_enemies — Spiders, birds and fish, one [[array]] name per type. */
-static void write_enemies(FILE *fp, const LevelDef *def)
-{
-    /* ---- Spiders ------------------------------------------------- */
-
-    for (int i = 0; i < def->spider_count; i++) {
-        const SpiderPlacement *sp = &def->spiders[i];
-        fprintf(fp, "[[spiders]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(sp->x));
-        fprintf(fp, "vx = %s\n", fmt_float(sp->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(sp->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(sp->patrol_x1));
-        fprintf(fp, "frame_index = %d\n", sp->frame_index);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Jumping spiders ----------------------------------------- */
-
-    for (int i = 0; i < def->jumping_spider_count; i++) {
-        const JumpingSpiderPlacement *js = &def->jumping_spiders[i];
-        fprintf(fp, "[[jumping_spiders]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(js->x));
-        fprintf(fp, "vx = %s\n", fmt_float(js->vx));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(js->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(js->patrol_x1));
-        fprintf(fp, "\n");
-    }
-
-    /* Both bird types share BirdPlacement and both fish types share
-     * FishPlacement; only the [[table]] name differs, so one writer each. */
-    write_bird_tables(fp, "birds", def->birds, def->bird_count);
-    write_bird_tables(fp, "faster_birds", def->faster_birds,
-                      def->faster_bird_count);
-    write_fish_tables(fp, "fish", def->fish, def->fish_count);
-    write_fish_tables(fp, "faster_fish", def->faster_fish,
-                      def->faster_fish_count);
-}
-
-/* write_hazards — Axe traps, saws, spike rows/platforms/blocks and flames. */
-static void write_hazards(FILE *fp, const LevelDef *def)
-{
-    /* ---- Axe traps ----------------------------------------------- */
-
-    for (int i = 0; i < def->axe_trap_count; i++) {
-        const AxeTrapPlacement *a = &def->axe_traps[i];
-        fprintf(fp, "[[axe_traps]]\n");
-        fprintf(fp, "pillar_x = %s\n", fmt_float(a->pillar_x));
-        fprintf(fp, "y = %s\n", fmt_float(a->y));
-        write_toml_key_string(fp, "mode", serializer_axe_mode_to_str(a->mode));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Circular saws ------------------------------------------- */
-
-    for (int i = 0; i < def->circular_saw_count; i++) {
-        const CircularSawPlacement *cs = &def->circular_saws[i];
-        fprintf(fp, "[[circular_saws]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(cs->x));
-        fprintf(fp, "y = %s\n", fmt_float(cs->y));
-        fprintf(fp, "patrol_x0 = %s\n", fmt_float(cs->patrol_x0));
-        fprintf(fp, "patrol_x1 = %s\n", fmt_float(cs->patrol_x1));
-        fprintf(fp, "direction = %d\n", cs->direction);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Spike rows ---------------------------------------------- */
-
-    for (int i = 0; i < def->spike_row_count; i++) {
-        const SpikeRowPlacement *sr = &def->spike_rows[i];
-        fprintf(fp, "[[spike_rows]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(sr->x));
-        fprintf(fp, "count = %d\n", sr->count);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Spike platforms ----------------------------------------- */
-
-    for (int i = 0; i < def->spike_platform_count; i++) {
-        const SpikePlatformPlacement *sp = &def->spike_platforms[i];
-        fprintf(fp, "[[spike_platforms]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(sp->x));
-        fprintf(fp, "y = %s\n", fmt_float(sp->y));
-        fprintf(fp, "tile_count = %d\n", sp->tile_count);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Spike blocks -------------------------------------------- */
-
-    for (int i = 0; i < def->spike_block_count; i++) {
-        const SpikeBlockPlacement *sb = &def->spike_blocks[i];
-        fprintf(fp, "[[spike_blocks]]\n");
-        fprintf(fp, "rail_index = %d\n", sb->rail_index);
-        fprintf(fp, "t_offset = %s\n", fmt_float(sb->t_offset));
-        fprintf(fp, "speed = %s\n", fmt_float(sb->speed));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Blue flames --------------------------------------------- */
-
-    for (int i = 0; i < def->blue_flame_count; i++) {
-        fprintf(fp, "[[blue_flames]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(def->blue_flames[i].x));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Fire flames --------------------------------------------- */
-
-    for (int i = 0; i < def->fire_flame_count; i++) {
-        fprintf(fp, "[[fire_flames]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(def->fire_flames[i].x));
-        fprintf(fp, "\n");
-    }
-}
-
-/* write_surfaces — Float platforms, bridges, bouncepads and climbables. */
-static void write_surfaces(FILE *fp, const LevelDef *def)
-{
-    /* ---- Float platforms ----------------------------------------- */
-
-    for (int i = 0; i < def->float_platform_count; i++) {
-        const FloatPlatformPlacement *fl = &def->float_platforms[i];
-        fprintf(fp, "[[float_platforms]]\n");
-        write_toml_key_string(fp, "mode", serializer_float_mode_to_str(fl->mode));
-        fprintf(fp, "x = %s\n", fmt_float(fl->x));
-        fprintf(fp, "y = %s\n", fmt_float(fl->y));
-        fprintf(fp, "tile_count = %d\n", fl->tile_count);
-        fprintf(fp, "rail_index = %d\n", fl->rail_index);
-        fprintf(fp, "t_offset = %s\n", fmt_float(fl->t_offset));
-        fprintf(fp, "speed = %s\n", fmt_float(fl->speed));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Bridges ------------------------------------------------- */
-
-    for (int i = 0; i < def->bridge_count; i++) {
-        const BridgePlacement *br = &def->bridges[i];
-        fprintf(fp, "[[bridges]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(br->x));
-        fprintf(fp, "y = %s\n", fmt_float(br->y));
-        fprintf(fp, "brick_count = %d\n", br->brick_count);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Bouncepads (small) -------------------------------------- */
-
-    for (int i = 0; i < def->bouncepad_small_count; i++) {
-        const BouncepadPlacement *bp = &def->bouncepads_small[i];
-        fprintf(fp, "[[bouncepads_small]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(bp->x));
-        fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        write_toml_key_string(fp, "pad_type", serializer_bouncepad_type_to_str(bp->pad_type));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Bouncepads (medium) ------------------------------------- */
-
-    for (int i = 0; i < def->bouncepad_medium_count; i++) {
-        const BouncepadPlacement *bp = &def->bouncepads_medium[i];
-        fprintf(fp, "[[bouncepads_medium]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(bp->x));
-        fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        write_toml_key_string(fp, "pad_type", serializer_bouncepad_type_to_str(bp->pad_type));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Bouncepads (high) --------------------------------------- */
-
-    for (int i = 0; i < def->bouncepad_high_count; i++) {
-        const BouncepadPlacement *bp = &def->bouncepads_high[i];
-        fprintf(fp, "[[bouncepads_high]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(bp->x));
-        fprintf(fp, "launch_vy = %s\n", fmt_float(bp->launch_vy));
-        write_toml_key_string(fp, "pad_type", serializer_bouncepad_type_to_str(bp->pad_type));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Vines --------------------------------------------------- */
-
-    for (int i = 0; i < def->vine_count; i++) {
-        const VinePlacement *v = &def->vines[i];
-        fprintf(fp, "[[vines]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(v->x));
-        fprintf(fp, "y = %s\n", fmt_float(v->y));
-        fprintf(fp, "tile_count = %d\n", v->tile_count);
-        if (v->vine_type != 0) {
-            fprintf(fp, "vine_type = %d\n", v->vine_type);
-        }
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Ladders ------------------------------------------------- */
-
-    for (int i = 0; i < def->ladder_count; i++) {
-        const LadderPlacement *l = &def->ladders[i];
-        fprintf(fp, "[[ladders]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(l->x));
-        fprintf(fp, "y = %s\n", fmt_float(l->y));
-        fprintf(fp, "tile_count = %d\n", l->tile_count);
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Ropes --------------------------------------------------- */
-
-    for (int i = 0; i < def->rope_count; i++) {
-        const RopePlacement *rp = &def->ropes[i];
-        fprintf(fp, "[[ropes]]\n");
-        fprintf(fp, "x = %s\n", fmt_float(rp->x));
-        fprintf(fp, "y = %s\n", fmt_float(rp->y));
-        fprintf(fp, "tile_count = %d\n", rp->tile_count);
-        fprintf(fp, "\n");
-    }
-
-}
-
-/* write_layers — Background, foreground and fog layers (drawn, not solid). */
-static void write_layers(FILE *fp, const LevelDef *def)
-{
-    /* ---- Background layers --------------------------------------- */
-
-    for (int i = 0; i < def->background_layer_count; i++) {
-        fprintf(fp, "[[background_layers]]\n");
-        write_toml_key_string(fp, "path", def->background_layers[i].path);
-        fprintf(fp, "speed = %s\n", fmt_float(def->background_layers[i].speed));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Foreground layers --------------------------------------- */
-
-    for (int i = 0; i < def->foreground_layer_count; i++) {
-        fprintf(fp, "[[foreground_layers]]\n");
-        write_toml_key_string(fp, "path", def->foreground_layers[i].path);
-        fprintf(fp, "speed = %s\n", fmt_float(def->foreground_layers[i].speed));
-        fprintf(fp, "\n");
-    }
-
-    /* ---- Fog layers ------------------------------------------------- */
-
-    for (int i = 0; i < def->fog_layer_count; i++) {
-        fprintf(fp, "[[fog_layers]]\n");
-        write_toml_key_string(fp, "path", def->fog_layers[i].path);
-        fprintf(fp, "speed = %s\n", fmt_float(def->fog_layers[i].speed));
-        fprintf(fp, "\n");
-    }
-}
+/*
+ * s_table_order — the [table] and [[array]] sections after [physics], in
+ * the order they appear in a saved level.
+ *
+ * Like s_key_order, each name is a row of the schema table in
+ * serializer_parse.c, which says what the section's keys are and in which
+ * order they are written (serializer_write_entry).  This list only decides
+ * the order of the sections themselves.  Both orders are part of the file
+ * format: changing either changes every saved level, and the round-trip
+ * tests compare bytes.
+ */
+static const char *const s_table_order[] = {
+    /* The world and what is collected in it. */
+    "rails", "platforms", "coins", "star_yellows", "star_greens", "star_reds",
+    "last_star",   /* one [last_star] table, with the optional next_phase */
+    /* Enemies. */
+    "spiders", "jumping_spiders", "birds", "faster_birds", "fish", "faster_fish",
+    /* Hazards. */
+    "axe_traps", "circular_saws", "spike_rows", "spike_platforms", "spike_blocks",
+    "blue_flames", "fire_flames",
+    /* Surfaces and climbables. */
+    "float_platforms", "bridges", "bouncepads_small", "bouncepads_medium",
+    "bouncepads_high", "vines", "ladders", "ropes",
+    /* Layers: drawn, not solid. */
+    "background_layers", "foreground_layers", "fog_layers",
+};
 
 /*
  * write_level_toml — Emit every LevelDef field as TOML text into fp.
@@ -478,13 +112,10 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
                              const char *original_path)
 {
     /* Sections are written in the order the loader and humans expect:
-     * plain keys first, then one group of [[array]] tables per family. */
+     * plain keys first (s_key_order), then the tables in s_table_order. */
     write_header_and_config(fp, def, original_path);
-    write_world_and_collectibles(fp, def);
-    write_enemies(fp, def);
-    write_hazards(fp, def);
-    write_surfaces(fp, def);
-    write_layers(fp, def);
+    for (size_t i = 0; i < sizeof(s_table_order) / sizeof(s_table_order[0]); i++)
+        serializer_write_entry(fp, def, s_table_order[i]);
 }
 
 /* ================================================================== */
@@ -701,13 +332,30 @@ int level_save_toml_recovery(const LevelDef *def, const char *path,
                                    SERIALIZER_SAVE_REPLACE, NULL, 1);
 }
 
+/*
+ * level_read_recovery_path — Read the destination a recovery copy belongs to.
+ *
+ * write_header_and_config writes it as a comment on the first line of the
+ * file, so the first line is the only one read. The rest of the file is
+ * the level, and its lines can be far longer than a path (a description of
+ * 4095 bytes grows further when its newlines and control bytes are
+ * escaped); requiring every line to fit this buffer used to lose the
+ * destination of any level with a long description.
+ *
+ * Returns 1 with the path in buf, 0 when the file has no such comment
+ * (not a recovery copy), -1 when the comment is malformed or the file
+ * cannot be read.
+ */
 int level_read_recovery_path(const char *path, char *buf, size_t buf_size)
 {
     FILE *fp;
     char line[SERIALIZER_IO_PATH_MAX];
     const char prefix[] = "# super_mango_recovery_path = \"";
     size_t prefix_len = sizeof(prefix) - 1;
-    int found = 0;
+    size_t len;
+    size_t out_len = 0;
+    int escaped = 0;
+    int closed = 0;
 
     if (!path || !buf || buf_size == 0) return -1;
     buf[0] = '\0';
@@ -715,73 +363,71 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size)
     fp = serializer_fopen_utf8(path, "rb");
     if (!fp) return -1;
 
-    while (fgets(line, sizeof(line), fp)) {
-        size_t len = strlen(line);
-        size_t out_len = 0;
-        int escaped = 0;
-        int closed = 0;
-
-        if (len == sizeof(line) - 1 && line[len - 1] != '\n' && !feof(fp)) {
-            goto fail;
-        }
-        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
-            line[--len] = '\0';
-        }
-        if (strncmp(line, prefix, prefix_len) != 0) continue;
-        if (found || len < prefix_len + 1) {
-            goto fail;
-        }
-
-        for (size_t i = prefix_len; i < len; i++) {
-            unsigned char ch = (unsigned char)line[i];
-
-            if (!escaped && ch == '"') {
-                if (i + 1 != len) {
-                    goto fail;
-                }
-                closed = 1;
-                break;
-            }
-            if (!escaped && ch == '\\') {
-                escaped = 1;
-                continue;
-            }
-            if (escaped) {
-                switch (ch) {
-                case 'b': ch = '\b'; break;
-                case 'f': ch = '\f'; break;
-                case 'n': ch = '\n'; break;
-                case 'r': ch = '\r'; break;
-                case 't': ch = '\t'; break;
-                case '\\':
-                case '"': break;
-                default:
-                    goto fail;
-                }
-                escaped = 0;
-            }
-            /* Destinations never contain control bytes, including DEL. */
-            if (ch < 0x20 || ch == 0x7F) {
-                goto fail;
-            }
-            if (out_len + 1 >= buf_size) {
-                goto fail;
-            }
-            buf[out_len++] = (char)ch;
-        }
-        if (!closed) {
-            /* A metadata prefix without a closing quote is malformed. */
-            goto fail;
-        }
-        buf[out_len] = '\0';
-        found = 1;
+    if (!fgets(line, sizeof(line), fp)) {
+        /* An empty file has no comment; a read error is a failure. */
+        if (ferror(fp)) goto fail;
+        fclose(fp);
+        return 0;
+    }
+    /* Any other first line means this is not a recovery copy. The prefix
+     * is far shorter than the buffer, so a cut-off line still shows it. */
+    if (strncmp(line, prefix, prefix_len) != 0) {
+        fclose(fp);
+        return 0;
     }
 
-    if (ferror(fp)) {
+    len = strlen(line);
+    if (len == sizeof(line) - 1 && line[len - 1] != '\n' && !feof(fp)) {
+        goto fail;   /* the comment itself does not fit: no usable path */
+    }
+    while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+        line[--len] = '\0';
+    }
+
+    for (size_t i = prefix_len; i < len; i++) {
+        unsigned char ch = (unsigned char)line[i];
+
+        if (!escaped && ch == '"') {
+            if (i + 1 != len) {
+                goto fail;
+            }
+            closed = 1;
+            break;
+        }
+        if (!escaped && ch == '\\') {
+            escaped = 1;
+            continue;
+        }
+        if (escaped) {
+            switch (ch) {
+            case 'b': ch = '\b'; break;
+            case 'f': ch = '\f'; break;
+            case 'n': ch = '\n'; break;
+            case 'r': ch = '\r'; break;
+            case 't': ch = '\t'; break;
+            case '\\':
+            case '"': break;
+            default:
+                goto fail;
+            }
+            escaped = 0;
+        }
+        /* Destinations never contain control bytes, including DEL. */
+        if (ch < 0x20 || ch == 0x7F) {
+            goto fail;
+        }
+        if (out_len + 1 >= buf_size) {
+            goto fail;
+        }
+        buf[out_len++] = (char)ch;
+    }
+    if (!closed) {
+        /* A metadata prefix without a closing quote is malformed. */
         goto fail;
     }
+    buf[out_len] = '\0';
     fclose(fp);
-    return found ? 1 : 0;
+    return 1;
 
 fail:
     /* Never leave a half-decoded destination behind for the caller. */

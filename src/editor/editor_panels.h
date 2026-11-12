@@ -14,11 +14,18 @@
  * properties take the rest of the column; otherwise the palette fills it
  * above a 200 px properties panel.  Level Config keeps its own open/closed
  * state, at most half the column.  props_h is 0 with nothing selected.
+ *
+ * While the Entities list is open (list_open; editor_entity_list.c) it
+ * takes the place of Level Config and the palette: both have height 0,
+ * the list runs from list_y for list_h pixels, and the selection's
+ * properties keep their 200 px underneath.  The Place tool needs the
+ * palette, so choosing it closes the list.
  */
 typedef struct {
     int config_y, config_h, config_total_h;
     int palette_y, palette_h, palette_folded;
     int props_y, props_h;
+    int list_open, list_y, list_h;
 } EditorSideLayout;
 
 void editor_side_panel_layout(const EditorState *es, EditorSideLayout *out);

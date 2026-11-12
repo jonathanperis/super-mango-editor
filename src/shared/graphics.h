@@ -11,6 +11,19 @@
  * to width x height (the editor); the canvas keeps its size and
  * display_present letterboxes it at a whole-number scale. */
 int display_open(int width, int height, const char *title, int hidden, int resizable);
+
+/*
+ * display_frame_cap — How many frames a second to draw on a display that
+ * refreshes refresh_hz times a second: that same number, so every refresh
+ * shows a new frame.  A rate the system cannot report (0), or one outside
+ * DISPLAY_FRAME_CAP_MIN..DISPLAY_FRAME_CAP_MAX, gives
+ * DISPLAY_FRAME_CAP_DEFAULT.  display_open applies it to a visible native
+ * window; the browser paces itself and tests run unpaced.
+ */
+#define DISPLAY_FRAME_CAP_DEFAULT 60
+#define DISPLAY_FRAME_CAP_MIN     30
+#define DISPLAY_FRAME_CAP_MAX     360
+int display_frame_cap(int refresh_hz);
 void display_present(RenderTexture2D target);
 /* Where display_present draws a canvas_w x canvas_h canvas inside a
  * window_w x window_h window, in window units. At 1x or more it is the

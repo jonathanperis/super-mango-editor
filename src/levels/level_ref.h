@@ -22,7 +22,20 @@
  *
  * Rejected: missing levels/ prefix or .toml suffix, subdirectories, '\',
  * Windows-reserved characters (<>:"|?*), control bytes including DEL,
- * embedded NUL, an empty stem (".toml", "..toml", ".hidden.toml") and
- * Windows device names such as CON or COM1 (see level_ref.c).
+ * embedded NUL, bytes that are not valid UTF-8, an empty stem (".toml",
+ * "..toml", ".hidden.toml") and Windows device names such as CON or COM1
+ * (see level_ref.c).
  */
 int level_ref_valid(const char *ref, size_t length);
+
+/*
+ * level_file_name_portable — Return 1 when the `length` bytes at `name` are
+ * one file or folder name that means the same thing on macOS, Linux and
+ * Windows: no '/', '\' or Windows-reserved character, no control byte, a
+ * non-empty stem, and not a Windows device name.
+ *
+ * level_ref_valid applies it to the <name>.toml part of a reference, and
+ * the level validator to every segment of an asset path, so a sprite
+ * named "con.png" is refused the same way "levels/con.toml" is.
+ */
+int level_file_name_portable(const char *name, size_t length);

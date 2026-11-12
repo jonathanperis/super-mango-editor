@@ -89,6 +89,7 @@ typedef struct {
     int       vine_index;       /* index into the climbable array being climbed   */
     int       climb_source;     /* 0 = vine, 1 = ladder, 2 = rope                */
     int       jump_held;         /* 1 = jump key still held from last jump; prevents re-jump */
+    int       jump_cut_armed;    /* 1 = releasing jump shortens this rise; only a jump arms it */
     float     coyote_timer;      /* seconds of post-edge jump grace remaining                 */
     float     jump_buffer_timer; /* seconds of pre-landing jump input grace remaining         */
     int       move_dir;          /* input direction this frame: -1 = left, 0 = none, +1 = right */
@@ -132,52 +133,85 @@ enum {
     PLAYER_INPUT_RUN   = 1u << 5,
 };
 
+/*
+ * PlayerSurfaces — everything in the level the player can stand on, climb
+ * or be launched by, as borrowed views of the arrays GameWorld owns.
+ *
+ * The player module needs nine arrays and the world's width. Passing each
+ * array and its count as two more arguments gave player_update 24
+ * parameters, and every call (a test wanting one platform, say) had to
+ * spell out a long row of NULL, 0. One struct keeps the dependencies just
+ * as explicit (they are all named below, and nothing else is reachable)
+ * while a call says only what it has: fields left out of an initializer
+ * are zero, which means "none of that kind".
+ *
+ *     PlayerSurfaces surfaces = { .platforms = &pillar, .platform_count = 1,
+ *                                 .world_w = 400 };
+ *
+ * Nothing here is owned or changed: the arrays must stay alive for the
+ * call, and the player functions only read them.
+ */
+typedef struct {
+    const Platform      *platforms;        int platform_count;
+    const FloatPlatform *float_platforms;  int float_platform_count;
+    /* Bouncepads come as a short list of arrays (medium, small, high). */
+    const BouncepadList *bouncepad_lists;  int bouncepad_list_count;
+    const VineDecor     *vines;            int vine_count;
+    const LadderDecor   *ladders;          int ladder_count;
+    const RopeDecor     *ropes;            int rope_count;
+    const Bridge        *bridges;          int bridge_count;
+    const SpikePlatform *spike_platforms;  int spike_platform_count;
+    const int           *floor_gaps;       int floor_gap_count;  /* gap left edges, px */
+    int                  world_w;          /* level width in logical px */
+} PlayerSurfaces;
+
+/*
+ * PlayerLanding — what player_update found under the player this step.
+ * Each field is -1 when there is none of that kind.
+ *
+ *   bouncepad_list / bouncepad_index
+ *       the pad that launched the player: which of surfaces->bouncepad_lists
+ *       and which pad inside it. Naming the list and the index (rather
+ *       than one number counted across all lists) means the caller needs
+ *       no arithmetic on the lists' sizes to find the pad again.
+ *   float_platform
+ *       the float platform landed on; game_float_platforms_update uses it
+ *       to drive the crumble timer and to carry a rail platform's rider.
+ *   bridge
+ *       the bridge stood on; game_bridges_update starts crumbling the
+ *       brick under the player, so a bridge only crumbles when this
+ *       landing test says the player stands on it.
+ */
+typedef struct {
+    int bouncepad_list;
+    int bouncepad_index;
+    int float_platform;
+    int bridge;
+} PlayerLanding;
+
 /* Sample keyboard, replay, and gamepad every frame and set vx/vy accordingly.
- * Device sampling belongs to the input module; replay uses the same action bits. */
+ * Device sampling belongs to the input module; replay uses the same action bits.
+ * surfaces supplies the vines, ladders and ropes the player may grab. */
 void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
                          unsigned int physical_input_mask,
-                         const VineDecor *vines, int vine_count,
-                         const LadderDecor *ladders, int ladder_count,
-                         const RopeDecor *ropes, int rope_count);
+                         const PlayerSurfaces *surfaces);
 
 /*
  * Move the player by velocity × dt; resolve floor, one-way platform,
- * float-platform, and bouncepad collisions.
+ * float-platform, and bouncepad collisions against `surfaces`.
  *
- * If the player lands on a bouncepad, *out_bounce_idx is set to that pad's
- * flat index across bouncepad_lists (see BouncepadList); otherwise it is
- * left unchanged.  Callers should initialise it to -1.
+ * *landed receives what the player ended the step on (see PlayerLanding).
  *
- * If the player lands on a float platform, *out_fp_landed_idx is set to that
- * platform's index; otherwise it is left at -1.  Used by game_float_platforms_update to drive
- * the crumble timer and to carry the player along with a moving rail platform.
- *
- * *out_bridge_landed_idx is set to the bridge the player is standing on after
- * this step, or -1.  game_bridges_update uses it to start crumbling the brick
- * under the player, so a bridge only crumbles when this landing test says
- * the player stands on it.
- *
- * prev_fp_landed_idx : the index that *out_fp_landed_idx was set to last frame
- *   (pass -1 on the first frame).  Used internally to "stay" on a platform that
+ * prev_fp_landed_idx : the float platform *landed reported last step
+ *   (pass -1 on the first step).  Used internally to "stay" on a platform that
  *   moved downward last step — the rider was carried down with it, so their
  *   feet start below the platform's previous top and the crossing test misses.
  */
 void player_update(Player *player, float dt, SoundEffect *snd_jump,
-                   const Platform *platforms, int platform_count,
-                   const FloatPlatform *float_platforms, int float_platform_count,
-                   const BouncepadList *bouncepad_lists, int bouncepad_list_count,
-                   const VineDecor *vines, int vine_count,
-                   const LadderDecor *ladders, int ladder_count,
-                   const RopeDecor *ropes, int rope_count,
-                   const Bridge *bridges, int bridge_count,
-                   const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *floor_gaps, int floor_gap_count,
-                   int *out_bounce_idx,
-                   int *out_fp_landed_idx,
-                   int *out_bridge_landed_idx,
+                   const PlayerSurfaces *surfaces,
                    int prev_fp_landed_idx,
-                   int world_w);
+                   PlayerLanding *landed);
 
 /* Draw the player sprite at its current position, offset by the camera.
  * reduced_motion swaps the hurt blink for a steady translucent sprite. */

@@ -53,7 +53,7 @@ The [manual](https://super-mango-editor.jonathanperis.tech/docs/) covers each of
 
 A C11 compiler (`clang` or `gcc`), `make`, CMake, Python 3 (3.12+
 recommended) and Node.js 22.12+ (CI uses 26.9.0), which `make test` needs for
-its four JavaScript host-contract tests. The first build downloads and verifies
+its six JavaScript host-contract tests. The first build downloads and verifies
 the pinned raylib 6.2 source; no system raylib is needed. See [dependency provenance](vendor/raylib/README.md).
 
 **macOS:**
@@ -146,7 +146,7 @@ super-mango-editor/
 | `DESIGN.md` | How the website looks: built from the game's own sprites, palette and fonts. |
 | `docs/wiki/` | The manual, published on the [docs site](https://super-mango-editor.jonathanperis.tech/docs/). |
 | `docs/README.md` | Website setup, content ownership, generated facts and deployment. |
-| `docs/AUDIT.md`, `docs/AUDIT_IMPLEMENTATION.md` | Historical, dated audit reports (not current status). |
+| `docs/archive/`, `.specs/archive/` | Historical, dated documents: two audit reports and the SDL2-era working specification. Not current status; each folder's README says what they are. |
 | `SECURITY.md` | Vulnerability reporting, scope and the web build's shared-origin model. |
 | `THIRD_PARTY_NOTICES.md` | Third-party code and media notices. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |

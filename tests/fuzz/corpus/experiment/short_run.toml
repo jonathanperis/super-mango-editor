@@ -1,0 +1,19 @@
+# A capture as F9 writes it: one row per fixed step, [input bits, nine
+# physics values]. level_hash is the value tests/fuzz_campaign_experiment.c
+# passes as the loaded level's hash, so the decoder reaches the rows.
+format_version = 4
+level_path = "levels/00_sandbox_01.toml"
+seed = 7
+level_hash = "0123456789abcdef"
+frames = [
+    [0, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [2, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [2, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [18, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [18, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [2, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [0, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [1, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [33, 800, 100, 250, 750, 600, 550, 100, 350, 180],
+    [0, 800, 100, 250, 750, 600, 550, 100, 350, 180]
+]

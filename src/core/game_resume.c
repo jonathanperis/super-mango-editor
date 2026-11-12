@@ -29,7 +29,10 @@ void game_resume_capture(const GameState *gs, GameResume *resume)
     resume->score = gs->world.score;
     resume->level_score_start = gs->world.level_score_start;
     resume->score_life_next = gs->world.score_life_next;
-    resume->lives = gs->world.lives < 0 ? 0 : gs->world.lives;
+    /* Held to the range a stored point accepts (GAME_RESUME_LIVES_MAX). */
+    resume->lives = gs->world.lives < 0 ? 0 :
+                    gs->world.lives > GAME_RESUME_LIVES_MAX ? GAME_RESUME_LIVES_MAX :
+                    gs->world.lives;
     resume->elapsed = gs->screen.completion.level_elapsed;
     /* One bit per coin: bit i set means coins[i] was already collected. */
     for (int i = 0; i < gs->world.coin_count && i < 64; i++)
@@ -41,7 +44,9 @@ void game_resume_capture(const GameState *gs, GameResume *resume)
  *
  * The hash check already proves the file is the same, so these checks only
  * guard against a hand-edited profile: the point must be one the game itself
- * could have saved for this level.
+ * could have saved for this level. That means an authored checkpoint's
+ * exact position, the level start, or (in a level without authored
+ * checkpoints) a column the automatic screen checkpoints could have chosen.
  */
 static int resume_fits_level(const GameState *gs, const LevelDef *def, const GameResume *resume)
 {
@@ -65,9 +70,16 @@ static int resume_fits_level(const GameState *gs, const LevelDef *def, const Gam
     }
     /* Automatic screen checkpoints move only x, along the floor of the
      * screens already entered; y stays the start's. */
-    return float_same_value(resume->respawn_y, start_y) && resume->respawn_x >= 0.0f &&
-           resume->respawn_x < (float)gs->world.runtime.world_w &&
-           resume->legacy_screen <= gs->world.runtime.world_w / GAME_W;
+    if (!float_same_value(resume->respawn_y, start_y)) return 0;
+    if (resume->legacy_screen >= gs->world.runtime.world_w / GAME_W) return 0;
+    /* Still at the level start: no screen entered yet, or none of the
+     * screens entered had a safe column to save. */
+    if (float_same_value(resume->respawn_x, start_x)) return 1;
+    /* Otherwise it must be a column the automatic checkpoints could have
+     * chosen for a screen already entered: on the search grid and clear of
+     * floor gaps, spikes and flames. */
+    return game_checkpoint_automatic_point_valid(gs, resume->respawn_x,
+                                                 resume->legacy_screen);
 }
 
 int game_resume_apply(GameState *gs, const GameResume *resume)

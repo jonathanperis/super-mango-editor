@@ -1,10 +1,16 @@
 name: Fuzz
 
 # Weekly coverage-guided search of the level loader, the editor's save -> load
-# round trip (tests/fuzz_editor_roundtrip.c) and the profile and ghost
-# decoders; `make fuzz` runs each harness in turn for FUZZ_SECONDS. Pull
-# requests already replay the seed corpus under `make sanitize` in build.yml. This job is not a required check: a crash here is a bug to
-# fix, and the failing input is uploaded from out/fuzz/.
+# round trip (tests/fuzz_editor_roundtrip.c), the profile and ghost decoders,
+# and the campaign manifest loader and experiment capture decoder
+# (tests/fuzz_campaign_experiment.c); `make fuzz` runs each harness in turn
+# for FUZZ_SECONDS. Pull requests already replay the seed corpus under
+# `make sanitize` in build.yml. This job is not a required check: a crash
+# here is a bug to fix, and the failing input is uploaded from out/fuzz/.
+#
+# The inputs each run discovers are kept in the Actions cache and restored
+# by the next run, so the search continues from where the last one stopped
+# rather than from the seeds every week.
 on:
   schedule:
     - cron: "15 4 * * 1"
@@ -23,12 +29,13 @@ jobs:
   libfuzzer:
     name: libFuzzer (Linux x86_64)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Four harnesses of FUZZ_SECONDS each, plus the build.
+    timeout-minutes: 45
     env:
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
       CC: clang
       FUZZ_CC: clang
-      FUZZ_SECONDS: "60"
+      FUZZ_SECONDS: "300"
 
     steps:
       - name: Checkout source
@@ -37,18 +44,33 @@ jobs:
           persist-credentials: false
 
       - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang cmake libgl1-mesa-dev libx11-dev \
-            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+        uses: ./.github/actions/install-linux-deps
 
-      - name: Cache pinned raylib source archive
+      # `make fuzz` links the ordinary Linux clang debug raylib (out/raylib),
+      # the tree the build workflow's Linux leg, CodeQL and clang-tidy cache
+      # under this name, so this job reuses their entry.
+      - name: Cache raylib
+        uses: ./.github/actions/raylib-cache
+        with:
+          variant: linux-clang-debug
+
+      # A cache entry cannot be overwritten, so each run saves under its own
+      # run id and restores the newest earlier one (restore-keys matches by
+      # prefix). An input found by an older build is still a fine starting
+      # point, so nothing else is in the key.
+      - name: Restore the discovered corpus
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .cache/raylib
-          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+          path: |
+            out/fuzz/level
+            out/fuzz/profile
+            out/fuzz/editor
+            out/fuzz/campaign
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-
 
-      - name: Search for 60 seconds per harness
+      - name: Search for 300 seconds per harness
         run: make fuzz
 
       - name: Upload crashes

@@ -11,6 +11,7 @@
 #include "../core/debug.h"
 #include "../core/game_checkpoint.h"
 #include "../core/game_ghost.h"
+#include "../player/player_jump.h"   /* player_cancel_jump_state */
 #include "../hazards/spike_block.h"  /* SPIKE_PUSH_SPEED, SPIKE_PUSH_VY */
 
 #include "../shared/audio.h"
@@ -81,6 +82,9 @@ void apply_damage(GameState *gs, int amount, int push,
         }
         gs->world.player.on_ground = 0;
         gs->world.player.on_vine   = 0;
+        /* The push replaces any jump in progress: no coyote jump out of
+         * it, and releasing jump does not shorten it. */
+        player_cancel_jump_state(&gs->world.player);
     }
     (void)src_cy;   /* reserved for future vertical-push logic */
 

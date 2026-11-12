@@ -5,8 +5,10 @@ The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 
 ## Requirements and Commands
 
-Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** and Bun
-**1.4.2**. Restore dependencies with `bun install --frozen-lockfile` in this directory.
+Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** (the
+repository's `.node-version` file) and Bun **1.4.2** (also `packageManager` in
+`package.json`; `make doctor` warns when your Bun is another release, which can
+refuse or rewrite `bun.lock`). Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
 The supported frontend versions are Astro **7.4**, `@astrojs/markdown-satteri`
 **0.4**, `@astrojs/sitemap` **3.7**, `@astrojs/check` **0.9**, Tailwind CSS
@@ -135,11 +137,21 @@ environment files stay untracked. Analytics loads only on manual pages
 third-party script does not share a document with the running game. The
 origin is still shared; see the repository `SECURITY.md`.
 
+`web/boot.js` is the one boot sequence for the browser game. The home page
+(`src/components/home/Dashboard.astro`) pastes it into an inline script through a
+`?raw` import, and the standalone page (`web/shell.html`) gets the same file from
+`tools/web_shell.py`; each page adds only its own buttons and status text.
+`tools/check_web_boot_contract.py` fails when a page grows boot logic of its own.
+The Pages build passes `PUBLIC_GAME_ASSET_VERSION` (the commit), and the home
+page then loads the game files as `super-mango.js?v=<commit>` and so on, so a
+cached older deploy cannot mix with a new one.
+
 The browser game builds the same checksum-pinned raylib source as native builds,
 using the pinned Emscripten SDK's Web/GLFW backend. `web/keyboard-scope.js` scopes
 that SDK's keyboard handlers to the canvas; revisit its integration when changing
 the SDK. `web/audio-unlock.js` resumes raylib's suspended Web Audio on a key or
 mouse press, since miniaudio itself waits for a click or tap. Host contract tests do not replace real-browser/device verification.
 
-[AUDIT.md](AUDIT.md) (2026-09-17) and `AUDIT_IMPLEMENTATION.md` (2026-09-16, the
+[archive/AUDIT.md](archive/AUDIT.md) (2026-09-17) and
+[archive/AUDIT_IMPLEMENTATION.md](archive/AUDIT_IMPLEMENTATION.md) (2026-09-16, the
 Sandbox School delivery report) are historical, dated reports, not current status.

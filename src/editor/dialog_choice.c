@@ -17,15 +17,21 @@
  * mode, draws its own frames into a target of its own, and on the way out
  * binds the frame target and sets the clip again, so the interrupted frame
  * carries on exactly where it was.  Behind the box it shows the last
- * complete frame, which dialog_choice_keep_frame copies after every frame
+ * complete frame, which dialog_choice_keep_frame keeps after every frame
  * (a half-drawn one would show missing panels).  Nothing in the loop runs
  * editor code: it reads input, draws and returns.
+ *
+ * dialog_path is the same prompt with one line of text to type into, and
+ * OK and Cancel for buttons.  It stands in for the native file picker on a
+ * desktop that has none (Linux without zenity or kdialog), so a level can
+ * always be opened and saved from inside the editor window.
  */
 
 #include "file_dialog.h"    /* dialog_choice */
 #include "dialog_choice.h"
 #include "editor_session.h" /* editor_pace_frames */
 
+#include <stdio.h>           /* snprintf */
 #include <string.h>          /* strlen, memcpy */
 
 #include "../shared/graphics.h"      /* display_present */
@@ -53,17 +59,21 @@ void dialog_choice_attach(EditorState *es)
 
 void dialog_choice_keep_frame(EditorState *es)
 {
-    if (!es || !IsWindowReady() || !IsRenderTextureValid(es->frame_target) ||
+    RenderTexture2D finished;
+
+    if (!es || !IsRenderTextureValid(es->frame_target) ||
         !IsRenderTextureValid(es->prompt_backdrop)) return;
-    EndTextureMode();
-    BeginTextureMode(es->prompt_backdrop);
-    /* Render textures are stored upside down; a negative height reads the
-     * frame the right way up, as display_present does. */
-    DrawTextureRec(es->frame_target.texture,
-                   (Rectangle){0, 0, (float)es->frame_target.texture.width,
-                               -(float)es->frame_target.texture.height},
-                   (Vector2){0, 0}, WHITE);
-    EndTextureMode();
+    /*
+     * Swap the two targets instead of copying one into the other. The
+     * frame just shown becomes the backdrop, and the old backdrop becomes
+     * the target the next frame is drawn into (it is cleared first, so
+     * what it held does not matter). Copying meant drawing all 1280x720
+     * pixels a second time on every frame, to prepare for a prompt that
+     * almost never opens; swapping two small structs costs nothing.
+     */
+    finished = es->frame_target;
+    es->frame_target = es->prompt_backdrop;
+    es->prompt_backdrop = finished;
 }
 
 /* ------------------------------------------------------------------ */
@@ -76,6 +86,7 @@ void dialog_choice_keep_frame(EditorState *es)
 #define BUTTON_H   28
 #define BUTTON_MIN 96
 #define BUTTON_GAP 8
+#define FIELD_H    24   /* the text line of dialog_path */
 
 /* Width of the bytes [from, from + length) of text in ui's font. */
 static int span_width(UIState *ui, const char *text, int from, int length)
@@ -139,7 +150,7 @@ static int wrap_message(UIState *ui, const char *text, int width, DialogLayout *
 /* Lay out a prompt for `message` and `count` buttons with ui's font,
  * centred in the editor.  Returns 0, or -1 for a count other than 2 or 3. */
 static int layout_prompt(UIState *ui, const char *message, const char *const *labels,
-                         int count, DialogLayout *out)
+                         int count, int with_field, DialogLayout *out)
 {
     int text_h = 0;
     int right;
@@ -154,10 +165,18 @@ static int layout_prompt(UIState *ui, const char *message, const char *const *la
     out->line_count = wrap_message(ui, message, BOX_W - 2 * PAD, out);
     out->button_h = BUTTON_H;
     out->box_h = TITLE_H + PAD + out->line_count * out->line_h + PAD + BUTTON_H + PAD;
+    /* A text line, when there is one, sits between message and buttons. */
+    if (with_field) out->box_h += FIELD_H + PAD;
     out->box_x = (EDITOR_W - out->box_w) / 2;
     out->box_y = (EDITOR_H - out->box_h) / 2;
     out->text_x = out->box_x + PAD;
     out->text_y = out->box_y + TITLE_H + PAD;
+    if (with_field) {
+        out->field_x = out->box_x + PAD;
+        out->field_y = out->text_y + out->line_count * out->line_h + PAD / 2;
+        out->field_w = out->box_w - 2 * PAD;
+        out->field_h = FIELD_H;
+    }
     out->button_y = out->box_y + out->box_h - PAD - BUTTON_H;
     /* Buttons in their given order, the row ending at the right margin. */
     out->button_count = count;
@@ -192,9 +211,39 @@ static int button_at(const DialogLayout *layout, int x, int y)
  * Static: a UIState holds several kilobytes of edit buffers. */
 static UIState s_ui;
 
+/*
+ * draw_field — The text line of dialog_path: a box, the typed text and a
+ * caret after it.  A path longer than the box shows its end, where the
+ * typing is, with "..." standing for the start that does not fit.
+ */
+static void draw_field(UIState *ui, const DialogLayout *layout, const char *text)
+{
+    const int inner_w = layout->field_w - 12;
+    int from = 0;
+    int length = (int)strlen(text);
+    char shown[300];
+    int caret_x;
+
+    DrawRectangle(layout->field_x, layout->field_y, layout->field_w, layout->field_h,
+                  ui_color(ui, UI_COLOR_INPUT));
+    DrawRectangleLines(layout->field_x, layout->field_y, layout->field_w, layout->field_h,
+                       ui_color(ui, UI_COLOR_ACCENT));
+    /* Drop whole characters from the front until what is left fits. */
+    while (from < length &&
+           span_width(ui, text, from, length - from) + (from ? ui_text_width(ui, "...") : 0) > inner_w)
+        from = next_char(text, from);
+    snprintf(shown, sizeof(shown), "%s%.*s", from ? "..." : "",
+             (int)(sizeof(shown) - 8), text + from);
+    ui_label(ui, layout->field_x + 6, layout->field_y + 6, shown);
+    caret_x = layout->field_x + 6 + ui_text_width(ui, shown) + 1;
+    DrawRectangle(caret_x, layout->field_y + 4, 1, layout->field_h - 8,
+                  ui_color(ui, UI_COLOR_TEXT));
+}
+
 static void draw_prompt(EditorState *es, RenderTexture2D target, const char *title,
                         const char *message, const char *const *labels,
-                        const DialogLayout *layout, int focus, Vector2 pointer)
+                        const DialogLayout *layout, int focus, Vector2 pointer,
+                        const char *field_text)
 {
     UIState *ui = &s_ui;
     char line[512];
@@ -232,6 +281,7 @@ static void draw_prompt(EditorState *es, RenderTexture2D target, const char *tit
         line[length] = '\0';
         ui_label(ui, layout->text_x, layout->text_y + i * layout->line_h, line);
     }
+    if (field_text) draw_field(ui, layout, field_text);
     /* The highlighted button (Enter presses it) is drawn lit. */
     for (int i = 0; i < layout->button_count; i++)
         (void)ui_toggle(ui, layout->button_x[i], layout->button_y, layout->button_w[i],
@@ -251,8 +301,44 @@ static void draw_prompt(EditorState *es, RenderTexture2D target, const char *tit
  * believe the button was still held. */
 #define MAX_RETURNED 4
 
-int dialog_choice(const char *title, const char *message, const char *const *labels,
-                  int count, int default_index, int cancel_index, int *selected)
+/* Remove the last UTF-8 character of text (Backspace). */
+static void erase_last_char(char *text)
+{
+    size_t length = strlen(text);
+    if (length == 0) return;
+    length--;
+    /* Step back over continuation bytes (10xxxxxx) to the lead byte. */
+    while (length > 0 && ((unsigned char)text[length] & 0xC0) == 0x80) length--;
+    text[length] = '\0';
+}
+
+/* Append `more` to the size-byte buffer text if all of it fits; a path cut
+ * short would name another file, so nothing is added when it does not.
+ * Line breaks cannot be part of a path typed on one line and are dropped. */
+static void append_text(char *text, int size, const char *more)
+{
+    size_t have = strlen(text);
+    size_t add = 0;
+    char clean[512];
+
+    for (const char *p = more; *p && add + 1 < sizeof(clean); p++)
+        if (*p != '\n' && *p != '\r') clean[add++] = *p;
+    clean[add] = '\0';
+    if (have + add + 1 > (size_t)size) return;
+    memcpy(text + have, clean, add + 1);
+}
+
+/*
+ * run_prompt — The frame loop behind dialog_choice and dialog_path.
+ *
+ * field is NULL for a button prompt.  For a text prompt it is the buffer
+ * being typed into (field_size bytes, starting with its initial text):
+ * typing appends, Backspace erases, Ctrl+V pastes, and Space types a space
+ * instead of pressing the highlighted button.
+ */
+static int run_prompt(const char *title, const char *message, const char *const *labels,
+                      int count, int default_index, int cancel_index, int *selected,
+                      char *field, int field_size)
 {
     EditorState *es = s_host;
     RenderTexture2D target = {0};
@@ -282,7 +368,7 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
     s_open = 1;
     ui_init(&s_ui, es->font);
     s_ui.style = es->ui.style;
-    if (layout_prompt(&s_ui, message, labels, count, &layout) != 0) {
+    if (layout_prompt(&s_ui, message, labels, count, field != NULL, &layout) != 0) {
         s_open = 0;
         return -1;
     }
@@ -314,7 +400,7 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
 
         /* Focus can come back while the question is up; pace like a frame. */
         editor_pace_frames(es);
-        draw_prompt(es, target, title, message, labels, &layout, focus, input_mouse());
+        draw_prompt(es, target, title, message, labels, &layout, focus, input_mouse(), field);
         input_collect();
 #ifdef MANGO_TESTING
         /* Where the window's events arrive: a test can act as one would. */
@@ -323,9 +409,18 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
         while (answer < 0 && input_poll(&event)) {
             got = 1;
             switch (event.type) {
+            case INPUT_TEXT:
+                if (field) append_text(field, field_size, event.text);
+                break;
             case INPUT_KEY_DOWN:
-                if (event.key == KEY_ENTER || event.key == KEY_KP_ENTER ||
-                    event.key == KEY_SPACE)
+                if (field && event.key == KEY_BACKSPACE) {
+                    erase_last_char(field);
+                } else if (field && event.key == KEY_V &&
+                           (event.mods & (INPUT_CTRL | INPUT_SUPER))) {
+                    const char *pasted = GetClipboardText();
+                    if (pasted) append_text(field, field_size, pasted);
+                } else if (event.key == KEY_ENTER || event.key == KEY_KP_ENTER ||
+                           (event.key == KEY_SPACE && !field))
                     answer = focus;
                 else if (event.key == KEY_ESCAPE)
                     answer = cancel_index;
@@ -379,4 +474,30 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
     if (failed) return -1;
     *selected = answer;
     return 0;
+}
+
+int dialog_choice(const char *title, const char *message, const char *const *labels,
+                  int count, int default_index, int cancel_index, int *selected)
+{
+    return run_prompt(title, message, labels, count, default_index, cancel_index,
+                      selected, NULL, 0);
+}
+
+int dialog_path(const char *title, const char *message, char *buf, int buf_size)
+{
+    static const char *const labels[] = { "OK", "Cancel" };
+    int selected = 1;
+
+    if (!buf || buf_size < 2) return FILE_DIALOG_ERROR;
+    buf[buf_size - 1] = '\0';   /* the initial text, if any, ends in a NUL */
+    if (run_prompt(title, message, labels, 2, 0, 1, &selected, buf, buf_size) != 0) {
+        buf[0] = '\0';
+        return FILE_DIALOG_ERROR;
+    }
+    /* Cancel, or OK on an empty line: nothing was chosen. */
+    if (selected != 0 || buf[0] == '\0') {
+        buf[0] = '\0';
+        return FILE_DIALOG_CANCELLED;
+    }
+    return FILE_DIALOG_SELECTED;
 }

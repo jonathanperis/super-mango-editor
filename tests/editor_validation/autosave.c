@@ -104,8 +104,15 @@ static int autosave_recovery_preserves_destination_with(EditorState *es,
     if (expect_prefix("recovery status", recovered->status_message,
                       "Recovered unsaved changes") != 0) goto cleanup;
 
-    if (expect_int("recovered source unknown",
-                   recovered->source_state, EDITOR_SOURCE_UNKNOWN) != 0)
+    /* A recovered copy is its own state: Save asks whether to replace the
+     * file it came from, never claims that file "changed on disk". */
+    if (expect_int("recovered source state",
+                   recovered->source_state, EDITOR_SOURCE_RECOVERED) != 0)
+        goto cleanup;
+    /* The copy just recovered is this editor's open document now: it is
+     * owned by this process and no longer offered as a crash leftover. */
+    if (expect_int("recovered copy is not offered again",
+                   editor_recovery_offer_count(recovered), 0) != 0)
         goto cleanup;
     recovered->level.coins[0].x = 128.0f;
     file_dialog_test_set_save_result(FILE_DIALOG_SELECTED, save_as_path);
@@ -597,7 +604,7 @@ static int recent_files_skip_overlong_lines_and_line_breaks(void)
                 sizeof(reloaded.recent_path) - 1);
         editor_load_recent_files(&reloaded);
         if (expect_int("saved recent count", reloaded.recent_file_count, 3) != 0 ||
-            expect_string("saved recent newest", reloaded.recent_files[0], level_path) != 0 ||
+            expect_document_path("saved recent newest", reloaded.recent_files[0], level_path) != 0 ||
             expect_string("line break path dropped", reloaded.recent_files[2],
                           "levels/e.toml") != 0) goto cleanup;
     }

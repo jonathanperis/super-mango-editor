@@ -9,6 +9,7 @@
 #include "dialog_choice.h"
 #include "editor_chrome.h"
 #include "editor_events.h"
+#include "editor_handles.h"   /* which resize handle the pointer is on */
 #include "editor_recovery.h"
 #include "editor_panels.h"
 #include "editor_playtest.h"
@@ -23,6 +24,22 @@ void editor_update_cursor(EditorState *es)
 {
     /* Moving entities: the four-way arrows, whatever is under them. */
     if (es->dragging && !es->playing) ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
+    /* A resize handle, grabbed or under the pointer: arrows along the way
+     * it moves (a rail's corner moves both ways). */
+    if (!es->playing) {
+        float world_x, world_y;
+        EditorHandleKind handle = EDITOR_HANDLE_NONE;
+        canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &world_x, &world_y);
+        if (es->resizing) handle = (EditorHandleKind)es->resize_handle;
+        else if (canvas_contains(es->mouse_x, es->mouse_y))
+            handle = editor_handle_at(es, world_x, world_y);
+        if (handle == EDITOR_HANDLE_CORNER)
+            ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_NWSE);
+        else if (handle == EDITOR_HANDLE_HEIGHT)
+            ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_NS);
+        else if (handle != EDITOR_HANDLE_NONE)
+            ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_EW);
+    }
     /* Sliding the view, or ready to (Space over the canvas): the same. */
     if ((es->panning || (es->space_held && canvas_contains(es->mouse_x, es->mouse_y))) &&
         !es->playing)
@@ -103,11 +120,12 @@ void editor_run_frame(EditorState *es)
     }
     /* The widgets drawn above said which cursor they want; set it once. */
     editor_update_cursor(es);
-    /* Keep this complete frame for a prompt to show behind it. */
-    dialog_choice_keep_frame(es);
     es->drawing_target = NULL;
     /* Ends texture mode, presents the scaled target, then calls EndDrawing.
      * EndDrawing polls the next frame's input and owns frame pacing; adding
      * another event poll or sleep here would perform that job twice. */
     display_present(es->frame_target);
+    /* Keep this complete frame for a prompt to show behind it: the two
+     * targets trade places, so the next frame draws into the other one. */
+    dialog_choice_keep_frame(es);
 }

@@ -55,6 +55,41 @@ int serializer_file_exists_utf8(const char *path);
 SerializerPathStatus serializer_read_file(const char *path, size_t max_bytes,
                                           char **out);
 
+/*
+ * Read a whole file into a new buffer of at most max_bytes (its bytes plus
+ * one NUL after them), without caring what the bytes are: unlike
+ * serializer_read_file a NUL byte inside the file is kept, and *out_size
+ * says how many bytes were read.  This is the one way the game takes in a
+ * file somebody else wrote (a level, a campaign, an experiment): the size
+ * is bounded before anything is parsed, and the caller hashes and parses
+ * the same buffer, so the hash always describes exactly the bytes parsed.
+ *
+ * Returns as serializer_read_file does.  When the only problem is that the
+ * file does not fit, *too_large (if not NULL) is set to 1 so the caller
+ * can say so; it is 0 otherwise.
+ */
+SerializerPathStatus serializer_read_bytes(const char *path, size_t max_bytes,
+                                           char **out, size_t *out_size,
+                                           int *too_large);
+
+/* Fingerprint bytes already in memory: the same size and hash
+ * serializer_fingerprint_utf8 gives for a file holding exactly them. */
+void serializer_fingerprint_bytes(const void *bytes, size_t size,
+                                  SerializerFileFingerprint *fingerprint);
+
+/*
+ * serializer_set_durable — Turn the wait for the disk on (1, the default)
+ * or off (0).
+ *
+ * A save normally ends with fsync on the file and on its folder, so a level
+ * that was reported saved is still there after a power cut. Each of those
+ * waits costs milliseconds, which is nothing for a person pressing Ctrl+S
+ * and nearly everything for a fuzz harness that saves three files for each
+ * of millions of inputs. The harnesses turn it off; the game and the
+ * editor never call this.
+ */
+void serializer_set_durable(int durable);
+
 /* Fingerprint bytes read from an opened UTF-8 path. */
 int serializer_fingerprint_utf8(const char *path,
                                 SerializerFileFingerprint *fingerprint);

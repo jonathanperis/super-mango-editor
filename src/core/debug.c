@@ -5,6 +5,7 @@
 #include "../shared/platform.h"  /* clock_millis */
 #include "../game.h"
 #include "../collision/game_collision.h"
+#include "../player/player_climb.h"   /* the climbables' grab rectangles */
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -57,6 +58,34 @@ static void outline(IntRect r, int camera, Color color)
     DrawRectangleLines(r.x-camera,r.y,r.w,r.h,color);
 }
 
+/*
+ * damage_source_color — The outline colour for one kind of thing that
+ * hurts, looked up by the name its row has in game_collision.c's
+ * s_damage_sources table. A kind added there without a colour here is
+ * still outlined, in plain red, so it cannot be forgotten.
+ */
+static Color damage_source_color(const char *name)
+{
+    static const struct { const char *name; Color color; } colors[] = {
+        { "spider",         {255,   0,   0, 255} },
+        { "jspider",        {255,   0, 180, 255} },
+        { "bird",           {255, 160,   0, 255} },
+        { "fbird",          {255, 100, 200, 255} },
+        { "fish",           {255,  50,  50, 255} },
+        { "ffish",          {220, 100, 180, 255} },
+        { "axe",            {200,   0,  50, 255} },
+        { "saw",            {255, 140,   0, 255} },
+        { "spike_block",    {255, 140,   0, 255} },
+        { "spike",          {220, 180,   0, 255} },
+        { "spike_platform", {180,   0, 120, 255} },
+        { "blue_flame",     {255,  80,   0, 255} },
+        { "fire_flame",     {255, 120,   0, 255} },
+    };
+    for (size_t i = 0; name && i < sizeof(colors) / sizeof(colors[0]); i++)
+        if (strcmp(colors[i].name, name) == 0) return colors[i].color;
+    return (Color){255, 0, 0, 255};
+}
+
 static void draw_collision_boxes(const GameState *gs, int cam)
 {
     /* Draw world-space collision extents, not entire transparent sprite slots.
@@ -90,67 +119,61 @@ static void draw_collision_boxes(const GameState *gs, int cam)
     for (int i=0;i<gs->world.star_red_count;i++) if (gs->world.star_reds[i].active)
         outline(health_star_get_hitbox(&gs->world.star_reds[i]),cam,(Color){200,0,0,255});
 
-    /* Patrol extents follow visible art, rather than transparent sprite slots. */
+    /* Everything that hurts on touch: the boxes game_collide tests, asked
+     * for from the same table it walks (s_damage_sources), in the kind's
+     * colour. An item that cannot hurt right now (inactive, a flame still
+     * below its gap) has no box and is not outlined. */
+    for (int source = 0; source < game_damage_source_count(); source++) {
+        Color color = damage_source_color(game_damage_source_name(source));
+        int items = game_damage_source_items(&gs->world, source);
+        for (int i = 0; i < items; i++) {
+            IntRect box;
+            if (game_damage_source_hitbox(&gs->world, source, i, &box)) outline(box, cam, color);
+        }
+    }
+
+    /* Patrol extents follow visible art, rather than transparent sprite
+     * slots. These are ranges of movement, not boxes that hurt. */
     for (int i=0;i<gs->world.spider_count;i++) {
         const Spider *s=&gs->world.spiders[i];
-        outline(spider_build_hitbox(s),cam,(Color){255,0,0,255});
         int y=FLOOR_Y-SPIDER_ART_H/2;
         DrawLine((int)s->patrol_x0+SPIDER_ART_X-cam,y,(int)s->patrol_x1-SPIDER_FRAME_W+SPIDER_ART_X+SPIDER_ART_W-cam,y,(Color){180,0,0,255});
     }
     for (int i=0;i<gs->world.jumping_spider_count;i++) {
         const JumpingSpider *s=&gs->world.jumping_spiders[i];
-        outline(jumping_spider_build_hitbox(s),cam,(Color){255,0,180,255});
         int y=FLOOR_Y-JSPIDER_ART_H/2;
         DrawLine((int)s->patrol_x0+JSPIDER_ART_X-cam,y,(int)s->patrol_x1-JSPIDER_FRAME_W+JSPIDER_ART_X+JSPIDER_ART_W-cam,y,(Color){180,0,120,255});
     }
     for (int i=0;i<gs->world.bird_count;i++) {
         const Bird *b=&gs->world.birds[i];
-        outline(bird_get_hitbox(b),cam,(Color){255,160,0,255});
         int y=(int)b->base_y+BIRD_ART_H/2;
         DrawLine((int)b->patrol_x0+BIRD_ART_X-cam,y,(int)b->patrol_x1-BIRD_FRAME_W+BIRD_ART_X+BIRD_ART_W-cam,y,(Color){180,120,0,255});
     }
     for (int i=0;i<gs->world.faster_bird_count;i++) {
         const FasterBird *b=&gs->world.faster_birds[i];
-        outline(faster_bird_get_hitbox(b),cam,(Color){255,100,200,255});
         int y=(int)b->base_y+FBIRD_ART_H/2;
         DrawLine((int)b->patrol_x0+FBIRD_ART_X-cam,y,(int)b->patrol_x1-FBIRD_FRAME_W+FBIRD_ART_X+FBIRD_ART_W-cam,y,(Color){180,70,140,255});
     }
     for (int i=0;i<gs->world.fish_count;i++) {
         const Fish *f=&gs->world.fish[i];
-        outline(fish_get_hitbox(f),cam,(Color){255,50,50,255});
         int y=(int)f->water_y+24;
         DrawLine((int)f->patrol_x0+FISH_HITBOX_PAD_X-cam,y,(int)f->patrol_x1-FISH_HITBOX_PAD_X-cam,y,(Color){180,50,50,255});
     }
-    for (int i=0;i<gs->world.spike_block_count;i++) if (gs->world.spike_blocks[i].active)
-        outline(spike_block_get_hitbox(&gs->world.spike_blocks[i]),cam,(Color){255,140,0,255});
+    /* An axe trap's pivot: a small cross where it hangs from. */
     for (int i = 0; i < gs->world.axe_trap_count; i++)
         if (gs->world.axe_traps[i].active) {
-            outline(axe_trap_get_hitbox(&gs->world.axe_traps[i]), cam, (Color){200,0,50,255});
             int x = (int)gs->world.axe_traps[i].x - cam, y = (int)gs->world.axe_traps[i].y + 4;
             DrawLine(x - 3, y, x + 3, y, (Color){200,0,50,255});
             DrawLine(x, y - 3, x, y + 3, (Color){200,0,50,255});
         }
-    for (int i=0;i<gs->world.spike_row_count;i++) if (gs->world.spike_rows[i].active)
-        outline(spike_row_get_rect(&gs->world.spike_rows[i]),cam,(Color){220,180,0,255});
-    for (int i=0;i<gs->world.spike_platform_count;i++) if (gs->world.spike_platforms[i].active)
-        outline(spike_platform_get_rect(&gs->world.spike_platforms[i]),cam,(Color){180,0,120,255});
-    for (int i=0;i<gs->world.blue_flame_count;i++) if (gs->world.blue_flames[i].active && gs->world.blue_flames[i].state!=BLUE_FLAME_WAITING)
-        outline(blue_flame_get_hitbox(&gs->world.blue_flames[i]),cam,(Color){255,80,0,255});
-    for (int i=0;i<gs->world.fire_flame_count;i++) if (gs->world.fire_flames[i].active && gs->world.fire_flames[i].state!=BLUE_FLAME_WAITING)
-        outline(blue_flame_get_hitbox(&gs->world.fire_flames[i]),cam,(Color){255,120,0,255});
-    for (int i=0;i<gs->world.circular_saw_count;i++) if (gs->world.circular_saws[i].active)
-        outline(circular_saw_get_hitbox(&gs->world.circular_saws[i]),cam,(Color){255,140,0,255});
-    for (int i=0;i<gs->world.faster_fish_count;i++) outline(faster_fish_get_hitbox(&gs->world.faster_fish[i]),cam,(Color){220,100,180,255});
     if (gs->world.last_star.active) outline(last_star_get_hitbox(&gs->world.last_star),cam,(Color){255,215,0,255});
-    /* Climbables show their full interaction spans, including tile overlap. */
-    for (int i=0;i<gs->world.ladder_count;i++) {
-        const LadderDecor *d=&gs->world.ladders[i];
-        outline((IntRect){(int)d->x,(int)d->y,LADDER_W,(d->tile_count-1)*LADDER_STEP+LADDER_H},cam,(Color){180,120,60,255});
-    }
-    for (int i=0;i<gs->world.rope_count;i++) {
-        const RopeDecor *r=&gs->world.ropes[i];
-        outline((IntRect){(int)r->x,(int)r->y,ROPE_W,(r->tile_count-1)*ROPE_STEP+ROPE_H},cam,(Color){200,160,100,255});
-    }
+    /* Climbables: the very rectangles the grab test uses (player_climb.c),
+     * a few pixels wider than the sprite on each side. Drawing a rectangle
+     * worked out again here would show a box the game does not test. */
+    for (int i = 0; i < gs->world.ladder_count; i++)
+        outline(player_ladder_grab_rect(&gs->world.ladders[i]), cam, (Color){180,120,60,255});
+    for (int i = 0; i < gs->world.rope_count; i++)
+        outline(player_rope_grab_rect(&gs->world.ropes[i]), cam, (Color){200,160,100,255});
     const Bouncepad *pads[] = {gs->world.bouncepads_medium, gs->world.bouncepads_small, gs->world.bouncepads_high};
     int counts[] = {gs->world.bouncepad_medium_count, gs->world.bouncepad_small_count, gs->world.bouncepad_high_count};
     Color colors[] = {{0,255,255,255}, {0,200,0,255}, {255,50,50,255}};
@@ -160,10 +183,8 @@ static void draw_collision_boxes(const GameState *gs, int cam)
             outline((IntRect){(int)p->x + BOUNCEPAD_ART_X, (int)p->y, BOUNCEPAD_ART_W, p->h},
                     cam, colors[kind]);
         }
-    for (int i=0;i<gs->world.vine_count;i++) {
-        const VineDecor *v=&gs->world.vines[i];
-        outline((IntRect){(int)v->x-4,(int)v->y,VINE_W+8,(v->tile_count-1)*VINE_STEP+VINE_H},cam,(Color){0,180,0,255});
-    }
+    for (int i = 0; i < gs->world.vine_count; i++)
+        outline(player_vine_grab_rect(&gs->world.vines[i]), cam, (Color){0,180,0,255});
     for (int i=0;i<gs->world.rail_count;i++) for (int j=0;j<gs->world.rails[i].count;j++)
         outline((IntRect){gs->world.rails[i].tiles[j].x,gs->world.rails[i].tiles[j].y,RAIL_TILE_W,RAIL_TILE_H},cam,(Color){160,80,255,255});
 

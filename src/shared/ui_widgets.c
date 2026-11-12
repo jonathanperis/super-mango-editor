@@ -635,6 +635,31 @@ int ui_dropdown(UIState *ui, int id, int x, int y, int w,
     return ui_dropdown_unlisted(ui, id, x, y, w, options, count, selected, "---");
 }
 
+/*
+ * dropdown_list_y — Where an open list's first row goes, for a header at
+ * y that is h tall.
+ *
+ * Below the header when the whole list fits there. A dropdown low in a
+ * panel would otherwise run past the bottom of the window, where its last
+ * rows can be neither seen nor clicked, so then the list opens upward
+ * instead, ending at the header's top. When it fits neither way (a list
+ * taller than the space on both sides) it is slid up just far enough to
+ * end at the bottom edge, which keeps every row inside the window.
+ *
+ * The click test and the drawing both ask this function, so the rows are
+ * always clicked where they are drawn.
+ */
+static int dropdown_list_y(const UIState *ui, int y, int h, int count)
+{
+    int view_h = ui->view_h > 0 ? ui->view_h : GetScreenHeight();
+    int list_h = count * h;
+    int below = y + h;
+
+    if (below + list_h <= view_h) return below;
+    if (y - list_h >= 0) return y - list_h;
+    return view_h - list_h > 0 ? view_h - list_h : 0;
+}
+
 int ui_dropdown_unlisted(UIState *ui, int id, int x, int y, int w,
                          const char **options, int count, int *selected,
                          const char *unlisted)
@@ -716,7 +741,7 @@ int ui_dropdown_unlisted(UIState *ui, int id, int x, int y, int w,
         is_open = 0;
     } else if (ui->mouse_clicked || ui->dropdown_click) {
         /* --- The press while open: pick an option or just close --- */
-        int list_y = y + h;
+        int list_y = dropdown_list_y(ui, y, h, count);
         if (count > 0 &&
             point_in_rect(ui->mouse_x, ui->mouse_y, x, list_y, w, count * h)) {
             int i = (ui->mouse_y - list_y) / h;
@@ -753,7 +778,7 @@ int ui_dropdown_unlisted(UIState *ui, int id, int x, int y, int w,
         ui->dropdown_options = options;
         ui->dropdown_count = count;
         ui->dropdown_x = x;
-        ui->dropdown_y = y + h;
+        ui->dropdown_y = dropdown_list_y(ui, y, h, count);
         ui->dropdown_w = w;
         ui->dropdown_selected = *selected;
     }

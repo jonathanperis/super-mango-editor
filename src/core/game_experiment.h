@@ -7,6 +7,14 @@
 #define EXPERIMENT_MAX_FRAMES 36000
 
 /*
+ * The largest capture file read, in bytes (the file plus one NUL).  A row
+ * is an input number and nine physics values, at most about 110 characters
+ * as the exporter writes them; 36,000 rows of that are about 4 MB, so
+ * 8 MiB holds any capture the game can record.
+ */
+#define EXPERIMENT_TEXT_MAX (8 * 1024 * 1024)
+
+/*
  * Capture file format. Rows are one fixed simulation step each
  * (GAME_FIXED_STEP seconds), so they hold no duration. The version names
  * the engine behaviour a capture depends on, and older ones are refused
@@ -16,9 +24,17 @@
  *      eased back after a lost life. The camera now snaps to the start and
  *      to the respawn point, and waiting spike blocks start when the
  *      camera reveals them, so they can start on other steps.
- *   3  the current engine.
+ *   3  waiting spike blocks started when the camera showed them, and the
+ *      camera's lookahead follows the Reduced motion setting, so the same
+ *      input could start a block on another step. A bouncepad launch could
+ *      also be replaced or cut short by jump input. Blocks now start from
+ *      the player's position and a launch ignores the jump key. Fog also
+ *      drew from the same random stream as the fish, so a level's fog
+ *      changed its fish; looks and gameplay now have a stream each
+ *      (game_random.h).
+ *   4  the current engine.
  */
-#define EXPERIMENT_FORMAT_VERSION 3
+#define EXPERIMENT_FORMAT_VERSION 4
 
 /* One recorded simulation step: the input and tuning in effect. */
 typedef struct {
@@ -36,6 +52,20 @@ typedef struct GameExperiment {
 
 int game_experiment_begin(GameState *gs);
 int game_experiment_load(GameState *gs, const char *path);
+
+/*
+ * game_experiment_decode — Turn the text of a capture into frames
+ * (game_experiment_file.c).
+ *
+ * text holds size bytes (no NUL needed); label stands in for the file name
+ * in messages. level_hash is the content hash of the level loaded now: the
+ * capture must name the same one. On success tape holds the seed, the
+ * frame count and a calloc'd frames array the caller frees, and 0 is
+ * returned; on failure tape is zeroed and nothing is left to free.
+ * It reads no file and no GameState, so the fuzz harness can call it.
+ */
+int game_experiment_decode(const char *text, size_t size, const char *label,
+                           uint64_t level_hash, GameExperiment *tape);
 int game_experiment_save(GameState *gs, const char *path);
 
 /* What an F9 export did, so the debug log can say what actually went wrong. */
