@@ -7,6 +7,7 @@
 #include "core/app_session.h"
 #include "collision/collision_damage.h"  /* game_restart_after_game_over */
 #include "core/game_checkpoint.h"
+#include "core/game_completion.h"  /* game_level_steps_from_seconds */
 #include "core/game_experiment.h"
 #include "core/game_ghost.h"
 #include "core/game_overlay.h"
@@ -578,7 +579,7 @@ static int persistent_session(void)
     InputEvent event = {.type=INPUT_KEY_DOWN,.key=KEY_F1};
     puts("profile session: open settings");
     input_push(&event); session_frame(session);
-    CHECK(session->settings.open && session->game->screen.completion.level_elapsed==0);
+    CHECK(session->settings.open && session->game->screen.completion.level_steps==0);
     session->profile.data.settings.muted=1;
     session->profile.data.settings.high_contrast=1;
     session->profile.data.settings.reduced_motion=1;
@@ -767,7 +768,7 @@ static int continue_round_trip(void)
     game->world.coins[3].active = 0;
     game->world.score = 30;
     game->world.lives = 2;
-    game->screen.completion.level_elapsed = 12.5f;
+    game->screen.completion.level_steps = 750;   /* 12.5 s */
     game_overlay_set_pause_reason(game, GAME_PAUSE_REASON_PLAYER, 1);
     session_frame(session);
     const GameResume *saved = game_profile_resume(&session->profile, level);
@@ -789,7 +790,7 @@ static int continue_round_trip(void)
     CHECK(session && session->game && session->game->screen.resumed);
     game = session->game;
     CHECK(game->world.respawn_x == respawn_x && game->world.score == 40 && game->world.lives == 2);
-    CHECK(!game->world.coins[3].active && game->world.coins[2].active && game->screen.completion.level_elapsed >= 12.5f);
+    CHECK(!game->world.coins[3].active && game->world.coins[2].active && game->screen.completion.level_steps >= 750);
     CHECK(fabsf(game->world.player.x - (respawn_x + (TILE_SIZE - game->world.player.w) / 2.0f)) < 0.01f);
     CHECK(game->world.camera.x > 0.0f);  /* snapped to the respawn, not panning from 0 */
 
@@ -962,7 +963,7 @@ static void finish_run(AppSession *session, int steps, float seconds)
 {
     GameState *game = session->game;
     for (int i = 0; i < steps; i++) game_ghost_step(game);
-    game->screen.completion.level_elapsed = seconds;
+    game->screen.completion.level_steps = game_level_steps_from_seconds(seconds);
     game_complete_level(game);
     session_frame(session);
 }

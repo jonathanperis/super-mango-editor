@@ -39,6 +39,7 @@ core/game_state.c 100.00
 core/game_terminal.c 95.16
 core/game_timing.c 100.00
 core/game_timing.h 100.00
+core/game_trig.h 89.47
 core/game_update.c 100.00
 core/game_window.c 80.00
 editor/asset_choices.c 100.00

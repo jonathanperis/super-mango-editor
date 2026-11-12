@@ -840,13 +840,17 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
 
     switch (event->type) {
     case INPUT_QUIT:
+        /* The questions asked from here are the quit's own: closing the
+         * window again while one is up cancels the quit (dialog_choice.c). */
+        es->quitting = 1;
         /* Unsaved campaign edits are asked about first, like Close does. */
-        if (!editor_campaign_close(es, 0)) break;
-        if (editor_confirm_discard_changes(es, "quit")) {
+        if (editor_campaign_close(es, 0) &&
+            editor_confirm_discard_changes(es, "quit")) {
             editor_retire_current_recovery(es);
             if (es->playing) editor_stop_play(es);
             es->running = 0;
         }
+        es->quitting = 0;
         break;
     case INPUT_KEY_DOWN:
         editor_key(es, event);

@@ -243,7 +243,9 @@ static int fire_flame_hitbox(const GameWorld *world, int i, IntRect *box)
  *
  * Adding an enemy or hazard that hurts on touch means one <thing>_hitbox()
  * above and one row here; the debug overlay then draws it without being
- * told (it walks this table through game_damage_source_hitbox).
+ * told (it walks this table through game_damage_source_hitbox). The other
+ * places a new enemy needs are in the checklist above s_update_steps in
+ * core/game_update.c.
  */
 typedef struct {
     const char *name;
@@ -355,10 +357,7 @@ void game_collide(GameState *gs, float dt)
     /* Coins — add score, possible bonus life */
     for (int i = 0; i < gs->world.coin_count; i++) {
         if (!gs->world.coins[i].active) continue;
-        IntRect cbox = {
-            (int)gs->world.coins[i].x, (int)gs->world.coins[i].y,
-            COIN_DISPLAY_W, COIN_DISPLAY_H
-        };
+        IntRect cbox = coin_get_hitbox(&gs->world.coins[i]);
         if (rect_intersects(&phit, &cbox)) {
             gs->world.coins[i].active = 0;
             game_award_score(gs, gs->world.rules.coin_score);

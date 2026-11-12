@@ -63,10 +63,12 @@ void editor_entity_list_row_text(const LevelDef *level, EntityType type, int ind
  * editor_entity_list_matches — Whether entity (type, index) is listed for
  * the search text `filter`.
  *
- * The text is split into words at spaces, commas and brackets, and every
+ * The text is split into words at spaces, commas, brackets and '#', and every
  * word has to fit:
  *   - a whole number fits an entity whose listed x or y is that number
  *     ("96", or "120 96" for both);
+ *   - a whole number right after '#' fits the entity with that index,
+ *     as the row writes it ("#3" lists Coin #3, Spider #3...);
  *   - any other word fits when the type's name contains it, whatever the
  *     case ("spi" lists Spider, Jumping Spider, Spike Row...).
  * An empty filter lists everything.

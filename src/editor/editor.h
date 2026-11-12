@@ -513,6 +513,28 @@ typedef struct {
     char           pending_text_before[256];
     LevelConfigSnapshot pending_config_before;
 
+    /*
+     * The shared field being typed into while several entities of one type
+     * are selected (properties_entities.c remembers it when it draws the
+     * active row).  Enter and Tab apply a value there to every selected
+     * entity at once; any other way of leaving the field (a click on the
+     * canvas, Ctrl+S, Undo...) goes through editor_finish_field_edit, which
+     * reads these to do the same.  shared_field_id is the widget id, 0 when
+     * no shared field is being edited.
+     */
+    int            shared_field_id;
+    int            shared_field_type;     /* EntityType of the selection  */
+    const char    *shared_field_key;      /* the TOML key, for the status */
+    size_t         shared_field_offset;   /* where the value is ...       */
+    size_t         shared_field_size;     /* ... and how many bytes       */
+
+    /* 1 while the window's close request is being handled (the quit's
+     * own questions: save, discard, a campaign's edits).  Closing the
+     * window again while one of those is up just cancels it; closing it
+     * while any other prompt is up cancels that prompt and then quits
+     * as usual (dialog_choice.c). */
+    int            quitting;
+
     EditorValidationReport validation_report;
     EditorLoadReport load_report;   /* why the last Open failed */
 

@@ -162,6 +162,22 @@ static int entity_list_finds_and_selects_entities(void)
               es.level.jumping_spider_count == 0);
         list_search(&es, "zzz");
         CHECK(editor_entity_list_row_count(&es) == 0);
+
+        /* "#3" is an index, as the rows write it: Coin #3 and every other
+         * entity #3, not whatever stands at x or y 3.  With a name, just
+         * the one; the whole row's text finds its own row. */
+        CHECK(editor_entity_list_matches(&es.level, ENT_COIN, 3, "#3"));
+        CHECK(!editor_entity_list_matches(&es.level, ENT_COIN, 2, "#3"));
+        CHECK(editor_entity_list_matches(&es.level, ENT_COIN, 3, "Coin #3"));
+        CHECK(!editor_entity_list_matches(&es.level, ENT_SPIDER, 3, "Coin #3"));
+        editor_entity_list_row_text(&es.level, ENT_COIN, 3, text, sizeof(text));
+        CHECK(editor_entity_list_matches(&es.level, ENT_COIN, 3, text));
+        list_search(&es, "coin #3");
+        CHECK(editor_entity_list_row_count(&es) == 2);   /* the heading and Coin #3 */
+        CHECK(editor_entity_list_row_of(&es, ENT_COIN, 3) == 1);
+        /* A plain "3" still means a coordinate. */
+        if ((int)roundf(es.level.coins[3].x) != 3 && (int)roundf(es.level.coins[3].y) != 3)
+            CHECK(!editor_entity_list_matches(&es.level, ENT_COIN, 3, "3"));
     }
 
     /* Esc first gives up the typing, then closes the list. */

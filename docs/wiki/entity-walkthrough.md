@@ -215,7 +215,8 @@ in the shared loops, with no hand-written load/free code:
 
 `s_required_textures` is for sprites every level needs. A sprite only some
 levels use goes in `s_optional_textures`, plus a `REQUIRE(token, def->token_count)`
-line in `game_resources_require_level_textures()`, so a level that places
+line in `game_resources_missing_level_texture()` (which
+`game_resources_require_level_textures()` calls), so a level that places
 Tokens is rejected with the asset path when the file is missing.
 
 ## 5. Complete editor integration
@@ -303,7 +304,7 @@ the sprite appears on screen.
 
 ## 7. Entities that move or hurt
 
-A Token sits still. An enemy or hazard adds three things:
+A Token sits still. An enemy or hazard adds four things:
 
 - **An update function.** Write one that walks the whole array, in the shape
   of `circular_saws_update(CircularSaw *saws, int count, float dt)`, named
@@ -335,11 +336,22 @@ A Token sits still. An enemy or hazard adds three things:
   debug log prints, `WORLD_COUNT(<things>_count)`, your function and `NULL`
   (the last column is only for a kind that needs more than "the player
   overlaps the box", as a spike row does). `game_collide()` tests the player
-  against that box, and the F3 debug overlay outlines the same one.
+  against that box, and the `--debug` overlay outlines the same one,
+  walking this table; give the kind a colour in `damage_source_color()`
+  (`src/core/debug.c`), or it is drawn plain red.
   The row's place in the table is when it is tested; the first hit in a
   step wins. `game_collide()` passes that hit to `apply_damage()` in
   `src/collision/collision_damage.c`, which handles hearts, knockback and the
   hurt-immunity timer.
+- **Smooth drawing between steps.** The screen refreshes more often than the
+  simulation steps, so a moving kind is drawn blended between its last two
+  steps. Add a `MOVER_<THINGS>` value to `GameMoverKind`
+  (`src/core/game_movers.h`), its row in `s_movers` and a `PREV_HOLDS` line
+  (`src/core/game_movers.c`; the build stops when they disagree), and one
+  array in `GameMoverPrev` (`src/game.h`) with one float per blended value.
+  The render function then draws what `game_movers_shown()` returns. A kind
+  left out of the table moves in visible 60 Hz jumps beside smooth
+  neighbours.
 - **Render order.** As for the Token in section 4: a `render_<things>()`
   function and a row in `s_render_layers` at the right depth. The
   [render order](../architecture/#render-order-back-to-front) table lists
@@ -350,16 +362,22 @@ automatically. A brand-new source directory needs its own wildcard line there.
 
 ## Checklist
 
-- [ ] `src/<category>/<entity>.h` and `.c` with render (and update) functions over the whole array, plus a `_get_hitbox` helper if it collides
-- [ ] Placement struct, array and count in `LevelDef` (`src/levels/level.h`); runtime array and count in `GameWorld` (`src/game.h`), stored by value
-- [ ] Schema entry, loader, saver and C/Python validation (section 3)
-- [ ] `load_<entities>()` in `level_loader.c` and its `s_level_loaders` row: `LOAD_EVERY_LIFE` unless it awards score (then `LOAD_ONCE`)
-- [ ] If it moves: `update_<entities>()` in `src/core/game_update.c` and its `s_update_steps` row, above `collision` if it can hurt
-- [ ] If it hurts: a `_hitbox()` function and its `s_damage_sources` row in `src/collision/game_collision.c` (the F3 debug overlay then outlines it without further code); if it is collected, pickup code in `game_collide()`
-- [ ] `render_<entities>()` in `src/render/game_render.c` and its `s_render_layers` row at the right layer, with the rows after it renumbered
-- [ ] The same rows in the manual's [update order](../architecture/#update-order-one-fixed-step) and [render order](../architecture/#render-order-back-to-front) tables (`make docs-drift` compares them with the code)
-- [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)
-- [ ] Hitbox in `src/core/debug.c` and `debug_log()` calls for significant events
-- [ ] Editor integration (section 5): the `s_entity_meta` row and palette slot, undo union, property panel, hit test, canvas, tools (whose move case also moves pasted copies), document hash
-- [ ] Tests (section 6), then `make builder test CC=clang`, `make validate-levels`, `make docs-drift`
-- [ ] Play it with `make run-level-debug LEVEL=...` and check the hitboxes match the sprite
+The complete list is the comment headed "ADDING AN ENEMY — the checklist"
+above `s_update_steps` in `src/core/game_update.c`. That comment is the source;
+the other tables' comments point to it, and this list follows it step by step
+for an enemy or hazard (a collectible such as the Token skips the update,
+damage and mover steps). Each step is a place the build or a test will not
+find for you unless it says so.
+
+- [ ] **Module:** `src/<category>/<entity>.h` and `.c` with the struct, its `MAX_*`, an update function over the whole array (one fixed step), a render function and a `_get_hitbox` helper. Use `game_sinf()` / `game_cosf()` (`src/core/game_trig.h`), not `sinf` / `cosf`, for anything the step computes
+- [ ] **World:** include the header in `src/game.h` and add the array and count to `GameWorld`, stored by value
+- [ ] **File format:** placement struct, array and count in `LevelDef` (`src/levels/level.h`); a `ROOT_TABLES` row in `ROOT_FIELDS` (`src/shared/serializer_parse.c`); the key in `s_table_order` (`src/shared/serializer_save.c`); `CHECK_COUNT` and its checks in `src/levels/level_validate.c`; the same table in `tools/validate_levels.py` (`make validate-levels` compares the two) and the key in `tests/fuzz/toml.dict` (section 3)
+- [ ] **Loading:** `load_<entities>()` and its `s_level_loaders` row in `src/levels/level_loader.c`, `LOAD_EVERY_LIFE` for an enemy (`LOAD_ONCE` for something that awards score)
+- [ ] **Moving:** `update_<entities>()` and its `s_update_steps` row in `src/core/game_update.c`, above the `collision` row, and the same row in the manual's [update order](../architecture/#update-order-one-fixed-step) table (`make docs-drift` compares them)
+- [ ] **Hurting:** a `_hitbox()` function and its `s_damage_sources` row in `src/collision/game_collision.c`; the `--debug` overlay outlines it from that row, so give it a colour in `damage_source_color()` (`src/core/debug.c`) or it is drawn plain red. Something collected instead gets pickup code in `game_collide()`
+- [ ] **Smooth drawing:** `MOVER_<ENTITIES>` in `GameMoverKind` (`src/core/game_movers.h`), its `s_movers` row and `PREV_HOLDS` line (`src/core/game_movers.c`), and its array in `GameMoverPrev` (`src/game.h`)
+- [ ] **Drawing:** `render_<entities>()`, drawing what `game_movers_shown()` returns, and its `s_render_layers` row in `src/render/game_render.c`, with the rows after it renumbered and the manual's [render order](../architecture/#render-order-back-to-front) table to match
+- [ ] **Sprite:** a `Texture2D *` slot in `TextureResources` (`src/game_assets.h`) and a row in `s_required_textures` or `s_optional_textures` (`src/core/game_resources.c`); an optional one also needs its `REQUIRE(...)` row in `game_resources_missing_level_texture()`, so a level that uses it does not start without the sprite
+- [ ] **Editor** (section 5): the `ENT_*` value and texture field (`src/editor/editor.h`), the `s_entity_meta` row and palette slot (`entity_meta.c`), `LOAD_TEX` / `DESTROY_TEX` (`editor_textures.c`), undo union, property panel, hit test, canvas, tools (whose move case also moves pasted copies) and document hash
+- [ ] **Tests and the manual** (section 6): a fixture in `tests/fixtures/runtime/` that the gameplay tests step through, and the pages that list every enemy; then `make builder test CC=clang`, `make validate-levels`, `make docs-drift`
+- [ ] Add `debug_log()` calls for significant events, then play it with `make run-level-debug LEVEL=...` and check the hitboxes match the sprite

@@ -92,6 +92,9 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 | `FLOOR_PIECE_W` | `TILE_SIZE / 3` (16) | `int` | Width of one floor piece; floor gaps must start on this grid |
 | `MAX_LEVEL_MOTION` | `10000` | `int` | Upper magnitude for authored motion values (speeds, accelerations) |
 | `MAX_PATROL_SPEED` | `FLOOR_GAP_W * TARGET_FPS / 2` (960) | `int` | Fastest enemy `vx` a level may set (px/s): half a floor gap per step, so spider gap checks cannot be skipped |
+| `MAX_PLAYER_SPEED` | `FLOOR_PIECE_W * TARGET_FPS` (960) | `int` | Largest `[physics]` top speed (`walk_max_speed`, `run_max_speed`) a level may set (px/s): one floor piece per step, so the player cannot pass through the thinnest solid in one step (`src/levels/level.h`) |
+| `MAX_PLAYER_ACCEL` | `MAX_LEVEL_MOTION` (10000) | `int` | Largest `[physics]` acceleration or friction a level may set (px/s²); the live inspector and experiment captures use the same caps (`src/levels/level.h`) |
+| `LEVEL_PHYSICS_ENGINE_DEFAULT` | `-1.0f` | `float` | The `[physics]` value that keeps the engine's own value; a missing key loads as it (`src/levels/level.h`) |
 
 ### Level Limits
 
@@ -101,6 +104,7 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 | `MAX_LEVEL_SCREENS` | `99` | Maximum `screen_count` |
 | `LEVEL_DEFAULT_LAST_STAR_X` | `145.0f` | Last Star x when the level's TOML gives none |
 | `LEVEL_DEFAULT_LAST_STAR_Y` | `167.0f` | Last Star y when the level's TOML gives none |
+| `LEVEL_UNTITLED_NAME` | `"Untitled"` | What a level with an empty `name` is saved as; it still loads as empty |
 | `LEVEL_DEFAULT_SCREEN_COUNT` | `4` | Screens a level spans when its `screen_count` is `0`; `level_screen_count()` in `src/levels/level.h` applies it |
 | `GAME_LEVEL_PATH_MAX` | `1024` | Byte capacity of a UTF-8 level path (matches the editor) |
 

@@ -25,6 +25,12 @@ inputs:
     description: The compiler this job builds raylib with (part of the fingerprint).
     required: false
     default: clang
+  source:
+    description: >-
+      'false' skips the source archive steps, for a second call in the same
+      job that only adds another compiled tree (the release tree, say).
+    required: false
+    default: 'true'
 
 # Who may save. A cache entry cannot be overwritten, and pull requests can
 # read the entries that main wrote. Letting every pull request save its own
@@ -47,19 +53,26 @@ runs:
   steps:
     # The archive only changes with the pin; build_raylib.py re-verifies its
     # SHA-256 on every use, so a restored copy cannot inject other sources.
+    # The archive is the same bytes on every OS, so one entry serves Linux,
+    # macOS and Windows: the key names no OS and holds only the manifest
+    # (which .gitattributes keeps LF, so Windows hashes the same text), and
+    # enableCrossOsArchive lets a Windows job restore an entry a Linux job
+    # saved. It used to be three identical 52 MB entries, one per OS.
     - name: Cache pinned raylib source archive (main saves)
-      if: github.ref == 'refs/heads/main'
+      if: inputs.source == 'true' && github.ref == 'refs/heads/main'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .cache/raylib
-        key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+        key: raylib-source-${{ hashFiles('vendor/raylib/manifest.json') }}
+        enableCrossOsArchive: true
 
     - name: Restore pinned raylib source archive (other runs)
-      if: github.ref != 'refs/heads/main'
+      if: inputs.source == 'true' && github.ref != 'refs/heads/main'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: .cache/raylib
-        key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+        key: raylib-source-${{ hashFiles('vendor/raylib/manifest.json') }}
+        enableCrossOsArchive: true
 
     # The fingerprint asks the compiler for its version, so on Windows it
     # runs in the MSYS2 shell, where that compiler is (setup-msys2-toolchain

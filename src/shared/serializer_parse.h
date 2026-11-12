@@ -27,7 +27,12 @@ void copy_str(char *dst, size_t dst_size, const char *src);
 
 /*
  * Validate explicit v1 schema before any TOML value is normalized into a
- * LevelDef. Missing format_version selects legacy-compatible loading.
+ * LevelDef. Missing format_version selects legacy-compatible loading,
+ * which still refuses what it cannot skip: a number that does not fit its
+ * field, an array longer than its LevelDef array, a floor gap that is not
+ * a number, and a [[checkpoints]] entry without a numeric x and y. Every
+ * message starts with the value's full TOML path ("root.platforms[1].
+ * tile_height"), so serializer_toml_line can give its line.
  */
 int serializer_validate_schema(toml_datum_t top, int *strict,
                                char *error, size_t error_size);
@@ -43,11 +48,15 @@ int serializer_validate_schema(toml_datum_t top, int *strict,
  * gone, and the editor's next save (which writes format_version = 1)
  * makes the loss permanent.
  *
- * warn is called once per skipped key or value, with a message that starts
- * with its TOML path (so serializer_toml_line can find its line).  At most
- * SERIALIZER_LEGACY_WARNING_MAX are reported.  Returns how many there
- * were; 0 for a file that states its format_version, which is checked
- * strictly instead and has nothing to warn about.
+ * warn is called once per skipped key or value, and once per enum value
+ * the enum does not have (pad_type = "WOD": the row's default is used),
+ * with a message that starts with its TOML path (so serializer_toml_line
+ * can find its line).  A key or value quoted in a message has its control
+ * bytes escaped (serializer_message_text).  What the loader refuses
+ * instead of skipping (see serializer_validate_schema) is not a warning.
+ * At most SERIALIZER_LEGACY_WARNING_MAX are reported.  Returns how many
+ * there were; 0 for a file that states its format_version, which is
+ * checked strictly instead and has nothing to warn about.
  */
 #define SERIALIZER_LEGACY_WARNING_MAX 16
 typedef void (*SerializerWarningFn)(void *context, const char *message);
@@ -78,11 +87,16 @@ int serializer_toml_line(toml_datum_t top, const char *message);
  *     missing table keeps what level_def_init_defaults set;
  *   - floor_gaps, a plain array of integers;
  *   - an [[array]] of tables is copied element by element, each key into
- *     the struct member its field row names.  A missing array stays empty.
+ *     the struct member its field row names.  A missing array stays empty,
+ *     and an item that is not a table is skipped (not counted).
+ *
+ * An enum value the enum does not have reads as the row's default.
  *
  * Returns 0, or -1 (after printing why) when an array holds more items than
  * its LevelDef array can, a floor gap is not a number, or a required key
- * ([[checkpoints]] x and y) has no finite number.  def may be half filled
+ * ([[checkpoints]] x and y) has no finite number.  serializer_validate_schema
+ * has refused all of these already, with the value's path and line; this
+ * is the safety net for a caller that skipped it.  def may be half filled
  * after a failure: level_load_toml_text reads into a scratch copy and
  * throws it away, so the caller's level is never touched.
  *
@@ -102,6 +116,24 @@ int serializer_load_schema(toml_datum_t top, LevelDef *def);
  * by the order of its calls.
  */
 void serializer_write_entry(FILE *fp, const LevelDef *def, const char *name);
+
+/*
+ * The rows of the schema table and the order a save writes them in, so a
+ * test can check that every row but format_version (written by hand, as
+ * the first line) is saved exactly once.
+ *
+ *   serializer_schema_row_name(i)  the key of row i, in table order
+ *                                  (serializer_parse.c, ROOT_FIELDS)
+ *   serializer_save_order_name(i)  the i-th entry a save writes
+ *                                  (serializer_save.c: s_key_order,
+ *                                  [physics], then s_table_order)
+ *
+ * Each returns NULL for an index at or past its count.
+ */
+size_t serializer_schema_row_count(void);
+const char *serializer_schema_row_name(size_t index);
+size_t serializer_save_order_count(void);
+const char *serializer_save_order_name(size_t index);
 
 /*
  * serializer_dump_schema — Print the schema table as text, one line per

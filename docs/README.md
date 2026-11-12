@@ -10,12 +10,14 @@ repository's `.node-version` file) and Bun **1.4.4** (also `packageManager` in
 `package.json`; `make doctor` warns when your Bun is another release, which can
 refuse or rewrite `bun.lock`). Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
-The supported frontend versions are Astro **7.4**, `@astrojs/markdown-satteri`
-**0.4**, `@astrojs/sitemap` **3.7**, `@astrojs/check` **0.9**, Tailwind CSS
-and its Vite plugin **4.3**, and TypeScript **6.0**. A lockfile patch bump
-stays on that line. TypeScript 7 is newer, but Astro Check 0.9 requires
-`^5.0.0 || ^6.0.0`; retain 6.0 until the checker supports 7.x. Keep peer
-constraints enforced. After dependency updates,
+The frontend versions (Astro, `@astrojs/markdown-satteri`, `@astrojs/sitemap`,
+`@astrojs/check`, Tailwind CSS with its Vite plugin, and TypeScript) are the
+ones `package.json` declares and `bun.lock` resolves. This page does not repeat
+the numbers, so a Renovate bump never needs a docs edit to pass `make
+docs-drift`; that check only requires `bun.lock` to keep Tailwind CSS and its
+Vite plugin on one major.minor line. Before accepting a major bump, read the
+peer ranges the lock records (for example `@astrojs/check`'s `typescript` range)
+and keep peer constraints enforced. After dependency updates,
 run frozen install, `bun audit`, lint, build and `check-site`.
 
 | Command (from `docs/`) | Action |

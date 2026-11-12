@@ -26,7 +26,7 @@ void game_restart_after_game_over(GameState *gs)
     def = (const LevelDef *)gs->world.runtime.current_level;
     gs->screen.game_over = 0;
     gs->screen.completion.complete = 0;
-    gs->screen.completion.level_elapsed = 0.0f;
+    gs->screen.completion.level_steps = 0;
     gs->screen.pause_reasons = 0;
     gs->screen.paused = 0;
     gs->world.lives = def && def->initial_lives > 0 ? def->initial_lives : DEFAULT_LIVES;

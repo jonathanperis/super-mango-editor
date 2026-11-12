@@ -602,9 +602,9 @@ static void render_debug(GameState *gs, int cam_x)
  *
  * To draw a new enemy, say a bat: write render_bats() beside
  * render_birds(), add its row where it should sit in depth, renumber the
- * rows after it, and add the same row to the manual's table. See
- * s_update_steps in game_update.c for the other three tables a new enemy
- * needs a row in.
+ * rows after it, and add the same row to the manual's table. A new enemy
+ * needs much more than this row; the full checklist is the comment above
+ * s_update_steps in core/game_update.c.
  */
 typedef void (*RenderFn)(GameState *gs, int cam_x);
 

@@ -1,0 +1,8 @@
+# The shortest ghost run: one fixed step, one sample, on a level whose
+# path has no sub-folder.
+format_version = 1
+level = "levels/01_lugio_01.toml"
+level_hash = "0000000000000000"
+time = 0.0166666675
+steps = 1
+frames = ["0450011c00"]

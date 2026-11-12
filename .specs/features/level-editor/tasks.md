@@ -13,17 +13,17 @@ Baseline editor is shipped. TOML is the only level workflow; no C exporter remai
 | Canvas/palette/properties/tools | Complete baseline | `src/editor/canvas.*`, `palette.*`, `properties.*`, `tools.*` |
 | Undo/redo | Complete baseline | `src/editor/undo.*` |
 | Copy/paste | Complete baseline | `src/editor/tools.*`, `src/editor/undo.*` |
-| TOML serializer | Complete baseline | `src/editor/serializer.*`, `vendor/tomlc17/` |
+| TOML serializer | Complete baseline | `src/shared/serializer*.c` and `src/shared/serializer*.h` (moved from `src/editor/`; the game and editor share them), `vendor/tomlc17/` |
 | Runtime TOML levels | Complete | `levels/*.toml`, `make run-level LEVEL=...` |
 | Authored checkpoints | Complete | `[[checkpoints]]`, runtime respawn resolution, palette/canvas/properties/undo/playtest support |
-| Level validation tool | Complete baseline | `tools/validate_levels.py`, `make validate-levels`, CI |
-| C validation tests | Complete baseline | `make test` runs 15 native binaries plus Python host checks |
+| Level validation tool | Complete baseline | `make validate-levels` (`out/level-check` and `tools/validate_levels.py`), CI |
+| C validation tests | Complete baseline | `make test` runs 18 native binaries plus Python and Node host checks |
 | Editor trust safeguards | Complete baseline | Validation blocks save/playtest; status summary shown |
 | Metadata editor | Complete baseline | Level Config edits current top-level TOML metadata, layers, and physics overrides |
 | Playtest launch | Complete baseline | Editor validates, writes a private TOML snapshot, and launches game with `--level` |
 | Recent files + recovery | Complete baseline | Recent paths and valid dirty-level recovery snapshots under the per-user preference directory |
 | Smoke gates | Complete baseline | Game/editor native smoke and WebAssembly artifact smoke in CI |
-| Docs checks | Complete baseline | `docs.yml` runs docs lint/build |
+| Docs checks | Complete baseline | `docs.yml` runs docs lint/build on site pull requests; build.yml's `Docs drift` job runs `make docs-drift` on every pull request |
 
 ## Next Task Groups
 

@@ -1,3 +1,8 @@
-levels/*.toml text eol=lf
+# Level, lab and campaign TOML: LF in every checkout, in every subfolder
+# (levels/labs/, levels/campaigns/), so hashes and diffs match across OSes.
+levels/**/*.toml text eol=lf
 # Pinned upstream data, verified by SHA-256: keep the bytes exactly as fetched.
 vendor/raylib/gamecontrollerdb/* -text
+# The raylib pin: CI keys the shared source-archive cache on this file's hash,
+# so it must be the same bytes on Windows (autocrlf) as on Linux and macOS.
+vendor/raylib/manifest.json text eol=lf

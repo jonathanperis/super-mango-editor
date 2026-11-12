@@ -131,10 +131,17 @@ static int documents_are_known_by_absolute_path(void)
         expect_int("one recent entry", es.recent_file_count, 1) != 0 ||
         expect_string("recent entry is absolute", es.recent_files[0], absolute) != 0)
         goto cleanup;
-    /* The status line shows it relative to the working folder: short. */
-    if (expect_int("status shows the short form",
-                   strstr(es.status_message, relative) != NULL &&
-                   strstr(es.status_message, absolute) == NULL, 1) != 0) goto cleanup;
+    /* The status line shows it relative to the working folder: short. An
+     * absolute OUTDIR (make test OUTDIR=$(mktemp -d)/o) has no shorter
+     * relative form, so there the file name is all the check can expect. */
+    if (strcmp(relative, absolute) != 0) {
+        if (expect_int("status shows the short form",
+                       strstr(es.status_message, relative) != NULL &&
+                       strstr(es.status_message, absolute) == NULL, 1) != 0) goto cleanup;
+    } else if (expect_int("status names the file",
+                          strstr(es.status_message, "test_editor_absolute_path.toml") != NULL, 1) != 0) {
+        goto cleanup;
+    }
 
     /* The same file again by its absolute path: still one entry. */
     if (expect_int("absolute load", editor_load_level(&es, absolute), 0) != 0 ||

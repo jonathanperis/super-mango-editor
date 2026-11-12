@@ -246,13 +246,55 @@ static void update_bouncepads_high(GameState *gs, const StepInputs *in)
  * Moving a row can change what a seeded run does, and then recorded runs
  * and the replay tests no longer match.
  *
- * To add an enemy, say a bat: write its module (bat.h / bat.c with
- * bats_update and bats_render), then add one row in each table:
- *   - s_level_loaders  (level_loader.c)    load_bats        fills the array
- *   - s_update_steps   (here)              update_bats      moves them
- *   - s_damage_sources (game_collision.c)  bat_touches      hurts the player
- *   - s_render_layers  (game_render.c)     render_bats      draws them
- * Each row needs its small function, written next to the others like it.
+ * ADDING AN ENEMY — the checklist. This is the one complete list; the
+ * other tables' comments point here. Say the new enemy is a bat that
+ * flies a patrol and hurts on touch. Every step below is a place the
+ * build or a test will not find for you, unless it says otherwise.
+ *
+ *  1. The module: src/entities/bat.h and bat.c with Bat, MAX_BATS,
+ *     bats_update (the whole array, one fixed step), bats_render and
+ *     bat_get_hitbox. The Makefile picks up a new .c in an existing
+ *     src/ folder by itself. Use game_sinf/game_cosf (game_trig.h), not
+ *     sinf/cosf, for anything the step computes.
+ *  2. The world: in src/game.h include bat.h and add `Bat bats[MAX_BATS];
+ *     int bat_count;` to GameWorld.
+ *  3. The file format: a BatPlacement (or an existing placement struct)
+ *     with `bats[MAX_BATS]` and `bat_count` in LevelDef (levels/level.h);
+ *     a ROOT_TABLES("bats", ...) row in ROOT_FIELDS
+ *     (shared/serializer_parse.c); "bats" in s_table_order
+ *     (shared/serializer_save.c); CHECK_COUNT and the patrol checks in
+ *     levels/level_validate.c; the same table in tools/validate_levels.py
+ *     (`make validate-levels` compares the two) and the key in
+ *     tests/fuzz/toml.dict (tests/fuzz_dict_test.py checks it).
+ *  4. Loading: load_bats and its row in s_level_loaders
+ *     (levels/level_loader.c), LOAD_EVERY_LIFE for an enemy.
+ *  5. Moving: update_bats and its row in s_update_steps (below), above
+ *     the "collision" row; the same row in the manual's Update Order
+ *     table (`make docs-drift` compares them).
+ *  6. Hurting: bat_hitbox and its row in s_damage_sources
+ *     (collision/game_collision.c). The --debug overlay outlines it from
+ *     that row; give it a colour in damage_source_color (core/debug.c),
+ *     or it is drawn plain red.
+ *  7. Drawing smoothly between steps: MOVER_BATS in GameMoverKind
+ *     (core/game_movers.h), its row in s_movers and a PREV_HOLDS line
+ *     (core/game_movers.c; the build stops when they disagree), and
+ *     `float bats[MAX_BATS]` (one float per blended value) in
+ *     GameMoverPrev (game.h).
+ *  8. Drawing: render_bats, which draws what game_movers_shown returns,
+ *     and its row in s_render_layers (render/game_render.c), with the rows
+ *     after it renumbered and the manual's Render Order table to match.
+ *  9. The sprite: `Texture2D *bat;` in TextureResources (src/game_assets.h) and a
+ *     row in s_required_textures or s_optional_textures
+ *     (core/game_resources.c). An optional one also needs
+ *     REQUIRE(bat, def->bat_count) in game_resources_missing_level_texture,
+ *     so a level with bats does not start without their sprite.
+ * 10. The editor: ENT_BAT and a texture field (editor/editor.h), its
+ *     s_entity_meta row and palette slot (entity_meta.c), LOAD_TEX and
+ *     DESTROY_TEX (editor_textures.c), properties, hit test, canvas,
+ *     placement tools and the document hash. docs/wiki/entity-walkthrough.md
+ *     section 5 walks through each file.
+ * 11. Tests and the manual: a fixture in tests/fixtures/runtime that the
+ *     gameplay tests step through, and the pages that list every enemy.
  */
 typedef void (*UpdateFn)(GameState *gs, const StepInputs *in);
 
@@ -310,7 +352,10 @@ int game_update_active(GameState *gs, float dt, int cam_x)
     StepInputs in = { dt, cam_x, { -1, -1 } };
 
     game_checkpoint_feedback_tick(gs, dt);
-    gs->screen.completion.level_elapsed += dt;
+    /* Count the step; seconds are worked out from the count when asked
+     * for (game_level_seconds). Adding dt to a float every step would
+     * drift: about 0.1 s short after ten minutes. */
+    if (gs->screen.completion.level_steps < UINT32_MAX) gs->screen.completion.level_steps++;
 
     /* The player moves first: input, physics and landing on surfaces. What
      * they landed on goes to the rows that need it. */

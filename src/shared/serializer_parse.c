@@ -163,9 +163,11 @@ typedef enum {
     SERIALIZER_WRITE_ALWAYS,
     SERIALIZER_OMIT_EMPTY,    /* a string that is ""  */
     SERIALIZER_OMIT_ZERO,     /* an integer that is 0 */
-    /* A string that is "" is written as its fallback instead: a level with
-     * no name is saved as "Untitled", the name it would load with. */
-    SERIALIZER_WRITE_FALLBACK_IF_EMPTY
+    /* A string that is "" is written as LEVEL_UNTITLED_NAME instead, so a
+     * saved level always has a name a person can read. Only `name` uses
+     * it. Loading does not do the reverse: a file without a name loads
+     * with an empty one, and the campaign then shows its file name. */
+    SERIALIZER_WRITE_UNTITLED_IF_EMPTY
 } SerializerOmit;
 
 typedef struct {
@@ -238,42 +240,71 @@ typedef struct {
  *   TEXT_AT(key, T, member, omit)         a char array; missing reads as ""
  *   TEXT_AT_OR(key, T, member, omit, text) a char array; missing reads as text
  *   TEXT_AT_KEEP(key, T, member, omit)    a char array; missing keeps the default
- *   ENUM_AT(key, T, member, values, validator, from, to, fallback)
- *                                         a C enum, written as its name
+ *   ENUM_AT(key, T, member, E, values, validator, from, to, fallback)
+ *                                         a C enum of type E, written as its name
+ *
+ * Every macro also checks, while compiling, that the member has the type
+ * the row says (MEMBER_IS below): a FLOAT_AT row on an int member would
+ * make the loader write a float's bytes into an int, which the compiler
+ * would otherwise accept without a word.
  */
+
+/*
+ * MEMBER_IS(T, member, type) — the constant 0, but only when T's member
+ * has exactly that type; any other type does not compile.
+ *
+ * _Generic(e, type: 1) chooses among its associations by the type of e.
+ * It has one association and no `default`, so a member of another type
+ * matches nothing, and that is a compile error. sizeof turns the choice
+ * into a constant that can be added to an offsetof; its operand is never
+ * evaluated, so the null pointer is never followed (the same trick as
+ * FIELD_SIZE). TEXT_MEMBER checks a char array through the address of its
+ * first element, a char *, so the check never depends on how a compiler
+ * treats an array inside _Generic.
+ */
+#define MEMBER_IS(T, member, type) (0 * sizeof(_Generic(((T *)0)->member, type: 1)))
+#define TEXT_MEMBER(T, member) (0 * sizeof(_Generic(&(((T *)0)->member)[0], char *: 1)))
+
 #define FLOAT_AT(key, T, member) \
     { key, SERIALIZER_VALUE_NUMBER, NULL, 0, NULL, 0, 0, \
-      SERIALIZER_STORE_FLOAT, offsetof(T, member), 0.0, NULL, NULL, NULL, SERIALIZER_WRITE_ALWAYS, 0 }
+      SERIALIZER_STORE_FLOAT, offsetof(T, member) + MEMBER_IS(T, member, float), 0.0, NULL, NULL, \
+      NULL, SERIALIZER_WRITE_ALWAYS, 0 }
 #define FLOAT_AT_OR(key, T, member, fallback_value) \
     { key, SERIALIZER_VALUE_NUMBER, NULL, 0, NULL, 0, 0, \
-      SERIALIZER_STORE_FLOAT, offsetof(T, member), (double)(fallback_value), NULL, NULL, NULL, \
-      SERIALIZER_WRITE_ALWAYS, 0 }
+      SERIALIZER_STORE_FLOAT, offsetof(T, member) + MEMBER_IS(T, member, float), \
+      (double)(fallback_value), NULL, NULL, NULL, SERIALIZER_WRITE_ALWAYS, 0 }
 #define FLOAT_AT_KEEP(key, T, member) \
     { key, SERIALIZER_VALUE_NUMBER, NULL, 0, NULL, 0, 0, \
-      SERIALIZER_STORE_FLOAT, offsetof(T, member), 0.0, NULL, NULL, NULL, SERIALIZER_WRITE_ALWAYS, 1 }
+      SERIALIZER_STORE_FLOAT, offsetof(T, member) + MEMBER_IS(T, member, float), 0.0, NULL, NULL, \
+      NULL, SERIALIZER_WRITE_ALWAYS, 1 }
 #define REQUIRED_FLOAT_AT(key, T, member) \
     { key, SERIALIZER_VALUE_NUMBER, NULL, 0, NULL, 1, 0, \
-      SERIALIZER_STORE_FLOAT, offsetof(T, member), 0.0, NULL, NULL, NULL, SERIALIZER_WRITE_ALWAYS, 0 }
+      SERIALIZER_STORE_FLOAT, offsetof(T, member) + MEMBER_IS(T, member, float), 0.0, NULL, NULL, \
+      NULL, SERIALIZER_WRITE_ALWAYS, 0 }
 #define INT_AT(key, T, member, fallback_value) \
     { key, SERIALIZER_VALUE_INTEGER, NULL, 0, NULL, 0, 0, \
-      SERIALIZER_STORE_INT, offsetof(T, member), (double)(fallback_value), NULL, NULL, NULL, \
-      SERIALIZER_WRITE_ALWAYS, 0 }
+      SERIALIZER_STORE_INT, offsetof(T, member) + MEMBER_IS(T, member, int), \
+      (double)(fallback_value), NULL, NULL, NULL, SERIALIZER_WRITE_ALWAYS, 0 }
 #define INT_AT_OMIT_ZERO(key, T, member) \
     { key, SERIALIZER_VALUE_INTEGER, NULL, 0, NULL, 0, 0, \
-      SERIALIZER_STORE_INT, offsetof(T, member), 0.0, NULL, NULL, NULL, SERIALIZER_OMIT_ZERO, 0 }
+      SERIALIZER_STORE_INT, offsetof(T, member) + MEMBER_IS(T, member, int), 0.0, NULL, NULL, \
+      NULL, SERIALIZER_OMIT_ZERO, 0 }
 #define TEXT_AT(key, T, member, omit_rule) \
     { key, SERIALIZER_VALUE_STRING, NULL, 0, NULL, 0, FIELD_SIZE(T, member), \
-      SERIALIZER_STORE_STRING, offsetof(T, member), 0.0, NULL, NULL, NULL, omit_rule, 0 }
+      SERIALIZER_STORE_STRING, offsetof(T, member) + TEXT_MEMBER(T, member), 0.0, NULL, NULL, \
+      NULL, omit_rule, 0 }
 #define TEXT_AT_OR(key, T, member, omit_rule, fallback_text) \
     { key, SERIALIZER_VALUE_STRING, NULL, 0, NULL, 0, FIELD_SIZE(T, member), \
-      SERIALIZER_STORE_STRING, offsetof(T, member), 0.0, fallback_text, NULL, NULL, omit_rule, 0 }
+      SERIALIZER_STORE_STRING, offsetof(T, member) + TEXT_MEMBER(T, member), 0.0, fallback_text, \
+      NULL, NULL, omit_rule, 0 }
 #define TEXT_AT_KEEP(key, T, member, omit_rule) \
     { key, SERIALIZER_VALUE_STRING, NULL, 0, NULL, 0, FIELD_SIZE(T, member), \
-      SERIALIZER_STORE_STRING, offsetof(T, member), 0.0, NULL, NULL, NULL, omit_rule, 1 }
-#define ENUM_AT(key, T, member, values, validator, from_name, to_name, fallback_name) \
+      SERIALIZER_STORE_STRING, offsetof(T, member) + TEXT_MEMBER(T, member), 0.0, NULL, NULL, \
+      NULL, omit_rule, 1 }
+#define ENUM_AT(key, T, member, E, values, validator, from_name, to_name, fallback_name) \
     { key, SERIALIZER_VALUE_ENUM, values, sizeof(values) / sizeof((values)[0]), validator, 0, 0, \
-      SERIALIZER_STORE_ENUM, offsetof(T, member), 0.0, fallback_name, from_name, to_name, \
-      SERIALIZER_WRITE_ALWAYS, 0 }
+      SERIALIZER_STORE_ENUM, offsetof(T, member) + MEMBER_IS(T, member, E), 0.0, fallback_name, \
+      from_name, to_name, SERIALIZER_WRITE_ALWAYS, 0 }
 
 static const char *const RAIL_LAYOUT_VALUES[] = {"RECT", "HORIZ"};
 static const char *const AXE_MODE_VALUES[] = {"PENDULUM", "SPIN"};
@@ -334,7 +365,7 @@ static const SerializerFieldSpec CHECKPOINT_FIELDS[] = {
 };
 
 static const SerializerFieldSpec RAIL_FIELDS[] = {
-    ENUM_AT("layout", RailPlacement, layout, RAIL_LAYOUT_VALUES, serializer_rail_layout_is_valid,
+    ENUM_AT("layout", RailPlacement, layout, RailLayout, RAIL_LAYOUT_VALUES, serializer_rail_layout_is_valid,
             rail_layout_from_name, rail_layout_to_name, "RECT"),
     INT_AT("x", RailPlacement, x, 0),
     INT_AT("y", RailPlacement, y, 0),
@@ -396,7 +427,7 @@ static const SerializerFieldSpec FISH_FIELDS[] = {
 static const SerializerFieldSpec AXE_FIELDS[] = {
     FLOAT_AT("pillar_x", AxeTrapPlacement, pillar_x),
     FLOAT_AT("y", AxeTrapPlacement, y),
-    ENUM_AT("mode", AxeTrapPlacement, mode, AXE_MODE_VALUES, serializer_axe_mode_is_valid,
+    ENUM_AT("mode", AxeTrapPlacement, mode, AxeTrapMode, AXE_MODE_VALUES, serializer_axe_mode_is_valid,
             axe_mode_from_name, axe_mode_to_name, "PENDULUM")
 };
 
@@ -431,7 +462,7 @@ static const SerializerFieldSpec X_ONLY_FIELDS[] = {
 SAME_LAYOUT(BlueFlamePlacement, FireFlamePlacement, x);
 
 static const SerializerFieldSpec FLOAT_PLATFORM_FIELDS[] = {
-    ENUM_AT("mode", FloatPlatformPlacement, mode, FLOAT_MODE_VALUES, serializer_float_mode_is_valid,
+    ENUM_AT("mode", FloatPlatformPlacement, mode, FloatPlatformMode, FLOAT_MODE_VALUES, serializer_float_mode_is_valid,
             float_mode_from_name, float_mode_to_name, "STATIC"),
     FLOAT_AT("x", FloatPlatformPlacement, x),
     FLOAT_AT("y", FloatPlatformPlacement, y),
@@ -456,7 +487,7 @@ static const SerializerFieldSpec BRIDGE_FIELDS[] = {
 #define BOUNCEPAD_FIELDS_DEFAULTING_TO(pad_type_name) { \
     FLOAT_AT("x", BouncepadPlacement, x), \
     FLOAT_AT("launch_vy", BouncepadPlacement, launch_vy), \
-    ENUM_AT("pad_type", BouncepadPlacement, pad_type, BOUNCEPAD_VALUES, \
+    ENUM_AT("pad_type", BouncepadPlacement, pad_type, BouncepadType, BOUNCEPAD_VALUES, \
             serializer_bouncepad_type_is_valid, bouncepad_type_from_name, \
             bouncepad_type_to_name, pad_type_name) }
 static const SerializerFieldSpec BOUNCEPAD_SMALL_FIELDS[]  = BOUNCEPAD_FIELDS_DEFAULTING_TO("GREEN");
@@ -487,10 +518,12 @@ static const SerializerFieldSpec LAYER_FIELDS[] = {
 };
 
 /*
- * [physics] is one table of LevelDef.physics. -1.0 means "use the engine's
- * own value" (level_physics.c), so that is what a missing key reads as.
+ * [physics] is one table of LevelDef.physics. LEVEL_PHYSICS_ENGINE_DEFAULT
+ * (-1) means "use the engine's own value" (level_physics.c), so that is
+ * what a missing key reads as, the same value level_def_init_defaults sets.
  */
-#define PHYSICS_AT(key, member) FLOAT_AT_OR(key, LevelDef, physics.member, -1.0)
+#define PHYSICS_AT(key, member) \
+    FLOAT_AT_OR(key, LevelDef, physics.member, LEVEL_PHYSICS_ENGINE_DEFAULT)
 static const SerializerFieldSpec PHYSICS_FIELDS[] = {
     PHYSICS_AT("walk_max_speed", walk_max_speed),
     PHYSICS_AT("run_max_speed", run_max_speed),
@@ -562,10 +595,10 @@ _Static_assert(sizeof(((LevelDef *)0)->floor_gaps[0]) == sizeof(int),
 
 static const SerializerRootSpec ROOT_FIELDS[] = {
     ROOT_VALUE("format_version", SERIALIZER_VALUE_INTEGER),
-    ROOT_TEXT("name", name, SERIALIZER_WRITE_FALLBACK_IF_EMPTY, "Untitled"),
+    ROOT_TEXT("name", name, SERIALIZER_WRITE_UNTITLED_IF_EMPTY, ""),
     ROOT_TEXT("description", description, SERIALIZER_OMIT_EMPTY, ""),
     ROOT_TEXT("generated_by", generated_by, SERIALIZER_OMIT_EMPTY, ""),
-    ROOT_INT("screen_count", screen_count, 4),
+    ROOT_INT("screen_count", screen_count, LEVEL_DEFAULT_SCREEN_COUNT),
     ROOT_INTEGERS("floor_gaps", floor_gaps, floor_gap_count),
     ROOT_TABLES("rails", RAIL_FIELDS, rails, rail_count),
     ROOT_TABLES("platforms", PLATFORM_FIELDS, platforms, platform_count),
@@ -621,6 +654,8 @@ static const SerializerRootSpec ROOT_FIELDS[] = {
 #undef ROOT_VALUE
 #undef FIELD_COUNT
 #undef FIELD_SIZE
+#undef TEXT_MEMBER
+#undef MEMBER_IS
 
 PRINTF_FORMAT(3, 4)
 static int schema_error(char *error, size_t error_size, const char *format, ...)
@@ -650,6 +685,21 @@ static const char *toml_type_name(toml_type_t type)
         case TOML_TABLE:   return "table";
         default:           return "unknown";
     }
+}
+
+/*
+ * show_key — A key from the file, ready to quote in a message.
+ *
+ * Keys are untrusted: a quoted TOML key may hold any byte, an ESC that
+ * starts a terminal escape sequence included, and these messages reach
+ * stderr and the editor's status bar. serializer_message_text writes every
+ * such byte as \xHH. A key longer than the buffer is cut; the message
+ * only has to say which key it is.
+ */
+#define SHOWN_KEY_SIZE 96
+static const char *show_key(char *out, size_t out_size, const char *key, int key_len)
+{
+    return serializer_message_text(out, out_size, key, key_len > 0 ? (size_t)key_len : 0);
 }
 
 static const SerializerFieldSpec *find_field(const SerializerFieldSpec *fields,
@@ -832,11 +882,12 @@ static int validate_table_fields(toml_datum_t table, const char *path,
                                 "%s has an embedded NUL in a key", path);
         }
         field = find_field(fields, field_count, key, key_len);
-        snprintf(child_path, sizeof(child_path), "%s.%s", path, key);
         if (!field) {
-            return schema_error(error, error_size,
-                                "%s has unknown key '%s'", path, key);
+            char shown[SHOWN_KEY_SIZE];
+            return schema_error(error, error_size, "%s has unknown key '%s'", path,
+                                show_key(shown, sizeof(shown), key, key_len));
         }
+        snprintf(child_path, sizeof(child_path), "%s.%s", path, field->name);
         if (validate_scalar(table.u.tab.value[i], field->type, child_path,
                             field->enum_values, field->enum_count,
                             field->enum_validator, field->string_capacity,
@@ -921,11 +972,12 @@ static int validate_root_v1(toml_datum_t top, char *error, size_t error_size)
                                 "root has an embedded NUL in a key");
         }
         field = find_root_field(key, key_len);
-        snprintf(path, sizeof(path), "root.%s", key);
         if (!field) {
-            return schema_error(error, error_size,
-                                "root has unknown key '%s'", key);
+            char shown[SHOWN_KEY_SIZE];
+            return schema_error(error, error_size, "root has unknown key '%s'",
+                                show_key(shown, sizeof(shown), key, key_len));
         }
+        snprintf(path, sizeof(path), "root.%s", field->name);
 
         switch (field->type) {
             case SERIALIZER_ROOT_VALUE:
@@ -954,8 +1006,39 @@ static int validate_root_v1(toml_datum_t top, char *error, size_t error_size)
     return 0;
 }
 
-/* Legacy files may use fractional integers and omit types/fields. Validate
- * every value we actually consume before the legacy readers convert it. */
+/* 1 when any key of the row's tables is required: such an array is read
+ * strictly even in a file without format_version. */
+static int root_is_strict(const SerializerRootSpec *root)
+{
+    for (size_t f = 0; f < root->field_count; f++)
+        if (root->fields[f].required) return 1;
+    return 0;
+}
+
+/* 1 when text is one of the names an ENUM row accepts ("RECT", "SPIN"). */
+static int enum_name_known(const SerializerFieldSpec *field, const char *text)
+{
+    if (!text) return 0;
+    for (size_t i = 0; i < field->enum_count; i++) {
+        if (strcmp(text, field->enum_values[i]) == 0)
+            return !field->enum_validator || field->enum_validator(text);
+    }
+    return 0;
+}
+
+/*
+ * A file without format_version is read leniently: a value of a type the
+ * loader cannot use is skipped (and serializer_legacy_warnings says so).
+ * What it cannot skip is checked here, before anything is loaded, so the
+ * error names the value by its full TOML path ("root.platforms[1].
+ * tile_height") and serializer_toml_line can find its line:
+ *   - a number the loader would read but that does not fit (an integer
+ *     outside C int range, an infinite float, a string too long);
+ *   - an array with more items than its LevelDef array holds;
+ *   - a floor gap that is not a number;
+ *   - [[checkpoints]], whose x and y are required (see CHECKPOINT_FIELDS).
+ * serializer_load_schema checks the same things again, as a safety net.
+ */
 static int validate_legacy_value(toml_datum_t value, SerializerValueType type,
                                  size_t string_capacity, const char *path,
                                  char *error, size_t error_size)
@@ -975,16 +1058,79 @@ static int validate_legacy_value(toml_datum_t value, SerializerValueType type,
     return 0;
 }
 
+/* The keys of one table: path names the table ("root.physics",
+ * "root.coins[3]"). strict: the table belongs to an array whose keys are
+ * required, so it must be a table and have them. */
 static int validate_legacy_fields(toml_datum_t table, const SerializerRootSpec *root,
+                                  const char *path, int strict,
                                   char *error, size_t error_size)
 {
-    if (table.type != TOML_TABLE) return 0;
+    if (table.type != TOML_TABLE) {
+        if (!strict) return 0;   /* skipped; the legacy warnings say so */
+        return schema_error(error, error_size, "%s has type %s, expected table",
+                            path, toml_type_name(table.type));
+    }
     for (int i = 0; i < table.u.tab.size; i++) {
         const SerializerFieldSpec *field = find_field(root->fields, root->field_count,
                                                        table.u.tab.key[i], table.u.tab.len[i]);
-        if (field && validate_legacy_value(table.u.tab.value[i], field->type,
-                                           field->string_capacity, field->name,
-                                           error, error_size) != 0) return -1;
+        /* The table's path (up to 271 bytes) + "." + the key. */
+        char child_path[320];
+
+        if (!field) continue;
+        snprintf(child_path, sizeof(child_path), "%s.%s", path, field->name);
+        if (field->required) {
+            /* A required key is read strictly, whatever the version. */
+            if (validate_scalar(table.u.tab.value[i], field->type, child_path, NULL, 0,
+                                NULL, field->string_capacity, error, error_size) != 0)
+                return -1;
+        } else if (validate_legacy_value(table.u.tab.value[i], field->type,
+                                         field->string_capacity, child_path,
+                                         error, error_size) != 0) {
+            return -1;
+        }
+    }
+    for (size_t f = 0; f < root->field_count; f++) {
+        if (root->fields[f].required &&
+            toml_table_get_exact(table, root->fields[f].name).type == TOML_UNKNOWN)
+            return schema_error(error, error_size, "%s missing required key '%s'",
+                                path, root->fields[f].name);
+    }
+    return 0;
+}
+
+/* An array: path is "root.<key>". */
+static int validate_legacy_array(toml_datum_t value, const SerializerRootSpec *root,
+                                 const char *path, char *error, size_t error_size)
+{
+    const int strict = root_is_strict(root);
+
+    if (value.type != TOML_ARRAY) {
+        if (!strict) return 0;   /* skipped; the legacy warnings say so */
+        return schema_error(error, error_size, "%s has type %s, expected array",
+                            path, toml_type_name(value.type));
+    }
+    if (value.u.arr.size > root->max_count) {
+        return schema_error(error, error_size, "%s has %d items (max %d)", path,
+                            value.u.arr.size, root->max_count);
+    }
+    for (int j = 0; j < value.u.arr.size; j++) {
+        /* Parent path (up to 255 chars) + "[" + up to 10 digits + "]". */
+        char item_path[256 + 16];
+        toml_datum_t item = value.u.arr.elem[j];
+
+        snprintf(item_path, sizeof(item_path), "%s[%d]", path, j);
+        if (root->type == SERIALIZER_ROOT_ARRAY_INTEGER) {
+            /* A floor gap that is not a number has no value to skip to. */
+            if (item.type != TOML_INT64 && item.type != TOML_FP64)
+                return schema_error(error, error_size, "%s has type %s, expected integer",
+                                    item_path, toml_type_name(item.type));
+            if (validate_legacy_value(item, SERIALIZER_VALUE_INTEGER, 0, item_path,
+                                      error, error_size) != 0)
+                return -1;
+        } else if (validate_legacy_fields(item, root, item_path, strict,
+                                          error, error_size) != 0) {
+            return -1;
+        }
     }
     return 0;
 }
@@ -994,22 +1140,19 @@ static int validate_legacy(toml_datum_t top, char *error, size_t error_size)
     for (int i = 0; i < top.u.tab.size; i++) {
         const SerializerRootSpec *field = find_root_field(top.u.tab.key[i], top.u.tab.len[i]);
         toml_datum_t value = top.u.tab.value[i];
+        char path[256];
+
         if (!field) continue;
+        snprintf(path, sizeof(path), "root.%s", field->name);
         if (field->type == SERIALIZER_ROOT_VALUE) {
             if (validate_legacy_value(value, field->value_type, field->string_capacity,
-                                      field->name, error, error_size) != 0)
+                                      path, error, error_size) != 0)
                 return -1;
         } else if (field->type == SERIALIZER_ROOT_TABLE) {
-            if (validate_legacy_fields(value, field, error, error_size) != 0) return -1;
-        } else if (value.type == TOML_ARRAY) {
-            for (int j = 0; j < value.u.arr.size; j++) {
-                if (field->type == SERIALIZER_ROOT_ARRAY_INTEGER) {
-                    if (validate_legacy_value(value.u.arr.elem[j], SERIALIZER_VALUE_INTEGER,
-                                              0, field->name, error, error_size) != 0)
-                        return -1;
-                } else if (validate_legacy_fields(value.u.arr.elem[j], field, error, error_size) != 0)
-                    return -1;
-            }
+            if (validate_legacy_fields(value, field, path, 0, error, error_size) != 0)
+                return -1;
+        } else if (validate_legacy_array(value, field, path, error, error_size) != 0) {
+            return -1;
         }
     }
     return 0;
@@ -1045,23 +1188,46 @@ static int legacy_value_is_read(toml_datum_t value, SerializerValueType type)
     return value.type == TOML_INT64 || value.type == TOML_FP64;
 }
 
+/*
+ * The keys of one table. Only what the loader really skips is reported:
+ * what validate_legacy refuses (a [[checkpoints]] entry that is not a
+ * table, or whose x is not a number) fails the load instead, and saying
+ * "it is ignored" about it would be untrue.
+ */
 static void legacy_warn_fields(LegacyWarnings *warnings, toml_datum_t table,
-                               const SerializerRootSpec *root, const char *path)
+                               const SerializerRootSpec *root, const char *path,
+                               int strict)
 {
     if (table.type != TOML_TABLE) {
-        legacy_warn(warnings, "%s has type %s, expected table; it is ignored",
-                    path, toml_type_name(table.type));
+        if (!strict)
+            legacy_warn(warnings, "%s has type %s, expected table; it is ignored",
+                        path, toml_type_name(table.type));
         return;
     }
     for (int i = 0; i < table.u.tab.size; i++) {
         const char *key = table.u.tab.key[i];
+        toml_datum_t value = table.u.tab.value[i];
         const SerializerFieldSpec *field =
             find_field(root->fields, root->field_count, key, table.u.tab.len[i]);
-        if (!field)
-            legacy_warn(warnings, "%s has unknown key '%s'; it is ignored", path, key);
-        else if (!legacy_value_is_read(table.u.tab.value[i], field->type))
-            legacy_warn(warnings, "%s.%s has type %s and is ignored", path, key,
-                        toml_type_name(table.u.tab.value[i].type));
+
+        if (!field) {
+            char shown[SHOWN_KEY_SIZE];
+            legacy_warn(warnings, "%s has unknown key '%s'; it is ignored", path,
+                        show_key(shown, sizeof(shown), key, table.u.tab.len[i]));
+        } else if (field->required) {
+            continue;   /* checked strictly by validate_legacy */
+        } else if (!legacy_value_is_read(value, field->type)) {
+            legacy_warn(warnings, "%s.%s has type %s and is ignored", path, field->name,
+                        toml_type_name(value.type));
+        } else if (field->type == SERIALIZER_VALUE_ENUM &&
+                   !enum_name_known(field, value.u.str.ptr)) {
+            /* load_field gives such a value the row's default. */
+            char shown[SHOWN_KEY_SIZE];
+            legacy_warn(warnings, "%s.%s has unknown value '%s'; %s is used instead",
+                        path, field->name,
+                        show_key(shown, sizeof(shown), value.u.str.ptr, value.u.str.len),
+                        field->text_fallback);
+        }
     }
 }
 
@@ -1081,31 +1247,32 @@ int serializer_legacy_warnings(toml_datum_t top, SerializerWarningFn warn,
         char path[256];
 
         if (!field) {
-            legacy_warn(&warnings, "root has unknown key '%s'; it is ignored", key);
+            char shown[SHOWN_KEY_SIZE];
+            legacy_warn(&warnings, "root has unknown key '%s'; it is ignored",
+                        show_key(shown, sizeof(shown), key, top.u.tab.len[i]));
             continue;
         }
-        snprintf(path, sizeof(path), "root.%s", key);
+        snprintf(path, sizeof(path), "root.%s", field->name);
         if (field->type == SERIALIZER_ROOT_VALUE) {
             if (!legacy_value_is_read(value, field->value_type))
                 legacy_warn(&warnings, "%s has type %s and is ignored", path,
                             toml_type_name(value.type));
         } else if (field->type == SERIALIZER_ROOT_TABLE) {
-            legacy_warn_fields(&warnings, value, field, path);
+            legacy_warn_fields(&warnings, value, field, path, 0);
         } else if (value.type != TOML_ARRAY) {
-            legacy_warn(&warnings, "%s has type %s, expected array; it is ignored",
-                        path, toml_type_name(value.type));
-        } else {
+            /* A strict array that is not an array fails the load instead. */
+            if (!root_is_strict(field))
+                legacy_warn(&warnings, "%s has type %s, expected array; it is ignored",
+                            path, toml_type_name(value.type));
+        } else if (field->type == SERIALIZER_ROOT_ARRAY_TABLE) {
+            /* (A floor gap that is not a number fails the load, so a plain
+             * array of integers has nothing to warn about.) */
             for (int j = 0; j < value.u.arr.size; j++) {
                 /* Parent path (up to 255 chars) + "[" + up to 10 digits + "]". */
                 char item_path[256 + 16];
                 snprintf(item_path, sizeof(item_path), "%s[%d]", path, j);
-                if (field->type == SERIALIZER_ROOT_ARRAY_INTEGER) {
-                    if (!legacy_value_is_read(value.u.arr.elem[j], SERIALIZER_VALUE_INTEGER))
-                        legacy_warn(&warnings, "%s has type %s and is ignored", item_path,
-                                    toml_type_name(value.u.arr.elem[j].type));
-                } else {
-                    legacy_warn_fields(&warnings, value.u.arr.elem[j], field, item_path);
-                }
+                legacy_warn_fields(&warnings, value.u.arr.elem[j], field, item_path,
+                                   root_is_strict(field));
             }
         }
     }
@@ -1222,6 +1389,16 @@ int serializer_validate_schema(toml_datum_t top, int *strict,
  * aligned.
  */
 
+size_t serializer_schema_row_count(void)
+{
+    return sizeof(ROOT_FIELDS) / sizeof(ROOT_FIELDS[0]);
+}
+
+const char *serializer_schema_row_name(size_t index)
+{
+    return index < serializer_schema_row_count() ? ROOT_FIELDS[index].name : NULL;
+}
+
 /* Find a root row by its key (NULL when there is none). */
 static const SerializerRootSpec *root_by_name(const char *name)
 {
@@ -1287,7 +1464,13 @@ static int load_field(const SerializerFieldSpec *field, toml_datum_t table, char
         break;
     }
     case SERIALIZER_STORE_ENUM: {
-        int value = field->enum_from_name(get_str(table, field->name, field->text_fallback));
+        /* A missing key, or a name the enum does not have (only a file
+         * without format_version gets this far with one), reads as the
+         * row's default; serializer_legacy_warnings reports the second. */
+        const char *text = get_str(table, field->name, NULL);
+        int value;
+        if (!enum_name_known(field, text)) text = field->text_fallback;
+        value = field->enum_from_name(text);
         memcpy(member, &value, sizeof(value));
         break;
     }
@@ -1297,21 +1480,13 @@ static int load_field(const SerializerFieldSpec *field, toml_datum_t table, char
     return 0;
 }
 
-/* 1 when any key of the row's tables is required: such an array is read
- * strictly even in a file without format_version. */
-static int root_is_strict(const SerializerRootSpec *root)
-{
-    for (size_t f = 0; f < root->field_count; f++)
-        if (root->fields[f].required) return 1;
-    return 0;
-}
-
 /* An [[array]] of tables: copy it element by element. */
 static int load_table_array(const SerializerRootSpec *root, toml_datum_t value, LevelDef *def)
 {
     const int strict = root_is_strict(root);
     char *item;
     int count;
+    int loaded;
 
     /* A value that is not an array leaves the array empty, which is how an
      * optional section works; a strict array refuses it instead. */
@@ -1327,12 +1502,20 @@ static int load_table_array(const SerializerRootSpec *root, toml_datum_t value, 
                 root->name, count, root->max_count);
         return -1;
     }
-    memcpy((char *)def + root->count_offset, &count, sizeof(count));
+    /*
+     * An item that is not a table (coins = [1, 2]) is skipped and not
+     * counted, so the next table takes its place: the legacy warning says
+     * such an item "is ignored", and it must be. (It used to be counted
+     * and loaded as a coin at 0,0 made of fallbacks.) A strict array
+     * refuses it instead.
+     */
+    loaded = 0;
     item = (char *)def + root->items_offset;
-    for (int i = 0; i < count; i++, item += root->item_size) {
+    for (int i = 0; i < count; i++) {
         toml_datum_t table = value.u.arr.elem[i];
 
-        if (strict && table.type != TOML_TABLE) {
+        if (table.type != TOML_TABLE) {
+            if (!strict) continue;
             fprintf(stderr, "serializer: %s[%d] must be a table\n", root->name, i);
             return -1;
         }
@@ -1343,7 +1526,10 @@ static int load_table_array(const SerializerRootSpec *root, toml_datum_t value, 
                 return -1;
             }
         }
+        loaded++;
+        item += root->item_size;
     }
+    memcpy((char *)def + root->count_offset, &loaded, sizeof(loaded));
     return 0;
 }
 
@@ -1440,8 +1626,8 @@ static void write_field(FILE *fp, const SerializerFieldSpec *field, const char *
     }
     case SERIALIZER_STORE_STRING:
         if (member[0] == '\0' && field->omit == SERIALIZER_OMIT_EMPTY) break;
-        if (member[0] == '\0' && field->omit == SERIALIZER_WRITE_FALLBACK_IF_EMPTY)
-            member = field->text_fallback;
+        if (member[0] == '\0' && field->omit == SERIALIZER_WRITE_UNTITLED_IF_EMPTY)
+            member = LEVEL_UNTITLED_NAME;
         write_toml_key_string(fp, field->name, member);
         break;
     case SERIALIZER_STORE_ENUM: {

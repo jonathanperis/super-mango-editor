@@ -11,6 +11,7 @@
 
 #include "game_timing.h"
 #include "game_movers.h"   /* game_movers_note */
+#include "game_completion.h" /* game_level_seconds */
 #include <stdio.h>
 
 float game_timing_frame_seconds(GameState *gs)
@@ -116,7 +117,7 @@ void game_timing_tick_smoke(GameState *gs)
                        "\"hearts\":%d,\"elapsed\":%.6f,\"paused\":%d,\"complete\":%d}\n",
                        gs->screen.loop.smoke_frames_run, gs->world.player.x, gs->world.player.y,
                        gs->world.player.vx, gs->world.player.vy, gs->world.score, gs->world.lives,
-                       gs->world.hearts, gs->screen.completion.level_elapsed, gs->screen.paused,
+                       gs->world.hearts, (double)game_level_seconds(gs), gs->screen.paused,
                        gs->screen.completion.complete);
             }
         }

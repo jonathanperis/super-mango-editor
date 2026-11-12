@@ -351,6 +351,7 @@ static int run_prompt(const char *title, const char *message, const char *const 
     int focus = default_index;
     int answer = -1;
     int failed = 0;
+    int quit_after = 0;               /* the window was closed meanwhile */
     int clip = 0, clip_x = 0, clip_y = 0, clip_w = 0, clip_h = 0;
 
     if (!title || !message || !labels || !selected || count < 2 || count > 3 ||
@@ -450,8 +451,13 @@ static int run_prompt(const char *title, const char *message, const char *const 
                 break;
             case INPUT_QUIT:
                 /* Closing the window while asked counts as Cancel, as
-                 * closing a native dialog did. */
+                 * closing a native dialog did.  The close itself is not
+                 * forgotten: it goes back to the editor after the prompt,
+                 * which then quits the usual way (asking about unsaved
+                 * changes first).  Unless this prompt is one of those quit
+                 * questions: there, closing again just cancels the quit. */
                 answer = cancel_index;
+                if (!es->quitting) quit_after = 1;
                 break;
             default:
                 break;   /* typing, the wheel, focus: nothing to do here */
@@ -467,6 +473,7 @@ static int run_prompt(const char *title, const char *message, const char *const 
 
     if (IsRenderTextureValid(target)) UnloadRenderTexture(target);
     for (int i = 0; i < returned_count; i++) (void)input_push(&returned[i]);
+    if (quit_after) (void)input_push(&(InputEvent){.type = INPUT_QUIT});
     /* Back into the interrupted frame: its target, then its clip. */
     if (bound) BeginTextureMode(*bound);
     if (clip) ui_clip_begin(&es->ui, clip_x, clip_y, clip_w, clip_h);

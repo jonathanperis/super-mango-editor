@@ -106,3 +106,35 @@ void write_toml_key_string(FILE *fp, const char *key, const char *value)
     write_toml_string(fp, value);
     fputc('\n', fp);
 }
+
+const char *serializer_message_text(char *out, size_t out_size,
+                                    const char *text, size_t len)
+{
+    static const char hex[] = "0123456789abcdef";
+    size_t used = 0;
+
+    if (!out || out_size == 0) return out;
+    for (size_t i = 0; text && i < len; i++) {
+        unsigned char byte = (unsigned char)text[i];
+        char piece[4];
+        size_t piece_len = 0;
+
+        if (byte == '\\') {
+            piece[piece_len++] = '\\';
+            piece[piece_len++] = '\\';
+        } else if (byte >= 0x20 && byte < 0x7f) {
+            piece[piece_len++] = (char)byte;
+        } else {
+            piece[piece_len++] = '\\';
+            piece[piece_len++] = 'x';
+            piece[piece_len++] = hex[byte >> 4];
+            piece[piece_len++] = hex[byte & 0x0f];
+        }
+        /* Keep room for the final NUL; never write half an escape. */
+        if (used + piece_len >= out_size) break;
+        memcpy(out + used, piece, piece_len);
+        used += piece_len;
+    }
+    out[used] = '\0';
+    return out;
+}

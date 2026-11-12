@@ -83,7 +83,7 @@ Inspect the zip and confirm it contains:
 
 Before creating a release, confirm checks for the intended source commit are green:
 
-- Build & Release, including the non-gating `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)`, `Desktop backend (Windows x86_64 Mesa)` and `Coverage (Linux x86_64)` jobs
+- Build & Release, including the non-gating `Windows x86_64 extras (clang -Werror, Mesa desktop backend)` and `Coverage (Linux x86_64)` jobs
 - CodeQL (`Analyze (c-cpp)`, `Analyze (actions)`, `Analyze (python)`, `Analyze (javascript-typescript)`)
 - Docs (runs on pull requests that touch docs-related paths, weekly and on demand, never on `main` pushes; Build & Release's `Docs drift` job always runs, and on `main` its `Pages build` job lints, builds and checks the site)
 - Pages build and Pages deploy (main pushes and manual runs on main)
@@ -163,7 +163,8 @@ cut a release:
   fixes in the latest release);
 - otherwise at least every 50 commits on `main`.
 
-On every `main` push the `Release freshness` job counts the commits since the
+On every `main` push a step of the `Docs drift` job (it used to be a separate
+`Release freshness` job) counts the commits since the
 latest `v*` tag that `main` contains and raises a warning annotation (it never
 fails the run) once that is more than 50. Treat the warning as a prompt to
 work through this checklist, not as something to silence.

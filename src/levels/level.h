@@ -414,6 +414,34 @@ typedef struct {
     float cam_lookahead_max;       /* maximum lookahead offset in pixels            */
 } LevelPhysics;
 
+/* What a [physics] value is when the level keeps the engine's own value:
+ * a missing key loads as this, and level_def_init_defaults sets it. */
+#define LEVEL_PHYSICS_ENGINE_DEFAULT (-1.0f)
+
+/*
+ * The largest override each [physics] key accepts. A value is either
+ * exactly LEVEL_PHYSICS_ENGINE_DEFAULT or a number from 0 to its cap
+ * (level_validate.c, tools/validate_levels.py, and the experiment capture
+ * decoder for the same player values, game_experiment_file.c).
+ *
+ * MAX_PLAYER_SPEED — the top speed a level may give the player, px/s.
+ * The player moves once per fixed step (1/TARGET_FPS s) and there is no
+ * substepping: a step that moved further than the thinnest solid, a
+ * 16 px floor piece (FLOOR_PIECE_W), could start on one side of it and
+ * end on the other without ever overlapping it. 16 px x 60 steps = 960
+ * px/s, almost four times the engine's run speed (250 px/s).
+ *
+ * MAX_PLAYER_ACCEL — the largest acceleration or friction, px/s^2. The
+ * motion code never lets an acceleration push the speed past the top
+ * speed above, so this only keeps the numbers sane: at most about 167
+ * px/s gained or lost per step.
+ *
+ * The two camera keys do not move the player; they keep the general
+ * MAX_LEVEL_MOTION limit.
+ */
+#define MAX_PLAYER_SPEED (FLOOR_PIECE_W * TARGET_FPS)
+#define MAX_PLAYER_ACCEL MAX_LEVEL_MOTION
+
 /*
  * LevelDef — all data needed to load and reset a level.
  *
@@ -435,6 +463,8 @@ typedef struct {
 #define LEVEL_DEFAULT_LAST_STAR_X 145.0f
 #define LEVEL_DEFAULT_LAST_STAR_Y 167.0f
 #define LEVEL_NAME_CAPACITY 64
+/* What a level with an empty name is saved as (serializer_parse.c). */
+#define LEVEL_UNTITLED_NAME "Untitled"
 #define LEVEL_DESCRIPTION_CAPACITY 4096
 #define LEVEL_AUTHOR_CAPACITY 128
 /* Loudest authored music_volume (the audio module's full volume, 128 units);
@@ -653,17 +683,17 @@ static inline void level_def_init_defaults(LevelDef *def)
 
     memset(def, 0, sizeof(*def));
     def->format_version = LEVEL_FORMAT_VERSION;
-    def->physics.walk_max_speed          = -1.0f;
-    def->physics.run_max_speed           = -1.0f;
-    def->physics.walk_ground_accel       = -1.0f;
-    def->physics.run_ground_accel        = -1.0f;
-    def->physics.ground_friction         = -1.0f;
-    def->physics.ground_counter_accel    = -1.0f;
-    def->physics.air_accel_walk          = -1.0f;
-    def->physics.air_accel_run           = -1.0f;
-    def->physics.air_friction            = -1.0f;
-    def->physics.cam_lookahead_vx_factor = -1.0f;
-    def->physics.cam_lookahead_max       = -1.0f;
+    def->physics.walk_max_speed          = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.run_max_speed           = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.walk_ground_accel       = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.run_ground_accel        = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.ground_friction         = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.ground_counter_accel    = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.air_accel_walk          = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.air_accel_run           = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.air_friction            = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.cam_lookahead_vx_factor = LEVEL_PHYSICS_ENGINE_DEFAULT;
+    def->physics.cam_lookahead_max       = LEVEL_PHYSICS_ENGINE_DEFAULT;
     def->last_star.x = LEVEL_DEFAULT_LAST_STAR_X;
     def->last_star.y = LEVEL_DEFAULT_LAST_STAR_Y;
 }

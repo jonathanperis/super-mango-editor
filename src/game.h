@@ -157,9 +157,9 @@ typedef struct {
     float faster_birds[MAX_FASTER_BIRDS];               /* x                 */
     float fish[MAX_FISH][2];                            /* x, y              */
     float faster_fish[MAX_FASTER_FISH][2];              /* x, y              */
-    float spike_blocks[MAX_SPIKE_BLOCKS][2];            /* x, y              */
+    float spike_blocks[MAX_SPIKE_BLOCKS][3];            /* x, y, spin angle  */
     float float_platforms[MAX_FLOAT_PLATFORMS][2];      /* x, y              */
-    float circular_saws[MAX_CIRCULAR_SAWS][2];          /* x, y              */
+    float circular_saws[MAX_CIRCULAR_SAWS][3];          /* x, y, spin angle  */
     float axe_traps[MAX_AXE_TRAPS];                     /* angle, degrees    */
     float blue_flames[MAX_BLUE_FLAMES][2];              /* y, angle          */
     float fire_flames[MAX_FIRE_FLAMES][2];              /* y, angle          */
@@ -204,7 +204,8 @@ enum {
 
 typedef struct {
     int   complete;           /* 1 = last star collected; show overlay     */
-    float level_elapsed;      /* active level timer in seconds             */
+    uint32_t level_steps;     /* active level timer, in fixed steps; read it
+                                 as seconds with game_level_seconds()      */
     int   level_coin_total;   /* coins present when current level loaded   */
     int   coins_collected;    /* coins collected at completion summary     */
     int   coin_total;         /* total coins shown at completion summary   */

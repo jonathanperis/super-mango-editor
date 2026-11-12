@@ -17,7 +17,7 @@ The project uses a **GNU Makefile** with explicit per-directory wildcards. New `
 ifeq ($(origin CC),default)
 CC      = clang   # /c/msys64/ucrt64/bin/clang.exe on Windows
 endif
-CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -I$(RAYLIB_BUILD)/build/raylib/include
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -ffp-contract=off -I$(RAYLIB_BUILD)/build/raylib/include
 LIBS    = $(RAYLIB_LIB) $(PLATFORM_LIBS)
 OUTDIR  = out
 OBJDIR  = $(OUTDIR)/obj
@@ -116,8 +116,8 @@ object rules with `-MMD -MP`, so editing a shared test header such as
 null backend for explicit headless tests. Use a dedicated `OUTDIR`, such as
 `out/headless`; `release` and `dist-native` reject this backend. Linux CI keeps
 the desktop GLFW test path under Xvfb/Mesa; the gating macOS/Windows legs use Memory
-tests and separately build/package the desktop applications. The non-gating
-`Desktop backend` job runs the same tests and smoke on real GLFW/OpenGL on
+tests and separately build/package the desktop applications. The Mesa half of
+the non-gating `Windows x86_64 extras` job runs the same tests and smoke on real GLFW/OpenGL on
 Windows (a checksum-pinned Mesa llvmpipe `opengl32.dll` beside the binaries)
 until it proves stable enough to require. That VM has no sound hardware, so the
 job builds with `RAYLIB_AUDIO=null`: the normal desktop raylib backend with
@@ -203,6 +203,7 @@ filters. Linux dialogs use zenity.
 | `-Wall` | Enable common warnings |
 | `-Wextra` | Enable extra warnings beyond `-Wall` |
 | `-Wpedantic` | Strict ISO compliance warnings |
+| `-ffp-contract=off` | Never fuse a multiply and an add into one instruction (FMA). A fused result rounds once instead of twice, so it can differ in the last bit from one CPU or compiler to another; with fusing off, together with `game_sinf()` / `game_cosf()` from `src/core/game_trig.h` in the fixed step, an experiment capture replays the same on every platform built from the same source. The WebAssembly build passes it too |
 | `-MMD` | Generate `.d` dependency files for each `.o` (tracks header changes) -- passed in compile rule, not in `CFLAGS` |
 | `-MP` | Add phony targets for each dependency (prevents errors when headers are deleted) -- passed in compile rule, not in `CFLAGS` |
 | `-I$(RAYLIB_BUILD)/build/raylib/include` | Headers from the pinned raylib build |
@@ -213,7 +214,7 @@ filters. Linux dialogs use zenity.
 |------|---------|
 | `$(RAYLIB_LIB)` | Static raylib library: graphics, image/font decoding, input and audio |
 | `$(PLATFORM_LIBS)` | Native OpenGL/OS frameworks and system libraries selected by platform |
-| `-lm` | Math library (`math.h` functions: `sinf`, `cosf`, `fmodf`, etc.) |
+| `-lm` | Math library (`math.h` functions such as `fmodf`, `sqrtf` and `floor`) |
 
 ---
 
@@ -308,7 +309,7 @@ Compiles the game to WebAssembly using the Emscripten SDK (`emcc`). CI pins **6.
 make web
 ```
 
-Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). Each source compiles once into `out/obj/web/` (with `-MMD -MP` header tracking) and links once. The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Both compile with `-Os` (`WEB_OPT`), and the link sets `ENVIRONMENT=web`: download size matters more than speed for this light 2D game, and against `-O2` the `.wasm` shrank from 469 KB to 371 KB (190 KB to 166 KB gzipped). The page around the game comes from `web/shell.html`: before the link, `tools/web_shell.py` writes the shell emcc uses (`out/obj/web/shell.html`), pasting in `web/boot.js`, the one boot sequence that this page and the website's home page share. `WEB_ASSET_VERSION=<commit>` (CI passes the commit; empty by default) makes the page load `super-mango.js?v=<commit>`, `.wasm?v=<commit>` and `.data?v=<commit>`, in the script tag, the two preload links and `Module.locateFile`, so a browser that cached an older deploy cannot pair an old file with a new one. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
+Produces `out/super-mango.html`, `.js`, `.wasm`, and `.data` (bundled assets/sounds). Each source compiles once into `out/obj/web/` (with `-MMD -MP` header tracking) and links once. The pinned raylib Web library is built separately with `emcmake`; the application links it with `USE_GLFW=3`. Both compile with `-Os` (`WEB_OPT`), and the link sets `ENVIRONMENT=web`: download size matters more than speed for this light 2D game, and against `-O2` the `.wasm` shrank from 469 KB to 371 KB (190 KB to 166 KB gzipped). The page around the game comes from `web/shell.html`: before the link, `tools/web_shell.py` writes the shell emcc uses (`out/obj/web/shell.html`), pasting in `web/boot.js`, the one boot sequence that this page and the website's home page share. `WEB_ASSET_VERSION=<commit>` (CI passes the commit; empty by default) makes the page load `super-mango.js?v=<commit>`, `.wasm?v=<commit>` and `.data?v=<commit>`, in the script tag, the two preload links and `Module.locateFile`, so a browser that cached an older deploy cannot pair an old file with a new one. Application sources compile with the native warning set (`-Wall -Wextra -Wpedantic`) and the same `-ffp-contract=off` (so the browser build steps through floating-point maths exactly as the native one does), minus the pedantic empty-declaration diagnostic that Emscripten's documented `EM_JS(...);` form triggers. `EXTRA_WEB_CFLAGS` appends flags (CI passes `-Werror`). After linking, `tools/web_csp.py` pins the minified shell's inline boot script hash into its same-origin Content-Security-Policy (`script-src 'self' 'wasm-unsafe-eval'`, no JavaScript eval); `tools/check_wasm_artifacts.py` re-verifies it.
 
 The Web frame callback returns to Emscripten's animation-frame scheduler rather
 than using raylib's blocking FPS limiter. Asyncify is not required by this loop.
@@ -381,7 +382,9 @@ Makefile's "Native test programs" section: the run line in `make test` and the
 link rule are generated from that list (`TEST_ENV_<program>` adds environment
 to one program's run line). Adding a Python or Node test takes its path in one
 of the three lists above; `make docs-drift` fails while a test file in `tests/`
-is not run by any target. `tests/docs_checks_test.py` runs from
+is not run by any target. `make docs-drift` runs `tests/docs_drift_unit_test.py`
+(the `DOCS_PYTHON_TESTS` list: unit tests of the docs checkers, no built site
+needed), and `tests/docs_checks_test.py`, which reads the built site, runs from
 `bun run check-site` instead. The native list above is the complete
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
 into existing harnesses rather than separate binaries.
@@ -457,7 +460,7 @@ make doctor
 
 ### `make fuzz-corpus` / `make fuzz`
 
-`fuzz-corpus` replays the level, editor round-trip and profile fuzz seeds under ASan/UBSan with a plain driver; CI's sanitizer job passes `FUZZ_MUTATIONS=50`. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). See [Testing](../testing/#fuzzing).
+`fuzz-corpus` replays the level, editor round-trip, profile and campaign/experiment fuzz seeds under ASan/UBSan with a plain driver; CI's sanitizer job passes `FUZZ_MUTATIONS=50`. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). `make fuzz-merge`, run after `make fuzz`, minimises each corpus under `out/fuzz/` with libFuzzer's `-merge=1` (only inputs that add coverage are kept); the weekly fuzz workflow runs it before saving the corpus. See [Testing](../testing/#fuzzing).
 
 ```sh
 make fuzz-corpus FUZZ_MUTATIONS=500
@@ -526,7 +529,7 @@ make dist-wasm   # runs make web first when its outputs are stale
 
 ### `make docs-drift`
 
-Runs generated content-inventory/asset-budget, `tools/gen_sounds.py --check`, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, and `tools/check_roadmap_quality.py`. They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, constant values, inspector keys, the render order, `make` targets and `src/` paths named in the manual, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
+Runs generated content-inventory/asset-budget, `tools/gen_sounds.py --check`, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, `tools/check_roadmap_quality.py`, and then `tests/docs_drift_unit_test.py`, the unit tests of those checkers (each plants a stale claim and expects the check to name it). They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, constant values, inspector keys, the render order, `make` targets and `src/` paths named in the manual, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
 
 ```sh
 make docs-drift
@@ -587,11 +590,14 @@ Node version is the single line of the repository's `.node-version` file, which
 every workflow reads (`node-version-file`); the Bun version is also recorded as
 `packageManager` in `docs/package.json`, and `make doctor` warns when the local
 Bun is a different release. The
-supported frontend set is Astro **7.4**, `@astrojs/markdown-satteri` **0.4**,
-`@astrojs/sitemap` **3.7**, `@astrojs/check` **0.9**, Tailwind CSS and its Vite
-plugin **4.3**, and TypeScript **6.0**. A lockfile patch bump stays on that
-line. TypeScript 7 is newer but outside Astro Check 0.9's `^5.0.0 || ^6.0.0`
-peer range; retain 6.0 until supported.
+frontend versions (Astro, `@astrojs/markdown-satteri`, `@astrojs/sitemap`,
+`@astrojs/check`, Tailwind CSS with its Vite plugin, and TypeScript) are the
+ones `docs/package.json` declares and `docs/bun.lock` resolves; the manual does
+not repeat the numbers, so a dependency pull request never fails `make
+docs-drift` on prose. The drift check only requires `bun.lock` to keep Tailwind
+CSS and its Vite plugin on one major.minor line. Check the peer ranges the lock
+records (such as `@astrojs/check`'s `typescript` range) before accepting a major
+bump.
 Locked transitive dependencies respect their upstream version constraints.
 
 Development and production both serve from `/`. The public host is `super-mango-editor.jonathanperis.tech`, so the repository name is not a path prefix. Astro does not compile or
@@ -682,27 +688,44 @@ Five workflow files handle automated builds, docs checks, analysis and fuzzing; 
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (a required check; see the [release checklist](../release-checklist/)); native game/editor tests, smoke and packaging (Windows with GCC); a separate `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` job builds and tests with Clang outside the release `needs`; a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); Linux scripted smoke; level validation on every native OS; WASM build/artifact/package checks; a separate `Desktop backend` job runs Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL (hosted macOS runners have no OpenGL pixel format); a `Coverage (Linux x86_64)` job runs `make coverage` on the Memory backend with a line-coverage floor and a per-file check against `tools/coverage_baseline.txt` (no file may drop more than 2 points), posts the per-file table and the baseline comparison to the job summary and uploads `summary.txt` as the `coverage-summary` artifact; the three Windows jobs each cover something the others do not (comments in `build.yml`): the GCC build leg ships and checks the release zip, the Clang job catches Clang warnings in `_WIN32`-only code, and `Desktop backend` runs the real GLFW/OpenGL backend and the scripted smoke; on `main` pushes a `Release freshness` job warns when `main` is more than 50 commits past the latest `v*` tag. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` (the tag is `v` plus the `VERSION` file; routine releases stay on 2.0.x) |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (a required check; see the [release checklist](../release-checklist/)), which on `main` pushes also warns when `main` is more than 50 commits past the latest `v*` tag (this was the separate `Release freshness` job); a `Changed paths` job that marks documentation-only pull requests; native game/editor tests, smoke and packaging (Windows with GCC); a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); Linux scripted smoke; level validation on every native OS; WASM build/artifact/package checks; one informational `Windows x86_64 extras (clang -Werror, Mesa desktop backend)` job builds and tests with Clang under `-Werror`, then runs the Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL with GCC (hosted macOS runners have no OpenGL pixel format); a `Coverage (Linux x86_64)` job runs `make coverage` on the Memory backend with a line-coverage floor and a per-file check against `tools/coverage_baseline.txt` (no file may drop more than 2 points), posts the per-file table and the baseline comparison to the job summary and uploads `summary.txt` as the `coverage-summary` artifact; the Windows build leg and the extras job each cover something the other does not (comments in `build.yml`): the GCC build leg ships and checks the release zip, the extras job catches Clang warnings in `_WIN32`-only code and runs the real GLFW/OpenGL backend and the scripted smoke. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` (the tag is `v` plus the `VERSION` file; routine releases stay on 2.0.x) |
 | Docs | `docs.yml` | Relevant pull requests, weekly, manual | Frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows. `make docs-drift` is left to the always-on `Docs drift` job, and on `main` the `Pages build` job lints, builds and checks the site, so neither runs twice. The weekly run audits the lockfile against new advisories. Superseded PR runs are cancelled |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis; superseded PR runs are cancelled. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
-| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 300 seconds per harness) on the level loader, the editor's save → load round trip, the profile and ghost decoders, and the campaign manifest loader and experiment capture decoder. The inputs each run discovers are kept in the Actions cache for the next run. Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
-| Static analysis | `static-analysis.yml` | Push to `main`, pull requests, manual | `clang-tidy (informational)`: builds the pinned raylib for its headers, writes `compile_commands.json` and runs `tools/run_clang_tidy.py` with the checks in `.clang-tidy` (Clang static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/` only. Findings go to the job summary; the job never fails on them and is not a required check |
+| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 300 seconds per harness) on the level loader, the editor's save → load round trip, the profile and ghost decoders, and the campaign manifest loader and experiment capture decoder. After a successful search `make fuzz-merge` minimises each corpus (`-merge=1`); the result is kept in the Actions cache for the next run and uploaded as the `fuzz-corpus` artifact (90 days), and a run that finds no cache entry downloads the newest such artifact with `gh run download` instead of starting from the seeds. Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
+| Static analysis | `static-analysis.yml` | Pull requests (not documentation-only ones), manual | `clang-tidy (informational)`: builds the pinned raylib for its headers, writes `compile_commands.json` and runs `tools/run_clang_tidy.py` with the checks in `.clang-tidy` (Clang static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/` only. Findings go to the job summary; the job never fails on them and is not a required check |
 | Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
 
-Every job sets `timeout-minutes`. The build legs, the sanitizers and the two
-extra Windows jobs take 1 to 6 minutes when raylib comes from the cache, but a
-pull request that changes the cache key builds raylib from source on every
-push (only `main` saves caches), so the jobs keep room for that: 60 minutes for
-the build legs and Windows Clang, 45 for the sanitizers and the desktop
-backend. Their long test steps have limits of their own (10 minutes, 5 for the
+Every job sets `timeout-minutes`. The build legs and the sanitizers take 1 to
+6 minutes when raylib comes from the cache, but a pull request that changes the
+cache key builds raylib from source on every push (only `main` saves caches),
+so the jobs keep room for that: 60 minutes for the build legs, 45 for the
+sanitizers, and 90 for the Windows extras job, which may build two raylib
+trees (Clang and null-audio GCC) under MSYS2. Their long test steps have limits of their own (10 minutes, 5 for the
 Windows Memory-backend tests), so a test that hangs still ends early with its
 output in the log. Every native leg (Clang and GCC) passes
 `EXTRA_CFLAGS=-Werror` and the WebAssembly leg `EXTRA_WEB_CFLAGS=-Werror`.
 The release job needs the legs that ship an archive (`build`), the
 `Sanitizers (Linux x86_64)` job (which used to be part of the Linux leg) and
 `provenance`, which itself waits for `build` and the sanitizers so it never
-attests archives a failing gate blocks; the Windows Clang, `Desktop backend`
-and `Coverage (Linux x86_64)` jobs report separately and never block a release.
+attests archives a failing gate blocks; the `Windows x86_64 extras` and
+`Coverage (Linux x86_64)` jobs report separately and never block a release.
+
+**Documentation-only pull requests.** The `Changed paths` job diffs a pull
+request's merge commit against its base (`git diff --name-only --no-renames HEAD^1 HEAD`,
+no third-party action) and reports `code=false` only when every changed file is
+documentation: `docs/wiki/`, `docs/archive/`, `docs/README.md`, `.specs/`, or a
+Markdown file at the top of the repository or in `.github/`, except
+`THIRD_PARTY_NOTICES.md`, which every release archive packs. `docs/src/` and
+`docs/package.json` count as code because `make test` reads them. On such a
+pull request `Sanitizers (Linux x86_64)`, `Coverage (Linux x86_64)` and the
+Windows extras job are skipped through a job-level `if:` (a skipped required
+check counts as passing), and each `Build (<platform>)` leg runs on a Linux
+runner with every step skipped: a matrix job skipped through its own `if:`
+reports one check under its unexpanded name, so the four required build checks
+would never report. `Docs drift` and the `docs.yml` site build still run, and
+so does CodeQL. Pushes to `main`, tags and manual runs always build
+everything, and so does any pull request when `Changed paths` itself fails.
+`static-analysis.yml` skips the same paths with a `paths-ignore` filter.
 
 **Why a pull request can wait an hour or two.** The jobs themselves take
 about five minutes. `Build (macOS arm64)` is a required check, and GitHub's
@@ -721,14 +744,17 @@ compilers and the WebAssembly leg pins Emscripten 6.0.13, but Windows uses
 MSYS2, a rolling distribution: the local `setup-msys2-toolchain` action runs
 `setup-msys2` with `update: true` and installs the current GCC/Clang through the
 action's `install:` input (which also lets the action's package cache cover
-them). MSYS2 cannot reliably install older
+them). Only runs on `main` turn that package cache on (`cache:`): the action
+has no restore-only mode, and with it on every pull request saved its own copy
+whenever MSYS2 shipped new packages, so pull requests and tags download the
+packages instead. MSYS2 cannot reliably install older
 package versions, so these are not pinned. A new compiler release can add a
 warning and fail a Windows leg with no source change. Each Windows job prints
 `--version` and `pacman -Q` output in that action's "Record rolling MSYS2 toolchain versions" step;
 when a Windows-only `-Werror` failure appears, compare that output with the last
-green run before changing code. A Clang-only failure shows up in the job named
-`Windows x86_64 clang -Werror (rolling MSYS2 toolchain)` and does not block
-releases; a GCC failure in `Build (Windows x86_64)` does, because that leg ships
+green run before changing code. A Clang-only failure shows up in the Clang
+steps of `Windows x86_64 extras (clang -Werror, Mesa desktop backend)` and does
+not block releases; a GCC failure in `Build (Windows x86_64)` does, because that leg ships
 the Windows archive.
 GCC's `-Wformat-truncation` is stricter than Clang's: label code formats long
 paths through `editor_path_for_display()` and checks `snprintf` results where
@@ -740,18 +766,25 @@ composite actions under `.github/actions/`: `install-linux-deps` (the one apt
 package list), `setup-linux-display` (Xvfb and the PulseAudio null sink),
 `setup-msys2-toolchain` and `raylib-cache`. `raylib-cache` restores the pinned
 raylib source archive (`RAYLIB_ARCHIVE`; SHA-256 verified on every use) and,
-for every job that compiles raylib, the compiled tree: each native build leg
-(Linux, macOS and Windows) its debug trees (`out/raylib`, plus
-`out/headless/raylib` for the Memory-backend tests), and the sanitizers,
-coverage, Windows Clang and Desktop backend jobs their own trees. The Linux
+for every job that compiles raylib, the compiled tree. The source archive is
+one entry for all three operating systems (`raylib-source-<hash of
+vendor/raylib/manifest.json>`, saved with `enableCrossOsArchive`; the manifest
+is kept LF by `.gitattributes` so Windows hashes the same bytes) instead of
+three identical 52 MB copies. Compiled trees: each native build leg (Linux,
+macOS and Windows) its debug trees (`out/raylib`, plus `out/headless/raylib`
+for the Memory-backend tests) and its release tree (`out/release/raylib`,
+which `make dist-native` links, under the `<os>-<cc>-release` variant; before,
+"Package release archive" rebuilt it on every run), and the sanitizers,
+coverage and Windows extras jobs their own trees (the extras job keeps a Clang
+entry and a null-audio GCC entry). A second `raylib-cache` call in a job passes
+`source: 'false'` so the archive is restored once. The Linux
 clang debug tree is the same in the Linux build leg, CodeQL, clang-tidy and the
 fuzz job, so those four share one cache entry (`linux-clang-debug`) instead of
 storing it under four names. Only runs on `main` save a cache; pull requests
 and tags restore what `main` saved, so a pull request no longer stores its own
 copy of each tree (a pull request that changes the raylib pin or the toolchain
-builds raylib from source on every push until it is merged). The release tree that ships
-(`dist-native`) is never cached, and neither is the WebAssembly leg's
-`out/raylib-web`: the Emscripten SDK is installed under a new temporary folder
+builds raylib from source on every push until it is merged). The WebAssembly
+leg's `out/raylib-web` is never cached: the Emscripten SDK is installed under a new temporary folder
 on every run, so a restored CMake tree would name an `emcc` that is gone.
 CMake records absolute paths and per-compiler settings, so the key must match
 exactly: it covers the pin, patches, `tools/build_raylib.py`, the Makefile's
@@ -770,8 +803,10 @@ Renovate (`renovate.json`, on top of the shared `jonathanperis/.github` preset)
 watches the pins that no package manager owns, through regex `customManagers`:
 the Emscripten SDK (the setup-emsdk `version` in `build.yml`, `EMSCRIPTEN_VERSION`
 in the Makefile and every version quoted in the docs, grouped into one pull
-request; `make docs-drift` fails if they disagree), Mesa for the `Desktop
-backend` job, the raylib tag and commit in `vendor/raylib/manifest.json`, and
+request; `make docs-drift` fails if they disagree), the Node.js version quoted
+in the README, `docs/README.md` and this page (grouped with `.node-version` in
+one `node` pull request; `make docs-drift` checks all three mentions), Mesa for
+the Windows extras job, the raylib tag and commit in `vendor/raylib/manifest.json`, and
 the vendored tomlc17 release. None of them automerge, and they are rebased
 only when they conflict with `main` (`rebaseWhen: conflicted`), not each time
 `main` moves. Renovate's own managers cover the rest: the Action pins in the
@@ -780,9 +815,12 @@ version in `.node-version`, and the docs site's npm packages, which arrive as
 one pull request (`docs site dependencies`). Mesa's `MESA_SHA256` is
 the digest of `mesa3d-<version>-release-msvc.7z`; the
 `github-release-attachments` manager replaces it when the version changes, and
-the Desktop backend job still fails closed if the pin and the archive disagree.
+the Windows extras job still fails closed if the pin and the archive disagree.
 Raylib bumps still need their new SHA-256 entered by hand (CI fails closed
-until then), and tomlc17 only appears on the Dependency Dashboard, because
+until then), and the raylib version quoted in the manual, the READMEs,
+`PRODUCT.md`, `THIRD_PARTY_NOTICES.md` and `.specs/` is checked against the
+manifest by `make docs-drift`, so the same pull request updates those
+mentions; and tomlc17 only appears on the Dependency Dashboard, because
 re-importing it means re-applying the project patches listed in
 `vendor/tomlc17/README.md`. Pins inside a workflow or the Makefile carry a
 `# renovate: datasource=... depName=...` comment on the line above, except

@@ -299,3 +299,70 @@ done:
     close_editor(&es);
     return failed;
 }
+
+/* A poll hook that closes the window once, while a prompt waits. */
+static int quit_hook_left;
+static void close_window_once(void)
+{
+    if (quit_hook_left > 0) {
+        quit_hook_left--;
+        push_event(INPUT_QUIT, 0, 0, 0, 0);
+    }
+}
+
+/*
+ * Closing the window while a prompt is up cancels the prompt, and the
+ * editor still quits afterwards, the usual way: with unsaved changes it
+ * asks about them first.  Closing the window again while THAT question is
+ * up only cancels the quit; nothing is left to quit later.
+ */
+static int closing_the_window_during_a_prompt_still_quits(void)
+{
+    int failed = 0;
+    EditorState es;
+    InputEvent event;
+    PlacementData coin;
+    const char *labels[] = {"No", "Yes"};
+    int choice = -1;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(es.running && !es.modified);
+
+    /* A clean document: the prompt is cancelled, then the editor quits. */
+    input_clear();
+    push_event(INPUT_QUIT, 0, 0, 0, 0);
+    CHECK(dialog_choice("Question", "The window is closed while this is asked.",
+                        labels, 2, 1, 0, &choice) == 0);
+    CHECK(choice == 0);                             /* Cancel */
+    CHECK(es.running);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    CHECK(!es.running);
+
+    /* Unsaved changes: the quit after the prompt asks about them, and a
+     * second close while it asks cancels the quit for good. */
+    es.running = 1;
+    memset(&coin, 0, sizeof(coin));
+    coin.coin.x = 96.0f;
+    coin.coin.y = 96.0f;
+    CHECK(editor_add_placement(&es, ENT_COIN, &coin, "place") == 0);
+    CHECK(es.modified);
+    input_clear();
+    push_event(INPUT_QUIT, 0, 0, 0, 0);
+    choice = -1;
+    CHECK(dialog_choice("Question", "The window is closed while this is asked.",
+                        labels, 2, 1, 0, &choice) == 0);
+    CHECK(choice == 0);
+    quit_hook_left = 1;
+    dialog_choice_test_set_poll_hook(close_window_once);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);           /* the quit asks; closed again */
+    dialog_choice_test_set_poll_hook(NULL);
+    CHECK(quit_hook_left == 0);                    /* the question was shown */
+    CHECK(es.running && es.modified);
+    CHECK(strcmp(es.status_message, "quit cancelled") == 0);
+    CHECK(!input_poll(&event));                    /* no quit left waiting */
+done:
+    dialog_choice_test_set_poll_hook(NULL);
+    input_clear();
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}

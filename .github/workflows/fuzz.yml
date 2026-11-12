@@ -10,7 +10,13 @@ name: Fuzz
 #
 # The inputs each run discovers are kept in the Actions cache and restored
 # by the next run, so the search continues from where the last one stopped
-# rather than from the seeds every week.
+# rather than from the seeds every week. After each successful search,
+# `make fuzz-merge` minimises every corpus with libFuzzer's -merge=1 (keeping
+# only inputs that add coverage), and the merged corpus is also uploaded as
+# the `fuzz-corpus` artifact for 90 days. The cache can be evicted (7 days
+# unused, or the repository's 10 GB limit); when no cache entry is found,
+# the job downloads the newest `fuzz-corpus` artifact of an earlier
+# successful run with the GitHub CLI instead of starting from the seeds.
 on:
   schedule:
     - cron: "15 4 * * 1"
@@ -29,8 +35,12 @@ jobs:
   libfuzzer:
     name: libFuzzer (Linux x86_64)
     runs-on: ubuntu-latest
-    # Four harnesses of FUZZ_SECONDS each, plus the build.
-    timeout-minutes: 45
+    # actions: read lets `gh run download` fetch an earlier run's artifact.
+    permissions:
+      contents: read
+      actions: read
+    # Four harnesses of FUZZ_SECONDS each, plus the build and the merge.
+    timeout-minutes: 50
     env:
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
       CC: clang
@@ -59,6 +69,7 @@ jobs:
       # prefix). An input found by an older build is still a fine starting
       # point, so nothing else is in the key.
       - name: Restore the discovered corpus
+        id: corpus
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -70,8 +81,43 @@ jobs:
           restore-keys: |
             fuzz-corpus-
 
+      # No cache entry at all (evicted, or the first run on a new cache
+      # scope): take the merged corpus from the newest successful run that
+      # still has one. Finding none is fine; the search starts from the seeds.
+      - name: Restore the corpus artifact when the cache has none
+        if: steps.corpus.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for run_id in $(gh run list --workflow fuzz.yml --status success --limit 20 \
+                            --json databaseId --jq '.[].databaseId'); do
+            if gh run download "$run_id" --name fuzz-corpus --dir out/fuzz; then
+              echo "Restored fuzz-corpus from run $run_id"
+              exit 0
+            fi
+          done
+          echo "::notice::No fuzz-corpus artifact found; starting from the seeds."
+
       - name: Search for 300 seconds per harness
         run: make fuzz
+
+      # Keeps only the inputs that add coverage, so the corpus the cache and
+      # the artifact carry stays small however many runs added to it.
+      - name: Minimise the corpus (-merge=1)
+        run: make fuzz-merge
+
+      - name: Upload the merged corpus
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-corpus
+          path: |
+            out/fuzz/level
+            out/fuzz/profile
+            out/fuzz/editor
+            out/fuzz/campaign
+          if-no-files-found: warn
+          retention-days: 90
 
       - name: Upload crashes
         if: failure()

@@ -190,21 +190,42 @@ static int draw_row(EditorState *es, EntityType type, void *item, const Property
  * that struct, so the address is that member's own and is aligned for it.
  */
 
+/* How many bytes a row's value takes in the placement struct. */
+static size_t row_size(const PropertyRow *row)
+{
+    return row->kind == ROW_INT || row->kind == ROW_CHOICE ? sizeof(int) : sizeof(float);
+}
+
 /*
  * draw_rows — Draw every row of one entity. With several entities of this
  * type selected, a changed row is copied to all of them as one undo step
  * (properties_apply_to_selection); with one selected it is an ordinary
  * property edit.
+ *
+ * Enter and Tab end the edit here, while the row draws.  Every other way
+ * of leaving the field (a click on the canvas or on another field, Ctrl+S,
+ * Undo...) ends it in editor_finish_field_edit before the panel draws
+ * again, so the row being typed into is remembered in es->shared_field_*
+ * for that path to copy the value the same way.
  */
 static void draw_rows(EditorState *es, EntityType type, void *item,
                       const PropertyRow *rows, int count, int y)
 {
+    int shared = editor_selection_count(es) > 1;
+
     for (int i = 0; i < count; i++, y += ROW_H) {
-        if (!draw_row(es, type, item, &rows[i], y)) continue;
-        if (editor_selection_count(es) > 1)
+        int changed = draw_row(es, type, item, &rows[i], y);
+        if (shared && es->ui.active_id == FIELD_ID(type, rows[i].id)) {
+            es->shared_field_id = FIELD_ID(type, rows[i].id);
+            es->shared_field_type = (int)type;
+            es->shared_field_key = rows[i].key;
+            es->shared_field_offset = rows[i].offset;
+            es->shared_field_size = row_size(&rows[i]);
+        }
+        if (!changed) continue;
+        if (shared)
             properties_apply_to_selection(es, type, rows[i].key, rows[i].offset,
-                                          rows[i].kind == ROW_INT || rows[i].kind == ROW_CHOICE
-                                              ? sizeof(int) : sizeof(float));
+                                          row_size(&rows[i]));
         else
             editor_commit_change(es);
     }

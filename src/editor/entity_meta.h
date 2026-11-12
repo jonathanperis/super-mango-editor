@@ -125,8 +125,11 @@ void editor_select_none(EditorState *es);
 /* Select exactly these entities (items[0] becomes the primary one); more
  * than EDITOR_MAX_SELECTION are cut off.  Returns how many were taken. */
 int editor_select_items(EditorState *es, const Selection *items, int count);
-/* Shift+click: add (type, index) to the selection, or take it out. */
-void editor_selection_toggle(EditorState *es, EntityType type, int index);
+/* Shift+click: add (type, index) to the selection, or take it out.
+ * Returns 1 when the selection changed.  A full selection
+ * (EDITOR_MAX_SELECTION) takes nothing more: the status bar says so and
+ * 0 is returned, as it is for an entity that does not exist. */
+int editor_selection_toggle(EditorState *es, EntityType type, int index);
 void editor_selection_reconcile(EditorState *es);
 /* Make (type, index) the whole selection. */
 void editor_select_only(EditorState *es, EntityType type, int index);

@@ -39,7 +39,11 @@ In scope:
   level file are in scope. Each of these files is read once, with a size
   limit, before any of it is parsed: 1 MiB for a level (`LEVEL_TEXT_MAX`),
   64 KiB for a campaign manifest, which may list at most 128 levels
-  (`CAMPAIGN_MAX_LEVELS`), and 8 MiB for an experiment capture.
+  (`CAMPAIGN_MAX_LEVELS`), and 8 MiB for an experiment capture. An unknown key
+  or enum value that a level loader message quotes has every byte outside printable ASCII written as
+  `\xHH` and a backslash as `\\` (`serializer_message_text()` in
+  `src/shared/serializer_emit.c`), so a crafted file cannot send terminal
+  escape sequences to the log or the editor's status bar.
 - **Player profiles and replay/experiment files**: native profile files in the
   OS preference directory or passed with `--profile`, and replay/experiment
   inputs.

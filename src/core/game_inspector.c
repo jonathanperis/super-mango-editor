@@ -88,7 +88,8 @@ int game_inspector_event(GameState *gs, const InputEvent *event)
         if (gs->screen.experiment && gs->screen.experiment->replaying) return 1;
         float *value = (float *)((char *)&gs->world.player + fields[gs->screen.inspector.physics_field].offset);
         float next = *value + (key == KEY_EQUAL ? 25.0f : -25.0f);
-        if (next >= 0 && next <= MAX_LEVEL_MOTION) *value = next;
+        /* Stop at the capture's limit, so whatever is tuned can be replayed. */
+        if (next >= 0 && next <= game_experiment_physics_max(gs->screen.inspector.physics_field)) *value = next;
         show_tuning(gs);
         return 1;
     }

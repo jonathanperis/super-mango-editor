@@ -17,7 +17,7 @@ Use this page to choose the smallest useful verification set for a change. Run c
 | Editor behaviour | `make editor CC=clang` and `./out/super-mango-editor --smoke-test` | Builds the editor and renders five hidden-window frames; a desktop context is still required. |
 | Suspected C defects | `make tidy` | clang-tidy (static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/`; report only. |
 | Memory/UB-sensitive C changes | `make sanitize CC=clang` and, when startup paths changed, `make sanitize-smoke CC=clang` | Runs AddressSanitizer/UBSan over tests and optionally smoke startup. |
-| Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts and sounds, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap/CSP (`check-site` also runs `tests/docs_checks_test.py`). Uses the frozen `bun.lock` dependency set. |
+| Docs, README, Pages routes | `make docs-drift`, then from `docs/`: `bun run lint`, `bun run build`, `bun run check-site` | Checks generated facts and sounds, TOML examples, API/CLI references, Astro compilation and emitted routes/links/metadata/sitemap/CSP (`make docs-drift` also runs the checkers' unit tests in `tests/docs_drift_unit_test.py`; `check-site` runs `tests/docs_checks_test.py` against the built site). Uses the frozen `bun.lock` dependency set. |
 | WebAssembly payload | `make web`, artifact checks, green WebAssembly + Pages assembly checks, and actual browser startup for runtime changes | Build raylib and the application with the same pinned SDK. HTTP/module checks do not execute the browser frame loop. |
 | Release packaging | `make dist-native` and `make dist-wasm` or the `Build & Release` workflow | Produces native and WebAssembly archives using the same archive layout described in the release checklist. |
 
@@ -125,7 +125,7 @@ that editor). `editor-ui-test` also reads the canvas back to check the floor sti
 edges at every zoom and scroll. It and `editor-validation-test` edit a campaign in a
 scratch game folder, made and entered through `tests/test_folders.h`, so those
 cases run on Windows too. On POSIX it also covers the playtest process status
-and the native file pickers through stand-in `osascript`/`zenity` scripts. The in-window prompts are answered with queued events (keys, clicks, closing the window), on every system; a prompt opened mid-frame must leave the frame's target and clip as it found them. They write scratch files
+and the native file pickers through stand-in `osascript`/`zenity` scripts, including a picker that fails and the in-window path prompt that then takes its place. The in-window prompts are answered with queued events (keys, clicks, closing the window), on every system; closing the window during a prompt must cancel it and still quit afterwards (asking about unsaved changes first), and a prompt opened mid-frame must leave the frame's target and clip as it found them. They write scratch files
 under the build's own `OUTDIR` (`TEST_OUT` in `tests/test_paths.h`), so
 `make test`, `make sanitize` and `make coverage` can run at the same time in one
 checkout. The cases in those two programs are grouped under `tests/editor_ui/`
@@ -225,9 +225,10 @@ Each defines the libFuzzer entry point `LLVMFuzzerTestOneInput`.
 | Command | What it does |
 |---------|--------------|
 | `make fuzz-corpus` | Builds every harness with `tests/fuzz_replay_main.c` under ASan/UBSan and replays the seeds: `levels/`, `levels/labs/`, `tests/fixtures/serializer_v1/`, `tests/fixtures/runtime/`, `tests/fuzz/corpus/level/` and `tests/fuzz/corpus/profile/`, and for the editor harness the level seeds plus `tests/fuzz/corpus/editor/`. `make sanitize` runs it too, and CI's sanitizer job adds `FUZZ_MUTATIONS=50`. `FUZZ_MUTATIONS=N` adds N blind byte mutations per seed: this is slower and weaker than libFuzzer, but needs no extra toolchain. |
-| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/`, `out/fuzz/editor/` and `out/fuzz/profile/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. `.github/workflows/fuzz.yml` runs this weekly and on demand; it is not a required check. |
+| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/`, `out/fuzz/editor/`, `out/fuzz/profile/` and `out/fuzz/campaign/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. `.github/workflows/fuzz.yml` runs this weekly and on demand; it is not a required check. |
+| `make fuzz-merge` | After `make fuzz`: replaces each `out/fuzz/<harness>/` corpus with the inputs libFuzzer's `-merge=1` keeps (only those that add coverage). The weekly workflow runs it after every successful search, then keeps the merged corpus in the Actions cache and uploads it as the `fuzz-corpus` artifact (90 days); a run with no cache entry downloads the newest such artifact (`gh run download`), so an evicted cache does not send the search back to the seeds. |
 
-Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-editor-replay`, `out/fuzz-profile-replay`).
+Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-editor-replay`, `out/fuzz-profile-replay`, `out/fuzz-campaign-replay`).
 If an input exposed a real bug, add it to `tests/fuzz/corpus/` after the fix.
 Keep that corpus small and hand-reviewed.
 
@@ -261,7 +262,7 @@ audible output or physical-device behavior.
 
 ## Smoke Tests
 
-`make smoke` builds the game and editor, runs root and lab TOML levels for a bounded frame count, then renders five editor frames. Desktop hidden windows still need graphics and audio devices. Linux CI supplies Xvfb/Mesa and a PulseAudio null sink. It starts Xvfb with `-noreset`, and so should you when you run the tests under your own Xvfb: without it the X server resets itself each time its last client disconnects, the tests close and reopen their window many times, and a window opened during such a reset fails with `X11: Failed to open display`. The gating macOS/Windows legs use a separate Memory/software-rendered test build while building and packaging normal GLFW desktop executables. The non-gating `Desktop backend` job runs the real GLFW/OpenGL tests and smoke on Windows only, with Mesa llvmpipe and `RAYLIB_AUDIO=null`; hosted macOS runners have no OpenGL pixel format.
+`make smoke` builds the game and editor, runs root and lab TOML levels for a bounded frame count, then renders five editor frames. Desktop hidden windows still need graphics and audio devices. Linux CI supplies Xvfb/Mesa and a PulseAudio null sink. It starts Xvfb with `-noreset`, and so should you when you run the tests under your own Xvfb: without it the X server resets itself each time its last client disconnects, the tests close and reopen their window many times, and a window opened during such a reset fails with `X11: Failed to open display`. The gating macOS/Windows legs use a separate Memory/software-rendered test build while building and packaging normal GLFW desktop executables. The Mesa half of the non-gating `Windows x86_64 extras (clang -Werror, Mesa desktop backend)` job runs the real GLFW/OpenGL tests and smoke on Windows only, with Mesa llvmpipe and `RAYLIB_AUDIO=null`; hosted macOS runners have no OpenGL pixel format.
 
 On a desktop with a display but no sound device, `make test OUTDIR=out/nullaudio RAYLIB_AUDIO=null` keeps the real graphics backend and swaps in miniaudio's null playback device. Like Memory, it is test-only: `release` and `dist-native` refuse it.
 
@@ -302,18 +303,20 @@ units and owner/borrower contracts still need their existing regression checks.
 - WebAssembly authority caveats;
 - Pages route metadata and developer-guide context;
 - every `make <target>` the manual or README mentions exists in the Makefile;
-- every backticked `src/...` path exists;
+- every backticked `src/...` path in the manual, README, `.specs/project/` and `.specs/features/` exists (a `*` pattern must match at least one file);
 - backticked `name()` functions on the learning pages are defined in `src/`, `tests/` or `labs/`;
 - constant values in [Constants Reference](../constants-reference/) and in `#define` snippets match the source;
 - the [debug inspector key table](../controls/#debug-inspector-keys) matches `src/core/game_inspector.c`;
 - the [render order table](../architecture/#render-order-back-to-front) matches the `s_render_layers` table in `src/render/game_render.c`, row for row, and nothing is drawn outside that table;
 - the [update order table](../architecture/#update-order-one-fixed-step) matches the `s_update_steps` table in `src/core/game_update.c`, row for row;
-- every "N native binaries" claim in the manual, README and `.specs/project/` matches `TEST_TARGETS`, and `STATE.md` lists each test binary;
+- every "N native binaries" claim (also spelled "N-native-binary") in the manual, README, `.specs/project/` and `.specs/features/` matches `TEST_TARGETS`, and `STATE.md` lists each test binary;
 - every constant the docs place in a particular `src/` header (written as the constant name, "in", then the header path) is really defined there, and so are the camera constants;
 - every function the docs place in a particular `src/` file (written as `name()`, or a list such as `a()` and `b()`, then "in" or "(" and the file path) is defined or declared in that file;
 - the README's workflow trigger summary matches each workflow's `on:` block, and no page credits the drift check to the Docs workflow (only `build.yml` runs it);
-- the README prerequisites name Node.js (`make test` runs Node tests) with the Node version CI uses (the `.node-version` file, which every workflow reads);
-- every `tests/*.cjs` and `tests/*_test.py` file is run by a `make` target (or, for `tests/docs_checks_test.py`, by `bun run check-site`), every such file the Makefile names exists, the README and `STATE.md` quote the right number of Node tests, and `STATE.md`, this page and the Build System page name each of them;
+- the README prerequisites name Node.js (`make test` runs Node tests), and the README, `docs/README.md` and the Build System page quote the Node version CI uses (the `.node-version` file, which every workflow reads) in the form `renovate.json`'s Node manager rewrites, so a Node bump updates all four together;
+- every quoted raylib version (`raylib 6.2`, `raylib **6.2**`, the README's tech-stack row) in the manual, the READMEs, `PRODUCT.md`, `THIRD_PARTY_NOTICES.md` and `.specs/` matches `vendor/raylib/manifest.json`;
+- `docs/bun.lock` keeps Tailwind CSS and its Vite plugin on one major.minor line, and the docs toolchain paragraphs name the site's packages without quoting versions (the lock is the record, so a dependency bump needs no docs edit);
+- every `tests/*.cjs` and `tests/*_test.py` file is run by a `make` target (`tests/docs_drift_unit_test.py` by `make docs-drift` itself; `tests/docs_checks_test.py` by `bun run check-site`), every such file the Makefile names exists, the README and `STATE.md` quote the right number of Node tests, and `STATE.md`, this page and the Build System page name each of them;
 - level, screen and lab counts in `PRODUCT.md`, the README and `.specs/project/` match `docs/src/generated/project.json` and `levels/`;
 - every render layer count ("N render layers", "N-layer order") in the manual, README, `PRODUCT.md` and `.specs/project/` matches the rows of the [render order table](../architecture/#render-order-back-to-front), numbered 1..N;
 - the Emscripten version is the same in the Makefile, `build.yml` and the files the check lists in `EMSCRIPTEN_MENTIONS` (the READMEs, the Build System page, `vendor/raylib/README.md` and `web/keyboard-scope.js`). Dated reports such as `docs/AUDIT_IMPLEMENTATION.md` keep the version they were written against.

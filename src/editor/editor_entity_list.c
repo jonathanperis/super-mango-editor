@@ -105,9 +105,11 @@ static int is_word_separator(char c)
 /*
  * next_word — Copy the next search word of *text into word (lower-cased,
  * at most ENTITY_LIST_WORD_MAX - 1 characters) and move *text past it.
- * Returns 0 when no word is left.
+ * *after_hash is 1 when a '#' comes right before the word, as in "#3",
+ * the way a row writes an entity's index ("Coin #3").  Returns 0 when no
+ * word is left.
  */
-static int next_word(const char **text, char *word)
+static int next_word(const char **text, char *word, int *after_hash)
 {
     const char *p = *text;
     int length = 0;
@@ -117,6 +119,7 @@ static int next_word(const char **text, char *word)
         *text = p;
         return 0;
     }
+    *after_hash = p > *text && p[-1] == '#';
     while (*p && !is_word_separator(*p)) {
         if (length < ENTITY_LIST_WORD_MAX - 1)
             word[length++] = (char)tolower((unsigned char)*p);
@@ -170,10 +173,14 @@ int editor_entity_list_matches(const LevelDef *level, EntityType type, int index
     const char *name = editor_entity_type_name(type);
     int x = 0, y = 0;
     int has_position = listed_position(level, type, index, &x, &y);
+    int after_hash = 0;
 
-    while (next_word(&rest, word)) {
+    while (next_word(&rest, word, &after_hash)) {
         long number;
-        if (word_is_number(word, &number)) {
+        if (after_hash && word_is_number(word, &number)) {
+            /* "#3" is an index: Coin #3, not something at x or y 3. */
+            if (number != (long)index) return 0;
+        } else if (word_is_number(word, &number)) {
             if (!has_position || (number != (long)x && number != (long)y)) return 0;
         } else if (!name_contains(name, word)) {
             return 0;
@@ -257,7 +264,8 @@ static void pick_entity(EditorState *es, EntityType type, int index, int shift)
 
     es->tool = TOOL_SELECT;
     if (shift) {
-        editor_selection_toggle(es, type, index);
+        /* A full selection left its own message: keep it. */
+        if (!editor_selection_toggle(es, type, index)) return;
         editor_set_status(es, editor_selection_count(es) == 1
                           ? "Selected %d entity" : "Selected %d entities",
                           editor_selection_count(es));

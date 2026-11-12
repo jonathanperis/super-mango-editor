@@ -5,6 +5,8 @@
 #include "core/game_resources.h"
 #include "core/game_random.h"
 #include "core/game_movers.h"
+#include "core/game_completion.h"
+#include "core/game_trig.h"
 #include "core/game_timing.h"
 #include "core/game_player_step.h"
 #include "core/game_float_platforms.h"
@@ -122,7 +124,7 @@ static int inspection_and_replay(void)
     }
     CHECK(gs.screen.experiment->count == 180 && gs.world.player.x > 150);
     Player recorded = gs.world.player;
-    float elapsed = gs.screen.completion.level_elapsed;
+    uint32_t elapsed = gs.screen.completion.level_steps;
     int score = gs.world.score, checkpoint = gs.world.checkpoint_index;
     remove(TEST_OUT "school-experiment.toml");
     CHECK(game_experiment_save(&gs, TEST_OUT "school-experiment.toml") == 0);
@@ -171,7 +173,7 @@ static int inspection_and_replay(void)
     CHECK(replayed == 180);
     CHECK(NEAR(gs.world.player.x, recorded.x) && NEAR(gs.world.player.y, recorded.y));
     CHECK(NEAR(gs.world.player.vx, recorded.vx) && NEAR(gs.world.player.vy, recorded.vy));
-    CHECK(NEAR(gs.screen.completion.level_elapsed, elapsed) && gs.world.score == score && gs.world.checkpoint_index == checkpoint);
+    CHECK(gs.screen.completion.level_steps == elapsed && gs.world.score == score && gs.world.checkpoint_index == checkpoint);
     CHECK(game_inspector_steps(&gs, 0.04f) == 0);
     FILE *bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
     CHECK(bad != NULL);
@@ -668,6 +670,178 @@ done:
     return failed;
 }
 
+/*
+ * The debug overlay outlines a coin with coin_get_hitbox and a bouncepad
+ * with bouncepad_trigger_rect. Those must be the game's own tests: for
+ * every column a player can stand in around them, "the player's hitbox
+ * meets the outline" must say exactly what the game does. The overlay
+ * used to draw a pad as the full height of its sprite, which a player in
+ * mid-air touches without being launched.
+ */
+static int debug_coin_and_bouncepad_outlines_match_the_game(void)
+{
+    int failed = 0;
+
+    /* A coin is collected exactly when the hitbox meets its outline. */
+    for (int dx = -40; dx <= 40; dx++) {
+        GameState gs = {0};
+        stand_player_on_floor(&gs, 0.0f);
+        gs.world.hearts = gs.world.lives = 3;
+        gs.world.score_life_next = 1000;
+        gs.world.coin_count = 1;
+        gs.world.coins[0] = (Coin){.x = 300, .y = 230, .active = 1};
+        gs.world.player.x = 300.0f + (float)dx;
+        IntRect body = player_get_hitbox(&gs.world.player);
+        IntRect coin = coin_get_hitbox(&gs.world.coins[0]);
+        int touches = rect_intersects(&body, &coin);
+        game_collide(&gs, GAME_FIXED_STEP);
+        CHECK(touches == !gs.world.coins[0].active);
+    }
+
+    /* A pad launches a player landing on the floor exactly when their
+     * hitbox, standing there, meets the outlined strip. */
+    int launched_any = 0, missed_any = 0;
+    for (int dx = -40; dx <= 40; dx++) {
+        GameState gs = {0};
+        stand_player_on_floor(&gs, 0.0f);
+        gs.world.bouncepad_medium_count = 1;
+        bouncepad_place(&gs.world.bouncepads_medium[0], 200.0f, BOUNCEPAD_VY_MEDIUM,
+                        BOUNCEPAD_WOOD);
+        Player *p = &gs.world.player;
+        p->x = 200.0f + (float)dx;
+        IntRect standing = player_get_hitbox(p);
+        IntRect strip = bouncepad_trigger_rect(&gs.world.bouncepads_medium[0]);
+        int touches = rect_intersects(&standing, &strip);
+        /* Just above the floor and falling onto it. Up there the player
+         * is not launched yet, so the outline must not reach that high:
+         * it is the floor's top row, not the pad's sprite. */
+        p->y -= 2.0f;
+        IntRect above = player_get_hitbox(p);
+        CHECK(!rect_intersects(&above, &strip));
+        p->vy = 120.0f;
+        p->on_ground = 0;
+        game_player_step(&gs, GAME_FIXED_STEP);
+        int launched = p->vy < 0.0f;
+        CHECK(touches == launched);
+        if (launched) launched_any = 1; else missed_any = 1;
+    }
+    CHECK(launched_any && missed_any);   /* the range covered both cases */
+done:
+    return failed;
+}
+
+/*
+ * game_sinf and game_cosf (core/game_trig.h) agree with the C library to
+ * within one float step everywhere the game uses them, and give exactly
+ * the values below on every machine. The values were printed on macOS
+ * arm64; if Linux, Windows or the WebAssembly build disagrees in a single
+ * bit, this test fails there, before a replay quietly goes another way.
+ */
+static int fixed_step_sine_is_the_same_everywhere(void)
+{
+    int failed = 0;
+    static const struct { float x, sin_x, cos_x; } known[] = {
+        {0x0p+0f, 0x0p+0f, 0x1p+0f},                          /* 0       */
+        {0x1p-1f, 0x1.eaee88p-2f, 0x1.c1528p-1f},             /* 0.5     */
+        {0x1p+0f, 0x1.aed548p-1f, 0x1.14a28p-1f},             /* 1       */
+        {-0x1.4p+1f, -0x1.326afp-1f, -0x1.9a2f7ep-1f},        /* -2.5    */
+        {0x1.921fb6p+1f, -0x1.777a5cp-24f, -0x1p+0f},         /* π       */
+        {0x1.4p+3f, -0x1.1689fp-1f, -0x1.ad9ac8p-1f},         /* 10      */
+        {0x1.edd2f2p+6f, -0x1.9b9dc8p-1f, -0x1.307e36p-1f},   /* 123.456 */
+        {-0x1.edap+9f, -0x1.6baad2p-1f, 0x1.686718p-1f},      /* -987.25 */
+        {0x1.f4p+11f, -0x1.5df436p-1f, -0x1.75bb9cp-1f},      /* 4000    */
+    };
+    for (size_t i = 0; i < sizeof(known) / sizeof(known[0]); i++) {
+        CHECK(game_sinf(known[i].x) == known[i].sin_x);
+        CHECK(game_cosf(known[i].x) == known[i].cos_x);
+    }
+    /* Close to the library's answer: an axe angle in radians stays within
+     * ±2π, a bird's wave argument within a few thousand. */
+    for (float x = -5000.0f; x < 5000.0f; x += 0.0371f) {
+        CHECK(fabsf(game_sinf(x) - sinf(x)) < 2e-7f);
+        CHECK(fabsf(game_cosf(x) - cosf(x)) < 2e-7f);
+    }
+done:
+    return failed;
+}
+
+/*
+ * A jump key still held when a life is lost must not jump the moment the
+ * player is back on the ground: the press belongs to the life that ended.
+ * Letting go and pressing again jumps as usual. The first step of a level
+ * is different: there nothing was held "from before", so a jump recorded
+ * on step 0 (a replay, an experiment) still jumps at once; a key that was
+ * physically held through the level change is the input release latch's
+ * job (game_input.c), not the player's.
+ */
+static int held_jump_does_not_jump_again_after_a_lost_life(void)
+{
+    int failed = 0;
+    GameState gs = {0};
+    strcpy(gs.world.level_path, "tests/fixtures/runtime/transition.toml");
+    CHECK(game_init(&gs) == 0);
+    Player *p = &gs.world.player;
+
+    /* Level start: a jump held on the very first step jumps. */
+    gs.screen.replay_input_mask = PLAYER_INPUT_JUMP;
+    game_player_step(&gs, GAME_FIXED_STEP);
+    CHECK(p->vy < 0.0f && !p->on_ground);
+
+    /* Still holding jump, take the last heart. */
+    for (int step = 0; step < 5; step++) game_player_step(&gs, GAME_FIXED_STEP);
+    int lives = gs.world.lives;
+    gs.world.hearts = 1;
+    p->hurt_timer = 0.0f;
+    apply_damage(&gs, 1, 0, p->x, p->y);
+    CHECK(gs.world.lives == lives - 1 && p->on_ground);
+
+    /* Jump is still down on the steps after the respawn: no jump. */
+    for (int step = 0; step < 3; step++) {
+        game_player_step(&gs, GAME_FIXED_STEP);
+        CHECK(p->vy == 0.0f && p->on_ground);
+    }
+    /* Let go, press again: a normal jump. */
+    gs.screen.replay_input_mask = 0;
+    game_player_step(&gs, GAME_FIXED_STEP);
+    gs.screen.replay_input_mask = PLAYER_INPUT_JUMP;
+    game_player_step(&gs, GAME_FIXED_STEP);
+    CHECK(p->vy < 0.0f && !p->on_ground);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
+/*
+ * The level timer counts fixed steps, not a running float sum of 1/60 s.
+ * Adding 1/60 in float loses a little on every step: after ten minutes
+ * of play the sum read 599.90 s, and after an hour 3597.2 s. A count of
+ * steps divided by 60 at the end is exact.
+ */
+static int level_timer_stays_exact_over_a_long_run(void)
+{
+    int failed = 0;
+    GameState gs = {0};
+    strcpy(gs.world.level_path, "tests/fixtures/runtime/transition.toml");
+    CHECK(game_init(&gs) == 0);
+    for (int step = 0; step < 10 * 60 * 60; step++)   /* ten minutes */
+        game_update_active(&gs, GAME_FIXED_STEP, (int)gs.world.camera.x);
+    CHECK(gs.screen.completion.level_steps == 10 * 60 * 60);
+    CHECK(game_level_seconds(&gs) == 600.0f);
+    /* A Continue point stores seconds; reading them back gives the same
+     * count, also after an hour, and odd values are held in range. */
+    CHECK(game_level_steps_from_seconds(game_level_seconds(&gs)) == 10 * 60 * 60);
+    gs.screen.completion.level_steps = 60 * 60 * 60;
+    CHECK(game_level_seconds(&gs) == 3600.0f);
+    CHECK(game_level_steps_from_seconds(3600.0f) == 60 * 60 * 60);
+    CHECK(game_level_steps_from_seconds(12.5f) == 750);
+    CHECK(game_level_steps_from_seconds(-1.0f) == 0);
+    CHECK(game_level_steps_from_seconds(NAN) == 0);
+    CHECK(game_level_steps_from_seconds(1e9f) == UINT32_MAX);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 /* A crumbling platform that has started to fall carries its rider down:
  * they stay standing on it on every step, so the animation does not
  * flicker between idle and falling and a jump off it always works. */
@@ -903,7 +1077,19 @@ static int render_view_interpolates_without_touching_the_run(void)
     gs.world.bridges[0].brick_count = 3;
     gs.world.bridges[0].bricks[1].y_offset = 0.0f;
     gs.world.bridges[0].bricks[2].y_offset = 6.0f;
+    gs.world.circular_saw_count = 1;
+    gs.world.circular_saws[0].x = 30.0f;
+    gs.world.circular_saws[0].y = 60.0f;
+    gs.world.circular_saws[0].spin_angle = 350.0f;
+    gs.world.spike_block_count = 1;
+    gs.world.spike_blocks[0].x = 70.0f;
+    gs.world.spike_blocks[0].y = 90.0f;
+    gs.world.spike_blocks[0].spin_angle = 100.0f;
     game_timing_note_step(&gs);
+    gs.world.circular_saws[0].x = 34.0f;
+    gs.world.circular_saws[0].spin_angle = 10.0f;
+    gs.world.spike_blocks[0].y = 94.0f;
+    gs.world.spike_blocks[0].spin_angle = 110.0f;
     gs.world.axe_traps[0].angle = 20.0f;
     gs.world.axe_traps[1].angle = 4.0f;
     gs.world.blue_flames[0].y = 190.0f;
@@ -931,6 +1117,20 @@ static int render_view_interpolates_without_touching_the_run(void)
         CHECK(count == 1 && bridge[0].brick_count == 3);
         CHECK(bridge[0].bricks[0].y_offset == 0.0f);
         CHECK(NEAR(bridge[0].bricks[1].y_offset, 2.0f) && NEAR(bridge[0].bricks[2].y_offset, 9.0f));
+        /* A saw and a spike block spin as they travel: the spin is a third
+         * blended value, and it too goes the short way across 360. */
+        {
+            CircularSaw saws[MAX_CIRCULAR_SAWS];
+            SpikeBlock blocks[MAX_SPIKE_BLOCKS];
+            const CircularSaw *saw = game_movers_shown(&gs, MOVER_CIRCULAR_SAWS, view.t,
+                                                       saws, sizeof(saws), &count);
+            CHECK(count == 1 && NEAR(saw[0].x, 32.0f) && NEAR(saw[0].y, 60.0f));
+            /* Half way from 350 to 10 is 0 (or 360), not 180. */
+            CHECK(NEAR(saw[0].spin_angle, 0.0f) || NEAR(saw[0].spin_angle, 360.0f));
+            const SpikeBlock *block = game_movers_shown(&gs, MOVER_SPIKE_BLOCKS, view.t,
+                                                        blocks, sizeof(blocks), &count);
+            CHECK(count == 1 && NEAR(block[0].y, 92.0f) && NEAR(block[0].spin_angle, 105.0f));
+        }
         /* A buffer too small for the array is refused, not overrun. */
         CHECK(game_movers_shown(&gs, MOVER_BRIDGES, view.t, bridges, 8, &count) ==
               (const void *)gs.world.bridges);
@@ -989,6 +1189,18 @@ int game_simulation_contract_test(void)
     int streams = cosmetic_random_draws_leave_gameplay_alone();
     printf("simulation: cosmetic random draws leave gameplay alone %s\n", streams ? "FAIL" : "PASS");
     failures += streams;
+    int trig = fixed_step_sine_is_the_same_everywhere();
+    printf("simulation: fixed-step sine and cosine are the same everywhere %s\n", trig ? "FAIL" : "PASS");
+    failures += trig;
+    int outlines = debug_coin_and_bouncepad_outlines_match_the_game();
+    printf("simulation: debug coin and bouncepad outlines match the game %s\n", outlines ? "FAIL" : "PASS");
+    failures += outlines;
+    int respawn_jump = held_jump_does_not_jump_again_after_a_lost_life();
+    printf("simulation: held jump does not jump again after a lost life %s\n", respawn_jump ? "FAIL" : "PASS");
+    failures += respawn_jump;
+    int timer = level_timer_stays_exact_over_a_long_run();
+    printf("simulation: level timer stays exact over a long run %s\n", timer ? "FAIL" : "PASS");
+    failures += timer;
     int crumble = falling_crumble_platform_keeps_its_rider_standing();
     printf("simulation: falling crumble platform keeps its rider standing %s\n", crumble ? "FAIL" : "PASS");
     failures += crumble;

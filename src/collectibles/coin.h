@@ -30,6 +30,13 @@ typedef struct {
 } Coin;
 
 /*
+ * coin_get_hitbox — The box a player touches to collect this coin, in
+ * world pixels: the coin's drawn square. game_collide tests it and the
+ * --debug overlay outlines it, so the outline is the box that collects.
+ */
+IntRect coin_get_hitbox(const Coin *coin);
+
+/*
  * coins_render — Draw all active coins using the shared coin texture.
  *
  * Inactive coins (active == 0) are skipped.  Each coin is drawn at its

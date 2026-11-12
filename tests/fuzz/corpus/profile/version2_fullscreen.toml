@@ -1,0 +1,10 @@
+# Version 2 keys without a Continue point: the ghost turned off, fullscreen
+# on, and both binding lists. The keys are in another order than the game
+# writes them; the decoder must not depend on the order.
+fullscreen = 1
+ghost = 0
+format_version = 2
+buttons = [13, 14, 11, 12, 2, 16]
+keys = [4, 7, 26, 22, 44, 225]
+last_level = ""
+levels = []

@@ -55,7 +55,7 @@ session_destroy(session) / browser terminal cleanup
 
 ## App Session and Game Frame
 
-`AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation and event polling. Native visible windows use its frame limiter, set to one frame per refresh of the display the window opened on (`display_frame_cap` in `src/shared/graphics.c`; 60 when the system cannot say), so a 144 Hz display shows a new blended frame on every refresh instead of holding 60 Hz frames for an uneven two or three. Hidden smoke runs and Memory-backend test runs are uncapped. The simulation takes fixed steps at any of these rates. Each click on the native close button is reported once, as an Exit request; it replaces a Play, Continue, Next Level, Replay or Level Select route chosen earlier in the same frame (a fatal error still wins), so a close is never lost to a screen change.
+`AppSession` is the sole production loop owner. It samples physical input, pumps the music stream, frames the active screen, then consumes its route. raylib's `EndDrawing` owns presentation and event polling. Native visible windows use its frame limiter, set to one frame per refresh of the display the window is on (`display_frame_cap` in `src/shared/graphics.c`; 60 when the system cannot say), so a 144 Hz display shows a new blended frame on every refresh instead of holding 60 Hz frames for an uneven two or three. A window dragged to another display follows it: `display_follow_monitor()`, called once a frame, sets the cap again from the new display's refresh rate. Hidden smoke runs and Memory-backend test runs are uncapped. The simulation takes fixed steps at any of these rates. Each click on the native close button is reported once, as an Exit request; it replaces a Play, Continue, Next Level, Replay or Level Select route chosen earlier in the same frame (a fatal error still wins), so a close is never lost to a screen change.
 
 On Web, Emscripten's animation-frame callback owns scheduling. `display_open`
 sets raylib's target FPS to zero so `EndDrawing` returns to the browser instead
@@ -168,17 +168,17 @@ so a run that matches the best one draws both in the same place. The moving
 world objects are blended from the values `game_timing_note_step` stored before
 the step, through one table: each row of `s_movers` in `src/core/game_movers.c`
 names a kind's array and the floats to blend (spiders, jumping spiders, birds,
-fish and their faster variants, circular saws, spike blocks and float
-platforms by position; an axe trap by its angle, the shorter way round; a
+fish and their faster variants and float platforms by position; circular
+saws and spike blocks by position and spin angle, the angle the shorter way
+round; an axe trap by its angle, the same way; a
 flame by its height and flip angle; a bridge by each falling brick's drop). A
 kind that is not in the table would move in 60 Hz jumps beside smooth
 neighbours, so a new mover gets a row there and one `game_movers_shown` call
 in its render layer. A bird's height stays on its
 sine wave because only its x is blended and the wave is computed from that x.
-A step that moves any of them more than 48 px is shown where it is now. A
-saw's patrol position is blended; its spin angle and a bouncepad's squash
-frames stay on the latest step, which are sprite animations rather than
-movement. The accumulator restarts half a step full after pauses and loads, which
+A step that moves any of them more than 48 px is shown where it is now. Only a
+bouncepad's squash frames stay on the latest step: they are a sprite animation
+rather than movement. The accumulator restarts half a step full after pauses and loads, which
 absorbs sub-millisecond vsync jitter. Frame time is clamped to 0.25 s and at most
 5 steps run per frame; excess time is dropped (below 12 FPS the game slows down
 instead of spiralling). Smoke and scripted replays feed exactly one step per
@@ -298,7 +298,7 @@ after these 33 layers.
 
 ### Level Completion and Terminal Actions
 
-Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time, coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While it is active, gameplay update pauses. Its action list is **Next Level**, **Replay**, **Level Select**, **Exit** when a phase is pending; otherwise it is **Replay**, **Level Select**, **Exit**. Up/Down or D-pad moves the focused row with wraparound. Enter/Space/Start confirms it (controller A also confirms). Esc/Back exits immediately (controller B is equivalent).
+Collecting `last_star` calls `game_complete_level()`. The game snapshots elapsed time (the level timer counts whole fixed steps in `completion.level_steps`, and `game_level_seconds()` turns that count into seconds with one division, so ten minutes read exactly 600 s; adding 1/60 s to a float every step would drift short; a saved Continue point still stores seconds), coins collected, total coins, and the resolved `next_phase` path (if any), then shows a completion overlay. While it is active, gameplay update pauses. Its action list is **Next Level**, **Replay**, **Level Select**, **Exit** when a phase is pending; otherwise it is **Replay**, **Level Select**, **Exit**. Up/Down or D-pad moves the focused row with wraparound. Enter/Space/Start confirms it (controller A also confirms). Esc/Back exits immediately (controller B is equivalent).
 
 Next Level uses `game_load_next_phase()` without replacing the game screen. If loading fails, the completion overlay stays visible with a "Next level failed to load" line (`completion.next_phase_failed`), the dead Next Level row is removed and focus moves to Replay; the current level is untouched, so the remaining actions keep working. That holds by construction: the next file is parsed and validated once into a heap copy and its sprites are checked before anything changes; only then is the active `LevelDef` swapped and applied, a step with no failure path. Level Select closes the game screen and opens the start menu in the same `AppSession`. Replay closes the game screen and opens the same TOML path in a new `GameState`, on native and in the browser alike; the window, audio device, frame callback and profile stay alive.
 
@@ -473,7 +473,7 @@ The cache and `GameAssets` are two answers to the same question, "who frees this
 
 `LevelDef` owns optional immutable `CheckpointPlacement { x, y }` records. Each active frame samples authored records after player movement and before lethal collisions. The furthest record with `x <= player.x` becomes the resolved respawn point, so a death in the same frame preserves a crossed checkpoint. The runtime never regresses to an earlier record.
 
-Authored records disable automatic screen-boundary checkpoints for that level. A level with no records saves automatically when the player enters a new screen; the respawn column is the screen edge, or the nearest column to its left (over ground already crossed) with solid floor and no floor gap, spike row, spike platform or flame. If no such column exists the previous checkpoint is kept. Losing a life respawns at the resolved checkpoint and keeps collected coins collected; Retry, replay, and successful next-phase loads restore every coin and reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows brief `CHECKPOINT CP n` (1.2 s) and `RESPAWN CP n` (0.9 s) notices. They are timed in simulated time (`sim_steps`, a count of fixed steps turned into milliseconds with integers, restarted whenever a level is applied, F8 restarts included), so a pause does not use them up and they last exactly 72 and 54 steps, the same steps in every replay. The debug inspector exposes the stored checkpoint index; the regular HUD does not keep a permanent checkpoint label after the notice expires.
+Authored records disable automatic screen-boundary checkpoints for that level. A level with no records saves automatically when the player enters a new screen; the respawn column is the screen edge, or the nearest column to its left (over ground already crossed) with solid floor and no floor gap, spike row, spike platform or flame. If no such column exists the previous checkpoint is kept. Losing a life respawns at the resolved checkpoint and keeps collected coins collected; a jump key held through the death counts as already used, so the player jumps again only after letting go and pressing it anew; Retry, replay, and successful next-phase loads restore every coin and reset to the effective start of their respective level; a failed next-phase load retains the active level and its resolved checkpoint. The HUD shows brief `CHECKPOINT CP n` (1.2 s) and `RESPAWN CP n` (0.9 s) notices. They are timed in simulated time (`sim_steps`, a count of fixed steps turned into milliseconds with integers, restarted whenever a level is applied, F8 restarts included), so a pause does not use them up and they last exactly 72 and 54 steps, the same steps in every replay. The debug inspector exposes the stored checkpoint index; the regular HUD does not keep a permanent checkpoint label after the notice expires.
 
 ---
 

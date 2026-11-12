@@ -1,0 +1,7 @@
+# A frozen player: every physics value 0 (allowed: zero friction, zero
+# speed), no input, and a level path with a space and a UTF-8 letter.
+format_version = 4
+level_path = "levels/café run.toml"
+seed = 1
+level_hash = "0123456789abcdef"
+frames = [[0, 0, 0.0, 0, 0, 0, 0, 0, 0, -0.0]]

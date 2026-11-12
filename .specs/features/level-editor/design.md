@@ -19,6 +19,8 @@ super-mango-editor
 ├── undo.c/.h, editor_undo_apply.c/.h  undo/redo command stack
 ├── editor_files/session/playtest.c/.h  save/load, recovery, recent files, playtest
 ├── editor_validation.c/.h in-memory validation report
+├── editor_handles/entity_list/minimap.c/.h  canvas handles, Entities list, minimap
+├── editor_campaign/recovery/shortcuts.c/.h  Campaign view, autosave recovery, key bindings
 ├── file_dialog.c/.h, dialog_choice.c  native pickers and decision dialogs
 └── ../shared/ui.c/.h, serializer*.c/.h  immediate-mode widgets; LevelDef <-> TOML
 ```
@@ -29,14 +31,14 @@ super-mango-editor
 |--------|---------|
 | `make editor` | Build `out/super-mango-editor`. |
 | `make run-editor` | Build and run editor. |
-| `make test` | Run 15 native regression binaries plus Python level-validation and web-host checks. |
-| `make validate-levels` | Run `python3 tools/validate_levels.py`. |
+| `make test` | Run 18 native regression binaries plus the Python and Node host checks. |
+| `make validate-levels` | Load every level through the game's own loader (`out/level-check`), then run `tools/validate_levels.py` and the schema parity test. |
 
-`make test` currently runs 15 native binaries: level-serializer, level-validate, runtime-load, rail, entity-utils, collision, phase-transition, editor-validation, gameplay-damage, gameplay-config, gameplay-score, game-overlay, game-events, session, and game-checkpoint. `tests/validate_levels_test.py` and `tools/check_web_boot_contract.py` run as Python host checks in the same target.
+`make test` currently runs 18 native binaries: level-serializer, level-validate, runtime-load, rail, entity-utils, collision, phase-transition, editor-validation, editor-undo-recovery, gameplay-damage, gameplay-config, gameplay-score, game-overlay, game-events, session, game-checkpoint, gameplay-mechanics, and editor-ui. The Python tests of the build and docs tools (`PYTHON_TESTS` in the Makefile), the Node host-contract tests and `tools/check_web_boot_contract.py` run in the same target.
 
 CI also builds the editor natively, runs game/editor smoke tests, checks WebAssembly artifacts, and runs docs lint/build for docs PRs.
 
-Editor links the pinned static raylib 6.0 build, `tomlc17`, and `src/surfaces/rail.c`. Text uses raylib's built-in font.
+Editor links the pinned static raylib 6.2 build, `tomlc17`, and `src/surfaces/rail.c`. Text uses raylib's built-in font.
 
 ## Data Model
 
@@ -85,7 +87,7 @@ Use categorized asset paths. Bare legacy paths such as `assets/<sprite>.png` are
 Current validation exists in both CLI/CI and editor UI/status:
 
 ```text
-TOML file → tools/validate_levels.py → parse/schema/count/path checks → CI / make validate-levels
+TOML file → out/level-check (level_load_toml) + tools/validate_levels.py → parse/schema/count/path checks → CI / make validate-levels
 LevelDef validation C tests → make test
 EditorState.level → editor_validate_level → status/panel summary + save/autosave/playtest blocking
 ```

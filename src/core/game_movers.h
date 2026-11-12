@@ -13,7 +13,8 @@
  * game_movers.c. game_movers_note walks the table before each step, and
  * game_movers_shown walks one row when a layer is drawn. Adding a kind
  * that should move smoothly is one row there, one array in GameMoverPrev
- * (game.h), and one call in its render layer. A kind that is NOT in the
+ * (game.h), and one call in its render layer (step 7 of the new-enemy
+ * checklist above s_update_steps in game_update.c). A kind that is NOT in the
  * table moves in visible 60 Hz jumps next to smooth neighbours, which is
  * how the axe traps, the flames and the falling bridge bricks used to
  * look.
@@ -36,9 +37,9 @@ typedef enum {
     MOVER_FASTER_BIRDS,
     MOVER_FISH,
     MOVER_FASTER_FISH,
-    MOVER_SPIKE_BLOCKS,
+    MOVER_SPIKE_BLOCKS,    /* position, and the spin angle       */
     MOVER_FLOAT_PLATFORMS,
-    MOVER_CIRCULAR_SAWS,
+    MOVER_CIRCULAR_SAWS,   /* position, and the spin angle       */
     MOVER_AXE_TRAPS,       /* the swing or spin angle            */
     MOVER_BLUE_FLAMES,     /* height, and the flip at the top    */
     MOVER_FIRE_FLAMES,

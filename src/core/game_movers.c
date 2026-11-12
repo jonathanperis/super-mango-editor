@@ -16,7 +16,10 @@ typedef enum {
     VALUE_ANGLE       /* degrees: blend along the shorter way round           */
 } ValueKind;
 
-#define MOVER_MAX_VALUES 2
+/* The most floats one item (or one piece of it) blends: a saw's x, y and
+ * spin. Raising it costs nothing at run time; each row says how many of
+ * its slots it uses (value_count). */
+#define MOVER_MAX_VALUES 3
 
 /*
  * One row: where a kind's array is in GameWorld, and which floats of each
@@ -75,9 +78,11 @@ static const Mover s_movers[MOVER_KIND_COUNT] = {
         sizeof(FasterFish), MAX_FASTER_FISH, WHOLE_ITEM,
         2, {{offsetof(FasterFish, x), VALUE_POSITION}, {offsetof(FasterFish, y), VALUE_POSITION}},
         PREV(faster_fish) },
+    /* A spike block travels and spins: x, y, and its spin angle. */
     [MOVER_SPIKE_BLOCKS] = { "spike_blocks", WORLD(spike_blocks), WORLD(spike_block_count),
         sizeof(SpikeBlock), MAX_SPIKE_BLOCKS, WHOLE_ITEM,
-        2, {{offsetof(SpikeBlock, x), VALUE_POSITION}, {offsetof(SpikeBlock, y), VALUE_POSITION}},
+        3, {{offsetof(SpikeBlock, x), VALUE_POSITION}, {offsetof(SpikeBlock, y), VALUE_POSITION},
+            {offsetof(SpikeBlock, spin_angle), VALUE_ANGLE}},
         PREV(spike_blocks) },
     /* Float platforms also keep their own prev_x/prev_y for the landing
      * test; those are simulation state and are not what is used here. */
@@ -85,9 +90,11 @@ static const Mover s_movers[MOVER_KIND_COUNT] = {
         sizeof(FloatPlatform), MAX_FLOAT_PLATFORMS, WHOLE_ITEM,
         2, {{offsetof(FloatPlatform, x), VALUE_POSITION}, {offsetof(FloatPlatform, y), VALUE_POSITION}},
         PREV(float_platforms) },
+    /* So does a circular saw. */
     [MOVER_CIRCULAR_SAWS] = { "circular_saws", WORLD(circular_saws), WORLD(circular_saw_count),
         sizeof(CircularSaw), MAX_CIRCULAR_SAWS, WHOLE_ITEM,
-        2, {{offsetof(CircularSaw, x), VALUE_POSITION}, {offsetof(CircularSaw, y), VALUE_POSITION}},
+        3, {{offsetof(CircularSaw, x), VALUE_POSITION}, {offsetof(CircularSaw, y), VALUE_POSITION},
+            {offsetof(CircularSaw, spin_angle), VALUE_ANGLE}},
         PREV(circular_saws) },
     /* An axe hangs from a fixed pivot; what moves is its angle. */
     [MOVER_AXE_TRAPS] = { "axe_traps", WORLD(axe_traps), WORLD(axe_trap_count),
@@ -123,9 +130,9 @@ PREV_HOLDS(birds,           MAX_BIRDS,           1);
 PREV_HOLDS(faster_birds,    MAX_FASTER_BIRDS,    1);
 PREV_HOLDS(fish,            MAX_FISH,            2);
 PREV_HOLDS(faster_fish,     MAX_FASTER_FISH,     2);
-PREV_HOLDS(spike_blocks,    MAX_SPIKE_BLOCKS,    2);
+PREV_HOLDS(spike_blocks,    MAX_SPIKE_BLOCKS,    3);
 PREV_HOLDS(float_platforms, MAX_FLOAT_PLATFORMS, 2);
-PREV_HOLDS(circular_saws,   MAX_CIRCULAR_SAWS,   2);
+PREV_HOLDS(circular_saws,   MAX_CIRCULAR_SAWS,   3);
 PREV_HOLDS(axe_traps,       MAX_AXE_TRAPS,       1);
 PREV_HOLDS(blue_flames,     MAX_BLUE_FLAMES,     2);
 PREV_HOLDS(fire_flames,     MAX_FIRE_FLAMES,     2);

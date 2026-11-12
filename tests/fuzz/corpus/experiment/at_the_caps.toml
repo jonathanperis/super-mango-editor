@@ -1,0 +1,11 @@
+# Every physics column at its cap: the two top speeds at MAX_PLAYER_SPEED
+# (960 px/s, 16 px a step) and the seven accelerations at MAX_PLAYER_ACCEL
+# (10000). One more in any column is refused.
+format_version = 4
+level_path = "levels/00_sandbox_01.toml"
+seed = 0
+level_hash = "0123456789abcdef"
+frames = [
+    [63, 960, 960, 10000, 10000, 10000, 10000, 10000, 10000, 10000],
+    [0, 960.0, 960.0, 1e4, 1e4, 1e4, 1e4, 1e4, 1e4, 1e4],
+]

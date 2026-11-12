@@ -84,6 +84,19 @@ void properties_focus_entity_field(EditorState *es, EntityType type, int index,
                                    const char *field);
 
 /*
+ * A shared field (one row of a several-entity panel) left some other way
+ * than Enter or Tab: a click elsewhere, Ctrl+S, F5, Undo.
+ * editor_finish_field_edit asks properties_shared_field_active before it
+ * stores the typed value, which says whether the active field is the
+ * shared row the panel last drew, with the same selection still there.
+ * After storing a changed value it calls properties_apply_shared_field,
+ * which copies it to every selected entity as one undo step, exactly as
+ * Enter would (properties_apply_to_selection).
+ */
+int properties_shared_field_active(const EditorState *es);
+void properties_apply_shared_field(EditorState *es);
+
+/*
  * Where a layer row's three small buttons sit, in pixels from the panel's
  * left edge: move up, move down, remove (config_layer_row in
  * properties_config.c).  They fill the space between the speed field and

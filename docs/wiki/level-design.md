@@ -33,7 +33,7 @@ make run-editor
 
 ## Top-Level Scalars
 
-New checked-in levels must declare `format_version = 1`. Other root fields have loader defaults, but should be authored explicitly when they matter to the level. Files without a version use the legacy reader; new examples use strict v1. The legacy reader skips a key it does not know and a value of the wrong type, which is what lets old files load; so that a misspelt key (`[[plataforms]]`) is not lost in silence, it reports each one as a warning with its line (on stderr, and in the editor's status bar after Open), because the editor's next save writes `format_version = 1` and would make the loss permanent.
+New checked-in levels must declare `format_version = 1`. Other root fields have loader defaults, but should be authored explicitly when they matter to the level. Files without a version use the legacy reader; new examples use strict v1. The legacy reader skips a key it does not know and a value of the wrong type, which is what lets old files load; so that a misspelt key (`[[plataforms]]`) is not lost in silence, it reports each one as a warning with its line (on stderr, and in the editor's status bar after Open), because the editor's next save writes `format_version = 1` and would make the loss permanent. The warnings also come when the load fails, after the errors, since a skipped key is often the reason (a misspelt `[[checkpoints]]` key, say). An enum value the loader does not know (`pad_type = "WOD"`) is a warning too, and the row's default is used instead; an item in a table array that is not a table (`coins = [1, 2]`) is skipped and not counted. What the legacy reader cannot skip is an error that names the value by its full TOML path, with its line (`root.platforms[1].tile_height`): a number that does not fit its field, an array with more items than the level can hold, a `floor_gaps` entry that is not a number, and a `[[checkpoints]]` entry that is not a table or lacks a numeric `x` and `y`. A key or value quoted in any of these messages has its control bytes written as `\xHH`.
 
 ```toml
 format_version = 1                       # required level-schema version
@@ -58,7 +58,7 @@ floor_gaps      = [0, 192, 560, 928]    # world-space x positions of sea gaps
 | Field | Type | Description |
 |-------|------|-------------|
 | `format_version` | int | Required for checked-in levels and new v1 documents: `1`. |
-| `name`, `description`, `generated_by` | string | Valid UTF-8, at most 63, 4095 and 127 bytes. The editor warns when `name` is empty. |
+| `name`, `description`, `generated_by` | string | Valid UTF-8, at most 63, 4095 and 127 bytes. A missing `name` loads as empty (campaign lists then show the file name) and is saved as `"Untitled"` (`LEVEL_UNTITLED_NAME`); the editor warns `level name is empty`. |
 | `screen_count` | int | Number of 400px-wide screens, `0`–`99`; `0` means the default of 4. `4` → world is 1600px wide. The editor requires at least 1. |
 | `player_start_x/y` | float | Spawn x and foot/landing y in logical pixels; y is not the sprite's top edge. Both `0` means the engine default (x 80, y 172); otherwise the point must be inside the world. |
 | `music_path` | string | A sound matching `assets/sounds/*.qoa` (the shipped format) or `assets/sounds/*.wav`, relative to repo root, at most 63 bytes. Empty means no music. Levels saved when the shipped loops were WAV files name `assets/sounds/levels/water.wav`, `lava.wav` or `winds.wav`; those three load as the `.qoa` files (only in `music_path`). The bundled levels keep the old names on purpose: ghosts and Continue points are tied to a hash of the level file's bytes, so rewriting the name would orphan them. The editor opens such a level with the `.qoa` file selected and no unsaved changes, so it never asks to save one; saving it from the editor writes the `.qoa` name and so gives the file a new hash, as any edit would. |
@@ -101,7 +101,7 @@ The standalone `levels/labs/03_checkpoints.toml` example places checkpoints befo
 
 ### Optional `[physics]` Overrides
 
-Levels can override player movement and camera feel with a `[physics]` table. Every field is optional; omitted fields, or values below zero, keep the engine default (movement constants in `src/player/player_lifecycle.c`, camera constants in `src/game_constants.h`). Values must be finite and at most `MAX_LEVEL_MOTION` (10000). The example below shows overrides; the defaults are in the table.
+Levels can override player movement and camera feel with a `[physics]` table. Every field is optional; an omitted field, or one set to exactly `-1` (`LEVEL_PHYSICS_ENGINE_DEFAULT`), keeps the engine default (movement constants in `src/player/player_lifecycle.c`, camera constants in `src/game_constants.h`). Any other value must be a finite number from `0` to its cap: the two top speeds stop at `MAX_PLAYER_SPEED` (960 px/s, which is 16 px per fixed step, the width of the thinnest floor piece, so the player can never pass through a solid in one step), the accelerations and frictions at `MAX_PLAYER_ACCEL` (10000), and the two camera keys at `MAX_LEVEL_MOTION` (10000). Other negative values are errors. The example below shows overrides; the defaults are in the table.
 
 ```toml
 [physics]

@@ -27,7 +27,7 @@
 
 static int file_dialog_finish(FILE *fp, char *buf, int buf_size);
 static int file_dialog_or_prompt(int result, char *buf, int buf_size,
-                                 const char *title, const char *message);
+                                 const char *title, const char *request);
 
 static int file_dialog_test_open_result = -1;
 static int file_dialog_test_save_result = -1;
@@ -161,15 +161,16 @@ int file_dialog_open(char *buf, int buf_size) {
      */
     /* `cmd` is a fixed string in this function, not caller input. */
     FILE *fp = popen(cmd, "r"); /* NOLINT(cert-env33-c) */
+    int result;
+
     if (!fp) {
         fprintf(stderr, "Warning: could not open file dialog\n");
-        return FILE_DIALOG_ERROR;
+        result = FILE_DIALOG_ERROR;
+    } else {
+        result = file_dialog_finish(fp, buf, buf_size);
     }
-
-    return file_dialog_or_prompt(file_dialog_finish(fp, buf, buf_size), buf, buf_size,
-                                 "Open Level",
-                                 "No file picker was found (install zenity or kdialog "
-                                 "to browse). Type the path of the level to open:");
+    return file_dialog_or_prompt(result, buf, buf_size, "Open Level",
+                                 "Type the path of the level to open:");
 }
 
 int file_dialog_read_path(FILE *fp, char *buf, int buf_size)
@@ -262,23 +263,36 @@ static int file_dialog_finish(FILE *fp, char *buf, int buf_size)
 /*
  * file_dialog_or_prompt — Keep a picker's answer, or ask in the window.
  *
- * With no picker program installed the editor could neither open a level
- * nor give a new one a name, so the path is asked for in the editor's own
- * window instead (dialog_path).  When that prompt cannot be shown either
- * (no window), the result stays FILE_DIALOG_UNAVAILABLE so the caller can
- * say what is missing.
+ * With no picker program installed (FILE_DIALOG_UNAVAILABLE), or one that
+ * failed (FILE_DIALOG_ERROR: it could not start, crashed, or printed
+ * something that is not one path), the editor could neither open a level
+ * nor give a new one a name.  So the path is asked for in the editor's own
+ * window instead (dialog_path), with a first line saying why.  `request`
+ * is the rest of the question ("Type the path ...").  When that prompt
+ * cannot be shown either (no window), the picker's own result is kept, so
+ * the caller can say what is missing or what failed.
  */
 static int file_dialog_or_prompt(int result, char *buf, int buf_size,
-                                 const char *title, const char *message)
+                                 const char *title, const char *request)
 {
+    char message[320];
     int typed;
 
-    if (result != FILE_DIALOG_UNAVAILABLE) return result;
-    fprintf(stderr, "Warning: no file picker found (zenity or kdialog); "
-                    "asking for the path in the editor window\n");
+    if (result == FILE_DIALOG_UNAVAILABLE) {
+        fprintf(stderr, "Warning: no file picker found (zenity or kdialog); "
+                        "asking for the path in the editor window\n");
+        snprintf(message, sizeof(message), "No file picker was found (install "
+                 "zenity or kdialog to browse). %s", request);
+    } else if (result == FILE_DIALOG_ERROR) {
+        fprintf(stderr, "Warning: the file picker failed; "
+                        "asking for the path in the editor window\n");
+        snprintf(message, sizeof(message), "The file picker did not work. %s", request);
+    } else {
+        return result;
+    }
     buf[0] = '\0';
     typed = dialog_path(title, message, buf, buf_size);
-    return typed == FILE_DIALOG_ERROR ? FILE_DIALOG_UNAVAILABLE : typed;
+    return typed == FILE_DIALOG_ERROR ? result : typed;
 }
 
 static int file_dialog_add_toml_extension(char *buf, int buf_size)
@@ -359,13 +373,12 @@ int file_dialog_save(char *buf, int buf_size)
 
     if (!fp) {
         fprintf(stderr, "Warning: could not open save file dialog\n");
-        return FILE_DIALOG_ERROR;
+        result = FILE_DIALOG_ERROR;
+    } else {
+        result = file_dialog_finish(fp, buf, buf_size);
     }
-
-    result = file_dialog_or_prompt(file_dialog_finish(fp, buf, buf_size), buf, buf_size,
-                                   "Save Level As",
-                                   "No file picker was found (install zenity or kdialog "
-                                   "to browse). Type the path to save the level to:");
+    result = file_dialog_or_prompt(result, buf, buf_size, "Save Level As",
+                                   "Type the path to save the level to:");
     if (result != FILE_DIALOG_SELECTED) return result;
     if (!file_dialog_add_toml_extension(buf, buf_size)) return FILE_DIALOG_ERROR;
     return FILE_DIALOG_SELECTED;

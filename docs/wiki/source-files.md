@@ -46,6 +46,7 @@ src/
 │   ├── game_state.h / .c         GameState reset helpers
 │   ├── game_window.h / .c        Screen-owned logical render target
 │   ├── game_timing.h / .c        Fixed-step accumulator and frame clock
+│   ├── game_trig.h               game_sinf / game_cosf: sine and cosine with the same bits on every platform (fixed step only)
 │   ├── game_lifecycle.c          `game_init` / `game_cleanup` implementation
 │   ├── game_loop.c               Active-game frame runner (game_frame)
 │   ├── game_update.h / .c        s_update_steps table: one fixed step, in order

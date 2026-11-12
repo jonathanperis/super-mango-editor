@@ -17,7 +17,6 @@ without a C compiler. Levels themselves never rely on it.
 
 from __future__ import annotations
 
-import ctypes
 import math
 import re
 import sys
@@ -120,6 +119,49 @@ STRING_CAPACITIES = {"description": 4096, "generated_by": 128, "next_phase": 256
 
 def string_capacity(key: str) -> int:
     return STRING_CAPACITIES.get(key, STRING_CAPACITY_DEFAULT)
+
+
+# Mirrors validate_physics_value in src/levels/level_validate.c and the caps
+# in src/levels/level.h: a [physics] override is exactly -1 (keep the engine
+# value) or a number from 0 to its cap.  The two top speeds stop at
+# MAX_PLAYER_SPEED, 16 px per 1/60 s step, so the player cannot pass through
+# a 16 px solid in one step (there is no substepping); the accelerations and
+# frictions at MAX_PLAYER_ACCEL; the camera keys at MAX_LEVEL_MOTION.
+PHYSICS_ENGINE_DEFAULT = -1.0
+MAX_LEVEL_MOTION = 10000
+MAX_PLAYER_SPEED = 16 * 60
+MAX_PLAYER_ACCEL = MAX_LEVEL_MOTION
+PHYSICS_MAX = {
+    "walk_max_speed": MAX_PLAYER_SPEED,
+    "run_max_speed": MAX_PLAYER_SPEED,
+    "walk_ground_accel": MAX_PLAYER_ACCEL,
+    "run_ground_accel": MAX_PLAYER_ACCEL,
+    "ground_friction": MAX_PLAYER_ACCEL,
+    "ground_counter_accel": MAX_PLAYER_ACCEL,
+    "air_accel_walk": MAX_PLAYER_ACCEL,
+    "air_accel_run": MAX_PLAYER_ACCEL,
+    "air_friction": MAX_PLAYER_ACCEL,
+    "cam_lookahead_vx_factor": MAX_LEVEL_MOTION,
+    "cam_lookahead_max": MAX_LEVEL_MOTION,
+}
+
+
+def physics_errors(physics) -> list[str]:
+    """The [physics] values the game would refuse (finite numbers only;
+    the type check reports the rest)."""
+    errors: list[str] = []
+    if not isinstance(physics, dict):
+        return errors
+    for key, value in physics.items():
+        cap = PHYSICS_MAX.get(key)
+        if cap is None or not _is_finite_number(value):
+            continue
+        if value != PHYSICS_ENGINE_DEFAULT and not 0 <= value <= cap:
+            errors.append(
+                f"physics.{key} is {float(value):.2f} (must be -1 for the engine "
+                f"default, or 0 to {cap})"
+            )
+    return errors
 
 
 XY_FIELDS = {"x": "number", "y": "number"}
@@ -370,6 +412,7 @@ def validate_schema(
             elif key == "floor_gaps" and isinstance(value, list):
                 for item in value:
                     check_legacy(item, "integer", key)
+        errors.extend(physics_errors(data.get("physics")))
         return errors
 
     version_errors = _validate_schema_value(data["format_version"], "integer", "root.format_version")
@@ -439,6 +482,7 @@ def validate_schema(
                     if required_key not in item:
                         errors.append(f"{item_path} missing required key {required_key!r}")
 
+    errors.extend(physics_errors(data.get("physics")))
     return errors
 
 
@@ -753,6 +797,7 @@ def validate_level(level_path: Path, asset_manifest: set[str]) -> list[str]:
     if isinstance(screen_count, bool) or not isinstance(screen_count, int) or screen_count <= 0:
         errors.append(f"{label}: screen_count must be a positive integer")
 
+    errors.extend(f"{label}: {error}" for error in physics_errors(data.get("physics")))
     errors.extend(validate_paths(level_path, data, asset_manifest))
     return errors
 

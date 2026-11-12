@@ -54,12 +54,22 @@ def check_screen_word_parser() -> None:
             fail(f"screen_mentions({text!r}) returned {actual}, expected {expected}")
 
 
+def read_bytes(path: Path) -> bytes:
+    return path.read_bytes()
+
+
+# The attribute line that keeps every level TOML LF, including the ones in
+# subfolders (levels/labs/, levels/campaigns/). `levels/*.toml` alone only
+# matched the top folder.
+LEVEL_EOL_ATTRIBUTE = "levels/**/*.toml text eol=lf"
+
+
 def check_level_line_endings() -> None:
     attrs = read(ROOT / ".gitattributes")
-    if "levels/*.toml text eol=lf" not in attrs:
-        fail(".gitattributes: levels/*.toml must enforce LF checkouts")
-    for path in sorted((ROOT / "levels").glob("*.toml")):
-        data = path.read_bytes()
+    if LEVEL_EOL_ATTRIBUTE not in attrs.splitlines():
+        fail(f".gitattributes: `{LEVEL_EOL_ATTRIBUTE}` must enforce LF checkouts for every level TOML")
+    for path in sorted((ROOT / "levels").rglob("*.toml")):
+        data = read_bytes(path)
         if b"\r\n" in data or b"\r" in data:
             fail(f"{path.relative_to(ROOT)}: normalize level TOML line endings to LF")
 

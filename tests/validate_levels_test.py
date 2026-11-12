@@ -182,6 +182,8 @@ def main() -> int:
 
     check_campaign_display_names()
     check_shipped_wav_loops(asset_manifest)
+    check_physics_caps(constants)
+    check_no_unused_ctypes()
 
     print("validate_levels_test: ok")
     return 0
@@ -212,6 +214,55 @@ def check_shipped_wav_loops(asset_manifest: set[str]) -> None:
                 "players' ghosts and Continue points")
 
 
+def check_physics_caps(constants: dict[str, int]) -> None:
+    """[physics] overrides: exactly -1 (engine default) or 0..cap.
+
+    Mirrors validate_physics_value in src/levels/level_validate.c.  Any
+    negative value used to pass, and the top speeds allowed 10000 px/s,
+    166 px per step: through any wall.
+    """
+    errors = validate_levels.physics_errors
+    for key, value in (("walk_max_speed", -1.0), ("walk_max_speed", 0.0),
+                       ("run_max_speed", 960.0), ("air_friction", 10000.0),
+                       ("cam_lookahead_max", 50.0)):
+        if errors({key: value}):
+            raise AssertionError(f"physics.{key} = {value} refused")
+    for key, value in (("walk_max_speed", -5.0), ("walk_max_speed", -0.5),
+                       ("run_max_speed", 960.5), ("run_max_speed", 10000.0),
+                       ("air_friction", 10001.0), ("ground_counter_accel", -2.0),
+                       ("cam_lookahead_vx_factor", -0.2)):
+        if not errors({key: value}):
+            raise AssertionError(f"physics.{key} = {value} accepted")
+    found = validate_levels.validate_schema(
+        {"format_version": 1, "physics": {"run_max_speed": 2000.0}})
+    if not any("physics.run_max_speed is 2000.00" in error for error in found):
+        raise AssertionError(f"docs schema accepted a too-fast top speed: {found}")
+    found = validate_levels.validate_schema({"physics": {"air_friction": -3}})
+    if not found:
+        raise AssertionError("legacy docs schema accepted a negative friction")
+    # The caps follow the C headers: 16 px (a third of a tile) per step.
+    if validate_levels.MAX_LEVEL_MOTION != constants["MAX_LEVEL_MOTION"]:
+        raise AssertionError("MAX_LEVEL_MOTION differs from game_constants.h")
+    target_fps = None
+    for line in (ROOT / "src" / "game_constants.h").read_text(encoding="utf-8").splitlines():
+        if line.startswith("#define TARGET_FPS"):
+            target_fps = int(line.split()[2])
+    if validate_levels.MAX_PLAYER_SPEED != constants["TILE_SIZE"] // 3 * target_fps:
+        raise AssertionError("MAX_PLAYER_SPEED differs from level.h")
+    level_h = (ROOT / "src" / "levels" / "level.h").read_text(encoding="utf-8")
+    if "#define MAX_PLAYER_SPEED (FLOOR_PIECE_W * TARGET_FPS)" not in level_h:
+        raise AssertionError("MAX_PLAYER_SPEED changed in level.h; update validate_levels.py")
+    if set(validate_levels.PHYSICS_MAX) != set(validate_levels.SCHEMA_TABLE_FIELDS["physics"]):
+        raise AssertionError("PHYSICS_MAX does not cover every [physics] key")
+
+
+def check_no_unused_ctypes() -> None:
+    """validate_levels.py used to import ctypes without using it (CodeQL)."""
+    source = (ROOT / "tools" / "validate_levels.py").read_text(encoding="utf-8")
+    if "import ctypes" in source:
+        raise AssertionError("tools/validate_levels.py imports ctypes again")
+
+
 def check_campaign_display_names() -> None:
     """A campaign entry must have something to show in the level selector.
 
@@ -223,6 +274,13 @@ def check_campaign_display_names() -> None:
     show = validate_levels.campaign_display_name
     if show("levels/   .toml", {"name": "Lava Run"}) != "Lava Run":
         raise AssertionError("visible name not used")
+    # A missing or empty name is shown as the file name too; the C loader
+    # used to read a missing name as "Untitled" and show that instead
+    # (tests/editor_validation/campaign.c checks the C side).
+    if show("levels/lava.toml", {}) != "lava":
+        raise AssertionError("missing name did not fall back to the file name")
+    if show("levels/lava.toml", {"name": ""}) != "lava":
+        raise AssertionError("empty name did not fall back to the file name")
     if show("levels/lava.toml", {"name": " \t "}) != "lava":
         raise AssertionError("blank name did not fall back to the file name")
     if show("levels/   .toml", {"name": ""}).strip(validate_levels.C_SPACE_CHARS):

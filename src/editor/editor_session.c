@@ -17,6 +17,7 @@
 #include "editor_undo_apply.h" /* staged property/config command capture */
 #include "undo.h"              /* undo_clear */
 #include "entity_meta.h"       /* editor_select_none */
+#include "properties.h"        /* a shared field of a several-entity panel */
 
 static int editor_test_finish_choice = -1;
 static int editor_test_discard_choice = -1;
@@ -235,6 +236,7 @@ int editor_finish_field_edit(EditorState *es)
     int test_choice;
     int result;
     int kind;
+    int shared;
     int outer_kind;
     UIBeforeChangeFn outer_before_change;
     void *outer_context;
@@ -259,11 +261,19 @@ int editor_finish_field_edit(EditorState *es)
     outer_context = es->ui.before_change_context;
     kind = es->ui.active_id >= 9000 ? EDITOR_CHANGE_CONFIG
                                     : EDITOR_CHANGE_ENTITY;
+    /* A field shared by several selected entities gives its value to all
+     * of them, however it is left (properties.h); ask before the edit
+     * ends, while the field is still the active one. */
+    shared = properties_shared_field_active(es);
     editor_begin_change_tracking(es, kind);
     es->ui.before_change = editor_before_change;
     es->ui.before_change_context = es;
     result = ui_apply_active_edit(&es->ui);
-    if (result == 2) editor_commit_change(es);
+    if (result == 2) {
+        if (shared) properties_apply_shared_field(es);
+        else        editor_commit_change(es);
+    }
+    if (result != 0) es->shared_field_id = 0;
     editor_restore_change_tracking(es, outer_kind, outer_before_change,
                                    outer_context);
     /* The field may have limited what was typed: say so (the command's

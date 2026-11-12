@@ -148,6 +148,27 @@ typedef struct {
 void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad_type);
 
 /*
+ * bouncepad_launches — Whether a player whose physics box spans the
+ * world columns [left, right) is over this pad's launch strip.
+ *
+ * A pad is a part of the floor that bounces, not a box: when the player's
+ * feet reach the floor (player_resolve_floor_collision) and their span
+ * overlaps the pad's art columns, BOUNCEPAD_ART_X .. + BOUNCEPAD_ART_W,
+ * they launch. Touching edges do not overlap.
+ */
+int bouncepad_launches(const Bouncepad *pad, float left, float right);
+
+/*
+ * bouncepad_trigger_rect — The same strip as a rectangle, for drawing: the
+ * art columns on the floor's top row of pixels (FLOOR_Y - 1), which is the
+ * row a standing player's hitbox ends on. A player hitbox that intersects
+ * it is exactly a player bouncepad_launches says yes to. Only the debug
+ * overlay draws it; a pad at a fractional x is drawn at the whole pixel
+ * to its left.
+ */
+IntRect bouncepad_trigger_rect(const Bouncepad *pad);
+
+/*
  * Advance the release animation for every ACTIVE pad.
  * dt is the step duration in seconds.
  */

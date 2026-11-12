@@ -1262,6 +1262,70 @@ done:
 }
 
 /*
+ * Campaign Save may rename the open level and rewrite its next_phase, and
+ * it keeps the level's history.  Undoing or redoing a config step recorded
+ * before that save (here, the screen count) changes what the step changed
+ * and nothing else: the name and next_phase stay as the campaign wrote them.
+ */
+static int campaign_save_names_survive_older_config_steps(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+
+    /* Open b and change its screen count in Level Config: one step. */
+    CHECK(editor_load_level(&es, "levels/b.toml") == 0);
+    es.config_open = 1;
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    /* An open file adds rows above the fields: find screen_count's. */
+    for (int y = TOOLBAR_H + 30; y < EDITOR_H - STATUS_H && es.ui.active_id != 9011; y += 6) {
+        if (es.ui.active_id) key_frame(&es, KEY_ESCAPE, 0);
+        click_frame(&es, CANVAS_W + 90, y);
+    }
+    CHECK(es.ui.active_id == 9011);                /* screen_count */
+    snprintf(es.ui.edit_buf, sizeof(es.ui.edit_buf), "6");
+    es.ui.edit_cursor = 1;
+    key_frame(&es, KEY_ENTER, 0);
+    CHECK(es.level.screen_count == 6 && es.undo->top == 1);
+    CHECK(editor_save_current_level(&es) == 0);
+    CHECK(strcmp(es.level.name, "Bravo") == 0);
+    CHECK(strcmp(es.level.next_phase, "levels/c.toml") == 0);
+
+    /* Move b last (a c b), rename it, relink and save the campaign. */
+    CHECK(editor_campaign_open(&es, NULL) == 0);
+    CHECK(editor_campaign_move(&es, 2, -1) == 0);
+    click_campaign_name(&es, 2);
+    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID + 2);
+    push_text("!");
+    key_frame(&es, KEY_ENTER, 0);
+    (void)editor_campaign_link_in_order(&es);
+    CHECK(editor_campaign_save(&es) == 0);
+    CHECK(strcmp(es.level.name, "Bravo!") == 0 && es.level.next_phase[0] == '\0');
+    CHECK(es.undo->top == 1);
+    (void)editor_campaign_close(&es, 1);
+
+    /* Undo: the screen count goes back, the campaign's names stay. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.screen_count == 4);
+    CHECK(strcmp(es.level.name, "Bravo!") == 0);
+    CHECK(es.level.next_phase[0] == '\0');
+    /* Redo: the same. */
+    key_frame(&es, KEY_Y, INPUT_CTRL);
+    CHECK(es.level.screen_count == 6);
+    CHECK(strcmp(es.level.name, "Bravo!") == 0);
+    CHECK(es.level.next_phase[0] == '\0');
+done:
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
  * The unsaved mark compares the view with the files, so it follows the
  * history: undoing back to what was saved is "nothing unsaved", Save makes
  * the list as it stands the saved one, and Revert and reopening the view

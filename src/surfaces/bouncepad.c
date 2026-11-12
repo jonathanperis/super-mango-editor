@@ -17,6 +17,20 @@
 
 /* ------------------------------------------------------------------ */
 
+int bouncepad_launches(const Bouncepad *pad, float left, float right)
+{
+    float strip_left = pad->x + BOUNCEPAD_ART_X;
+    return right > strip_left && left < strip_left + BOUNCEPAD_ART_W;
+}
+
+IntRect bouncepad_trigger_rect(const Bouncepad *pad)
+{
+    IntRect strip = { (int)pad->x + BOUNCEPAD_ART_X, FLOOR_Y - 1, BOUNCEPAD_ART_W, 1 };
+    return strip;
+}
+
+/* ------------------------------------------------------------------ */
+
 /*
  * bouncepad_place — Initialise one pad instance with position and type.
  *
