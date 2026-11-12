@@ -193,3 +193,18 @@ list:
 
 These two findings (#187, #188) were dismissed as false positives after explicit
 maintainer authorization on 2026-10-16.
+
+## Audit round 3 (PR #473)
+
+Round 3 moved the editor's save and reload code and added an orphan sweep to
+the recovery folder, so the C/C++ analysis reissued the path-injection class at
+the new lines. No new way for a path to reach these calls was added:
+
+| Alerts | Input and operation | Assessment |
+| --- | --- | --- |
+| #201 | `editor_files.c`: `editor_refresh_saved_level` reloads the document after a save (`level_load_toml_file`) | Same as #82/#105: the path is the document the invoking user opened (command line, file picker or recent list) and just saved; it is resolved with `serializer_resolve_save_target`, the same target the save wrote. The read is size-limited (`LEVEL_TEXT_MAX`) and parsed into a staging copy. |
+| #199, #200 | `editor_files.c`: saving a recovered copy back to its original file when that file is gone (`level_save_toml_with_policy` with create-only, then `editor_finalize_save`) | Same as the Save path in #82/#105: the destination is the document's own path, which the user confirmed in the "Save Recovered Copy" prompt. Create-only refuses to replace anything that appeared there meanwhile. |
+| #202 | `editor_recovery.c`: the orphan sweep reads a snapshot's first line (`level_read_recovery_path`) to rebuild a lost `.meta` | Same as #86–#93: `HOME`/`XDG_DATA_HOME` of the invoking user select the private preference root, and the file name is built from a 16-hex-digit id (`editor_recovery_<id>.toml`), so neither a level nor a recovery file can redirect it. Only the first line is read, and the destination it names is not opened. |
+
+These are false positives for path-injection privilege escalation under the
+native application contract described at the top of this file.

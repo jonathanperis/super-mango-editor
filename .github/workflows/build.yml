@@ -63,9 +63,13 @@ jobs:
   build:
     name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
-    # A leg takes 1 to 6 minutes. 20 leaves room for a run that has to build
-    # raylib from source, and still ends a hung job long before the old 60.
-    timeout-minutes: 20
+    # A leg takes 1 to 6 minutes with raylib restored from the cache. Pull
+    # requests only restore what main saved, so a pull request that changes
+    # the cache key (the raylib pin, its patches, the toolchain) builds
+    # raylib from source on every push, and the Windows legs do that under
+    # MSYS2 in well over 20 minutes. The job limit leaves room for that; a
+    # hung test is still stopped much sooner by its step's own timeout.
+    timeout-minutes: 60
 
     strategy:
       fail-fast: false   # let all platforms finish even if one fails
@@ -360,7 +364,7 @@ jobs:
   sanitizers:
     name: Sanitizers (Linux x86_64)
     runs-on: ubuntu-latest
-    timeout-minutes: 20  # see the build job
+    timeout-minutes: 45  # see the build job
 
     env:
       EXTRA_CFLAGS: -Werror
@@ -548,7 +552,7 @@ jobs:
   windows-clang:
     name: Windows x86_64 clang -Werror (rolling MSYS2 toolchain)
     runs-on: windows-latest
-    timeout-minutes: 20  # see the build job
+    timeout-minutes: 60  # see the build job
 
     env:
       EXTRA_CFLAGS: -Werror
@@ -622,7 +626,7 @@ jobs:
   desktop-backend:
     name: Desktop backend (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20  # see the build job
+    timeout-minutes: 45  # see the build job
 
     strategy:
       fail-fast: false
