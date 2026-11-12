@@ -263,12 +263,17 @@ static void session_apply_window(const GameSettings *s)
 }
 #endif
 
+#ifndef __EMSCRIPTEN__
 /*
  * session_in_active_play — Is the player moving through a level right now?
  *
  * True while a game is open and nothing has stopped it: no pause (the
  * player's, a lost focus, the settings panel), no completion summary, no
  * game over. Those are the moments a hitch would be felt.
+ *
+ * Only the native build asks (it holds a slow profile save back until the
+ * game is not being played), so the browser build leaves it out: an unused
+ * static function is a warning, and the web build treats warnings as errors.
  */
 static int session_in_active_play(const AppSession *session)
 {
@@ -277,6 +282,7 @@ static int session_in_active_play(const AppSession *session)
            !game->screen.paused && !game->screen.pause_reasons &&
            !game->screen.completion.complete && !game->screen.game_over;
 }
+#endif
 
 static void session_apply_preferences(AppSession *session)
 {
