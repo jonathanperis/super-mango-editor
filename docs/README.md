@@ -6,7 +6,7 @@ The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 ## Requirements and Commands
 
 Use Node.js **22.12+**, Bun and Python **3.11+**. CI pins Node **26.9.0** (the
-repository's `.node-version` file) and Bun **1.4.2** (also `packageManager` in
+repository's `.node-version` file) and Bun **1.4.4** (also `packageManager` in
 `package.json`; `make doctor` warns when your Bun is another release, which can
 refuse or rewrite `bun.lock`). Restore dependencies with `bun install --frozen-lockfile` in this directory.
 
