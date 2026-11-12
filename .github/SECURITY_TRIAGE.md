@@ -208,3 +208,6 @@ the new lines. No new way for a path to reach these calls was added:
 
 These are false positives for path-injection privilege escalation under the
 native application contract described at the top of this file.
+
+These four findings (#199–#202) were dismissed as false positives after explicit
+maintainer authorization on 2026-11-11.
