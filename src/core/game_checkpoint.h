@@ -14,6 +14,12 @@ void game_checkpoint_update_authored(GameState *gs);
  * per step by game_checkpoint_update_authored. */
 void game_checkpoint_update(GameState *gs);
 
+/* 1 when x is a respawn column the automatic checkpoints could have saved
+ * once screen `screen` (1 = the second screen) was entered: a safe column
+ * on the search grid, at or before that screen's left edge. Used to check
+ * a Continue point read from a profile. */
+int game_checkpoint_automatic_point_valid(const GameState *gs, float x, int screen);
+
 /*
  * Checkpoint feedback — the "CHECKPOINT" / "RESPAWN" banner on the HUD.
  *

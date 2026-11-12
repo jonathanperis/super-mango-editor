@@ -186,3 +186,116 @@ done:
     close_editor(&es);
     return failed;
 }
+
+/*
+ * The status bar keeps a "Recovery: N (Ctrl+R)" badge for as long as a
+ * crash-recovery copy of another document is waiting, and a click on it
+ * opens the same picker as Ctrl+R.  The picker's question is answered by
+ * the test seam (Cancel), which leaves "Recovery cancelled" in the bar: the
+ * proof that the click reached the picker.
+ */
+static int recovery_badge_opens_the_picker(void)
+{
+    int failed = 0;
+    EditorState es;
+    const int badge_x = 924;                      /* the badge starts at 920 */
+    const int badge_y = EDITOR_H - STATUS_H + 10;
+    CHECK(open_editor(&es, NULL) == 0);
+
+    /* No copies: a click in that spot is just a click on the bar. */
+    editor_set_status(&es, "before");
+    click_frame(&es, badge_x, badge_y);
+    CHECK(strcmp(es.status_message, "before") == 0);
+
+    /* One copy that belongs to some other document. */
+    memset(&es.recovery_entries[0], 0, sizeof(es.recovery_entries[0]));
+    es.recovery_entries[0].id = 77;
+    snprintf(es.recovery_entries[0].source_path,
+             sizeof(es.recovery_entries[0].source_path), "%s", "elsewhere/level.toml");
+    es.recovery_entry_count = 1;
+    CHECK(editor_recovery_offer_count(&es) == 1);
+
+    /* Drawn, hovered and not clicked: nothing happens. */
+    ui_frame(&es, badge_x, badge_y);
+    CHECK(strcmp(es.status_message, "before") == 0);
+
+    editor_test_set_recovery_choice(EDITOR_RECOVERY_CANCEL);
+    click_frame(&es, badge_x, badge_y);
+    CHECK(strcmp(es.status_message, "Recovery cancelled") == 0);
+    CHECK(es.recovery_entry_count == 1);          /* still waiting */
+done:
+    editor_test_set_recovery_choice(-1);
+    es.recovery_entry_count = 0;
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * The three save questions, asked through the real in-window prompt
+ * rather than the scripted answers the save tests use.  Each one is
+ * answered the ways a designer can answer it: nobody answers (the prompt
+ * cannot be shown or is closed), Enter (the highlighted default button),
+ * Tab to another button, and Esc.  Whatever is not a clear "Replace" must
+ * leave the file alone.
+ */
+static int save_questions_answer_through_the_prompt(void)
+{
+    int failed = 0;
+    EditorState es;
+    CHECK(open_editor(&es, NULL) == 0);
+    clear_dialog_seams();
+    editor_test_set_overwrite_choice(-1);
+    editor_test_set_external_choice((EditorExternalChoice)-1); /* NOLINT(clang-analyzer-optin.core.EnumCastOutOfRange) */
+
+    /* "Replace existing file?" — Cancel / Replace, Replace highlighted. */
+    input_clear();
+    CHECK(editor_confirm_overwrite(&es, "levels/taken.toml") == 0);
+    CHECK(strcmp(es.status_message, "Save failed: confirmation failed") == 0);
+    push_key(KEY_ENTER, 0);
+    CHECK(editor_confirm_overwrite(&es, "levels/taken.toml") == 1);
+    input_clear();
+    push_key(KEY_ESCAPE, 0);
+    CHECK(editor_confirm_overwrite(&es, "levels/taken.toml") == 0);
+
+    /* "File changed externally" — Cancel / Replace / Save As, Save As
+     * highlighted, so a stray Enter never overwrites someone else's work. */
+    input_clear();
+    CHECK(editor_confirm_external_change(&es) == EDITOR_EXTERNAL_CANCEL);
+    CHECK(strcmp(es.status_message,
+                 "Save cancelled: external change confirmation failed") == 0);
+    push_key(KEY_ENTER, 0);
+    CHECK(editor_confirm_external_change(&es) == EDITOR_EXTERNAL_SAVE_AS);
+    input_clear();
+    push_key(KEY_TAB, 0);                          /* Save As -> Cancel */
+    push_key(KEY_TAB, 0);                          /* Cancel -> Replace */
+    push_key(KEY_ENTER, 0);
+    CHECK(editor_confirm_external_change(&es) == EDITOR_EXTERNAL_REPLACE);
+    input_clear();
+    push_key(KEY_ESCAPE, 0);
+    CHECK(editor_confirm_external_change(&es) == EDITOR_EXTERNAL_CANCEL);
+    CHECK(strcmp(es.status_message, "Save cancelled: file changed externally") == 0);
+
+    /* "Save recovered copy" — the same three buttons, about the file the
+     * recovered copy came from. */
+    snprintf(es.file_path, sizeof(es.file_path), "%s", "levels/recovered.toml");
+    input_clear();
+    CHECK(editor_confirm_recovered_save(&es) == EDITOR_EXTERNAL_CANCEL);
+    CHECK(strcmp(es.status_message, "Save cancelled: confirmation failed") == 0);
+    push_key(KEY_ENTER, 0);
+    CHECK(editor_confirm_recovered_save(&es) == EDITOR_EXTERNAL_SAVE_AS);
+    input_clear();
+    push_key(KEY_TAB, 0);
+    push_key(KEY_TAB, 0);
+    push_key(KEY_ENTER, 0);
+    CHECK(editor_confirm_recovered_save(&es) == EDITOR_EXTERNAL_REPLACE);
+    input_clear();
+    push_key(KEY_ESCAPE, 0);
+    CHECK(editor_confirm_recovered_save(&es) == EDITOR_EXTERNAL_CANCEL);
+    CHECK(strcmp(es.status_message, "Save cancelled: recovered copy not saved") == 0);
+    es.file_path[0] = '\0';
+done:
+    input_clear();
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}

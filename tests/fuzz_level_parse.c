@@ -1,11 +1,23 @@
 /*
  * fuzz_level_parse.c — Fuzz the level loader exactly as the game uses it.
  *
- * Input bytes are written to a temporary .toml file and loaded with
- * level_load_toml(): tomlc17 parse → schema check → section loaders →
- * level_validate_runtime().  Rejecting input is the expected outcome for
- * almost every mutation; the harness only fails on crashes, sanitizer
- * reports, or a broken save/load round trip.
+ * Input bytes are loaded from memory with level_load_toml_text(), the code
+ * every level file goes through after it is read: tomlc17 parse → schema
+ * check → section loaders → level_validate_runtime().  Rejecting input is
+ * the expected outcome for almost every mutation; the harness only fails
+ * on crashes, sanitizer reports, or a broken save/load round trip.
+ *
+ * Every input is loaded with a listener attached, as the editor does when
+ * a file will not open.  That is the only way to reach the code that runs
+ * *after* a rejection: the line lookup for each message, and the validator's
+ * "report every error" mode, which keeps checking values an earlier rule
+ * already refused.  A rejected level is where most inputs end up, so this
+ * is most of the search.
+ *
+ * No input file is written (the bytes are parsed where they are), and the
+ * saves of the round trip skip their fsync (serializer_set_durable): a
+ * harness that waits for the disk three times per input spends its whole
+ * budget waiting.
  *
  * Round trip: any level the loader accepts must also save, load again, and
  * save to the same bytes.  This is how a raw DEL in a saved name (accepted
@@ -31,14 +43,12 @@
 #include "levels/level.h"
 #include "levels/level_ref.h"
 
-static char input_path[1024];
 static char first_save[1024];
 static char second_save[1024];
 
 /* Normal exit only: after abort() the failing input stays on disk. */
 static void remove_temp_files(void)
 {
-    remove(input_path);
     remove(first_save);
     remove(second_save);
 }
@@ -48,27 +58,15 @@ static void init_paths(void)
 {
     const char *dir;
 
-    if (input_path[0] != '\0') return;
+    if (first_save[0] != '\0') return;
     atexit(remove_temp_files);
+    serializer_set_durable(0);   /* no fsync: see the header comment */
     dir = getenv("TMPDIR");
     if (!dir || dir[0] == '\0') dir = "/tmp";
-    snprintf(input_path, sizeof(input_path), "%s/mango-fuzz-%ld-in.toml",
-             dir, (long)getpid());
     snprintf(first_save, sizeof(first_save), "%s/mango-fuzz-%ld-a.toml",
              dir, (long)getpid());
     snprintf(second_save, sizeof(second_save), "%s/mango-fuzz-%ld-b.toml",
              dir, (long)getpid());
-}
-
-static int write_bytes(const char *path, const uint8_t *data, size_t size)
-{
-    FILE *fp = fopen(path, "wb");
-    size_t written;
-
-    if (!fp) return -1;
-    written = fwrite(data, 1, size, fp);
-    if (fclose(fp) != 0 || written != size) return -1;
-    return 0;
 }
 
 /* Return 1 when two files hold identical bytes. */
@@ -91,8 +89,7 @@ static int same_bytes(const char *a_path, const char *b_path)
 
 static void round_trip_failed(const char *step)
 {
-    fprintf(stderr, "fuzz_level_parse: accepted level failed round trip at %s "
-                    "(input kept at %s)\n", step, input_path);
+    fprintf(stderr, "fuzz_level_parse: accepted level failed round trip at %s\n", step);
     abort();
 }
 
@@ -116,6 +113,14 @@ static void check_quoted_level_refs(const uint8_t *data, size_t size)
     }
 }
 
+/* The listener: every reason is produced, then dropped. */
+static void ignore_problem(void *context, const char *message, int line)
+{
+    (void)context;
+    (void)message;
+    (void)line;
+}
+
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
     /* LevelDef is large; static storage keeps it off the fuzzer's stack. */
@@ -124,9 +129,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 
     init_paths();
     check_quoted_level_refs(data, size);
-    if (write_bytes(input_path, data, size) != 0) return 0;
 
-    if (level_load_toml(input_path, &loaded) != 0) return 0;  /* rejected */
+    /* With a listener, so a rejected input still runs the explaining code
+     * (line lookups, and every-error validation). */
+    if (level_load_toml_text((const char *)data, size, "fuzz input", &loaded,
+                             ignore_problem, NULL) != 0)
+        return 0;  /* rejected */
 
     /* An accepted level may only chain to a valid level reference. */
     if (loaded.next_phase[0] != '\0' &&

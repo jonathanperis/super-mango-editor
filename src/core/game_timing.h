@@ -88,8 +88,8 @@ void game_timing_tick_smoke(GameState *gs);
  * accumulator: one step behind at most, but moving every frame.
  *
  * Only drawing uses it. game_timing_note_step copies the player, the camera
- * and the moving world objects before each step into GameLoopState, and the
- * render view reads them; nothing in the simulation reads those copies, and
+ * and the moving world objects (the rows of game_movers.c's table) before
+ * each step into GameLoopState, and the render view reads them; nothing in the simulation reads those copies, and
  * the steps, their order and their inputs are unchanged, so runs and
  * replays are too.
  */
@@ -119,7 +119,8 @@ GameRenderView game_timing_render_view(const GameState *gs, int cam_x);
 /* Move (*x, *y), a position after the latest step, back toward (from_x,
  * from_y), where it was one step earlier, as the view draws the player:
  * by the view's t, and not at all when either axis moved more than
- * GAME_INTERP_MAX_JUMP. The time-trial ghost and the moving world objects
- * go through it too, so a run that matches the best one draws the ghost
- * where the player is, and a rider stays on the platform under their feet. */
+ * GAME_INTERP_MAX_JUMP. The time-trial ghost goes through it too, so a run
+ * that matches the best one draws the ghost where the player is. The
+ * moving world objects use the same rule through game_movers.h, so a rider
+ * stays on the platform under their feet. */
 void game_timing_view_point(const GameRenderView *view, float from_x, float from_y, float *x, float *y);

@@ -27,6 +27,29 @@
 void game_collide(GameState *gs, float dt);
 
 /* ------------------------------------------------------------------ */
+/* Damage sources                                                     */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The kinds of enemy and hazard that hurt on touch are the rows of one
+ * table in game_collision.c. These four calls let other code walk it:
+ * the debug overlay draws every box collision would test, by asking for
+ * each one here instead of working the rectangles out a second time.
+ *
+ *   game_damage_source_count()            how many kinds there are
+ *   game_damage_source_name(source)       the kind's debug-log name
+ *   game_damage_source_items(world, s)    how many items of it the level has
+ *   game_damage_source_hitbox(world, s, i, &box)
+ *       1 with *box set when item i can hurt right now; 0 when it cannot
+ *       (inactive, a flame still below its gap) or the indexes are out of
+ *       range. A spike row's box is the whole row.
+ */
+int game_damage_source_count(void);
+const char *game_damage_source_name(int source);
+int game_damage_source_items(const GameWorld *world, int source);
+int game_damage_source_hitbox(const GameWorld *world, int source, int item, IntRect *box);
+
+/* ------------------------------------------------------------------ */
 /* Hitbox builders                                                    */
 /* ------------------------------------------------------------------ */
 

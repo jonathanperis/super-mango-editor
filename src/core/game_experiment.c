@@ -12,7 +12,6 @@
 #include "../levels/level_loader.h"
 #include "../levels/level_resources.h"
 #include "../shared/serializer_emit.h"
-#include "tomlc17.h"
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
@@ -191,88 +190,44 @@ void game_experiment_export(GameState *gs)
     }
 }
 
-static int number(toml_datum_t datum, float *out)
-{
-    double value;
-    if (datum.type == TOML_FP64) value = datum.u.fp64;
-    else if (datum.type == TOML_INT64) value = (double)datum.u.int64;
-    else return -1;
-    if (!isfinite(value) || value < 0 || value > MAX_LEVEL_MOTION) return -1;
-    *out = (float)value;
-    return 0;
-}
-
 int game_experiment_load(GameState *gs, const char *path)
 {
-    FILE *fp = serializer_fopen_utf8(path, "rb");
-    if (!fp) {
-        fprintf(stderr, "Error: cannot open experiment: %s\n", path);
+    /* A capture is somebody else's file: read it with a size limit before
+     * parsing any of it (serializer_read_bytes). */
+    char *text = NULL;
+    size_t size = 0;
+    int too_large = 0;
+    if (serializer_read_bytes(path, EXPERIMENT_TEXT_MAX, &text, &size, &too_large) !=
+        SERIALIZER_PATH_EXISTING) {
+        if (too_large)
+            fprintf(stderr, "Error: experiment is larger than %d bytes: %s\n",
+                    EXPERIMENT_TEXT_MAX - 1, path);
+        else
+            fprintf(stderr, "Error: cannot open experiment: %s\n", path);
         return -1;
     }
-    toml_result_t parsed = toml_parse_file(fp);
-    fclose(fp);
+    /* The level file must still hold the bytes this game loaded: a capture
+     * replayed on a changed level would quietly go another way. */
     GameExperiment *tape = calloc(1, sizeof(*tape));
+    SerializerFileFingerprint fingerprint;
     int result = -1;
-    if (!tape || !parsed.ok) goto done;
-    toml_datum_t top = parsed.toptab;
-    if (top.type != TOML_TABLE || top.u.tab.size != 5) goto done;
-    for (int i = 0; i < top.u.tab.size; i++)
-        if (strlen(top.u.tab.key[i]) != (size_t)top.u.tab.len[i]) goto done;
-    toml_datum_t version = toml_get(top, "format_version"), seed = toml_get(top, "seed");
-    toml_datum_t level = toml_get(top, "level_path"), hash = toml_get(top, "level_hash");
-    toml_datum_t frames = toml_get(top, "frames");
-    if (version.type == TOML_INT64 && version.u.int64 == 1) {
-        /* Recorded by the variable-timestep engine: its rows hold frame
-         * durations that the fixed-step engine cannot reproduce. */
-        fprintf(stderr, "Error: %s was recorded before fixed-step simulation "
-                        "(format_version 1); record it again\n", path);
-        goto done;
+    if (tape &&
+        serializer_fingerprint_utf8(gs->world.level_path, &fingerprint) == 1 &&
+        fingerprint.content_hash == gs->world.source_level_hash &&
+        game_experiment_decode(text, size, path, fingerprint.content_hash, tape) == 0) {
+        tape->fingerprint = fingerprint;
+        str_copy(tape->level_path, gs->world.level_path, sizeof(tape->level_path));
+        tape->replaying = 1;
+        game_experiment_cleanup(gs);
+        gs->screen.experiment = tape;
+        restart(gs, tape->seed);
+        gs->screen.random_seed = tape->seed;
+        result = 0;
     }
-    if (version.type == TOML_INT64 && version.u.int64 == 2) {
-        /* Recorded while the camera still panned in from x = 0 and eased
-         * back after a lost life. Spike blocks wait until the camera shows
-         * them, so with the camera snapping now they can start on other
-         * steps and the run would quietly go another way. */
-        fprintf(stderr, "Error: %s was recorded before the camera snapped to the level "
-                        "start and respawn point (format_version 2); record it again\n", path);
-        goto done;
+    free(text);
+    if (result) {
+        free(tape);   /* a failed decode left it with no frames */
+        fprintf(stderr, "Error: experiment invalid or level bytes changed: %s\n", path);
     }
-    if (version.type != TOML_INT64 || version.u.int64 != EXPERIMENT_FORMAT_VERSION ||
-        seed.type != TOML_INT64 || seed.u.int64 < 0 || seed.u.int64 > UINT_MAX ||
-        level.type != TOML_STRING || level.u.str.len <= 0 || level.u.str.len >= GAME_LEVEL_PATH_MAX ||
-        strlen(level.u.str.ptr) != (size_t)level.u.str.len ||
-        hash.type != TOML_STRING || hash.u.str.len != 16 || strlen(hash.u.str.ptr) != 16 ||
-        frames.type != TOML_ARRAY || frames.u.arr.size <= 0 || frames.u.arr.size > EXPERIMENT_MAX_FRAMES) goto done;
-    if (serializer_fingerprint_utf8(gs->world.level_path, &tape->fingerprint) != 1 ||
-        tape->fingerprint.content_hash != gs->world.source_level_hash) goto done;
-    char expected[17];
-    snprintf(expected, sizeof(expected), "%016llx", (unsigned long long)tape->fingerprint.content_hash);
-    if (strcmp(expected, hash.u.str.ptr) != 0) goto done;
-    tape->count = frames.u.arr.size;
-    tape->seed = (unsigned int)seed.u.int64;
-    str_copy(tape->level_path, gs->world.level_path, sizeof(tape->level_path));
-    tape->frames = calloc((size_t)tape->count, sizeof(*tape->frames));
-    if (!tape->frames) goto done;
-    for (int i = 0; i < tape->count; i++) {
-        toml_datum_t row = frames.u.arr.elem[i];
-        /* Row: [input bits, physics values...] for one fixed step. */
-        if (row.type != TOML_ARRAY || row.u.arr.size != INSPECTOR_PHYSICS_COUNT + 1) goto done;
-        toml_datum_t *values = row.u.arr.elem;
-        ExperimentFrame *frame = &tape->frames[i];
-        if (values[0].type != TOML_INT64 || values[0].u.int64 < 0 || values[0].u.int64 > 63) goto done;
-        frame->input = (unsigned int)values[0].u.int64;
-        for (int j = 0; j < INSPECTOR_PHYSICS_COUNT; j++)
-            if (number(values[j + 1], &frame->physics[j])) goto done;
-    }
-    tape->replaying = 1;
-    game_experiment_cleanup(gs);
-    gs->screen.experiment = tape;
-    restart(gs, tape->seed);
-    gs->screen.random_seed = tape->seed;
-    result = 0;
-done:
-    if (result && tape) { free(tape->frames); free(tape); }
-    toml_free(parsed);
-    if (result) fprintf(stderr, "Error: experiment invalid or level bytes changed: %s\n", path);
     return result;
 }

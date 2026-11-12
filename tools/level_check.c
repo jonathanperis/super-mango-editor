@@ -2,6 +2,7 @@
  * level_check.c — Validate level files with the game's own loader.
  *
  * Usage: level-check <level.toml>...
+ *        level-check --dump-schema
  *
  * Each file goes through level_load_toml() exactly as the game and editor
  * load it: tomlc17 parse -> schema check -> section loaders ->
@@ -13,13 +14,21 @@
  * tools/validate_levels.py for what a single file cannot show: that assets
  * and next_phase targets exist on disk and that the campaign manifest chains.
  *
+ * --dump-schema prints the serializer's schema table (every key, its type,
+ * capacity and enum values) instead of checking files.  It is how
+ * tests/schema_parity_test.py compares the copy of those facts that
+ * tools/validate_levels.py keeps (for the TOML snippets in the manual)
+ * with the table the game really uses, so the two cannot drift apart.
+ *
  * Needs no window, GPU or audio: it links only the serializer, the validator,
  * level_ref and tomlc17.
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "shared/serializer.h"
+#include "shared/serializer_parse.h"   /* serializer_dump_schema */
 #include "levels/level.h"
 
 int main(int argc, char **argv)
@@ -28,8 +37,13 @@ int main(int argc, char **argv)
     static LevelDef def;
     int failed = 0;
 
+    if (argc == 2 && strcmp(argv[1], "--dump-schema") == 0) {
+        serializer_dump_schema(stdout);
+        return 0;
+    }
     if (argc < 2) {
-        fprintf(stderr, "usage: %s <level.toml>...\n", argv[0]);
+        fprintf(stderr, "usage: %s <level.toml>...\n       %s --dump-schema\n",
+                argv[0], argv[0]);
         return 2;
     }
     for (int i = 1; i < argc; i++) {

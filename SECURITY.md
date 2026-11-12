@@ -36,7 +36,10 @@ In scope:
 - **TOML level and campaign parsing**: the vendored `tomlc17` parser, the
   serializer/loader in `src/shared/` and `src/levels/`, and level validation.
   Crashes, memory-safety bugs, hangs or unbounded allocation from a crafted
-  level file are in scope.
+  level file are in scope. Each of these files is read once, with a size
+  limit, before any of it is parsed: 1 MiB for a level (`LEVEL_TEXT_MAX`),
+  64 KiB for a campaign manifest, which may list at most 128 levels
+  (`CAMPAIGN_MAX_LEVELS`), and 8 MiB for an experiment capture.
 - **Player profiles and replay/experiment files**: native profile files in the
   OS preference directory or passed with `--profile`, and replay/experiment
   inputs.

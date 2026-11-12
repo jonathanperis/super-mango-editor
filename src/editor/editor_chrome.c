@@ -3,12 +3,14 @@
  */
 
 #include "editor_chrome.h"
+#include "editor_recovery.h"   /* editor_recovery_offer_count */
 #include "editor_panels.h" /* editor_focus_validation_issue */
 
 #include <stdio.h> /* snprintf */
 
 #include "canvas.h"            /* canvas_set_zoom, canvas_screen_to_world */
 #include "editor_campaign.h"   /* the Campaign view's button */
+#include "editor_entity_list.h" /* the Entities list's button */
 #include "editor_files.h"      /* editor file/save helpers */
 #include "editor_playtest.h"   /* editor_play_test/editor_stop_play */
 #include "editor_session.h"    /* editor reset/confirm helpers */
@@ -23,7 +25,7 @@
  *
  * Layout from left to right:
  *   [Select] [Place] [Delete] | [Grid] | [Debug] | Zoom | [Campaign] |
- *   [Contrast] | [Fog] | file buttons
+ *   [Contrast] | [Fog] | [Entities] | file buttons
  *
  * The tools and the on/off buttons are ui_toggle: the current tool, a
  * shown grid, an open Campaign view and so on draw in the selected colour.
@@ -117,6 +119,14 @@ void editor_render_toolbar(EditorState *es)
         es->show_fog ^= 1;
     }
     ui_tooltip(&es->ui, "Show the level's fog layers");
+
+    /* The Entities list (Ctrl+F) takes the right column's upper part. */
+    bx += 60;
+    if (ui_toggle(&es->ui, bx, by, 68, bh, "Entities", es->entity_list_open)) {
+        if (es->entity_list_open) editor_entity_list_close(es);
+        else if (!es->campaign) editor_entity_list_open(es);
+    }
+    ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_ENTITY_LIST));
 
     int rx = EDITOR_W - 4 - 52;
     if (es->playing) {
@@ -230,10 +240,38 @@ void editor_render_status_bar(EditorState *es)
                  total, es->modified ? " *" : "");
     }
     ui_label(&es->ui, STATUS_ENTITIES_X, bar_y + 8, info_text);
-    if (es->status_message[0] != '\0') {
-        /* Cut to the window's edge; the whole message is the tooltip. */
-        (void)ui_label_fit(&es->ui, 920, bar_y + 8, EDITOR_W - 920 - 8,
-                           es->status_message, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+    {
+        /*
+         * Crash-recovery copies waiting to be looked at. This stays in the
+         * bar for as long as there are any: the start-up message that
+         * announces them is one status line, and the next message (even
+         * "Loaded ...", before the first frame) replaces it. A click opens
+         * the same picker as Ctrl+R.
+         */
+        int message_x = 920;
+        int copies = editor_recovery_offer_count(es);
+        if (copies > 0) {
+            char badge[48];
+            int width;
+            snprintf(badge, sizeof(badge), "Recovery: %d (Ctrl+R)", copies);
+            width = ui_text_width(&es->ui, badge);
+            int hovered = es->ui.mouse_x >= message_x && es->ui.mouse_x < message_x + width &&
+                          es->ui.mouse_y >= bar_y && es->ui.mouse_y < EDITOR_MINIMAP_Y;
+            ui_label_color(&es->ui, message_x, bar_y + 8, badge,
+                           ui_color(&es->ui, UI_COLOR_WARNING));
+            if (hovered) DrawRectangle(message_x, bar_y + 22, width, 1,
+                                       ui_color(&es->ui, UI_COLOR_WARNING));
+            if (hovered && es->ui.mouse_clicked) {
+                es->ui.mouse_clicked = 0;
+                editor_open_recovery_picker(es);
+            }
+            message_x += width + 12;
+        }
+        if (es->status_message[0] != '\0') {
+            /* Cut to the window's edge; the whole message is the tooltip. */
+            (void)ui_label_fit(&es->ui, message_x, bar_y + 8, EDITOR_W - message_x - 8,
+                               es->status_message, ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+        }
     }
     /* Last, in the rows under the text: the level overview strip. */
     editor_minimap_render(es);

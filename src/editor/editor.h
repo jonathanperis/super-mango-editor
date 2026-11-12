@@ -118,10 +118,23 @@ typedef struct {
     char metadata_path[EDITOR_PATH_MAX];
 } EditorRecoveryEntry;
 
+/*
+ * What the editor knows about the file a plain Save would write.
+ *   UNKNOWN            nothing: the next Save asks before replacing it
+ *   EXPECTED_MISSING   a new document: Save creates the file, and refuses
+ *                      if one appeared there meanwhile
+ *   EXPECTED_EXISTING  opened or saved here: Save replaces the file while
+ *                      it still matches source_fingerprint
+ *   RECOVERED          a crash-recovery copy: the file at file_path was
+ *                      not read by this session at all, so Save asks
+ *                      "replace it with the recovered copy?" and creates
+ *                      the file if it is gone
+ */
 typedef enum {
     EDITOR_SOURCE_UNKNOWN = 0,
     EDITOR_SOURCE_EXPECTED_MISSING,
-    EDITOR_SOURCE_EXPECTED_EXISTING
+    EDITOR_SOURCE_EXPECTED_EXISTING,
+    EDITOR_SOURCE_RECOVERED
 } EditorSourceState;
 
 /* ------------------------------------------------------------------ */
@@ -242,6 +255,21 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 
 /*
+ * EditorTileTexture — one platform tile image the canvas has asked for.
+ *
+ * A platform names its image by path (PlatformPlacement.tile_path). The
+ * canvas loads each path once and keeps it here, whether or not it is one
+ * of the images the Properties dropdown lists, so a level using a custom
+ * tile is drawn with that tile, as the game draws it. texture is NULL for
+ * a path that did not load; the canvas then draws the default grass.
+ */
+#define EDITOR_TILE_CACHE_SIZE 16
+typedef struct {
+    char       path[64];   /* same capacity as PlatformPlacement.tile_path */
+    Texture2D *texture;    /* owned; NULL = the file does not load         */
+} EditorTileTexture;
+
+/*
  * EntityTextures — one owned raylib texture slot per visual entity type.
  *
  * Loaded once at editor startup and shared across the palette panel,
@@ -257,11 +285,7 @@ typedef struct {
     Texture2D *sky;
     Texture2D *floor_tile;
     Texture2D *water;
-    Texture2D *platform;
-    Texture2D *platform_stone;
-    Texture2D *platform_leaf;
-    Texture2D *platform_brick;
-    Texture2D *platform_grass_rock;
+    Texture2D *platform;       /* the default grass tile */
     Texture2D *spider;
     Texture2D *jumping_spider;
     Texture2D *bird;
@@ -343,10 +367,12 @@ typedef struct {
     /* Editor owns its process-wide context and logical render target. */
     RenderTexture2D frame_target;
     TextFont *font;
-    /* A copy of the last complete frame, shown dimmed behind an in-window
-     * prompt (dialog_choice.c), and the target texture mode is bound to
-     * while a frame is being drawn (NULL between frames), so a prompt that
-     * opens mid-frame can leave it and bind it again. */
+    /* The last complete frame, shown dimmed behind an in-window prompt
+     * (dialog_choice.c): after each frame it and frame_target trade places
+     * (dialog_choice_keep_frame), so no pixels are copied. drawing_target
+     * is the target texture mode is bound to while a frame is being drawn
+     * (NULL between frames), so a prompt that opens mid-frame can leave it
+     * and bind it again. */
     RenderTexture2D prompt_backdrop;
     RenderTexture2D *drawing_target;
 
@@ -370,6 +396,12 @@ typedef struct {
      */
     char           preview_sky_path[64];
     char           preview_floor_path[64];
+    /* Platform tile images loaded by path for the canvas
+     * (editor_platform_tile_texture); tile_cache_next is the slot reused
+     * once all are taken. */
+    EditorTileTexture tile_cache[EDITOR_TILE_CACHE_SIZE];
+    int            tile_cache_count;
+    int            tile_cache_next;
     char           preview_water_path[64];
     /* The other background layers (textures.sky is layer 0) and the fog
      * layers, loaded the same way so the canvas can draw them as the game
@@ -593,6 +625,43 @@ typedef struct {
     int            last_click_valid;
     float          last_click_x;
     float          last_click_y;
+
+    /* ---- Resize handles (editor_handles.c) ----------------------------- */
+    /*
+     * With one entity selected and the Select tool active, the canvas draws
+     * small square handles: the ends of a patrol range, the growing edge of
+     * a tiled entity, a rail's corner.  A press on one starts a resize:
+     * `resizing` is 1 until the button is released, and `dragging` is 1
+     * with it, so everything that waits for a move to finish (keys, Undo,
+     * right-click, a dropped file) waits for a resize too.
+     *
+     * resize_handle is the EditorHandleKind grabbed, and resize_before the
+     * entity as it was at the press: every motion recomputes the value from
+     * it, Esc writes it back, and the release records it as the undo
+     * step's "before".  resize_grab_x/y is the pointer's offset from the
+     * handle's centre at the press (world px), so the edge does not jump
+     * to the pointer.  resize_moved stays 0 until the pointer has
+     * travelled a few pixels, so a click on a handle changes nothing.
+     */
+    int            resizing;
+    int            resize_handle;
+    int            resize_moved;
+    EntityType     resize_type;
+    int            resize_index;
+    PlacementData  resize_before;
+    float          resize_grab_x, resize_grab_y;
+    float          resize_press_x, resize_press_y;
+
+    /* ---- Entity list (editor_entity_list.c) ---------------------------- */
+    /*
+     * The Entities list (Ctrl+F) takes the place of Level Config and the
+     * palette in the right column while it is open.  Its rows are worked
+     * out from the level on every frame, so nothing here names an entity:
+     * only the search text, and how far the rows are scrolled (pixels).
+     */
+    int            entity_list_open;
+    char           entity_list_filter[48];
+    UIScroll       entity_list_scroll;
 
     /* ---- Box (rubber-band) selection ---------------------------------- */
     /*

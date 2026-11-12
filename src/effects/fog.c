@@ -72,16 +72,16 @@ static void fog_spawn(FogSystem *fog) {
         FogInstance *inst = &fog->instances[i];
 
         /* Random texture: pick from however many were loaded for this level */
-        inst->tex_index = (int)(game_random() % (unsigned int)fog->tex_count);
+        inst->tex_index = (int)(game_random_cosmetic() % (unsigned int)fog->tex_count);
 
         /* Random direction: +1 (left→right) or -1 (right→left) */
-        inst->dir = (game_random() % 2) ? +1 : -1;
+        inst->dir = (game_random_cosmetic() % 2) ? +1 : -1;
 
         /*
          * Random duration between FOG_DURATION_MIN and FOG_DURATION_MAX.
          * Scale the reproducible unit interval to the desired duration range.
          */
-        float t      = game_random_unit();
+        float t      = game_random_cosmetic_unit();
         inst->duration = FOG_DURATION_MIN + t * (FOG_DURATION_MAX - FOG_DURATION_MIN);
 
         /*

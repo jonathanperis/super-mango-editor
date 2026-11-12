@@ -289,8 +289,8 @@ hurt by something they cannot see.
 running game and back out of the editor.
 
 **Read first:** the [Entity Walkthrough](../entity-walkthrough/),
-`src/shared/serializer_parse.c`, `src/shared/serializer_load_collectibles.c`
-and `src/levels/level_loader.c`.
+`src/shared/serializer_parse.c` (the schema table and
+`serializer_load_schema()`) and `src/levels/level_loader.c`.
 
 **Steps:**
 

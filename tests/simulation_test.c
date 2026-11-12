@@ -3,8 +3,11 @@
 #include "core/game_inspector.h"
 #include "core/game_overlay.h"
 #include "core/game_resources.h"
+#include "core/game_random.h"
+#include "core/game_movers.h"
 #include "core/game_timing.h"
 #include "core/game_player_step.h"
+#include "core/game_float_platforms.h"
 #include "collision/game_collision.h"
 #include "core/game_update.h"
 #include "collision/collision_damage.h"
@@ -175,20 +178,38 @@ static int inspection_and_replay(void)
     fputs("format_version = 9\n", bad); fclose(bad);
     GameExperiment *before = gs.screen.experiment;
     CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-invalid.toml") == -1 && gs.screen.experiment == before);
+    /* A capture that is not there, and one over the size limit, are refused
+     * before any of it is parsed; the running game keeps what it had. */
+    CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-missing.toml") == -1 && gs.screen.experiment == before);
+    bad = fopen(TEST_OUT "school-experiment-huge.toml", "wb");
+    CHECK(bad != NULL);
+    {
+        static char filler[4096];
+        memset(filler, '#', sizeof(filler) - 1);
+        filler[sizeof(filler) - 1] = '\n';
+        for (size_t written = 0; written < (size_t)EXPERIMENT_TEXT_MAX; written += sizeof(filler))
+            CHECK(fwrite(filler, 1, sizeof(filler), bad) == sizeof(filler));
+    }
+    CHECK(fclose(bad) == 0);
+    CHECK(game_experiment_load(&gs, TEST_OUT "school-experiment-huge.toml") == -1 && gs.screen.experiment == before);
+    remove(TEST_OUT "school-experiment-huge.toml");
     /* Rows are [input, 9 physics values]. Format 1 rows (with a leading
      * frame duration) came from the variable-timestep engine: refused.
      * Format 2 rows are well formed, but were recorded while the camera
      * still panned in from x = 0, which changes when waiting spike blocks
-     * start: refused too, rather than replayed into another run. */
+     * start: refused too, rather than replayed into another run. Format 3
+     * rows came from before spike blocks and bouncepads stopped depending
+     * on the Reduced motion setting and on jump input: refused as well. */
     const char *bad_rows[] = {
         "[0, nan, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[64, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[0, 1e100, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[0.016, 0, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
+        "[0, 100, 250, 750, 600, 550, 100, 350, 180, 80]",
         "[0, 100, 250, 750, 600, 550, 100, 350, 180, 80]"
     };
     const int bad_versions[] = {EXPERIMENT_FORMAT_VERSION, EXPERIMENT_FORMAT_VERSION,
-                                EXPERIMENT_FORMAT_VERSION, 1, 2};
+                                EXPERIMENT_FORMAT_VERSION, 1, 2, 3};
     for (size_t i = 0; i < sizeof(bad_rows) / sizeof(bad_rows[0]); i++) {
         bad = fopen(TEST_OUT "school-experiment-invalid.toml", "w");
         CHECK(bad != NULL);
@@ -371,11 +392,10 @@ static int fast_fall_does_not_tunnel_through_platform(void)
     Platform pillar = {.x = 0, .y = 150, .w = 200, .h = 102};
     Player player = {.x = 50, .y = 0, .w = 48, .h = 48, .vy = 3000};
     player_apply_default_physics(&player);
-    int bounce = -1, support = -1, on_bridge = -1;
+    const PlayerSurfaces surfaces = { .platforms = &pillar, .platform_count = 1, .world_w = 400 };
+    PlayerLanding landed;
     for (int step = 0; step < 60 && !player.on_ground; step++)
-        player_update(&player, GAME_FIXED_STEP, NULL, &pillar, 1, NULL, 0,
-                      NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
-                      NULL, 0, NULL, 0, &bounce, &support, &on_bridge, -1, 400);
+        player_update(&player, GAME_FIXED_STEP, NULL, &surfaces, -1, &landed);
     CHECK(player.on_ground);
     CHECK(NEAR(player.y + player.h - PLAYER_FLOOR_SINK, pillar.y));
     CHECK(player.vy == 0.0f);
@@ -398,11 +418,10 @@ static int sinking_into_a_gap_cannot_steer_back_onto_the_floor(void)
     player.y = (float)FLOOR_Y + 10.0f - player.h + PLAYER_FLOOR_SINK;
     player.vx = 100.0f;
     player.move_dir = 1;
-    int bounce = -1, support = -1, on_bridge = -1;
+    const PlayerSurfaces surfaces = { .floor_gaps = gaps, .floor_gap_count = 1, .world_w = 1600 };
+    PlayerLanding landed;
     for (int step = 0; step < 30; step++) {
-        player_update(&player, GAME_FIXED_STEP, NULL, NULL, 0, NULL, 0,
-                      NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
-                      NULL, 0, gaps, 1, &bounce, &support, &on_bridge, -1, 1600);
+        player_update(&player, GAME_FIXED_STEP, NULL, &surfaces, -1, &landed);
         float centre = player.x + player.w / 2.0f;
         CHECK(!player.on_ground);
         CHECK(player.y + player.h - PLAYER_FLOOR_SINK > (float)FLOOR_Y + 10.0f);
@@ -416,9 +435,7 @@ static int sinking_into_a_gap_cannot_steer_back_onto_the_floor(void)
     player.y = (float)FLOOR_Y - player.h + PLAYER_FLOOR_SINK;
     player.vx = 100.0f;
     player.move_dir = 1;
-    player_update(&player, GAME_FIXED_STEP, NULL, NULL, 0, NULL, 0,
-                  NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0,
-                  NULL, 0, gaps, 1, &bounce, &support, &on_bridge, -1, 1600);
+    player_update(&player, GAME_FIXED_STEP, NULL, &surfaces, -1, &landed);
     CHECK(player.on_ground);
     CHECK(NEAR(player.y + player.h - PLAYER_FLOOR_SINK, (float)FLOOR_Y));
 done:
@@ -509,7 +526,7 @@ done:
 
 /*
  * health_star.c: every colour heals one heart on touch, never above
- * MAX_HEARTS, and is used up even when the player is already full.
+ * MAX_HEARTS, and a player who is already full leaves the star in place.
  */
 static int health_stars_heal_one_heart_up_to_the_cap(void)
 {
@@ -534,8 +551,9 @@ static int health_stars_heal_one_heart_up_to_the_cap(void)
     game_collide(&gs, GAME_FIXED_STEP);
     CHECK(gs.world.hearts == 2);
 
-    /* Green and red together, one heart short: one fills the gap, the
-     * other is still used up but cannot heal past MAX_HEARTS. */
+    /* Green and red together, one heart short: the green one (tested
+     * first) fills the gap, and the red one stays for later because a
+     * full player has nothing to heal. */
     gs.world.hearts = MAX_HEARTS - 1;
     gs.world.star_green_count = 1;
     gs.world.star_greens[0] = on_player;
@@ -543,7 +561,13 @@ static int health_stars_heal_one_heart_up_to_the_cap(void)
     gs.world.star_reds[0] = on_player;
     game_collide(&gs, GAME_FIXED_STEP);
     CHECK(gs.world.hearts == MAX_HEARTS);
-    CHECK(!gs.world.star_greens[0].active && !gs.world.star_reds[0].active);
+    CHECK(!gs.world.star_greens[0].active && gs.world.star_reds[0].active);
+    /* Still there on later steps, and taken once a heart is missing. */
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.world.star_reds[0].active);
+    gs.world.hearts = MAX_HEARTS - 1;
+    game_collide(&gs, GAME_FIXED_STEP);
+    CHECK(gs.world.hearts == MAX_HEARTS && !gs.world.star_reds[0].active);
 
     /* A star the player does not touch stays. */
     gs.world.star_yellows[0] = (HealthStar){.x = phit.x + 200.0f, .y = (float)phit.y, .active = 1};
@@ -605,12 +629,26 @@ static int jump_buffer_coyote_time_and_short_hops(void)
      * letting go while falling changes nothing. */
     p.vy = -200.0f;
     p.jump_held = 1;
+    p.jump_cut_armed = 1;
     player_release_jump(&p);
-    CHECK(NEAR(p.vy, -90.0f) && !p.jump_held);
+    CHECK(NEAR(p.vy, -90.0f) && !p.jump_held && !p.jump_cut_armed);
     p.vy = 120.0f;
     p.jump_held = 1;
+    p.jump_cut_armed = 1;
     player_release_jump(&p);
     CHECK(p.vy == 120.0f);
+
+    /* Only a jump arms the cut. A press in mid-air sets jump_held (so the
+     * key has to be let go before it counts again) but shortens nothing. */
+    p.vy = -200.0f;
+    p.on_ground = 0;
+    p.coyote_timer = 0.0f;
+    p.jump_held = 0;
+    p.jump_cut_armed = 0;
+    player_press_jump(&p, NULL);
+    CHECK(p.jump_held && !p.jump_cut_armed);
+    player_release_jump(&p);
+    CHECK(p.vy == -200.0f);
 
     /* End to end: a tap rises much less than a held jump. */
     {
@@ -626,6 +664,124 @@ static int jump_buffer_coyote_time_and_short_hops(void)
         float tap = floor_y - apex_y;
         CHECK(tap > 5.0f && tap < 30.0f);   /* a full jump rises 60+ px */
     }
+done:
+    return failed;
+}
+
+/* A crumbling platform that has started to fall carries its rider down:
+ * they stay standing on it on every step, so the animation does not
+ * flicker between idle and falling and a jump off it always works. */
+static int falling_crumble_platform_keeps_its_rider_standing(void)
+{
+    int failed = 0;
+    GameState gs = {0};
+    stand_player_on_floor(&gs, 100.0f);
+    FloatPlatform *fp = &gs.world.float_platforms[0];
+    gs.world.float_platform_count = 1;
+    float_platform_init(fp, FLOAT_PLATFORM_CRUMBLE, 90.0f, 60.0f, 4,
+                        2.0f * GAME_FIXED_STEP, NULL, 0.0f, 0.0f);
+    gs.world.player.y = fp->y - gs.world.player.h + PLAYER_FLOOR_SINK;
+    gs.world.player.on_ground = 1;
+    gs.screen.loop.fp_prev_riding = 0;
+
+    int falling_steps = 0;
+    for (int step = 0; step < 50; step++) {
+        PlayerStepSupport support = game_player_step(&gs, GAME_FIXED_STEP);
+        game_float_platforms_update(&gs, GAME_FIXED_STEP, support.float_platform);
+        if (!fp->falling) continue;
+        falling_steps++;
+        CHECK(support.float_platform == 0);
+        CHECK(gs.world.player.on_ground);
+        CHECK(NEAR(gs.world.player.y + gs.world.player.h - PLAYER_FLOOR_SINK, fp->y));
+    }
+    CHECK(falling_steps > 30 && fp->y > 70.0f);
+done:
+    return failed;
+}
+
+/*
+ * Drop the player onto a high bouncepad and return how far the launch
+ * carries them above the floor, in pixels. Jump is down on the steps in
+ * [jump_from, jump_to) and up otherwise; pass 0, 0 for no input.
+ */
+static float bounce_height(int jump_from, int jump_to)
+{
+    GameState gs = {0};
+    stand_player_on_floor(&gs, 100.0f);
+    float floor_y = gs.world.player.y, apex_y = gs.world.player.y;
+    gs.world.bouncepad_high_count = 1;
+    bouncepad_place(&gs.world.bouncepads_high[0], 100.0f, BOUNCEPAD_VY_HIGH,
+                    BOUNCEPAD_RED);
+    /* Just above the pad and falling, with the coyote window still open,
+     * as it is for a player who walked off a ledge onto the pad. */
+    gs.world.player.y -= 4.0f;
+    gs.world.player.vy = 60.0f;
+    gs.world.player.on_ground = 0;
+    gs.world.player.coyote_timer = PLAYER_COYOTE_TIME;
+    for (int step = 0; step < 240; step++) {
+        gs.screen.replay_input_mask =
+            step >= jump_from && step < jump_to ? PLAYER_INPUT_JUMP : 0;
+        game_player_step(&gs, GAME_FIXED_STEP);
+        if (gs.world.player.y < apex_y) apex_y = gs.world.player.y;
+    }
+    return floor_y - apex_y;
+}
+
+/* A bouncepad launch belongs to the pad: no jump press replaces it through
+ * coyote time, and no jump release shortens it. */
+static int jump_input_does_not_change_a_bounce(void)
+{
+    int failed = 0;
+    float plain = bounce_height(0, 0);
+    CHECK(plain > 200.0f);                       /* a high pad: about 238 px */
+    CHECK(NEAR(bounce_height(4, 5), plain));     /* a tap just after the launch */
+    CHECK(NEAR(bounce_height(8, 14), plain));    /* press and release while rising */
+    CHECK(NEAR(bounce_height(0, 20), plain));    /* held through the landing, then released */
+    CHECK(NEAR(bounce_height(4, 5) , bounce_height(4, 240)));  /* tap or hold: the same */
+done:
+    return failed;
+}
+
+/*
+ * Gameplay and looks draw from separate random streams: any number of
+ * cosmetic draws leaves the gameplay numbers of a seeded run unchanged
+ * (and the other way round), both restart from the seed, and neither
+ * stream ever gets stuck on zero.
+ */
+static int cosmetic_random_draws_leave_gameplay_alone(void)
+{
+    int failed = 0;
+    uint32_t plain[8], mixed[8], looks[8];
+
+    game_random_seed(7);
+    for (int i = 0; i < 8; i++) plain[i] = game_random();
+    game_random_seed(7);
+    for (int i = 0; i < 8; i++) looks[i] = game_random_cosmetic();
+
+    game_random_seed(7);
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j <= i; j++) (void)game_random_cosmetic_unit();
+        mixed[i] = game_random();
+    }
+    CHECK(memcmp(plain, mixed, sizeof(plain)) == 0);
+
+    game_random_seed(7);
+    for (int i = 0; i < 8; i++) {
+        (void)game_random_unit();
+        CHECK(game_random_cosmetic() == looks[i]);
+    }
+    CHECK(plain[0] != looks[0]);                 /* two streams, not one twice */
+
+    /* A unit draw stays inside [0, 1] on both. */
+    for (int i = 0; i < 1000; i++) {
+        float a = game_random_unit(), b = game_random_cosmetic_unit();
+        CHECK(a >= 0.0f && a <= 1.0f && b >= 0.0f && b <= 1.0f);
+    }
+    /* Seed 0, and the one seed the cosmetic salt would cancel, still work. */
+    game_random_seed(0);
+    CHECK(game_random() != 0 && game_random_cosmetic() != 0);
+    game_random_seed(UINT32_C(0x85ebca6b));
+    CHECK(game_random() != 0 && game_random_cosmetic() != 0);
 done:
     return failed;
 }
@@ -704,23 +860,85 @@ static int render_view_interpolates_without_touching_the_run(void)
     gs.world.fish[0].x = 24.0f;
     gs.world.fish[0].y = 70.0f;
     view = game_timing_render_view(&gs, 54);
-    float sx = 18.0f, sy = 0.0f;
-    game_timing_view_point(&view, gs.screen.loop.prev_spider[0].x,
-                           gs.screen.loop.prev_spider[0].y, &sx, &sy);
-    CHECK(view.t == 0.5f && NEAR(sx, 14.0f) && sy == 0.0f);
-    float bx = 44.0f, by = 0.0f;
-    game_timing_view_point(&view, gs.screen.loop.prev_bird[0].x,
-                           gs.screen.loop.prev_bird[0].y, &bx, &by);
-    CHECK(NEAR(bx, 42.0f));
-    float fx = 24.0f, fy = 70.0f;
-    game_timing_view_point(&view, gs.screen.loop.prev_fish[0].x,
-                           gs.screen.loop.prev_fish[0].y, &fx, &fy);
-    CHECK(NEAR(fx, 22.0f) && NEAR(fy, 75.0f));
-    /* A step longer than the snap distance is shown where it landed. */
-    gs.world.spiders[0].x = 10.0f + GAME_INTERP_MAX_JUMP + 1.0f;
-    sx = gs.world.spiders[0].x;
-    game_timing_view_point(&view, gs.screen.loop.prev_spider[0].x, 0.0f, &sx, &sy);
-    CHECK(sx == gs.world.spiders[0].x);
+    CHECK(view.t == 0.5f);
+    {
+        Spider spiders[MAX_SPIDERS];
+        Bird birds[MAX_BIRDS];
+        Fish fish[MAX_FISH];
+        int count = -1;
+        const Spider *spider = game_movers_shown(&gs, MOVER_SPIDERS, view.t,
+                                                 spiders, sizeof(spiders), &count);
+        CHECK(count == 1 && spider == spiders && NEAR(spider[0].x, 14.0f));
+        CHECK(gs.world.spiders[0].x == 18.0f);            /* the world is not written */
+        const Bird *bird = game_movers_shown(&gs, MOVER_BIRDS, view.t, birds, sizeof(birds), &count);
+        CHECK(count == 1 && NEAR(bird[0].x, 42.0f));
+        const Fish *one = game_movers_shown(&gs, MOVER_FISH, view.t, fish, sizeof(fish), &count);
+        CHECK(count == 1 && NEAR(one[0].x, 22.0f) && NEAR(one[0].y, 75.0f));
+        /* A latest-step view draws the world's own array, uncopied. */
+        CHECK(game_movers_shown(&gs, MOVER_SPIDERS, 1.0f, spiders, sizeof(spiders), &count) ==
+              (const void *)gs.world.spiders);
+        /* A step longer than the snap distance is shown where it landed. */
+        gs.world.spiders[0].x = 10.0f + GAME_INTERP_MAX_JUMP + 1.0f;
+        spider = game_movers_shown(&gs, MOVER_SPIDERS, view.t, spiders, sizeof(spiders), &count);
+        CHECK(spider[0].x == gs.world.spiders[0].x);
+        /* One axis jumping takes the other with it: both are "now". */
+        gs.world.fish[0].x = 20.0f + GAME_INTERP_MAX_JUMP + 5.0f;
+        one = game_movers_shown(&gs, MOVER_FISH, view.t, fish, sizeof(fish), &count);
+        CHECK(one[0].x == gs.world.fish[0].x && one[0].y == 70.0f);
+    }
+
+    /* Things that do not travel are blended too: an axe's angle (the
+     * shorter way round, so a spin from 356 to 4 degrees passes through 0
+     * instead of swinging back), a flame's height, and each falling brick
+     * of a bridge. They used to jump at 60 Hz beside smooth neighbours. */
+    gs.world.axe_trap_count = 2;
+    gs.world.axe_traps[0].angle = 10.0f;
+    gs.world.axe_traps[1].angle = 356.0f;
+    gs.world.blue_flame_count = 1;
+    gs.world.blue_flames[0].y = 200.0f;
+    gs.world.blue_flames[0].angle = 0.0f;
+    gs.world.fire_flame_count = 1;
+    gs.world.fire_flames[0].y = 150.0f;
+    gs.world.bridge_count = 1;
+    gs.world.bridges[0].brick_count = 3;
+    gs.world.bridges[0].bricks[1].y_offset = 0.0f;
+    gs.world.bridges[0].bricks[2].y_offset = 6.0f;
+    game_timing_note_step(&gs);
+    gs.world.axe_traps[0].angle = 20.0f;
+    gs.world.axe_traps[1].angle = 4.0f;
+    gs.world.blue_flames[0].y = 190.0f;
+    gs.world.blue_flames[0].angle = 30.0f;
+    gs.world.fire_flames[0].y = 144.0f;
+    gs.world.bridges[0].bricks[1].y_offset = 4.0f;
+    gs.world.bridges[0].bricks[2].y_offset = 12.0f;
+    view = game_timing_render_view(&gs, 54);
+    {
+        AxeTrap axes[MAX_AXE_TRAPS];
+        BlueFlame flames[MAX_BLUE_FLAMES];
+        Bridge bridges[MAX_BRIDGES];
+        int count = -1;
+        const AxeTrap *axe = game_movers_shown(&gs, MOVER_AXE_TRAPS, view.t, axes, sizeof(axes), &count);
+        CHECK(count == 2 && NEAR(axe[0].angle, 15.0f));
+        /* Half way from 356 to 4 by the short way is 0 (or 360), not 180. */
+        CHECK(NEAR(axe[1].angle, 0.0f) || NEAR(axe[1].angle, 360.0f));
+        const BlueFlame *flame = game_movers_shown(&gs, MOVER_BLUE_FLAMES, view.t,
+                                                   flames, sizeof(flames), &count);
+        CHECK(count == 1 && NEAR(flame[0].y, 195.0f) && NEAR(flame[0].angle, 15.0f));
+        flame = game_movers_shown(&gs, MOVER_FIRE_FLAMES, view.t, flames, sizeof(flames), &count);
+        CHECK(count == 1 && NEAR(flame[0].y, 147.0f));
+        const Bridge *bridge = game_movers_shown(&gs, MOVER_BRIDGES, view.t,
+                                                 bridges, sizeof(bridges), &count);
+        CHECK(count == 1 && bridge[0].brick_count == 3);
+        CHECK(bridge[0].bricks[0].y_offset == 0.0f);
+        CHECK(NEAR(bridge[0].bricks[1].y_offset, 2.0f) && NEAR(bridge[0].bricks[2].y_offset, 9.0f));
+        /* A buffer too small for the array is refused, not overrun. */
+        CHECK(game_movers_shown(&gs, MOVER_BRIDGES, view.t, bridges, 8, &count) ==
+              (const void *)gs.world.bridges);
+    }
+    /* Every kind has a row, and a kind out of range has none. */
+    for (int kind = 0; kind < MOVER_KIND_COUNT; kind++)
+        CHECK(game_mover_name((GameMoverKind)kind) != NULL);
+    CHECK(game_mover_name(MOVER_KIND_COUNT) == NULL);
 
     /* Restarting the clock (a level load does) forgets the noted positions,
      * so the next frame shows everything where it is now. */
@@ -768,6 +986,15 @@ int game_simulation_contract_test(void)
     int jumps = jump_buffer_coyote_time_and_short_hops();
     printf("simulation: jump buffer, coyote time and short hops %s\n", jumps ? "FAIL" : "PASS");
     failures += jumps;
+    int streams = cosmetic_random_draws_leave_gameplay_alone();
+    printf("simulation: cosmetic random draws leave gameplay alone %s\n", streams ? "FAIL" : "PASS");
+    failures += streams;
+    int crumble = falling_crumble_platform_keeps_its_rider_standing();
+    printf("simulation: falling crumble platform keeps its rider standing %s\n", crumble ? "FAIL" : "PASS");
+    failures += crumble;
+    int bounce = jump_input_does_not_change_a_bounce();
+    printf("simulation: jump input leaves a bouncepad launch alone %s\n", bounce ? "FAIL" : "PASS");
+    failures += bounce;
     int collide = collision_hurts_once_and_collects_coins();
     printf("simulation: hazard and coin collision %s\n", collide ? "FAIL" : "PASS");
     int streak = coin_streak_raises_the_chime();

@@ -264,17 +264,38 @@ def check_zenity(host: Host) -> Finding:
     return Finding("zenity", "ok", path)
 
 
+def bun_pin(package_json: str) -> str:
+    """The Bun version docs/package.json asks for ("packageManager": "bun@1.2.3")."""
+    match = re.search(r'"packageManager"\s*:\s*"bun@([0-9][0-9A-Za-z.+-]*)"', package_json)
+    return match.group(1) if match else ""
+
+
 def check_bun(host: Host) -> Finding:
+    # docs/package.json names the Bun release the lockfile was written with,
+    # the one CI installs. It is read from the file, like the Emscripten pin.
+    pin = bun_pin(host.read(ROOT / "docs" / "package.json") or "")
     path = host.which("bun")
     if path is None:
+        pin_text = f" docs/package.json pins bun@{pin}." if pin else ""
         return Finding(
             "Bun", "warn",
-            "bun is not on PATH. The docs site in docs/ installs and builds with Bun. The game does not.",
+            "bun is not on PATH. The docs site in docs/ installs and builds with Bun."
+            f"{pin_text} The game does not.",
         )
     code, text = host.run([path, "--version"])
+    reported = first_line(text)
     if code != 0:
-        return Finding("Bun", "warn", f"{path} --version failed.\n{first_line(text)}")
-    return Finding("Bun", "ok", first_line(text))
+        return Finding("Bun", "warn", f"{path} --version failed.\n{reported}")
+    if pin and reported.strip() != pin:
+        return Finding(
+            "Bun", "warn",
+            f"bun reports {reported}; docs/package.json (packageManager) and CI use {pin}. "
+            "Another release can refuse docs/bun.lock under --frozen-lockfile or rewrite it. "
+            f"Install {pin} (bun upgrade, or https://bun.sh) before working on the docs site, "
+            "and do not commit a lockfile written by another version. The game does not need Bun.",
+        )
+    detail = reported if not pin else f"{reported} (docs/package.json pin {pin})"
+    return Finding("Bun", "ok", detail)
 
 
 def check_emcc(host: Host) -> Finding:

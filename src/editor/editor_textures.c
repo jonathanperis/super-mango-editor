@@ -52,11 +52,9 @@ void editor_textures_load(EditorState *es)
      * loads them once there is a document (and again whenever it changes). */
 
     /* Static geometry. */
+    /* The default grass tile. A platform that names another image gets
+     * it by path, on first use (editor_platform_tile_texture). */
     LOAD_TEX(platform,         "assets/sprites/levels/grass_platform.png");
-    LOAD_TEX(platform_stone,   "assets/sprites/levels/stone_platform.png");
-    LOAD_TEX(platform_leaf,    "assets/sprites/levels/leaf_platform.png");
-    LOAD_TEX(platform_brick,   "assets/sprites/levels/brick_platform.png");
-    LOAD_TEX(platform_grass_rock, "assets/sprites/levels/grass_rock_platform.png");
 
     /* Enemies — ground, air, and water patrol types. */
     LOAD_TEX(spider,           "assets/sprites/entities/spider.png");
@@ -110,6 +108,39 @@ void editor_textures_load(EditorState *es)
  * Textures must be released before the graphics context. DESTROY_TEX clears
  * owned slots after unloading their GPU handles.
  */
+Texture2D *editor_platform_tile_texture(EditorState *es, const char *tile_path)
+{
+    EditorTileTexture *slot;
+
+    if (!es) return NULL;
+    if (!tile_path || tile_path[0] == '\0') return es->textures.platform;
+
+    /* Already seen (loaded, or known not to load)? */
+    for (int i = 0; i < es->tile_cache_count; i++) {
+        slot = &es->tile_cache[i];
+        if (strcmp(slot->path, tile_path) == 0)
+            return slot->texture ? slot->texture : es->textures.platform;
+    }
+    /* A path longer than the level format allows cannot be a tile. */
+    if (strlen(tile_path) >= sizeof(slot->path)) return es->textures.platform;
+
+    /* New to the cache. When it is full the oldest entry makes room: a
+     * level uses a handful of tile images, far fewer than the slots. */
+    if (es->tile_cache_count < EDITOR_TILE_CACHE_SIZE) {
+        slot = &es->tile_cache[es->tile_cache_count++];
+    } else {
+        slot = &es->tile_cache[es->tile_cache_next];
+        es->tile_cache_next = (es->tile_cache_next + 1) % EDITOR_TILE_CACHE_SIZE;
+        texture_unload(slot->texture);
+    }
+    memcpy(slot->path, tile_path, strlen(tile_path) + 1);
+    slot->texture = IsWindowReady() ? texture_load(tile_path) : NULL;
+    if (!slot->texture)
+        fprintf(stderr, "Warning: platform tile %s does not load; showing the default\n",
+                tile_path);
+    return slot->texture ? slot->texture : es->textures.platform;
+}
+
 void editor_textures_cleanup(EditorState *es)
 {
     DESTROY_TEX(es->textures.sky);
@@ -124,10 +155,12 @@ void editor_textures_cleanup(EditorState *es)
     DESTROY_TEX(es->textures.floor_tile);
     DESTROY_TEX(es->textures.water);
     DESTROY_TEX(es->textures.platform);
-    DESTROY_TEX(es->textures.platform_stone);
-    DESTROY_TEX(es->textures.platform_leaf);
-    DESTROY_TEX(es->textures.platform_brick);
-    DESTROY_TEX(es->textures.platform_grass_rock);
+    for (int i = 0; i < es->tile_cache_count; i++) {
+        DESTROY_TEX(es->tile_cache[i].texture);
+        es->tile_cache[i].path[0] = '\0';
+    }
+    es->tile_cache_count = 0;
+    es->tile_cache_next = 0;
     DESTROY_TEX(es->textures.spider);
     DESTROY_TEX(es->textures.jumping_spider);
     DESTROY_TEX(es->textures.bird);

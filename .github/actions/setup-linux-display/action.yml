@@ -1,0 +1,33 @@
+name: Start a virtual display and sound device
+description: >-
+  Starts Xvfb (an X server that draws into memory) and a PulseAudio null
+  sink, so tests that open a window and an audio device run on a Linux
+  runner that has neither. Needs the packages that install-linux-deps adds
+  with display 'true'.
+
+runs:
+  using: composite
+  steps:
+    - name: Start Xvfb and PulseAudio
+      shell: bash
+      run: |
+        # -noreset: an X server normally resets itself when its last
+        # client disconnects. The tests are the only client and close and
+        # reopen their window many times, so every close started a reset,
+        # and a window opened while one was under way had its connection
+        # dropped: "X11: Failed to open display :99", twice in about 40
+        # runs. With this option the server never resets.
+        Xvfb :99 -screen 0 1280x1024x24 -noreset > "$RUNNER_TEMP/xvfb.log" 2>&1 &
+        # Xvfb starts in the background; with raylib restored from the
+        # cache the tests can reach the display before it listens, so wait
+        # for its socket (up to 30 s) instead of racing it.
+        for _ in $(seq 60); do [ -S /tmp/.X11-unix/X99 ] && break; sleep 0.5; done
+        [ -S /tmp/.X11-unix/X99 ] || { cat "$RUNNER_TEMP/xvfb.log"; exit 1; }
+        # Later steps of the job read these: which display to open, and
+        # that OpenGL should be drawn by the CPU (the runner has no GPU).
+        echo "DISPLAY=:99" >> "$GITHUB_ENV"
+        echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
+        # A sound "device" that accepts playback and discards it.
+        pulseaudio --start --exit-idle-time=-1
+        pactl load-module module-null-sink sink_name=mango
+        pactl set-default-sink mango

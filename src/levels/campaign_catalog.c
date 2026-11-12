@@ -223,7 +223,7 @@ void campaign_entry_load(CampaignLevel *entry)
 }
 
 /*
- * campaign_manifest_load_entries — Parse a campaign manifest into staged.
+ * campaign_manifest_parse_text — Parse manifest bytes into staged.
  *
  * The manifest is untrusted input, so every step checks before it trusts:
  * parse, root keys, version, the level list, then each level path and the
@@ -231,28 +231,27 @@ void campaign_entry_load(CampaignLevel *entry)
  * why; on failure the caller discards staged, so a bad manifest never
  * replaces a working campaign. A broken *level file* is not a broken
  * manifest: campaign_entry_load marks only that entry unavailable.
+ *
+ * label stands in for the file name in messages. Working from bytes in
+ * memory (rather than opening the file here) gives the fuzz harness and
+ * the game one and the same code to run.
  */
-static int campaign_manifest_load_entries(const char *manifest_path,
-                                          CampaignCatalog *staged)
+static int campaign_manifest_parse_text(const char *text, size_t size,
+                                        const char *label,
+                                        CampaignCatalog *staged)
 {
-    FILE *fp;
     toml_result_t parsed;
     toml_datum_t top;
     toml_datum_t version;
     toml_datum_t levels;
     int result = -1;
 
-    /* 1. Read and parse the manifest file. */
-    fp = serializer_fopen_utf8(manifest_path, "rb");
-    if (!fp) {
-        fprintf(stderr, "campaign: cannot open manifest '%s'\n", manifest_path);
-        return -1;
-    }
-    parsed = toml_parse_file(fp);
-    fclose(fp);
+    /* 1. Parse the bytes (already limited to CAMPAIGN_MANIFEST_TEXT_MAX). */
+    if (!text || size >= CAMPAIGN_MANIFEST_TEXT_MAX) return -1;
+    parsed = toml_parse(text, (int)size);
     if (!parsed.ok) {
         fprintf(stderr, "campaign: TOML parse error in '%s': %s\n",
-                manifest_path, parsed.errmsg);
+                label, parsed.errmsg);
         return -1;
     }
 
@@ -288,6 +287,14 @@ static int campaign_manifest_load_entries(const char *manifest_path,
     levels = campaign_manifest_get_exact(top, "levels", sizeof("levels") - 1);
     if (levels.type != TOML_ARRAY || levels.u.arr.size <= 0) {
         fprintf(stderr, "campaign: manifest levels must be a nonempty array\n");
+        goto done;
+    }
+    /* Each entry below costs a LevelDef (about 16 KB), a file probe and a
+     * comparison with every entry before it, so the list has a limit
+     * before any of that work starts. */
+    if (levels.u.arr.size > CAMPAIGN_MAX_LEVELS) {
+        fprintf(stderr, "campaign: manifest lists %d levels (at most %d)\n",
+                levels.u.arr.size, CAMPAIGN_MAX_LEVELS);
         goto done;
     }
 
@@ -392,6 +399,32 @@ int campaign_first_available(const CampaignCatalog *catalog)
     return -1;
 }
 
+/*
+ * campaign_manifest_load_entries — Read a manifest file, at most
+ * CAMPAIGN_MANIFEST_TEXT_MAX bytes of it, and parse what was read.
+ */
+static int campaign_manifest_load_entries(const char *manifest_path,
+                                          CampaignCatalog *staged)
+{
+    char *text = NULL;
+    size_t size = 0;
+    int too_large = 0;
+    int result;
+
+    if (serializer_read_bytes(manifest_path, CAMPAIGN_MANIFEST_TEXT_MAX, &text,
+                              &size, &too_large) != SERIALIZER_PATH_EXISTING) {
+        if (too_large)
+            fprintf(stderr, "campaign: manifest '%s' is larger than %d bytes\n",
+                    manifest_path, CAMPAIGN_MANIFEST_TEXT_MAX - 1);
+        else
+            fprintf(stderr, "campaign: cannot open manifest '%s'\n", manifest_path);
+        return -1;
+    }
+    result = campaign_manifest_parse_text(text, size, manifest_path, staged);
+    free(text);   /* the catalog keeps its own copies */
+    return result;
+}
+
 int campaign_catalog_read(const char *manifest_path, CampaignCatalog *catalog)
 {
     CampaignCatalog staged = {0};
@@ -406,23 +439,45 @@ int campaign_catalog_read(const char *manifest_path, CampaignCatalog *catalog)
     return 0;
 }
 
+/* The second half of a load: the order rules, and at least one playable
+ * level. Takes ownership of staged; *catalog is replaced only on success. */
+static int campaign_catalog_accept(CampaignCatalog *staged, const char *label,
+                                   CampaignCatalog *catalog)
+{
+    campaign_check_chain(staged, 1);
+    /* A menu with nothing to play is not a usable campaign. */
+    if (campaign_first_available(staged) < 0) {
+        fprintf(stderr, "campaign: no playable level in '%s'\n", label);
+        campaign_catalog_cleanup(staged);
+        return -1;
+    }
+
+    campaign_catalog_cleanup(catalog);
+    *catalog = *staged;
+    return 0;
+}
+
 int campaign_catalog_load(const char *manifest_path, CampaignCatalog *catalog)
 {
     CampaignCatalog staged = {0};
 
     if (!manifest_path || !catalog) return -1;
     if (campaign_catalog_read(manifest_path, &staged) != 0) return -1;
-    campaign_check_chain(&staged, 1);
-    /* A menu with nothing to play is not a usable campaign. */
-    if (campaign_first_available(&staged) < 0) {
-        fprintf(stderr, "campaign: no playable level in '%s'\n", manifest_path);
+    return campaign_catalog_accept(&staged, manifest_path, catalog);
+}
+
+int campaign_catalog_load_text(const char *text, size_t size, const char *label,
+                               CampaignCatalog *catalog)
+{
+    CampaignCatalog staged = {0};
+
+    if (!text || !catalog) return -1;
+    if (!label) label = "(memory)";
+    if (campaign_manifest_parse_text(text, size, label, &staged) != 0) {
         campaign_catalog_cleanup(&staged);
         return -1;
     }
-
-    campaign_catalog_cleanup(catalog);
-    *catalog = staged;
-    return 0;
+    return campaign_catalog_accept(&staged, label, catalog);
 }
 
 void campaign_catalog_cleanup(CampaignCatalog *catalog)

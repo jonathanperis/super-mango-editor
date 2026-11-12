@@ -24,29 +24,30 @@
 /*
  * read_stable_level — Parse, validate and fingerprint a level into the heap.
  *
- * level_load_toml validates the definition, which is the only validation a
- * level load needs; the callers below never repeat it. The copy lives on the
- * heap because a LevelDef is about 16 KB (see LEVEL_DEF_SIZE_BUDGET in
- * level.h). The file is fingerprinted before and after the parse, so the
- * hash an experiment records is the hash of exactly these bytes. Returns an
- * owned LevelDef, or NULL after printing why.
+ * level_load_toml_file validates the definition, which is the only
+ * validation a level load needs; the callers below never repeat it. The
+ * copy lives on the heap because a LevelDef is about 16 KB (see
+ * LEVEL_DEF_SIZE_BUDGET in level.h). The file is read once and the same
+ * bytes are hashed and parsed, so the hash an experiment records is the
+ * hash of exactly the level that was loaded, even if another program
+ * rewrites the file while it is being read. Returns an owned LevelDef, or
+ * NULL after printing why.
  */
 static LevelDef *read_stable_level(const char *path, uint64_t *hash)
 {
-    SerializerFileFingerprint before, after;
+    SerializerFileFingerprint fingerprint;
     LevelDef *level = malloc(sizeof(*level));
     if (!level) {
         fprintf(stderr, "Error: Failed to allocate level storage\n");
         return NULL;
     }
     level_def_init_defaults(level);
-    if (serializer_fingerprint_utf8(path, &before) != 1 || level_load_toml(path, level) != 0 ||
-        serializer_fingerprint_utf8(path, &after) != 1 || !serializer_fingerprint_equal(&before, &after)) {
-        fprintf(stderr, "Error: cannot read stable level bytes: %s\n", path);
+    if (level_load_toml_file(path, level, NULL, NULL, &fingerprint) != 0) {
+        fprintf(stderr, "Error: cannot load level: %s\n", path);
         free(level);
         return NULL;
     }
-    *hash = after.content_hash;
+    *hash = fingerprint.content_hash;
     return level;
 }
 

@@ -45,6 +45,7 @@
 #include "test_folders.h"
 #include "test_paths.h"  /* TEST_OUT scratch directory */
 #include "editor/tools.h"
+#include "editor/tools_internal.h"  /* delete_entity */
 #include "editor/undo.h"
 #include "shared/ui.h"
 #include "editor/canvas.h"
@@ -80,6 +81,17 @@ static int expect_string(const char *name, const char *actual,
         return 1;
     }
     return 0;
+}
+
+/* Compare a document path with `relative`, a path as a test wrote it. The
+ * editor knows every document by its absolute path (the working folder
+ * joined to a relative one), so that is what is compared. */
+static int expect_document_path(const char *name, const char *actual,
+                                const char *relative)
+{
+    char absolute[EDITOR_PATH_MAX];
+    if (editor_absolute_path(relative, absolute, sizeof(absolute)) != 0) return 1;
+    return expect_string(name, actual, absolute);
 }
 
 static int expect_prefix(const char *name, const char *actual,
@@ -355,6 +367,8 @@ int main(void)
     if (camera_scrolls_vertically_and_stays_clamped() != 0) return 1;
     if (playtest_blocks_editing_and_stop_cleans_up() != 0) return 1;
     if (load_fingerprints_the_bytes_it_parsed() != 0) return 1;
+    if (documents_are_known_by_absolute_path() != 0) return 1;
+    if (status_bar_names_files_usefully() != 0) return 1;
     if (recovery_metadata_keeps_longest_source_path() != 0) return 1;
     if (apply_loaded_level_rejects_long_path() != 0) return 1;
     if (recent_files_skip_overlong_lines_and_line_breaks() != 0) return 1;
@@ -372,6 +386,7 @@ int main(void)
     if (motion_fields_stay_within_validator_limits() != 0) return 1;
     if (open_dropdown_owns_the_next_click() != 0) return 1;
     if (dropdowns_accept_any_option_for_unknown_values() != 0) return 1;
+    if (dropdown_near_the_bottom_opens_upward() != 0) return 1;
     if (new_level_resets_previews() != 0) return 1;
     if (rail_rider_paste_follows_its_rail() != 0) return 1;
     if (repeated_paste_steps_each_copy() != 0) return 1;

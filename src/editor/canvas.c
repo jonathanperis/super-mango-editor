@@ -26,6 +26,7 @@
  */
 
 #include "canvas.h"
+#include "editor_textures.h"  /* editor_platform_tile_texture */
 
 #include <math.h>       /* floorf for the fog tiles                       */
 #include <stdio.h>      /* snprintf for debug labels                      */
@@ -35,6 +36,7 @@
 #include "editor_campaign.h" /* the Campaign view drawn in the canvas's place  */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers          */
 #include "hit_test.h"    /* editor_entity_bounds: sprites, selection outline     */
+#include "editor_handles.h" /* patrol ranges and resize handles                  */
 #include "tools.h"       /* editor_snap_point for the placement ghost           */
 #include "editor_session.h" /* editor_document_hash */
 #include "../levels/level_loader.h"
@@ -111,6 +113,8 @@ static void render_ropes(EditorState *es);
 static void render_checkpoints(EditorState *es);
 static void render_sprites(EditorState *es, const EntityType *types, int count);
 static void render_selection(EditorState *es);
+static void render_patrol_ranges(EditorState *es);
+static void render_handles(EditorState *es);
 static void render_ghost(EditorState *es);
 static void render_grid(EditorState *es);
 static void render_screens(EditorState *es);
@@ -269,8 +273,11 @@ void canvas_render(EditorState *es) {
     if (es->show_fog) render_fog(es);
     render_outside_world(es);
 
-    /* ---- Layer 6: Selection highlight ---- */
+    /* ---- Layer 6: Patrol ranges, the selection highlight and the
+     *      selected entity's resize handles ---- */
+    render_patrol_ranges(es);
     render_selection(es);
+    render_handles(es);
 
     /* ---- Layer 7: Ghost preview (placement mode) ---- */
     render_ghost(es);
@@ -537,23 +544,9 @@ static void render_platforms(EditorState *es) {
         EditorRect bounds = { plat_x, plat_y, (float)plat_w, (float)plat_h };
         if (!canvas_shows(es, &bounds)) continue;
 
-        /* Select texture based on tile_path */
-        Texture2D *tex;
-        if (pp->tile_path[0] != '\0') {
-            if (strcmp(pp->tile_path, "assets/sprites/levels/stone_platform.png") == 0) {
-                tex = es->textures.platform_stone;
-            } else if (strcmp(pp->tile_path, "assets/sprites/levels/leaf_platform.png") == 0) {
-                tex = es->textures.platform_leaf;
-            } else if (strcmp(pp->tile_path, "assets/sprites/levels/brick_platform.png") == 0) {
-                tex = es->textures.platform_brick;
-            } else if (strcmp(pp->tile_path, "assets/sprites/levels/grass_rock_platform.png") == 0) {
-                tex = es->textures.platform_grass_rock;
-            } else {
-                tex = es->textures.platform;  /* fallback to default */
-            }
-        } else {
-            tex = es->textures.platform;  /* default grass */
-        }
+        /* The platform's own tile image, loaded by path as the game does,
+         * so any valid tile_path is shown as it will look in play. */
+        Texture2D *tex = editor_platform_tile_texture(es, pp->tile_path);
 
         if (tex) {
             /* 9-slice tiling — walk every 16x16 piece inside the platform */
@@ -1151,6 +1144,109 @@ static void render_selection(EditorState *es) {
         float h = es->box_y0 < es->box_y1 ? es->box_y1 - es->box_y0 : es->box_y0 - es->box_y1;
         draw_outline(w2s_x(es, x0), w2s_y(es, y0), w2s_w(es, (int)w),
                      w2s_h(es, (int)h), 1, ui_color(&es->ui, UI_COLOR_ACCENT));
+    }
+}
+
+/* ---- Patrol ranges ------------------------------------------------ */
+
+/*
+ * draw_patrol_range — One range as a thin line with a tick at each end.
+ *
+ * The line is a bright amber pixel row on a black one three pixels thick,
+ * so it reads on a pale sky, on dark lava and on the floor alike.  alpha
+ * (0..255) fades both: full for a selected entity, faint for the rest.
+ * Everything is in screen pixels, so the line stays one pixel thin at any
+ * zoom.
+ */
+#define PATROL_TICK_HALF_H 4   /* a tick reaches this far above and below the line */
+
+static void draw_patrol_range(const EditorState *es, const EditorPatrolRange *range,
+                              unsigned char alpha)
+{
+    Color line = { 255, 214, 64, alpha };
+    Color edge = { 0, 0, 0, alpha };
+    int x0 = w2s_x(es, range->x0);
+    int x1 = w2s_x(es, range->x1);
+    int y = w2s_y(es, range->y);
+    int tick_top = y - PATROL_TICK_HALF_H;
+    int tick_h = 2 * PATROL_TICK_HALF_H + 1;
+
+    /* The dark edge first, one pixel bigger all round, then the line. */
+    DrawRectangle(x0 - 1, y - 1, x1 - x0 + 2, 3, edge);
+    DrawRectangle(x0 - 1, tick_top - 1, 3, tick_h + 2, edge);
+    DrawRectangle(x1 - 2, tick_top - 1, 3, tick_h + 2, edge);
+    DrawRectangle(x0, y, x1 - x0, 1, line);
+    DrawRectangle(x0, tick_top, 1, tick_h, line);
+    DrawRectangle(x1 - 1, tick_top, 1, tick_h, line);
+}
+
+/*
+ * render_patrol_ranges — Show where every patrolling enemy and saw turns
+ * round: faintly for all of them, at full strength for the selected ones
+ * (drawn last, so they lie on top).  Ranges outside the view are skipped.
+ */
+static void render_patrol_ranges(EditorState *es)
+{
+    static const EntityType patrollers[] = {
+        ENT_SPIDER, ENT_JUMPING_SPIDER, ENT_BIRD, ENT_FASTER_BIRD,
+        ENT_FISH, ENT_FASTER_FISH, ENT_CIRCULAR_SAW,
+    };
+    const unsigned char faint = 96, full = 255;
+
+    /* Pass 0 draws the unselected ranges, pass 1 the selected ones. */
+    for (int pass = 0; pass < 2; pass++) {
+        for (int t = 0; t < ARRAY_LEN(patrollers); t++) {
+            EntityType type = patrollers[t];
+            for (int i = 0; i < editor_entity_count(&es->level, type); i++) {
+                EditorPatrolRange range;
+                EditorRect area;
+                int selected = editor_is_selected(es, type, i);
+                if (selected != pass) continue;
+                if (!editor_patrol_range(&es->level, type, i, &range)) continue;
+                /* The line and its ticks, as a box, to ask the canvas
+                 * whether any of it is in view. */
+                area.x = range.x0;
+                area.w = range.x1 - range.x0;
+                area.y = range.y - (float)PATROL_TICK_HALF_H;
+                area.h = (float)(2 * PATROL_TICK_HALF_H + 1);
+                if (!canvas_shows(es, &area)) continue;
+                draw_patrol_range(es, &range, selected ? full : faint);
+            }
+        }
+    }
+}
+
+/* ---- Resize handles ----------------------------------------------- */
+
+/*
+ * render_handles — The small squares the Select tool can drag on the one
+ * selected entity (editor_handles.c says where they are).  White with a
+ * black edge, like the range line, to read on any background; the one
+ * under the pointer or being dragged is filled with the accent colour.
+ * EDITOR_HANDLE_SIZE_PX screen pixels wide at every zoom.
+ */
+static void render_handles(EditorState *es)
+{
+    EditorHandle handles[EDITOR_HANDLE_MAX];
+    EditorHandleKind hot = EDITOR_HANDLE_NONE;
+    float cursor_x, cursor_y;
+    int count;
+
+    if (!editor_handles_shown(es)) return;
+    count = editor_entity_handles(&es->level, es->selection.type,
+                                  es->selection.index, handles);
+    canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &cursor_x, &cursor_y);
+    if (es->resizing) hot = (EditorHandleKind)es->resize_handle;
+    else if (canvas_contains(es->mouse_x, es->mouse_y))
+        hot = editor_handle_at(es, cursor_x, cursor_y);
+
+    for (int i = 0; i < count; i++) {
+        int half = EDITOR_HANDLE_SIZE_PX / 2;
+        int x = w2s_x(es, handles[i].x) - half;
+        int y = w2s_y(es, handles[i].y) - half;
+        Color fill = handles[i].kind == hot ? ui_color(&es->ui, UI_COLOR_ACCENT) : WHITE;
+        DrawRectangle(x - 1, y - 1, EDITOR_HANDLE_SIZE_PX + 2, EDITOR_HANDLE_SIZE_PX + 2, BLACK);
+        DrawRectangle(x, y, EDITOR_HANDLE_SIZE_PX, EDITOR_HANDLE_SIZE_PX, fill);
     }
 }
 

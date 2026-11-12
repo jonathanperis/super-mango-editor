@@ -116,11 +116,13 @@ typedef struct {
 /* Place one spike block on a specific rail at starting position t0. */
 void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed);
 
-/* Advance one block along its rail. cam_x is the current camera left edge. */
-void spike_block_update(SpikeBlock *sb, float dt, int cam_x);
+/* Advance one block along its rail. reveal_x is the world x of the
+ * furthest-right pixel the camera could show (game_camera_reveal_right);
+ * a waiting block starts once its left edge is inside it. */
+void spike_block_update(SpikeBlock *sb, float dt, int reveal_x);
 
 /* Advance all active blocks. */
-void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int cam_x);
+void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int reveal_x);
 
 /* Draw one block at its current world position. */
 void spike_block_render(const SpikeBlock *sb,

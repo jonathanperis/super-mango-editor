@@ -223,6 +223,10 @@ static int config_state_init(EditorState *es, TextFont *font, char *root,
     memset(es, 0, sizeof(*es));
     editor_level_init_defaults(&es->level);
     ui_init(&es->ui, font);
+    /* The editor's logical size, as editor_init sets it: tooltips and
+     * dropdown lists are kept inside it. */
+    es->ui.view_w = EDITOR_W;
+    es->ui.view_h = EDITOR_H;
     es->ui.before_command = editor_before_command;
     es->ui.before_command_context = es;
     es->config_open = 1;
@@ -741,6 +745,74 @@ done:
  * A dropdown whose stored value is none of its options (a hand-edited
  * path) must still let the designer pick option 0, "(none)" here.
  */
+/*
+ * A dropdown near the bottom of the window opens upward: its rows end at
+ * the header instead of running off the bottom edge, where they could be
+ * neither seen nor clicked. The click test uses the same place the rows
+ * are drawn, so a click on a row picks that row.
+ */
+static int dropdown_near_the_bottom_opens_upward(void)
+{
+    static const char *options[] = {"one", "two", "three", "four", "five", "six"};
+    EditorWidgetTestContext context;
+    EditorState es;
+    int sel = 0;
+    int result = 1;
+    const int view_h = 720, row = 20, header_y = 690, x = 100, w = 120;
+
+    if (editor_widget_test_context_init(&context) != 0) {
+        editor_widget_test_context_cleanup(&context);
+        return 1;
+    }
+    if (config_state_init(&es, context.font, NULL, 0) != 0) goto done;
+    es.ui.view_w = 1280;
+    es.ui.view_h = view_h;
+
+    /* Open it with a click on the header, 30 px above the bottom edge. */
+    ui_begin_frame(&es.ui);
+    es.ui.mouse_clicked = 1;
+    es.ui.mouse_x = x + 10;
+    es.ui.mouse_y = header_y + 4;
+    (void)ui_dropdown(&es.ui, 7777, x, header_y, w, options, 6, &sel);
+    if (expect_int("list open", es.ui.dropdown_open_id, 7777) != 0 ||
+        expect_int("six rows end at the header's top", es.ui.dropdown_y, header_y - 6 * row) != 0)
+        goto done;
+
+    /* Click the fifth row ("five") where it is drawn. */
+    ui_begin_frame(&es.ui);
+    es.ui.mouse_clicked = 1;
+    es.ui.mouse_x = x + 10;
+    es.ui.mouse_y = header_y - 6 * row + 4 * row + 4;
+    if (expect_int("a row above the header is picked",
+                   ui_dropdown(&es.ui, 7777, x, header_y, w, options, 6, &sel), 1) != 0 ||
+        expect_int("the fifth option", sel, 4) != 0) goto done;
+
+    /* With room below, the list still opens downward. */
+    ui_begin_frame(&es.ui);
+    es.ui.mouse_clicked = 1;
+    es.ui.mouse_x = x + 10;
+    es.ui.mouse_y = 104;
+    (void)ui_dropdown(&es.ui, 7778, x, 100, w, options, 6, &sel);
+    if (expect_int("list below the header", es.ui.dropdown_y, 100 + row) != 0) goto done;
+
+    /* Taller than the room on either side: slid up to end at the bottom
+     * edge, so no row is outside the window. */
+    es.ui.view_h = 100;
+    ui_begin_frame(&es.ui);
+    es.ui.dropdown_open_id = 0;
+    es.ui.mouse_clicked = 1;
+    es.ui.mouse_x = x + 10;
+    es.ui.mouse_y = 44;
+    (void)ui_dropdown(&es.ui, 7779, x, 40, w, options, 6, &sel);
+    if (expect_int("list kept inside a short window", es.ui.dropdown_y, 0) != 0) goto done;
+    result = 0;
+
+done:
+    config_state_cleanup(&es, NULL);
+    editor_widget_test_context_cleanup(&context);
+    return result;
+}
+
 static int dropdowns_accept_any_option_for_unknown_values(void)
 {
     EditorWidgetTestContext context;

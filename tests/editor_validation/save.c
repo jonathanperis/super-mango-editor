@@ -57,8 +57,8 @@ static int save_and_load_resets_editor_session(void)
     if (expect_int("dirty undo count", es.undo->top, 2) != 0) goto cleanup;
 
     if (editor_load_level(&es, EDITOR_WORKFLOW_LEVEL_PATH) != 0) goto cleanup;
-    if (expect_string("loaded file path", es.file_path,
-                      EDITOR_WORKFLOW_LEVEL_PATH) != 0) goto cleanup;
+    if (expect_document_path("loaded file path", es.file_path,
+                             EDITOR_WORKFLOW_LEVEL_PATH) != 0) goto cleanup;
     if (expect_string("loaded level name", es.level.name,
                       "Workflow Fixture") != 0) goto cleanup;
     if (expect_int("loaded coin count", es.level.coin_count, 1) != 0)
@@ -70,7 +70,7 @@ static int save_and_load_resets_editor_session(void)
         goto cleanup;
     if (expect_int("recent count after load", es.recent_file_count, 1) != 0)
         goto cleanup;
-    if (expect_string("recent first after load", es.recent_files[0],
+    if (expect_document_path("recent first after load", es.recent_files[0],
                       EDITOR_WORKFLOW_LEVEL_PATH) != 0) goto cleanup;
 
     result = 0;

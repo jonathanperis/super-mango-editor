@@ -10,6 +10,11 @@
  * return its left edge as a whole pixel. */
 int game_camera_update(GameState *gs, float dt);
 
+/* The world x of the furthest-right pixel the camera could show for the
+ * player's current position, whatever the Reduced motion setting says. The
+ * simulation uses it to decide what has been revealed. */
+int game_camera_reveal_right(const GameState *gs);
+
 /*
  * Jump the camera straight to where it wants to be for the player's current
  * position, with no easing. Used whenever the player is placed rather

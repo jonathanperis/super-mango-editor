@@ -268,8 +268,21 @@ static int confirming_game_over_restores_default_spawn_when_level_start_unset(vo
     return 0;
 }
 
+/* Losing the last life leaves lives at -1 behind the Game Over overlay.
+ * The HUD counter shows x0 there, not x-1. */
+static int hud_never_shows_negative_lives(void)
+{
+    Hud hud = {0};
+    HudLayout layout;
+    hud_layout(&hud, 0, -1, 0, &layout);
+    if (expect_int("lives -1 reads x0", strcmp(layout.lives, "x0"), 0) != 0) return 1;
+    hud_layout(&hud, 3, 2, 0, &layout);
+    return expect_int("lives 2 reads x2", strcmp(layout.lives, "x2"), 0);
+}
+
 int main(void)
 {
+    if (hud_never_shows_negative_lives() != 0) return 1;
     if (nonlethal_damage_sets_invincibility_and_push() != 0) return 1;
     if (lethal_damage_consumes_life_and_resets_level() != 0) return 1;
     if (game_over_sets_overlay_without_resetting_level() != 0) return 1;

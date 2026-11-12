@@ -34,6 +34,7 @@
 #include <unistd.h>
 #endif
 
+#include "editor/editor_recovery.h"   /* the recovery badge and its picker seam */
 #include "editor/asset_choices.h"
 #include "editor/canvas.h"
 #include "editor/dialog_choice.h"
@@ -41,14 +42,17 @@
 #include "editor/editor.h"
 #include "editor/editor_chrome.h"
 #include "editor/editor_events.h"
+#include "editor/editor_entity_list.h"
 #include "editor/editor_files.h"
 #include "editor/editor_frame.h"
+#include "editor/editor_handles.h"
 #include "editor/editor_layout.h"
 #include "editor/editor_minimap.h"
 #include "editor/editor_panels.h"
 #include "editor/editor_playtest.h"
 #include "editor/editor_session.h"
 #include "editor/editor_shortcuts.h"
+#include "editor/editor_textures.h"
 #include "editor/entity_meta.h"
 #include "editor/file_dialog.h"
 #include "editor/palette.h"
@@ -89,6 +93,16 @@ static RenderTexture2D tiny_target;
 /* ------------------------------------------------------------------ */
 /* Input and frames                                                    */
 /* ------------------------------------------------------------------ */
+
+/* 1 when the open document is `relative`, a path as a test wrote it. The
+ * editor knows every document by its absolute path, so compare with that
+ * (the working folder joined to the relative one). */
+static int document_is(const EditorState *es, const char *relative)
+{
+    char absolute[EDITOR_PATH_MAX];
+    return editor_absolute_path(relative, absolute, sizeof(absolute)) == 0 &&
+           strcmp(es->file_path, absolute) == 0;
+}
 
 static void push_event(InputKind type, int key_or_button, int mods, int x, int y)
 {
@@ -297,6 +311,8 @@ static int settle_probe(EditorState *es, int x, int y, uint64_t before,
 #include "editor_ui/canvas.c"
 #include "editor_ui/properties.c"
 #include "editor_ui/selection.c"
+#include "editor_ui/handles.c"
+#include "editor_ui/entity_list.c"
 #include "editor_ui/campaign.c"
 #include "editor_ui/group.c"
 #include "editor_ui/text.c"
@@ -345,6 +361,7 @@ int main(void)
         CASE(minimap_jumps_and_drags_the_view),
         CASE(f1_sheet_lists_the_shortcuts),
         CASE(properties_panel_handles_every_entity_type),
+        CASE(a_field_edits_every_selected_entity_of_one_type),
         CASE(level_config_sections_resize_the_panel),
         CASE(text_fields_move_the_caret_and_tab_between_fields),
         CASE(up_and_down_step_number_fields),
@@ -358,6 +375,13 @@ int main(void)
         CASE(validation_messages_take_you_to_the_problem),
         CASE(files_that_will_not_open_list_why),
         CASE(box_and_shift_select_act_on_the_group),
+        CASE(patrol_ranges_show_where_patrollers_turn),
+        CASE(patrol_handles_move_the_range_ends),
+        CASE(handles_leave_other_clicks_alone),
+        CASE(size_handles_change_tile_counts),
+        CASE(entity_list_finds_and_selects_entities),
+        CASE(entity_list_follows_the_level),
+        CASE(layer_rows_move_and_remove_as_one_step),
         CASE(validation_rows_scroll_and_copy),
         CASE(text_fields_select_copy_cut_and_paste),
         CASE(text_fields_keep_line_breaks_on_one_row),
@@ -370,6 +394,7 @@ int main(void)
         CASE(campaign_history_keeps_the_latest_steps),
         CASE(campaign_undo_reads_the_level_file_again),
         CASE(campaign_unsaved_mark_follows_the_history),
+        CASE(campaign_save_keeps_the_open_levels_history),
         CASE(campaign_undo_keys_leave_the_level_history_alone),
         CASE(campaign_undo_and_redo_buttons_replay_each_edit),
         CASE(campaign_refused_undo_can_be_skipped),
@@ -380,6 +405,8 @@ int main(void)
         CASE(native_pickers_report_choice_cancel_and_failure),
 #endif
         CASE(campaign_skip_prompt_keeps_the_step_by_default),
+        CASE(recovery_badge_opens_the_picker),
+        CASE(save_questions_answer_through_the_prompt),
         CASE(prompt_returns_to_the_interrupted_frame),
         CASE(unfocused_editor_slows_its_frames),
 #undef CASE

@@ -1,0 +1,3 @@
+# One entry whose file does not exist: no playable level, so refused.
+format_version = 1
+levels = ["levels/no_such_level.toml"]

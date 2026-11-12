@@ -62,6 +62,128 @@ done:
     return failed;
 }
 
+/* Type `text` into the field of row `row` of a several-entity panel and
+ * press Enter. Row 0 sits under the title bar and the one-line note. */
+static void type_into_shared_row(EditorState *es, int row, const char *text)
+{
+    int y = props_top(es) + 24 + 8 + 20 + row * 24 + 6;
+    click_frame(es, PANEL_FIELD_X, y);
+    snprintf(es->ui.edit_buf, sizeof(es->ui.edit_buf), "%s", text);
+    es->ui.edit_cursor = (int)strlen(text);
+    push_key(KEY_ENTER, 0);
+    ui_frame(es, PANEL_FIELD_X, y);
+}
+
+/*
+ * With several entities of one type selected, the Properties panel shows
+ * that type's fields, and a value typed into one is given to every
+ * selected entity as a single undo step. A value that would break one of
+ * them is refused for all, the first one included. Entities of different
+ * types still show the summary and edit nothing.
+ */
+static int a_field_edits_every_selected_entity_of_one_type(void)
+{
+    int failed = 0;
+    EditorState es;
+    PlacementData data;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 4;
+    es.tool = TOOL_SELECT;
+
+    /* Three coins at different heights. */
+    for (int i = 0; i < 3; i++) {
+        memset(&data, 0, sizeof(data));
+        data.coin.x = 100.0f + 40.0f * i;
+        data.coin.y = 100.0f + 10.0f * i;
+        CHECK(editor_add_placement(&es, ENT_COIN, &data, "place") == 0);
+    }
+    Selection coins[3] = { {ENT_COIN, 0}, {ENT_COIN, 1}, {ENT_COIN, 2} };
+    CHECK(editor_select_items(&es, coins, 3) == 3);
+    CHECK(editor_selection_count(&es) == 3);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+
+    int steps = es.undo->top;
+    type_into_shared_row(&es, 1, "64");                 /* row 1 is y */
+    CHECK(es.level.coins[0].y == 64.0f && es.level.coins[1].y == 64.0f &&
+          es.level.coins[2].y == 64.0f);
+    CHECK(es.level.coins[0].x == 100.0f && es.level.coins[2].x == 180.0f);   /* x untouched */
+    CHECK(es.undo->top == steps + 1);                   /* one step for all three */
+    CHECK(strstr(es.status_message, "set on 3") != NULL);
+    CHECK(editor_selection_count(&es) == 3);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[0].y == 100.0f && es.level.coins[1].y == 110.0f &&
+          es.level.coins[2].y == 120.0f);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);
+    CHECK(es.level.coins[1].y == 64.0f && es.level.coins[2].y == 64.0f);
+
+    /* Typing the value they already share changes nothing and records nothing. */
+    CHECK(editor_select_items(&es, coins, 3) == 3);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    steps = es.undo->top;
+    type_into_shared_row(&es, 1, "64");
+    CHECK(es.undo->top == steps);
+
+    /* Two spiders with patrols apart. Moving both right ends to 250 would
+     * put the second one's right end left of its left end (400): refused
+     * for both, the first one's own edit taken back too. */
+    memset(&data, 0, sizeof(data));
+    data.spider.x = 150.0f; data.spider.vx = 40.0f;
+    data.spider.patrol_x0 = 100.0f; data.spider.patrol_x1 = 300.0f;
+    CHECK(editor_add_placement(&es, ENT_SPIDER, &data, "place") == 0);
+    data.spider.x = 450.0f;
+    data.spider.patrol_x0 = 400.0f; data.spider.patrol_x1 = 600.0f;
+    CHECK(editor_add_placement(&es, ENT_SPIDER, &data, "place") == 0);
+    CHECK(level_is_valid(&es));
+    Selection spiders[2] = { {ENT_SPIDER, 0}, {ENT_SPIDER, 1} };
+    CHECK(editor_select_items(&es, spiders, 2) == 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    steps = es.undo->top;
+    type_into_shared_row(&es, 3, "250");                /* row 3 is patrol_x1 */
+    CHECK(es.level.spiders[0].patrol_x1 == 300.0f && es.level.spiders[1].patrol_x1 == 600.0f);
+    CHECK(es.undo->top == steps && level_is_valid(&es));
+    CHECK(strstr(es.status_message, "Not applied to all 2") != NULL);
+
+    /* A value both can take is applied to both. */
+    CHECK(editor_select_items(&es, spiders, 2) == 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    type_into_shared_row(&es, 1, "55");                 /* row 1 is vx */
+    CHECK(es.level.spiders[0].vx == 55.0f && es.level.spiders[1].vx == 55.0f);
+    CHECK(es.undo->top == steps + 1 && level_is_valid(&es));
+
+    /* No memory for the step that would hold both: the edit is taken back
+     * whole, the primary's own value included, and the bar says why. */
+    CHECK(editor_select_items(&es, spiders, 2) == 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    steps = es.undo->top;
+    undo_test_limit_allocations(0);
+    type_into_shared_row(&es, 1, "66");
+    undo_test_limit_allocations(-1);
+    CHECK(es.level.spiders[0].vx == 55.0f && es.level.spiders[1].vx == 55.0f);
+    CHECK(es.undo->top == steps);
+    CHECK(strcmp(es.status_message, "Edit cancelled: cannot allocate undo history") == 0);
+
+    /* A validation message about "patrol" opens the field that usually
+     * fixes it, the right end; nothing is selected-dependent until the
+     * panel draws, and an empty selection draws no fields at all. */
+    properties_focus_entity_field(&es, ENT_SPIDER, 0, "patrol");
+    CHECK(es.panel_open == 1);
+    editor_select_none(&es);
+    properties_render(&es, 0, 400);
+
+    /* Different types selected: the summary, and no field under the click. */
+    Selection mixed[2] = { {ENT_COIN, 0}, {ENT_SPIDER, 0} };
+    CHECK(editor_select_items(&es, mixed, 2) == 2);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+    steps = es.undo->top;
+    uint64_t hash = doc_hash(&es);
+    type_into_shared_row(&es, 0, "7");
+    CHECK(doc_hash(&es) == hash && es.undo->top == steps);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 static int level_config_sections_resize_the_panel(void)
 {
     int failed = 0, changes = 0;

@@ -26,6 +26,8 @@
 #include "core/game_experiment.h"
 #include "core/game_overlay.h"
 #include "core/game_profile.h"
+#include "core/game_camera.h"   /* game_camera_snap */
+#include "collision/game_collision.h"  /* game_damage_source_* */
 #include "core/game_ghost.h"
 #include "core/game_resume.h"
 #include "effects/parallax.h"
@@ -511,6 +513,109 @@ done:
     return failed;
 }
 
+/*
+ * Run right through the hazards level for a few seconds and report on
+ * which step the open rail's waiting block started (-1 = never).
+ */
+static int open_rail_block_start_step(int reduced_motion, GameWorld *end_state)
+{
+    GameState gs;
+    GameProfile profile = {0};
+    int started = -1;
+    if (mechanics_open_level(&gs, HAZARDS_LEVEL, 0) != 0) return -2;
+    profile.data.settings.reduced_motion = reduced_motion;
+    gs.screen.profile = &profile;
+    stand_at(&gs, 1100.0f);
+    game_camera_snap(&gs);
+    for (int step = 0; step < 4 * STEPS_PER_SECOND; step++) {
+        gs.world.hearts = MAX_HEARTS;        /* the run is about timing, not damage */
+        gs.world.player.hurt_timer = 0.0f;
+        mechanics_step(&gs, PLAYER_INPUT_RIGHT | PLAYER_INPUT_RUN, 1);
+        if (started < 0 && !gs.world.spike_blocks[1].waiting) started = step;
+    }
+    *end_state = gs.world;
+    gs.screen.profile = NULL;
+    game_cleanup(&gs);
+    return started;
+}
+
+/* Reduced motion changes how the camera moves, and nothing else: the same
+ * input gives the same run, step for step, with the setting on or off. */
+static int reduced_motion_does_not_change_the_run(void)
+{
+    int failed = 0;
+    static GameWorld normal, reduced;   /* ~47 KB each: not on the stack */
+    int normal_step = open_rail_block_start_step(0, &normal);
+    int reduced_step = open_rail_block_start_step(1, &reduced);
+    CHECK(normal_step >= 0);
+    CHECK(normal_step == reduced_step);
+    CHECK(memcmp(normal.spike_blocks, reduced.spike_blocks, sizeof(normal.spike_blocks)) == 0);
+    CHECK(normal.player.x == reduced.player.x && normal.player.y == reduced.player.y);
+    /* The cameras did differ, or this test proved nothing. */
+    CHECK(normal.camera.x != reduced.camera.x ||
+          normal.player.x + GAME_W >= (float)normal.runtime.world_w);
+done:
+    return failed;
+}
+
+/*
+ * The debug overlay outlines the boxes of everything that hurts by asking
+ * the collision code's own table (game_damage_source_hitbox). So for each
+ * kind a level contains, the box that would be drawn is a box that really
+ * costs a heart, and an item with no box (a waiting flame, an inactive
+ * hazard) costs none.
+ */
+static int debug_boxes_are_the_boxes_that_hurt(void)
+{
+    int failed = 0;
+    GameState gs;
+    static const char *const levels[] = { HAZARDS_LEVEL, CREATURES_LEVEL };
+    int kinds_checked = 0;
+    int opened = 0;
+
+    for (size_t level = 0; level < sizeof(levels) / sizeof(levels[0]); level++) {
+        CHECK(mechanics_open_level(&gs, levels[level], 0) == 0);
+        opened = 1;
+        for (int source = 0; source < game_damage_source_count(); source++) {
+            IntRect box;
+            int items = game_damage_source_items(&gs.world, source);
+            CHECK(game_damage_source_name(source) != NULL);
+            /* Out of range: no box, and nothing is written through it. */
+            CHECK(game_damage_source_hitbox(&gs.world, source, items, &box) == 0);
+            CHECK(game_damage_source_hitbox(&gs.world, source, -1, &box) == 0);
+            if (items == 0 || !game_damage_source_hitbox(&gs.world, source, 0, &box)) continue;
+            CHECK(box.w > 0 && box.h > 0);
+            /* Put the player's hitbox centre on the box's centre and run
+             * the collision pass alone: nothing moves in between, so the
+             * box asked for is the box tested. */
+            {
+                Player *p = &gs.world.player;
+                IntRect body = player_get_hitbox(p);
+                p->x = box.x + box.w / 2.0f - body.w / 2.0f - PLAYER_PHYS_PAD_X;
+                p->y = box.y + box.h / 2.0f - body.h / 2.0f - PLAYER_PHYS_PAD_TOP;
+                p->hurt_timer = 0.0f;
+                gs.world.hearts = MAX_HEARTS;
+                game_collide(&gs, GAME_FIXED_STEP);
+                if (gs.world.hearts != MAX_HEARTS - 1)
+                    fprintf(stderr, "gameplay_mechanics_test: %s[0] box did not hurt\n",
+                            game_damage_source_name(source));
+                CHECK(gs.world.hearts == MAX_HEARTS - 1);
+            }
+            kinds_checked++;
+        }
+        game_cleanup(&gs);
+        opened = 0;
+    }
+    /* The two fixtures hold most kinds between them; a table that lost
+     * its rows would check none. */
+    CHECK(kinds_checked >= 6);
+    CHECK(game_damage_source_name(-1) == NULL);
+    CHECK(game_damage_source_name(game_damage_source_count()) == NULL);
+done:
+    if (opened) game_cleanup(&gs);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 /* Enemies and bridges                                                 */
 /* ------------------------------------------------------------------ */
@@ -990,6 +1095,64 @@ done:
 }
 
 /*
+ * In a level without authored checkpoints the respawn point is chosen by
+ * the automatic screen checkpoints. A Continue point for such a level is
+ * accepted only if they could have chosen it: the level start, or a safe
+ * column on their search grid at or before a screen already entered.
+ */
+static int automatic_continue_point_must_be_one_the_game_saves(void)
+{
+    int failed = 0;
+    GameState gs;
+    GameResume good, bad;
+    CHECK(mechanics_open_level(&gs, HAZARDS_LEVEL, 0) == 0);
+    CHECK(((const LevelDef *)gs.world.runtime.current_level)->checkpoint_count == 0);
+    snprintf(gs.screen.profile_level_key, sizeof(gs.screen.profile_level_key), "levels/hazards.toml");
+
+    /* Walk into the second screen: the game saves its own point there. */
+    stand_at(&gs, (float)GAME_W + 40.0f);
+    mechanics_step(&gs, 0, 1);
+    CHECK(gs.world.legacy_checkpoint_screen == 1);
+    CHECK(gs.world.respawn_x > 0.0f && gs.world.respawn_x <= (float)GAME_W);
+    game_resume_capture(&gs, &good);
+    game_cleanup(&gs);
+
+    CHECK(mechanics_open_level(&gs, HAZARDS_LEVEL, 0) == 0);
+    snprintf(gs.screen.profile_level_key, sizeof(gs.screen.profile_level_key), "levels/hazards.toml");
+#define REJECTS(change) do { bad = good; change; \
+        CHECK(game_resume_apply(&gs, &bad) == -1); \
+        CHECK(!gs.screen.resumed); } while (0)
+    REJECTS(bad.respawn_x = 320.0f);            /* over the floor gap at 320 */
+    REJECTS(bad.respawn_x += 3.0f);             /* off the 8 px search grid */
+    REJECTS(bad.respawn_x = 3.0f * GAME_W);     /* beyond the screen entered */
+    REJECTS(bad.legacy_screen = 6);             /* the level has screens 0..5 */
+    REJECTS(bad.legacy_screen = 0);             /* no screen entered, yet not at the start */
+    REJECTS(bad.respawn_y += 1.0f);             /* automatic points keep the start's y */
+#undef REJECTS
+    CHECK(game_resume_apply(&gs, &good) == 0);
+    CHECK(gs.screen.resumed && gs.world.respawn_x == good.respawn_x);
+
+    /* The level start is always acceptable, whatever screen was reached. */
+    {
+        float start_x, start_y;
+        level_effective_spawn((const LevelDef *)gs.world.runtime.current_level, &start_x, &start_y);
+        bad = good;
+        bad.respawn_x = start_x;
+        bad.legacy_screen = 4;
+        gs.screen.resumed = 0;
+        CHECK(game_resume_apply(&gs, &bad) == 0);
+    }
+
+    /* A stored point never claims more lives than GAME_RESUME_LIVES_MAX. */
+    gs.world.lives = 5000;
+    game_resume_capture(&gs, &bad);
+    CHECK(bad.lives == GAME_RESUME_LIVES_MAX);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
+/*
  * Time trial: game_frame records one sample per fixed step, the finished
  * run becomes a track, and racing it shows sample n - 1 after n steps.
  * A continued run, Retry and the length cap all behave as documented, and
@@ -1280,6 +1443,8 @@ int main(void)
         CASE(spikes_hurt_once_per_invincibility),
         CASE(hurt_blink_honours_reduced_motion),
         CASE(spike_blocks_follow_their_rails),
+        CASE(reduced_motion_does_not_change_the_run),
+        CASE(debug_boxes_are_the_boxes_that_hurt),
         CASE(jumping_spider_leaps_the_gap),
         CASE(jumping_spider_minimum_speed_clears_a_gap),
         CASE(spider_keeps_its_authored_speed),
@@ -1297,6 +1462,7 @@ int main(void)
         CASE(camera_jumps_to_the_respawn_point),
         CASE(level_start_shows_the_start_at_once),
         CASE(continue_point_must_fit_the_level),
+        CASE(automatic_continue_point_must_be_one_the_game_saves),
         CASE(ghost_records_and_races_the_best_run),
         CASE(experiment_restart_resets_the_step_clock),
         CASE(debug_log_is_a_bounded_ring),

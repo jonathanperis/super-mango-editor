@@ -30,6 +30,8 @@
 #include "../screens/hud.h"  /* MAX_HEARTS */
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
+#include "snapshot_equal.h"   /* placement_same: did a shared edit change an entity? */
+#include "undo.h"             /* undo_group_begin: several entities, one undo step  */
 #include "editor_files.h"  /* editor_path_for_display for recent entries   */
 #include "entity_meta.h" /* editor_entity_type_name/is_singleton             */
 #include "tools.h"       /* editor_set_float_platform_mode                    */
@@ -190,45 +192,48 @@ void draw_section_title(EditorState *es, int x, int y,
 /* ------------------------------------------------------------------ */
 
 /*
- * s_property_panels — one draw_<type>_properties function per EntityType,
- * in the enum order of editor.h.  The table is sized by its rows, so the
- * _Static_assert fails the build when a type added at the end of the enum
- * has no panel yet.  Every function takes the panel's first row y.
+ * s_property_panels — the function that draws each EntityType's fields,
+ * in the enum order of editor.h.  Most types are a table of field rows and
+ * share draw_table_properties (properties_entities.c); a type whose panel
+ * needs more than rows has a draw_<type>_properties function of its own.
+ * The table is sized by its rows, so the _Static_assert fails the build
+ * when a type added at the end of the enum has no panel yet.  Every
+ * function takes the panel's first row y.
  */
 typedef void (*PropertyPanelFn)(EditorState *es, int y);
 
 static const PropertyPanelFn s_property_panels[] = {
     [ENT_FLOOR_GAP]        = draw_floor_gap_properties,
     [ENT_CHECKPOINT]       = draw_checkpoint_properties,
-    [ENT_RAIL]             = draw_rail_properties,
+    [ENT_RAIL]             = draw_table_properties,
     [ENT_PLATFORM]         = draw_platform_properties,
-    [ENT_COIN]             = draw_coin_properties,
-    [ENT_STAR_YELLOW]      = draw_star_yellow_properties,
-    [ENT_STAR_GREEN]       = draw_star_green_properties,
-    [ENT_STAR_RED]         = draw_star_red_properties,
+    [ENT_COIN]             = draw_table_properties,
+    [ENT_STAR_YELLOW]      = draw_table_properties,
+    [ENT_STAR_GREEN]       = draw_table_properties,
+    [ENT_STAR_RED]         = draw_table_properties,
     [ENT_LAST_STAR]        = draw_last_star_properties,
-    [ENT_SPIDER]           = draw_spider_properties,
-    [ENT_JUMPING_SPIDER]   = draw_jumping_spider_properties,
-    [ENT_BIRD]             = draw_bird_properties,
-    [ENT_FASTER_BIRD]      = draw_faster_bird_properties,
-    [ENT_FISH]             = draw_fish_properties,
-    [ENT_FASTER_FISH]      = draw_faster_fish_properties,
-    [ENT_AXE_TRAP]         = draw_axe_trap_properties,
-    [ENT_CIRCULAR_SAW]     = draw_circular_saw_properties,
-    [ENT_SPIKE_ROW]        = draw_spike_row_properties,
-    [ENT_SPIKE_PLATFORM]   = draw_spike_platform_properties,
-    [ENT_SPIKE_BLOCK]      = draw_spike_block_properties,
+    [ENT_SPIDER]           = draw_table_properties,
+    [ENT_JUMPING_SPIDER]   = draw_table_properties,
+    [ENT_BIRD]             = draw_table_properties,
+    [ENT_FASTER_BIRD]      = draw_table_properties,
+    [ENT_FISH]             = draw_table_properties,
+    [ENT_FASTER_FISH]      = draw_table_properties,
+    [ENT_AXE_TRAP]         = draw_table_properties,
+    [ENT_CIRCULAR_SAW]     = draw_table_properties,
+    [ENT_SPIKE_ROW]        = draw_table_properties,
+    [ENT_SPIKE_PLATFORM]   = draw_table_properties,
+    [ENT_SPIKE_BLOCK]      = draw_table_properties,
     [ENT_BLUE_FLAME]       = draw_blue_flame_properties,
     [ENT_FIRE_FLAME]       = draw_fire_flame_properties,
     [ENT_FLOAT_PLATFORM]   = draw_float_platform_properties,
-    [ENT_BRIDGE]           = draw_bridge_properties,
+    [ENT_BRIDGE]           = draw_table_properties,
     [ENT_BOUNCEPAD_SMALL]  = draw_bouncepad_small_properties,
     [ENT_BOUNCEPAD_MEDIUM] = draw_bouncepad_medium_properties,
     [ENT_BOUNCEPAD_HIGH]   = draw_bouncepad_high_properties,
-    [ENT_VINE]             = draw_vine_properties,
-    [ENT_LADDER]           = draw_ladder_properties,
-    [ENT_ROPE]             = draw_rope_properties,
-    [ENT_PLAYER_SPAWN]     = draw_player_spawn_properties,
+    [ENT_VINE]             = draw_table_properties,
+    [ENT_LADDER]           = draw_table_properties,
+    [ENT_ROPE]             = draw_table_properties,
+    [ENT_PLAYER_SPAWN]     = draw_table_properties,
 };
 
 _Static_assert(sizeof(s_property_panels) / sizeof(s_property_panels[0]) == ENT_COUNT,
@@ -239,6 +244,100 @@ static PropertyPanelFn property_panel(EntityType type)
 {
     if (type < 0 || type >= ENT_COUNT) return NULL;
     return s_property_panels[type];
+}
+
+/* ------------------------------------------------------------------ */
+/* One field, several entities                                         */
+/* ------------------------------------------------------------------ */
+
+void properties_apply_to_selection(EditorState *es, EntityType type, const char *key,
+                                   size_t offset, size_t size)
+{
+    static Selection items[EDITOR_MAX_SELECTION];
+    static PlacementData before[EDITOR_MAX_SELECTION];
+    PlacementData primary_before, primary_after, after;
+    EditorIssueSnapshot issues;
+    char error[128];
+    int count, changed = 0, group;
+
+    if (!es || !es->pending_change_valid || es->pending_entity_type != (int)type ||
+        size == 0 || offset + size > sizeof(PlacementData)) {
+        editor_commit_change(es);
+        return;
+    }
+    /* The widget has already written the new value into the primary
+     * entity; pending_entity_before is that entity as it was. */
+    primary_before = es->pending_entity_before;
+    primary_after = editor_snapshot_entity(&es->level, type, es->selection.index);
+    count = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
+
+    /*
+     * What errors did the level have before this edit?  Put the primary
+     * back for a moment to ask, then restore the new value.  Each entity's
+     * own limits (a patrol's left end below its right end) are enforced by
+     * the widget for the primary only, so the others are checked the way
+     * every multi-entity edit is: the level must not gain an error.
+     */
+    (void)editor_entity_write(&es->level, type, es->selection.index, &primary_before);
+    editor_level_issue_snapshot(&es->level, &issues);
+    (void)editor_entity_write(&es->level, type, es->selection.index, &primary_after);
+
+    /* Room for every entry before anything else is touched (undo.h). */
+    group = undo_group_begin(es->undo, count);
+    if (group == 0) {
+        (void)editor_entity_write(&es->level, type, es->selection.index, &primary_before);
+        es->pending_change_valid = 0;
+        editor_set_status(es, "Edit cancelled: cannot allocate undo history");
+        return;
+    }
+
+    /*
+     * Copy the value into the others.  A PlacementData is a union whose
+     * members all start at its first byte, so the bytes at `offset` in the
+     * snapshot are the bytes at `offset` in the entity's own struct.
+     */
+    for (int i = 0; i < count; i++) {
+        if (items[i].type != type || items[i].index == es->selection.index) continue;
+        before[i] = editor_snapshot_entity(&es->level, type, items[i].index);
+        after = before[i];
+        memcpy((char *)&after + offset, (const char *)&primary_after + offset, size);
+        (void)editor_entity_write(&es->level, type, items[i].index, &after);
+    }
+
+    if (editor_edit_kept_level(&es->level, &issues, error, sizeof(error)) != 0) {
+        /* It would break one of them: take everything back, the primary's
+         * own edit included, so the selection stays consistent. */
+        for (int i = 0; i < count; i++) {
+            if (items[i].type != type || items[i].index == es->selection.index) continue;
+            (void)editor_entity_write(&es->level, type, items[i].index, &before[i]);
+        }
+        (void)editor_entity_write(&es->level, type, es->selection.index, &primary_before);
+        es->pending_change_valid = 0;
+        undo_group_end(es->undo);
+        editor_set_status(es, "Not applied to all %d: %s", count, error);
+        return;
+    }
+
+    /* Record it: the primary through the usual commit (it joins the open
+     * group), then one entry per other entity that really changed. */
+    editor_commit_change(es);
+    for (int i = 0; i < count; i++) {
+        Command cmd;
+        if (items[i].type != type || items[i].index == es->selection.index) continue;
+        after = editor_snapshot_entity(&es->level, type, items[i].index);
+        if (placement_same(type, &before[i], &after)) continue;
+        memset(&cmd, 0, sizeof(cmd));
+        cmd.type = CMD_PROPERTY;
+        cmd.entity_type = (int)type;
+        cmd.entity_index = items[i].index;
+        cmd.before = before[i];
+        cmd.after = after;
+        (void)undo_push(es->undo, &cmd);   /* fits the room begin reserved */
+        changed++;
+    }
+    undo_group_end(es->undo);
+    editor_refresh_dirty(es);
+    editor_set_status(es, "%s set on %d %s", key, changed + 1, editor_entity_type_name(type));
 }
 
 /* ------------------------------------------------------------------ */
@@ -262,8 +361,12 @@ void properties_render(EditorState *es, int start_y, int available_h)
     int prop_h = available_h;
 
     /*
-     * Several entities selected: there is no single set of fields to edit,
-     * so show how many of each type are selected and what acts on them.
+     * Several entities selected.  When they are all of one type whose
+     * fields are a table of rows, the panel shows those fields with the
+     * primary entity's values, and a value typed there is given to every
+     * selected entity at once (properties_apply_to_selection).  Otherwise
+     * there is no single set of fields to edit, so the panel shows how
+     * many of each type are selected and what acts on them.
      */
     int selected = editor_selection_count(es);
     if (selected > 1) {
@@ -272,14 +375,39 @@ void properties_render(EditorState *es, int start_y, int available_h)
         char header[64];
         int y;
         int n = editor_selection_items(es, items, EDITOR_MAX_SELECTION);
+        int one_type = 1;
 
-        snprintf(header, sizeof(header), " %d selected", selected);
+        for (int i = 0; i < n; i++) {
+            counts[items[i].type]++;
+            if (items[i].type != es->selection.type) one_type = 0;
+        }
+        one_type = one_type && properties_type_has_rows(es->selection.type);
+
+        if (one_type)
+            snprintf(header, sizeof(header), " %d x %s", selected,
+                     editor_entity_type_name(es->selection.type));
+        else
+            snprintf(header, sizeof(header), " %d selected", selected);
         ui_panel(&es->ui, prop_x, prop_y, PROP_W, prop_h);
         draw_section_title(es, prop_x, prop_y, header, &es->panel_open);
         if (!es->panel_open) return;
         ui_clip_begin(&es->ui, prop_x, prop_y + ROW_H + 4, PROP_W, prop_h - ROW_H - 4);
         y = prop_y + ROW_H + 8;
-        for (int i = 0; i < n; i++) counts[items[i].type]++;
+        if (one_type) {
+            /* The same change tracking as a single entity's panel: the
+             * widget snapshots the primary entity before writing to it. */
+            editor_begin_change_tracking(es, EDITOR_CHANGE_ENTITY);
+            es->ui.before_change = editor_before_change;
+            es->ui.before_change_context = es;
+            ui_label_color(&es->ui, CONTENT_X, y, "A value typed here is given to all of them.",
+                           ui_color(&es->ui, UI_COLOR_TEXT_DIM));
+            y += 20;
+            draw_table_properties(es, y);
+            show_field_note(es);
+            editor_end_change_tracking(es);
+            ui_clip_end(&es->ui);
+            return;
+        }
         for (int type = 0; type < ENT_COUNT; type++) {
             char line[64];
             if (counts[type] == 0) continue;

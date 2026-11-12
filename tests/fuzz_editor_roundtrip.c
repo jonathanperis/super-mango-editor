@@ -42,14 +42,12 @@
 #include "shared/serializer.h"
 #include "levels/level.h"
 
-static char input_path[1024];
 static char saved_path[1024];
 static char recovery_path[1024];
 
 /* Normal exit only: after abort() the failing input stays on disk. */
 static void remove_temp_files(void)
 {
-    remove(input_path);
     remove(saved_path);
     remove(recovery_path);
 }
@@ -59,33 +57,22 @@ static void init_paths(void)
 {
     const char *dir;
 
-    if (input_path[0] != '\0') return;
+    if (saved_path[0] != '\0') return;
     atexit(remove_temp_files);
+    /* The round trip is about bytes, not about surviving a power cut:
+     * skip the fsync after each save (serializer_set_durable). */
+    serializer_set_durable(0);
     dir = getenv("TMPDIR");
     if (!dir || dir[0] == '\0') dir = "/tmp";
-    snprintf(input_path, sizeof(input_path), "%s/mango-editor-fuzz-%ld-in.toml",
-             dir, (long)getpid());
     snprintf(saved_path, sizeof(saved_path), "%s/mango-editor-fuzz-%ld-save.toml",
              dir, (long)getpid());
     snprintf(recovery_path, sizeof(recovery_path),
              "%s/mango-editor-fuzz-%ld-recovery.toml", dir, (long)getpid());
 }
 
-static int write_bytes(const char *path, const uint8_t *data, size_t size)
-{
-    FILE *fp = fopen(path, "wb");
-    size_t written;
-
-    if (!fp) return -1;
-    written = fwrite(data, 1, size, fp);
-    if (fclose(fp) != 0 || written != size) return -1;
-    return 0;
-}
-
 static void round_trip_failed(const char *step)
 {
-    fprintf(stderr, "fuzz_editor_roundtrip: saved level did not come back at %s "
-                    "(input kept at %s)\n", step, input_path);
+    fprintf(stderr, "fuzz_editor_roundtrip: saved level did not come back at %s\n", step);
     abort();
 }
 
@@ -122,8 +109,10 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     int found;
 
     init_paths();
-    if (write_bytes(input_path, data, size) != 0) return 0;
-    if (level_load_toml(input_path, &opened) != 0) return 0;  /* rejected */
+    /* Parse the bytes where they are; no input file is needed. */
+    if (level_load_toml_text((const char *)data, size, "fuzz input", &opened,
+                             NULL, NULL) != 0)
+        return 0;  /* rejected */
 
     /* The one rewrite saving makes on purpose: a level with an empty name is
      * written as "Untitled" (serializer_save.c). Expect that, not the input. */

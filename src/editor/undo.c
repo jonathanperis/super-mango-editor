@@ -191,6 +191,31 @@ void undo_group_end(UndoStack *stack)
     stack->open_group = 0;
 }
 
+void undo_trim_group(UndoStack *stack, int group)
+{
+    UndoStep *step;
+
+    if (!stack || group == 0 || stack->top == 0) return;
+    step = &stack->steps[stack->top - 1];
+    if (step->group != group || !step->many || step->count >= step->capacity) return;
+
+    if (step->count == 1) {
+        /* One entry fits inside the step itself: no array needed. */
+        step->one = step->many[0];
+        free(step->many);
+        step->many = NULL;
+        step->capacity = 0;
+    } else if (step->count > 1) {
+        /* Shrinking in place. If realloc cannot, the larger block is
+         * still valid and simply stays. */
+        UndoEntry *smaller = realloc(step->many, (size_t)step->count * sizeof(*smaller));
+        if (smaller) {
+            step->many = smaller;
+            step->capacity = step->count;
+        }
+    }
+}
+
 int undo_top_group(const UndoStack *stack)
 {
     return stack && stack->top > 0 ? stack->steps[stack->top - 1].group : 0;

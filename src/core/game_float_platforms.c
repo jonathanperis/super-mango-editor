@@ -18,13 +18,18 @@ void game_float_platforms_update(GameState *gs, float dt, int fp_landed_idx)
 
     if (fp_landed_idx >= 0) {
         const FloatPlatform *fp = &gs->world.float_platforms[fp_landed_idx];
-        if (fp->mode == FLOAT_PLATFORM_RAIL) {
+        if (fp->mode == FLOAT_PLATFORM_RAIL || fp->falling) {
             /*
              * Carry the rider by exactly the distance the platform just
              * moved, along both axes. Without the vertical part, a platform
              * moving down would leave the player hovering above it each step
              * (falling, landing, falling again), and one moving up would sink
              * the feet into it until the next step pulled them back on top.
+             *
+             * A CRUMBLE platform that has started to fall moves down too,
+             * so its rider is carried the same way: they stand on it (and
+             * can jump off it) all the way down instead of flickering
+             * between standing and falling every few steps.
              */
             gs->world.player.x += fp->x - fp->prev_x;
             gs->world.player.y += fp->y - fp->prev_y;

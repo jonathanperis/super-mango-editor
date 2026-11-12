@@ -19,6 +19,24 @@ and so on). The bits are unchanged: `ui_draw_icon` (`src/shared/ui.c`) reads
 them the way raygui's `GuiDrawIcon` does, and `editor_ui_test` checks every
 icon pixel by pixel.
 
-To add an icon, append it to `ICONS`, rerun the tool and use the new
-`UI_ICON_*` name. To update raygui, change `manifest.json` (commit, URL and
-SHA-256) and rerun the tool.
+## When to run the importer
+
+Nothing runs it automatically: the generated header is checked in, so a
+normal build never downloads raygui. Run it by hand in two cases.
+
+- **Adding an icon.** Append the pair (raygui's name, the editor's name) to
+  `ICONS` in `tools/import_raygui_icons.py`, run `make raygui-icons`, and use
+  the new `UI_ICON_*` name in the editor.
+- **Updating raygui.** Change `manifest.json` (commit, URL and SHA-256), then
+  run `make raygui-icons`.
+
+`make raygui-icons` downloads the pinned `raygui.h` and refuses it when the
+SHA-256 differs. To use a copy you already have (no network), pass its path:
+`make raygui-icons RAYGUI_SOURCE=/path/to/raygui.h`; the checksum is still
+checked. Commit the regenerated `raygui_icons.h` with the change that needed
+it.
+
+`tests/import_raygui_icons_test.py` (part of `make test`) feeds the importer
+a small stand-in `raygui.h` and checks that each icon's bits land under the
+right name. It also fails when the checked-in header no longer matches the
+`ICONS` table or the pinned commit, which is the reminder to rerun the tool.

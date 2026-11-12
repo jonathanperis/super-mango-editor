@@ -317,7 +317,16 @@ int editor_add_placement(EditorState *es, EntityType type,
     cmd.entity_index = index;
     cmd.before       = before;
     cmd.after        = *pd;
-    undo_push(es->undo, &cmd);
+    if (!undo_push(es->undo, &cmd)) {
+        /* The placement could not be recorded, so take it back: an entity
+         * that undo does not know about would shift every later index in
+         * the history. */
+        if (singleton) (void)editor_entity_write(&es->level, type, 0, &before);
+        else (void)editor_entity_remove(&es->level, type, index);
+        editor_set_status(es, "Cannot %s %s: no room in the undo history", action,
+                          editor_entity_type_name(type));
+        return -1;
+    }
 
     /* Select the new entity for immediate inspection */
     editor_select_only(es, type, index);
@@ -484,7 +493,14 @@ void paint_step(EditorState *es, float world_x, float world_y)
 void tools_end_paint(EditorState *es)
 {
     if (!es || !es->painting) return;
-    if (es->paint_grouped) undo_group_end(es->undo);
+    if (es->paint_grouped) {
+        int group = undo_top_group(es->undo);
+        undo_group_end(es->undo);
+        /* The row reserved room for UNDO_GROUP_MAX entries before the first
+         * one was placed; most rows are a single click. Give back what the
+         * row did not use, or every click would keep ~12 KB in history. */
+        if (es->paint_count > 0) undo_trim_group(es->undo, group);
+    }
     es->painting = 0;
     es->paint_grouped = 0;
     if (es->paint_count > 1)

@@ -1018,8 +1018,36 @@ static int expect_qoa_and_wav_music_accepted(void)
     return 0;
 }
 
+static void set_music_device_name(LevelDef *def)
+{
+    strncpy(def->music_path, "assets/sounds/levels/con.qoa", sizeof(def->music_path) - 1);
+}
+
+static void set_floor_device_folder(LevelDef *def)
+{
+    strncpy(def->floor_tile_path, "assets/sprites/NUL/grass.png",
+            sizeof(def->floor_tile_path) - 1);
+}
+
+static void set_floor_stream_name(LevelDef *def)
+{
+    strncpy(def->floor_tile_path, "assets/sprites/levels/a:b.png",
+            sizeof(def->floor_tile_path) - 1);
+}
+
+static void set_floor_wildcard_name(LevelDef *def)
+{
+    strncpy(def->floor_tile_path, "assets/sprites/levels/gr*ss.png",
+            sizeof(def->floor_tile_path) - 1);
+}
+
 static int expect_rejected_unsafe_paths(void)
 {
+    /* Asset names follow the same portable-name rule as level references. */
+    if (reject_path_case("music Windows device name", set_music_device_name) != 0) return 1;
+    if (reject_path_case("floor Windows device folder", set_floor_device_folder) != 0) return 1;
+    if (reject_path_case("floor NTFS stream name", set_floor_stream_name) != 0) return 1;
+    if (reject_path_case("floor wildcard name", set_floor_wildcard_name) != 0) return 1;
     if (reject_path_case("music traversal", set_unsafe_music_parent) != 0) return 1;
     if (reject_path_case("floor absolute path", set_unsafe_floor_absolute) != 0) return 1;
     if (reject_path_case("platform tile traversal", set_unsafe_platform_tile) != 0) return 1;
@@ -1047,6 +1075,8 @@ static int level_reference_rule(void)
     static const struct { const char *path; int valid; } cases[] = {
         { "levels/01_lugio_01.toml", 1 },
         { "levels/caf\xC3\xA9.toml", 1 },
+        { "levels/caf\xC3.toml", 0 },          /* a cut-off UTF-8 sequence */
+        { "levels/caf\xFF.toml", 0 },          /* never valid in UTF-8 */
         { "levels/console.toml", 1 },
         { "levels/com10.toml", 1 },
         { "levels/x.y.toml", 1 },
@@ -1116,8 +1146,127 @@ static int rejects_numeric_boundaries(void)
     return 0;
 }
 
+/* Counts the errors a collect-mode pass reports and keeps the last text. */
+typedef struct {
+    int  count;
+    char last[256];
+    char all[2048];
+} CollectedIssues;
+
+static void collect_issue(void *context, const char *message,
+                          const LevelIssueLocation *where)
+{
+    CollectedIssues *issues = context;
+    (void)where;
+    issues->count++;
+    snprintf(issues->last, sizeof(issues->last), "%s", message);
+    strncat(issues->all, message, sizeof(issues->all) - strlen(issues->all) - 2);
+    strcat(issues->all, "\n");
+}
+
+/*
+ * "Report every error" mode keeps checking after a value was rejected, so
+ * later checks meet numbers the first-error mode never lets through. They
+ * must still be plain, defined arithmetic: `make sanitize` runs this test
+ * with UBSan, which stops on a signed overflow or on a float too large
+ * for the int it is converted to.
+ */
+static int collect_mode_survives_rejected_values(void)
+{
+    LevelDef def;
+    CollectedIssues issues = {0};
+
+    /* A rail far too wide, and a spike block riding it: the block's
+     * t_offset check counts the rail's tiles from that rejected width. */
+    level_def_init_defaults(&def);
+    def.rail_count = 1;
+    def.rails[0].layout = RAIL_LAYOUT_RECT;
+    def.rails[0].w = 2000000000;
+    def.rails[0].h = 2000000000;
+    def.spike_block_count = 1;
+    def.spike_blocks[0].rail_index = 0;
+    def.spike_blocks[0].speed = 3.0f;
+    def.float_platform_count = 1;
+    def.float_platforms[0].mode = FLOAT_PLATFORM_RAIL;
+    def.float_platforms[0].tile_count = 2;
+    def.float_platforms[0].rail_index = 0;
+    def.float_platforms[0].speed = 3.0f;
+    if (level_validate_runtime_each(&def, collect_issue, &issues) < 1 ||
+        !strstr(issues.all, "rails[0].w")) {
+        fprintf(stderr, "level_validate_test: oversized rail should be reported: %s\n", issues.all);
+        return 1;
+    }
+
+    /* A world far too long, with a floor gap, a platform and a checkpoint
+     * measured against its width. */
+    memset(&issues, 0, sizeof(issues));
+    level_def_init_defaults(&def);
+    def.screen_count = 2000000000;
+    def.floor_gap_count = 1;
+    def.floor_gaps[0] = 48;
+    def.platform_count = 1;
+    def.platforms[0].x = 100.0f;
+    def.platforms[0].tile_height = 2;
+    def.platforms[0].tile_width = 2;
+    if (level_validate_runtime_each(&def, collect_issue, &issues) < 1 ||
+        !strstr(issues.all, "screen_count")) {
+        fprintf(stderr, "level_validate_test: oversized screen_count should be reported: %s\n", issues.all);
+        return 1;
+    }
+    /* The gap and the platform fit the largest legal world, so the screen
+     * count is the only error: nothing was measured against a wrapped width. */
+    if (issues.count != 1) {
+        fprintf(stderr, "level_validate_test: expected 1 error, got %d: %s\n", issues.count, issues.all);
+        return 1;
+    }
+    return 0;
+}
+
+/* A range message names the limit the check really applies, so the number
+ * it prints is one the author can use. */
+static int range_messages_print_the_real_limits(void)
+{
+    LevelDef def;
+    char err[256], expected[64];
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.platform_count = 1;
+    def.platforms[0].x = 16.0f;
+    def.platforms[0].tile_width = 1;
+    def.platforms[0].tile_height = 500;
+    snprintf(expected, sizeof(expected), "1..%d", (FLOOR_Y + 16) / TILE_SIZE);
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 || !strstr(err, expected)) {
+        fprintf(stderr, "level_validate_test: tile_height limit: got '%s', want %s\n", err, expected);
+        return 1;
+    }
+
+    def.platforms[0].tile_height = 2;
+    def.platforms[0].tile_width = 500;
+    snprintf(expected, sizeof(expected), "0..%d", GAME_W / TILE_SIZE);
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 || !strstr(err, expected)) {
+        fprintf(stderr, "level_validate_test: tile_width limit: got '%s', want %s\n", err, expected);
+        return 1;
+    }
+
+    level_def_init_defaults(&def);
+    def.screen_count = 1;
+    def.ladder_count = 1;
+    def.ladders[0].x = 16.0f;
+    def.ladders[0].y = 0.0f;
+    def.ladders[0].tile_count = 10000;
+    if (level_validate_runtime(&def, err, sizeof(err)) == 0 ||
+        !strstr(err, "ladders[0]") || strstr(err, "999")) {
+        fprintf(stderr, "level_validate_test: ladder tile_count limit: got '%s'\n", err);
+        return 1;
+    }
+    return 0;
+}
+
 int main(void)
 {
+    if (collect_mode_survives_rejected_values() != 0) return 1;
+    if (range_messages_print_the_real_limits() != 0) return 1;
     if (rejects_numeric_boundaries() != 0) return 1;
     if (level_reference_rule() != 0) return 1;
     if (expect_valid_level() != 0) return 1;

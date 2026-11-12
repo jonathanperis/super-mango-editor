@@ -453,10 +453,34 @@ typedef struct {
     int              speed_id;
 } LayerChoices;
 
-/* One "i: [asset] spd: [speed]" row of a layer list. */
-static int config_layer_row(EditorState *es, int x, int y, int i,
+/*
+ * What a click on one of a layer row's three small buttons asks for.  The
+ * row only notes it; config_layer_list_apply changes the list after every
+ * row has been drawn, so no row is drawn from a list that changed under it.
+ */
+typedef enum {
+    LAYER_ROW_NOTHING = 0,
+    LAYER_ROW_MOVE_UP,     /* swap with the row above: drawn earlier (further back) */
+    LAYER_ROW_MOVE_DOWN,   /* swap with the row below: drawn later (nearer)         */
+    LAYER_ROW_REMOVE       /* delete this row; the rows below move up one           */
+} LayerRowAction;
+
+typedef struct {
+    LayerRowAction action;
+    int            row;
+} LayerRowRequest;
+
+/*
+ * One "i: [asset] Spd: [speed] [^] [v] [x]" row of a layer list.
+ *
+ * i is the row and count how many rows the list has: the first row cannot
+ * move up and the last cannot move down, so those buttons are drawn
+ * switched off.  A click on a button is written to *request.
+ */
+static int config_layer_row(EditorState *es, int x, int y, int i, int count,
                             const LayerChoices *choices,
-                            char *path, size_t path_size, float *speed)
+                            char *path, size_t path_size, float *speed,
+                            LayerRowRequest *request)
 {
     char label[16];
     snprintf(label, sizeof(label), "%d:", i);
@@ -473,11 +497,74 @@ static int config_layer_row(EditorState *es, int x, int y, int i,
     ui_label_tip(&es->ui, x + 236, y, "Spd:", "How fast the layer scrolls with the view: 0 = still, 1 = with the level");
     if (ui_float_field(&es->ui, choices->speed_id + i, x + 265, y, 60, speed))
         editor_commit_change(es);
+
+    /* Move up, move down, remove.  The list is drawn in row order, so "up"
+     * sends a layer further back and "down" brings it nearer. */
+    if (i > 0) {
+        if (ui_button(&es->ui, x + CONFIG_LAYER_UP_X, y, CONFIG_LAYER_BUTTON_W, 18, "^")) {
+            request->action = LAYER_ROW_MOVE_UP;
+            request->row = i;
+        }
+        ui_tooltip(&es->ui, "Move this layer up: drawn earlier, behind the next one");
+    } else {
+        ui_button_disabled(&es->ui, x + CONFIG_LAYER_UP_X, y, CONFIG_LAYER_BUTTON_W, 18, "^");
+    }
+    if (i < count - 1) {
+        if (ui_button(&es->ui, x + CONFIG_LAYER_DOWN_X, y, CONFIG_LAYER_BUTTON_W, 18, "v")) {
+            request->action = LAYER_ROW_MOVE_DOWN;
+            request->row = i;
+        }
+        ui_tooltip(&es->ui, "Move this layer down: drawn later, over the one before");
+    } else {
+        ui_button_disabled(&es->ui, x + CONFIG_LAYER_DOWN_X, y, CONFIG_LAYER_BUTTON_W, 18, "v");
+    }
+    if (ui_button(&es->ui, x + CONFIG_LAYER_REMOVE_X, y, CONFIG_LAYER_BUTTON_W, 18, "x")) {
+        request->action = LAYER_ROW_REMOVE;
+        request->row = i;
+    }
+    ui_tooltip(&es->ui, "Remove this layer");
     return y + 20;
 }
 
 /*
+ * config_layer_list_apply — Do what a row's button asked, as one undo step.
+ *
+ * layers is the list (background, foreground or fog) and *count how many
+ * rows it has.  The step is recorded the way "+ Add" records its own:
+ * snapshot the level's settings, change the list, commit (CMD_CONFIG).
+ * The commit also reloads the canvas's preview textures by path
+ * (editor_sync_config_resources), so the canvas shows the new order at once.
+ */
+static void config_layer_list_apply(EditorState *es, LevelLayer *layers, int *count,
+                                    const LayerRowRequest *request)
+{
+    int row = request->row;
+
+    if (request->action == LAYER_ROW_NOTHING) return;
+    if (row < 0 || row >= *count) return;
+    /* The ends of the list have nowhere to go (their buttons are switched
+     * off, so this only guards against a stale request). */
+    if (request->action == LAYER_ROW_MOVE_UP && row == 0) return;
+    if (request->action == LAYER_ROW_MOVE_DOWN && row == *count - 1) return;
+
+    editor_capture_change_before(es, -1);
+    if (request->action == LAYER_ROW_REMOVE) {
+        /* Close the gap: every row below moves up one place. */
+        for (int i = row; i < *count - 1; i++) layers[i] = layers[i + 1];
+        (*count)--;
+        editor_commit_change(es);
+    } else {
+        int other = request->action == LAYER_ROW_MOVE_UP ? row - 1 : row + 1;
+        LevelLayer moved = layers[row];
+        layers[row] = layers[other];
+        layers[other] = moved;
+        editor_commit_change(es);
+    }
+}
+
+/*
  * config_layer_buttons — "+ Add" and "- Remove Last" under a layer list.
+ * (Each row has its own move and remove buttons; see config_layer_row.)
  *
  * *count is the list's layer count and max its capacity.  next_path and
  * next_speed are the fields of the first unused slot (NULL when the list is
@@ -524,11 +611,15 @@ static int config_background_layers(EditorState *es, int x, int y)
     y += 18;
     if (!g_plx_open) return y;
 
-    for (int i = 0; i < level->background_layer_count && i < MAX_BACKGROUND_LAYERS; i++)
-        y = config_layer_row(es, x, y, i, &choices,
+    LayerRowRequest request = { LAYER_ROW_NOTHING, 0 };
+    int rows = level->background_layer_count < MAX_BACKGROUND_LAYERS
+             ? level->background_layer_count : MAX_BACKGROUND_LAYERS;
+    for (int i = 0; i < rows; i++)
+        y = config_layer_row(es, x, y, i, rows, &choices,
                              level->background_layers[i].path,
                              sizeof(level->background_layers[i].path),
-                             &level->background_layers[i].speed);
+                             &level->background_layers[i].speed, &request);
+    config_layer_list_apply(es, level->background_layers, &level->background_layer_count, &request);
 
     int next = level->background_layer_count;
     int has_room = next < MAX_BACKGROUND_LAYERS;
@@ -556,11 +647,15 @@ static int config_foreground_layers(EditorState *es, int x, int y)
     y += 18;
     if (!g_fg_open) return y;
 
-    for (int i = 0; i < level->foreground_layer_count && i < MAX_BACKGROUND_LAYERS; i++)
-        y = config_layer_row(es, x, y, i, &choices,
+    LayerRowRequest request = { LAYER_ROW_NOTHING, 0 };
+    int rows = level->foreground_layer_count < MAX_BACKGROUND_LAYERS
+             ? level->foreground_layer_count : MAX_BACKGROUND_LAYERS;
+    for (int i = 0; i < rows; i++)
+        y = config_layer_row(es, x, y, i, rows, &choices,
                              level->foreground_layers[i].path,
                              sizeof(level->foreground_layers[i].path),
-                             &level->foreground_layers[i].speed);
+                             &level->foreground_layers[i].speed, &request);
+    config_layer_list_apply(es, level->foreground_layers, &level->foreground_layer_count, &request);
 
     int next = level->foreground_layer_count;
     int has_room = next < MAX_BACKGROUND_LAYERS;
@@ -591,11 +686,15 @@ static int config_fog_layers(EditorState *es, int x, int y)
     y += 18;
     if (!g_fog_open) return y;
 
-    for (int i = 0; i < level->fog_layer_count && i < MAX_FOG_TEXTURES; i++)
-        y = config_layer_row(es, x, y, i, &choices,
+    LayerRowRequest request = { LAYER_ROW_NOTHING, 0 };
+    int rows = level->fog_layer_count < MAX_FOG_TEXTURES
+             ? level->fog_layer_count : MAX_FOG_TEXTURES;
+    for (int i = 0; i < rows; i++)
+        y = config_layer_row(es, x, y, i, rows, &choices,
                              level->fog_layers[i].path,
                              sizeof(level->fog_layers[i].path),
-                             &level->fog_layers[i].speed);
+                             &level->fog_layers[i].speed, &request);
+    config_layer_list_apply(es, level->fog_layers, &level->fog_layer_count, &request);
 
     int next = level->fog_layer_count;
     int has_room = next < MAX_FOG_TEXTURES;

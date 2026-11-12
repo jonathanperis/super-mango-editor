@@ -52,18 +52,23 @@ static int damage_ends_pass(GameState *gs, float source_x, float source_y)
 
 /*
  * collect_health_stars — Pick up every active star of one colour that the
- * player's hitbox touches: restore one heart (capped at MAX_HEARTS), play the
- * pickup sound and hide the star. `name` only labels the debug log.
+ * player's hitbox touches: restore one heart, play the pickup sound and
+ * hide the star. `name` only labels the debug log.
+ *
+ * A player who already has MAX_HEARTS leaves the star where it is. Taking
+ * it would heal nothing and remove it until the next life, so running past
+ * one at full health would throw away healing the level was designed with.
  */
 static void collect_health_stars(GameState *gs, const IntRect *phit,
                                  HealthStar *stars, int count, const char *name)
 {
     for (int i = 0; i < count; i++) {
         if (!stars[i].active) continue;
+        if (gs->world.hearts >= MAX_HEARTS) return;   /* nothing to heal */
         IntRect sbox = health_star_get_hitbox(&stars[i]);
         if (rect_intersects(phit, &sbox)) {
             stars[i].active = 0;
-            if (gs->world.hearts < MAX_HEARTS) gs->world.hearts++;
+            gs->world.hearts++;
             sound_play(gs->assets.audio.coin, 128);
             if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "%s[%d] collected", name, i);
         }
@@ -99,72 +104,86 @@ IntRect jumping_spider_build_hitbox(const JumpingSpider *js)
 /* ------------------------------------------------------------------ */
 
 /*
- * Each <thing>_touches(world, i, player, &hit) answers one question for
- * item i of one array: does it hurt the player box right now? When it
- * does, it returns 1 and stores in *hit the box that touched, whose
- * centre is where the knockback pushes away from. Inactive items, and
- * flames still waiting below their gap, never hurt.
+ * Each <thing>_hitbox(world, i, &box) answers one question for item i of
+ * one array: can it hurt right now, and where? When it can, it returns 1
+ * and stores the box that hurts in *box. Inactive items, and flames still
+ * waiting below their gap, return 0: they have no box at the moment.
+ *
+ * The same functions serve two readers. game_collide tests the player
+ * against the box, and the debug overlay (F3) draws it. Because both ask
+ * here, the outline on screen is always the box that is really tested;
+ * an overlay that worked the rectangles out again for itself could drift
+ * away from the collision code without anyone noticing.
  */
 
-static int spider_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int spider_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    *hit = spider_build_hitbox(&world->spiders[i]);
-    return rect_intersects(player, hit);
+    *box = spider_build_hitbox(&world->spiders[i]);
+    return 1;
 }
 
-static int jumping_spider_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int jumping_spider_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    *hit = jumping_spider_build_hitbox(&world->jumping_spiders[i]);
-    return rect_intersects(player, hit);
+    *box = jumping_spider_build_hitbox(&world->jumping_spiders[i]);
+    return 1;
 }
 
-static int bird_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int bird_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    *hit = bird_get_hitbox(&world->birds[i]);
-    return rect_intersects(player, hit);
+    *box = bird_get_hitbox(&world->birds[i]);
+    return 1;
 }
 
-static int faster_bird_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int faster_bird_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    *hit = faster_bird_get_hitbox(&world->faster_birds[i]);
-    return rect_intersects(player, hit);
+    *box = faster_bird_get_hitbox(&world->faster_birds[i]);
+    return 1;
 }
 
-static int fish_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int fish_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    *hit = fish_get_hitbox(&world->fish[i]);
-    return rect_intersects(player, hit);
+    *box = fish_get_hitbox(&world->fish[i]);
+    return 1;
 }
 
-static int faster_fish_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int faster_fish_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    *hit = faster_fish_get_hitbox(&world->faster_fish[i]);
-    return rect_intersects(player, hit);
+    *box = faster_fish_get_hitbox(&world->faster_fish[i]);
+    return 1;
 }
 
-static int axe_trap_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int axe_trap_hitbox(const GameWorld *world, int i, IntRect *box)
 {
     if (!world->axe_traps[i].active) return 0;
-    *hit = axe_trap_get_hitbox(&world->axe_traps[i]);
-    return rect_intersects(player, hit);
+    *box = axe_trap_get_hitbox(&world->axe_traps[i]);
+    return 1;
 }
 
-static int circular_saw_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int circular_saw_hitbox(const GameWorld *world, int i, IntRect *box)
 {
     if (!world->circular_saws[i].active) return 0;
-    *hit = circular_saw_get_hitbox(&world->circular_saws[i]);
-    return rect_intersects(player, hit);
+    *box = circular_saw_get_hitbox(&world->circular_saws[i]);
+    return 1;
 }
 
-static int spike_block_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int spike_block_hitbox(const GameWorld *world, int i, IntRect *box)
 {
     if (!world->spike_blocks[i].active) return 0;
-    *hit = spike_block_get_hitbox(&world->spike_blocks[i]);
-    return rect_intersects(player, hit);
+    *box = spike_block_get_hitbox(&world->spike_blocks[i]);
+    return 1;
+}
+
+/* The whole row: what the overlay outlines. */
+static int spike_row_hitbox(const GameWorld *world, int i, IntRect *box)
+{
+    if (!world->spike_rows[i].active) return 0;
+    *box = spike_row_get_rect(&world->spike_rows[i]);
+    return 1;
 }
 
 /* A spike row is tested one tile at a time, so the knockback pushes away
- * from the tile the player touched, not from the middle of a long row. */
+ * from the tile the player touched, not from the middle of a long row.
+ * The tiles together cover exactly the row's box above. */
 static int spike_row_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
 {
     const SpikeRow *row = &world->spike_rows[i];
@@ -183,29 +202,29 @@ static int spike_row_touches(const GameWorld *world, int i, const IntRect *playe
  * exactly sp->y, and the strict overlap test would miss a box whose top is
  * also sp->y; the extra 2 px make top-landing damage work.
  */
-static int spike_platform_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int spike_platform_hitbox(const GameWorld *world, int i, IntRect *box)
 {
     if (!world->spike_platforms[i].active) return 0;
-    *hit = spike_platform_get_rect(&world->spike_platforms[i]);
-    return rect_intersects(player, hit);
+    *box = spike_platform_get_rect(&world->spike_platforms[i]);
+    return 1;
 }
 
 /* Blue and fire flames share BlueFlame; one waiting below its gap is harmless. */
-static int flame_touches(const BlueFlame *flame, const IntRect *player, IntRect *hit)
+static int flame_hitbox(const BlueFlame *flame, IntRect *box)
 {
     if (!flame->active || flame->state == BLUE_FLAME_WAITING) return 0;
-    *hit = blue_flame_get_hitbox(flame);
-    return rect_intersects(player, hit);
+    *box = blue_flame_get_hitbox(flame);
+    return 1;
 }
 
-static int blue_flame_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int blue_flame_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    return flame_touches(&world->blue_flames[i], player, hit);
+    return flame_hitbox(&world->blue_flames[i], box);
 }
 
-static int fire_flame_touches(const GameWorld *world, int i, const IntRect *player, IntRect *hit)
+static int fire_flame_hitbox(const GameWorld *world, int i, IntRect *box)
 {
-    return flame_touches(&world->fire_flames[i], player, hit);
+    return flame_hitbox(&world->fire_flames[i], box);
 }
 
 /*
@@ -214,44 +233,73 @@ static int fire_flame_touches(const GameWorld *world, int i, const IntRect *play
  *
  * Each row names the kind for the debug log ("HIT spider[3]"), says where
  * its count lives in GameWorld (offsetof gives the byte offset of that
- * int field), and points at its touches function. The order only matters
+ * int field), and points at its hitbox function. The order only matters
  * when two things touch the player in the same step: the first row wins
  * and decides the knockback direction.
  *
- * Adding an enemy or hazard that hurts on touch means one <thing>_touches()
- * above and one row here.
+ * `touches` is for a kind whose hit needs more than "the player overlaps
+ * the box": a spike row reports the single tile that was touched. NULL,
+ * for every other kind, means exactly that overlap test.
+ *
+ * Adding an enemy or hazard that hurts on touch means one <thing>_hitbox()
+ * above and one row here; the debug overlay then draws it without being
+ * told (it walks this table through game_damage_source_hitbox).
  */
 typedef struct {
     const char *name;
     size_t      count_offset;  /* offsetof(GameWorld, <things>_count) */
+    int       (*hitbox)(const GameWorld *world, int i, IntRect *box);
     int       (*touches)(const GameWorld *world, int i, const IntRect *player, IntRect *hit);
 } DamageSource;
 
 #define WORLD_COUNT(field) offsetof(GameWorld, field)
 
 static const DamageSource s_damage_sources[] = {
-    /* debug name      count in GameWorld                       touches function       */
+    /* debug name      count in GameWorld                  hitbox function         touches */
     /* ---- Enemies ------------------------------------------------------------------ */
-    { "spider",         WORLD_COUNT(spider_count),               spider_touches          },
-    { "jspider",        WORLD_COUNT(jumping_spider_count),       jumping_spider_touches  },
-    { "bird",           WORLD_COUNT(bird_count),                 bird_touches            },
-    { "fbird",          WORLD_COUNT(faster_bird_count),          faster_bird_touches     },
-    { "fish",           WORLD_COUNT(fish_count),                 fish_touches            },
-    { "ffish",          WORLD_COUNT(faster_fish_count),          faster_fish_touches     },
+    { "spider",         WORLD_COUNT(spider_count),          spider_hitbox,          NULL },
+    { "jspider",        WORLD_COUNT(jumping_spider_count),  jumping_spider_hitbox,  NULL },
+    { "bird",           WORLD_COUNT(bird_count),            bird_hitbox,            NULL },
+    { "fbird",          WORLD_COUNT(faster_bird_count),     faster_bird_hitbox,     NULL },
+    { "fish",           WORLD_COUNT(fish_count),            fish_hitbox,            NULL },
+    { "ffish",          WORLD_COUNT(faster_fish_count),     faster_fish_hitbox,     NULL },
     /* ---- Hazards ------------------------------------------------------------------ */
-    { "axe",            WORLD_COUNT(axe_trap_count),             axe_trap_touches        },
-    { "saw",            WORLD_COUNT(circular_saw_count),         circular_saw_touches    },
-    { "spike_block",    WORLD_COUNT(spike_block_count),          spike_block_touches     },
-    { "spike",          WORLD_COUNT(spike_row_count),            spike_row_touches       },
-    { "spike_platform", WORLD_COUNT(spike_platform_count),       spike_platform_touches  },
-    { "blue_flame",     WORLD_COUNT(blue_flame_count),           blue_flame_touches      },
-    { "fire_flame",     WORLD_COUNT(fire_flame_count),           fire_flame_touches      },
+    { "axe",            WORLD_COUNT(axe_trap_count),        axe_trap_hitbox,        NULL },
+    { "saw",            WORLD_COUNT(circular_saw_count),    circular_saw_hitbox,    NULL },
+    { "spike_block",    WORLD_COUNT(spike_block_count),     spike_block_hitbox,     NULL },
+    { "spike",          WORLD_COUNT(spike_row_count),       spike_row_hitbox,       spike_row_touches },
+    { "spike_platform", WORLD_COUNT(spike_platform_count),  spike_platform_hitbox,  NULL },
+    { "blue_flame",     WORLD_COUNT(blue_flame_count),      blue_flame_hitbox,      NULL },
+    { "fire_flame",     WORLD_COUNT(fire_flame_count),      fire_flame_hitbox,      NULL },
 };
 
 /* Read the int count field that sits count_offset bytes into the world. */
 static int world_count(const GameWorld *world, size_t count_offset)
 {
     return *(const int *)((const char *)world + count_offset);
+}
+
+int game_damage_source_count(void)
+{
+    return ARRAY_LEN(s_damage_sources);
+}
+
+const char *game_damage_source_name(int source)
+{
+    if (source < 0 || source >= ARRAY_LEN(s_damage_sources)) return NULL;
+    return s_damage_sources[source].name;
+}
+
+int game_damage_source_items(const GameWorld *world, int source)
+{
+    if (!world || source < 0 || source >= ARRAY_LEN(s_damage_sources)) return 0;
+    return world_count(world, s_damage_sources[source].count_offset);
+}
+
+int game_damage_source_hitbox(const GameWorld *world, int source, int item, IntRect *box)
+{
+    if (!box || item < 0 || item >= game_damage_source_items(world, source)) return 0;
+    return s_damage_sources[source].hitbox(world, item, box);
 }
 
 /*
@@ -269,7 +317,11 @@ static int collide_damage_sources(GameState *gs, const IntRect *player)
         int count = world_count(&gs->world, source->count_offset);
         for (int i = 0; i < count; i++) {
             IntRect hit;
-            if (!source->touches(&gs->world, i, player, &hit)) continue;
+            /* No box right now (inactive, waiting), or the player is not
+             * in it. A kind with its own test narrows the box it reports. */
+            if (!source->hitbox(&gs->world, i, &hit) || !rect_intersects(player, &hit))
+                continue;
+            if (source->touches && !source->touches(&gs->world, i, player, &hit)) continue;
             if (gs->screen.debug_mode) debug_log(&gs->screen.debug, "HIT %s[%d]", source->name, i);
             float sx = hit.x + hit.w * 0.5f;
             float sy = hit.y + hit.h * 0.5f;

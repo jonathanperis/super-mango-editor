@@ -654,9 +654,10 @@ static int editor_for_each_recovery_name(const EditorState *es,
         char *name;
         WIN32_FIND_DATAW data;
         HANDLE handle;
-        /* Every recovery file (.meta and .toml); callbacks pick by suffix. */
-        int written = snprintf(pattern, sizeof(pattern), "%s\\%s*",
-                               es->recovery_root_path, EDITOR_RECOVERY_PREFIX);
+        /* Every private file the editor writes here (recovery .meta and
+         * .toml, playtest snapshots); callbacks pick by name. */
+        int written = snprintf(pattern, sizeof(pattern), "%s\\editor_*",
+                               es->recovery_root_path);
         if (written < 0 || (size_t)written >= sizeof(pattern)) return -1;
         wide_pattern = serializer_utf8_to_wide(pattern);
         if (!wide_pattern) return -1;
@@ -715,11 +716,19 @@ static int editor_for_each_recovery_name(const EditorState *es,
 #endif
 }
 
+#ifdef MANGO_TESTING
+static int s_test_folder_scans;
+int editor_test_recovery_folder_scans(void) { return s_test_folder_scans; }
+#endif
+
 int editor_discover_recoveries(EditorState *es)
 {
     EditorRecoveryDiscovery discovery;
 
     if (!es || es->recovery_root_path[0] == '\0') return -1;
+#ifdef MANGO_TESTING
+    s_test_folder_scans++;
+#endif
     memset(&discovery, 0, sizeof(discovery));
     discovery.es = es;
     if (editor_for_each_recovery_name(es, editor_discover_recovery_name,
@@ -778,12 +787,121 @@ typedef struct {
     int removed;
 } EditorOrphanSweep;
 
+/* A playtest snapshot older than this is removed even when a process with
+ * its owner's number is running: pids are reused, and no playtest lasts a
+ * day. */
+#define EDITOR_PLAYTEST_MAX_AGE_S (24 * 60 * 60)
+
+/*
+ * editor_playtest_name_owner — The process id inside a playtest snapshot's
+ * name, "editor_playtest_<pid>_<ms>_<sequence>.toml" (written by
+ * editor_make_playtest_path).  Returns 0 with *pid set, or -1 for any
+ * other name.
+ */
+static int editor_playtest_name_owner(const char *name, unsigned long *pid)
+{
+    static const char prefix[] = "editor_playtest_";
+    const size_t prefix_len = sizeof(prefix) - 1;
+    size_t length;
+    char *end;
+    unsigned long long parsed;
+
+    if (!name || strncmp(name, prefix, prefix_len) != 0) return -1;
+    length = strlen(name);
+    if (length < prefix_len + 6 || strcmp(name + length - 5, ".toml") != 0) return -1;
+    if (name[prefix_len] < '0' || name[prefix_len] > '9') return -1;
+    errno = 0;
+    parsed = strtoull(name + prefix_len, &end, 10);
+    if (errno == ERANGE || *end != '_' || parsed == 0 || parsed > 0xffffffffull) return -1;
+    *pid = (unsigned long)parsed;
+    return 0;
+}
+
+/*
+ * editor_rebuild_recovery_metadata — Write a new .meta for a snapshot whose
+ * own .meta cannot be read.
+ *
+ * The snapshot is the designer's unsaved work; the .meta only says where
+ * it belongs and who was writing it.  A damaged .meta used to hide the
+ * snapshot for good: discovery skipped it, and the sweep left it because a
+ * .meta existed.  Everything needed is still at hand: the id is in the
+ * file name, the destination is the comment on the snapshot's first line,
+ * and the time is the file's own.  The new .meta names no owner, so the
+ * copy is offered as a crash leftover, which is what it is.
+ */
+static int editor_rebuild_recovery_metadata(const EditorState *es, uint64_t id,
+                                            const char *snapshot_path,
+                                            const char *metadata_path,
+                                            long long age_seconds)
+{
+    EditorRecoveryEntry entry;
+    time_t now = time(NULL);
+
+    memset(&entry, 0, sizeof(entry));
+    entry.id = id;
+    entry.timestamp = (uint64_t)(now > (time_t)age_seconds ? now - (time_t)age_seconds : 1);
+    if (level_read_recovery_path(snapshot_path, entry.source_path,
+                                 sizeof(entry.source_path)) != 1 ||
+        !editor_path_fits(entry.source_path))
+        entry.source_path[0] = '\0';       /* destination unknown: untitled */
+    if (!editor_path_fits(snapshot_path) || !editor_path_fits(metadata_path)) return -1;
+    memcpy(entry.snapshot_path, snapshot_path, strlen(snapshot_path) + 1);
+    memcpy(entry.metadata_path, metadata_path, strlen(metadata_path) + 1);
+    (void)es;
+    return editor_write_recovery_metadata(&entry);
+}
+
+/*
+ * editor_sweep_orphan_name — Look at one file of the private folder and
+ * tidy it if it is a leftover.  Four kinds are recognised:
+ *
+ *   1. a recovery .toml with no .meta          -> removed (never offered)
+ *   2. a recovery .toml whose .meta is damaged -> its .meta is rebuilt
+ *   3. a recovery .meta with no .toml          -> removed (nothing to offer)
+ *   4. a playtest snapshot of an editor that is no longer running
+ *                                              -> removed
+ *
+ * Each needs the file to be older than EDITOR_ORPHAN_MIN_AGE_S, because a
+ * running editor writes its .toml first and its .meta right after; and
+ * nothing of this editor's own current document is touched.
+ */
 static int editor_sweep_orphan_name(const char *name, void *context)
 {
     EditorOrphanSweep *sweep = (EditorOrphanSweep *)context;
     char metadata_path[EDITOR_PATH_MAX];
     char snapshot_path[EDITOR_PATH_MAX];
+    unsigned long owner;
     uint64_t id;
+
+    /* 4. A playtest snapshot ("Playtest from here" writes one per run and
+     *    removes it when the game exits; a crash in between leaves it). */
+    if (editor_playtest_name_owner(name, &owner) == 0) {
+        char path[EDITOR_PATH_MAX];
+        long long age;
+        if (owner == editor_current_process_id() ||
+            editor_preference_file_path(sweep->es, name, path, sizeof(path)) != 0)
+            return 0;
+        age = editor_file_age_seconds(path);
+        if (age >= EDITOR_PLAYTEST_MAX_AGE_S ||
+            (age >= EDITOR_ORPHAN_MIN_AGE_S && !editor_process_is_running(owner, 0))) {
+            if (serializer_remove_utf8(path) == 0) sweep->removed++;
+        }
+        return 0;
+    }
+
+    /* 3. A .meta whose snapshot is gone. */
+    if (editor_recovery_name_id(name, &id, ".meta") == 0) {
+        if (id == sweep->es->recovery_document_id) return 0;
+        if (editor_recovery_metadata_path(sweep->es, id, metadata_path,
+                                          sizeof(metadata_path)) != 0 ||
+            editor_recovery_snapshot_path(sweep->es, id, snapshot_path,
+                                          sizeof(snapshot_path)) != 0) return 0;
+        if (serializer_probe_path_utf8(snapshot_path) == SERIALIZER_PATH_MISSING &&
+            editor_file_age_seconds(metadata_path) >= EDITOR_ORPHAN_MIN_AGE_S &&
+            serializer_remove_utf8(metadata_path) == 0)
+            sweep->removed++;
+        return 0;
+    }
 
     if (editor_recovery_name_id(name, &id, ".toml") != 0) return 0;
     /* This editor's own snapshot may be between its two writes. */
@@ -792,10 +910,24 @@ static int editor_sweep_orphan_name(const char *name, void *context)
                                       sizeof(metadata_path)) != 0 ||
         editor_recovery_snapshot_path(sweep->es, id, snapshot_path,
                                       sizeof(snapshot_path)) != 0) return 0;
-    if (serializer_probe_path_utf8(metadata_path) == SERIALIZER_PATH_MISSING &&
-        editor_file_age_seconds(snapshot_path) >= EDITOR_ORPHAN_MIN_AGE_S &&
-        serializer_remove_utf8(snapshot_path) == 0)
-        sweep->removed++;
+    {
+        long long age = editor_file_age_seconds(snapshot_path);
+        SerializerPathStatus meta = serializer_probe_path_utf8(metadata_path);
+        if (age < EDITOR_ORPHAN_MIN_AGE_S) return 0;
+        if (meta == SERIALIZER_PATH_MISSING) {
+            /* 1. Never offered, so it would only take up space. */
+            if (serializer_remove_utf8(snapshot_path) == 0) sweep->removed++;
+        } else if (meta == SERIALIZER_PATH_EXISTING) {
+            /* 2. The .meta is there; can it be read? */
+            char meta_name[64];
+            EditorRecoveryEntry entry;
+            snprintf(meta_name, sizeof(meta_name), "%s%016llx.meta",
+                     EDITOR_RECOVERY_PREFIX, (unsigned long long)id);
+            if (editor_read_recovery_metadata(sweep->es, meta_name, &entry) == 0)
+                (void)editor_rebuild_recovery_metadata(sweep->es, id, snapshot_path,
+                                                       metadata_path, age);
+        }
+    }
     return 0;
 }
 
@@ -818,23 +950,40 @@ int editor_clean_orphan_recoveries(EditorState *es)
  * EDITOR_MAX_RECOVERY_ENTRIES other snapshots (other failures are -1). */
 #define EDITOR_RECOVERY_FOLDER_FULL (-2)
 
+/* Where this document's own snapshot is in es->recovery_entries, or -1. */
+static int editor_own_recovery_entry(const EditorState *es)
+{
+    for (int i = 0; i < es->recovery_entry_count; i++)
+        if (es->recovery_entries[i].id == es->recovery_document_id) return i;
+    return -1;
+}
+
+/*
+ * editor_add_recovery_entry — Register the snapshot autosave just wrote:
+ * write its .meta and list it in es->recovery_entries.
+ *
+ * Reading the folder means opening every .meta in it, and this runs on the
+ * frame's own thread every 30 seconds, so it is done as rarely as it can
+ * be. A document whose snapshot is already listed needs no look at the
+ * folder at all: only its .meta is rewritten (a new time). A document
+ * being registered for the first time needs one look, to see whether the
+ * folder still has room. The list is then updated in memory, not read
+ * back: this function wrote the entry, so it knows what it holds.
+ */
 static int editor_add_recovery_entry(EditorState *es, const char *source_path)
 {
     EditorRecoveryEntry entry;
+    int own;
 
     if (!es || !source_path || !editor_path_fits(source_path) ||
         !editor_path_fits(es->autosave_path)) return -1;
     if (es->recovery_root_path[0] == '\0') return 0;
-    if (editor_discover_recoveries(es) != 0) return -1;
-    if (es->recovery_entry_count >= EDITOR_MAX_RECOVERY_ENTRIES) {
-        int current_entry = 0;
-        for (int i = 0; i < es->recovery_entry_count; i++) {
-            if (es->recovery_entries[i].id == es->recovery_document_id) {
-                current_entry = 1;
-                break;
-            }
-        }
-        if (!current_entry) return EDITOR_RECOVERY_FOLDER_FULL;
+    own = editor_own_recovery_entry(es);
+    if (own < 0) {
+        if (editor_discover_recoveries(es) != 0) return -1;
+        own = editor_own_recovery_entry(es);
+        if (own < 0 && es->recovery_entry_count >= EDITOR_MAX_RECOVERY_ENTRIES)
+            return EDITOR_RECOVERY_FOLDER_FULL;
     }
     memset(&entry, 0, sizeof(entry));
     entry.id = es->recovery_document_id;
@@ -847,11 +996,9 @@ static int editor_add_recovery_entry(EditorState *es, const char *source_path)
     if (editor_recovery_metadata_path(es, entry.id, entry.metadata_path,
                                       sizeof(entry.metadata_path)) != 0 ||
         editor_write_recovery_metadata(&entry) != 0) return -1;
-    if (editor_discover_recoveries(es) != 0) return -1;
-    for (int i = 0; i < es->recovery_entry_count; i++) {
-        if (es->recovery_entries[i].id == entry.id) return 0;
-    }
-    return -1;
+    if (own >= 0) es->recovery_entries[own] = entry;
+    else es->recovery_entries[es->recovery_entry_count++] = entry;
+    return 0;
 }
 
 static int editor_remove_recovery_entry(EditorState *es, int entry_index)
@@ -1145,10 +1292,75 @@ int editor_recover_entry_by_id(EditorState *es, uint64_t recovery_id)
     memcpy(es->recovery_original_path, entry.source_path,
            strlen(entry.source_path) + 1);
     memset(&es->source_fingerprint, 0, sizeof(es->source_fingerprint));
-    es->source_state = EDITOR_SOURCE_UNKNOWN;
+    es->source_state = EDITOR_SOURCE_RECOVERED;
+    /*
+     * The snapshot is this editor's open document now, so its .meta is
+     * rewritten with this process as the owner straight away. Until it
+     * was, the .meta still named the editor that crashed; a second editor
+     * started in that window saw a crash leftover and could adopt the same
+     * snapshot, and two editors would then autosave over each other.
+     * Failing to rewrite it loses nothing: the next autosave writes it.
+     */
+    entry.owner_pid = editor_current_process_id();
+    entry.owner_start = editor_process_start_time(entry.owner_pid);
+    if (editor_write_recovery_metadata(&entry) == 0)
+        (void)editor_discover_recoveries(es);
     editor_set_recovered_dirty(es);
     editor_set_status(es, "Recovered unsaved changes");
     return 0;
+}
+
+/*
+ * editor_recovery_is_own_document — Is this entry the snapshot of the
+ * document open in this editor right now?
+ *
+ * Autosave registers it like any other, so discovery lists it, but it is
+ * not a crash leftover to recover: "recovering" it would throw the
+ * document back up to 30 seconds, and "discard all" would delete the
+ * safety net of the work in progress.  The picker and the status-bar
+ * count therefore leave it out.
+ */
+static int editor_recovery_is_own_document(const EditorState *es,
+                                           const EditorRecoveryEntry *entry)
+{
+    return es->recovery_document_id != 0 && entry->id == es->recovery_document_id &&
+           entry->owner_pid == editor_current_process_id();
+}
+
+int editor_recovery_offer_count(const EditorState *es)
+{
+    int count = 0;
+
+    if (!es) return 0;
+    for (int i = 0; i < es->recovery_entry_count; i++)
+        if (!editor_recovery_is_own_document(es, &es->recovery_entries[i])) count++;
+    return count;
+}
+
+/* Index in es->recovery_entries of the n-th copy that is offered (n from
+ * 0), or -1 when there are not that many. */
+static int editor_recovery_offered_entry(const EditorState *es, int n)
+{
+    for (int i = 0; i < es->recovery_entry_count; i++) {
+        if (editor_recovery_is_own_document(es, &es->recovery_entries[i])) continue;
+        if (n-- == 0) return i;
+    }
+    return -1;
+}
+
+void editor_open_recovery_picker(EditorState *es)
+{
+    if (!es || !editor_finish_field_edit(es)) return;
+    if (editor_recovery_offer_count(es) > 0) {
+        int selected = editor_choose_recovery(es);
+        uint64_t id = selected >= 0 ? es->pending_recovery_id : 0;
+        if (id && editor_confirm_discard_changes(es, "recover autosave"))
+            (void)editor_recover_entry_by_id(es, id);
+        else
+            es->pending_recovery_id = 0;
+    } else {
+        editor_set_status(es, "Recovery copy not found");
+    }
 }
 
 /*
@@ -1163,11 +1375,18 @@ int editor_recover_entry_by_id(EditorState *es, uint64_t recovery_id)
  */
 static int editor_ask_recovery_action(const EditorState *es, int index)
 {
-    char message[EDITOR_PATH_MAX + 160];
+    /* index counts the offered copies; entry is where that one is stored. */
+    const int offered = editor_recovery_offer_count(es);
+    const EditorRecoveryEntry *entry =
+        &es->recovery_entries[editor_recovery_offered_entry(es, index)];
+    /* Room for the longest question below: its fixed text and two numbers
+     * (under 100 bytes), a full source path and the 63-byte timestamp. GCC
+     * adds these up and, with -Wformat-truncation, refuses a smaller one. */
+    char message[EDITOR_PATH_MAX + 256];
     char timestamp[64] = "unknown time";
-    time_t raw_time = (time_t)es->recovery_entries[index].timestamp;
+    time_t raw_time = (time_t)entry->timestamp;
     struct tm time_value;
-    int several = es->recovery_entry_count > 1;
+    int several = offered > 1;
     int button_id = 0;
     int answer = editor_take_test_recovery_answer();
 #ifdef _WIN32
@@ -1175,15 +1394,13 @@ static int editor_ask_recovery_action(const EditorState *es, int index)
 #else
     int time_valid = localtime_r(&raw_time, &time_value) != NULL;
 #endif
-    const char *source = es->recovery_entries[index].source_path[0]
-                       ? es->recovery_entries[index].source_path
-                       : "(untitled)";
+    const char *source = entry->source_path[0] ? entry->source_path : "(untitled)";
 
     if (answer >= 0) return answer;
     if (time_valid) strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S",
                              &time_value);
     snprintf(message, sizeof(message), "Copy %d of %d\nSource: %s\nTimestamp: %s",
-             index + 1, es->recovery_entry_count, source, timestamp);
+             index + 1, offered, source, timestamp);
     {
         const char *buttons[] = {"Cancel", "Recover", several ? "More..." : "Discard"};
         if (dialog_choice("Recover Editor Snapshot", message, buttons, 3, 1, 0,
@@ -1197,7 +1414,7 @@ static int editor_ask_recovery_action(const EditorState *es, int index)
         snprintf(message, sizeof(message),
                  "Discard copy %d of %d (deleting it), or look at the next one?\n"
                  "Source: %s\nTimestamp: %s",
-                 index + 1, es->recovery_entry_count, source, timestamp);
+                 index + 1, offered, source, timestamp);
         if (dialog_choice("Recover Editor Snapshot", message, buttons, 3, 2, 0,
                           &button_id) != 0) return -1;
     }
@@ -1206,11 +1423,11 @@ static int editor_ask_recovery_action(const EditorState *es, int index)
     {
         char all[32];
         const char *buttons[] = {"Back", "This copy", all};
-        snprintf(all, sizeof(all), "All %d copies", es->recovery_entry_count);
+        snprintf(all, sizeof(all), "All %d copies", offered);
         snprintf(message, sizeof(message),
                  "Delete copy %d only, or all %d recovery copies?\n"
                  "Deleted copies cannot be recovered.",
-                 index + 1, es->recovery_entry_count);
+                 index + 1, offered);
         /* Back is the default: deleting everything takes a deliberate click. */
         if (dialog_choice("Discard Editor Snapshots", message, buttons, 3, 0, 0,
                           &button_id) != 0) return -1;
@@ -1229,7 +1446,7 @@ int editor_choose_recovery(EditorState *es)
         editor_set_status(es, "Recovery discovery failed");
         return -1;
     }
-    if (es->recovery_entry_count == 0) return -1;
+    if (editor_recovery_offer_count(es) == 0) return -1;
     for (;;) {
         int action = editor_ask_recovery_action(es, index);
         if (action < 0) {
@@ -1242,31 +1459,33 @@ int editor_choose_recovery(EditorState *es)
             return -1;
         }
         if (action == EDITOR_RECOVERY_RECOVER) {
-            es->pending_recovery_id = es->recovery_entries[index].id;
-            return index;
+            int stored = editor_recovery_offered_entry(es, index);
+            es->pending_recovery_id = es->recovery_entries[stored].id;
+            return stored;
         }
         if (action == EDITOR_RECOVERY_DISCARD) {
             /* Delete both files of this copy; the list is re-read from
              * disk, so the next copy (if any) moves into this position. */
-            if (editor_remove_recovery_entry(es, index) != 0) {
+            if (editor_remove_recovery_entry(es, editor_recovery_offered_entry(es, index)) != 0) {
                 editor_set_status(es, "Could not discard the recovery copy");
                 return -1;
             }
-            if (es->recovery_entry_count == 0) {
+            if (editor_recovery_offer_count(es) == 0) {
                 es->pending_recovery_id = 0;
                 editor_set_status(es, "Recovery copy discarded");
                 return -1;
             }
-            if (index >= es->recovery_entry_count) index = 0;
+            if (index >= editor_recovery_offer_count(es)) index = 0;
             continue;
         }
         if (action == EDITOR_RECOVERY_DISCARD_ALL) {
             /* Every copy offered here: another running editor's live work
-             * was never offered, so it is not touched.  The list is re-read
-             * after each removal, so always take the first entry. */
+             * and this editor's own open document were never offered, so
+             * they are not touched.  The list is re-read after each
+             * removal, so always take the first offered entry. */
             int discarded = 0;
-            while (es->recovery_entry_count > 0) {
-                if (editor_remove_recovery_entry(es, 0) != 0) {
+            while (editor_recovery_offer_count(es) > 0) {
+                if (editor_remove_recovery_entry(es, editor_recovery_offered_entry(es, 0)) != 0) {
                     editor_set_status(es, "Discarded %d recovery cop%s; could not "
                                       "discard the rest", discarded,
                                       discarded == 1 ? "y" : "ies");
@@ -1281,7 +1500,7 @@ int editor_choose_recovery(EditorState *es)
             return -1;
         }
         if (action == EDITOR_RECOVERY_NEXT)
-            index = (index + 1) % es->recovery_entry_count;
+            index = (index + 1) % editor_recovery_offer_count(es);
         /* EDITOR_RECOVERY_BACK asks about the same copy again. */
     }
 }

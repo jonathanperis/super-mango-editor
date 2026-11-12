@@ -37,24 +37,38 @@
  *   top surface this frame (crossing test prevents tunnelling at high speed).
  */
 void player_update(Player *player, float dt, SoundEffect *snd_jump,
-                   const Platform *platforms, int platform_count,
-                   const FloatPlatform *float_platforms, int float_platform_count,
-                   const BouncepadList *bouncepad_lists, int bouncepad_list_count,
-                   const VineDecor *vines, int vine_count,
-                   const LadderDecor *ladders, int ladder_count,
-                   const RopeDecor *ropes, int rope_count,
-                   const Bridge *bridges, int bridge_count,
-                   const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *floor_gaps, int floor_gap_count,
-                   int *out_bounce_idx,
-                   int *out_fp_landed_idx,
-                   int *out_bridge_landed_idx,
+                   const PlayerSurfaces *surfaces,
                    int prev_fp_landed_idx,
-                   int world_w) {
+                   PlayerLanding *landed) {
 
-    (void)vine_count;    /* vine_index selects the climbable; count unused here */
-    (void)ladder_count;
-    (void)rope_count;
+    /*
+     * Unpack the view into locals, once. The steps below then read as they
+     * always did ("platforms", "bridge_count"), and each one still gets
+     * only the arrays it works on.
+     */
+    const Platform      *platforms       = surfaces->platforms;
+    const int            platform_count  = surfaces->platform_count;
+    const FloatPlatform *float_platforms = surfaces->float_platforms;
+    const int            float_platform_count = surfaces->float_platform_count;
+    const BouncepadList *bouncepad_lists = surfaces->bouncepad_lists;
+    const int            bouncepad_list_count = surfaces->bouncepad_list_count;
+    const VineDecor     *vines           = surfaces->vines;
+    const LadderDecor   *ladders         = surfaces->ladders;
+    const RopeDecor     *ropes           = surfaces->ropes;
+    const Bridge        *bridges         = surfaces->bridges;
+    const int            bridge_count    = surfaces->bridge_count;
+    const SpikePlatform *spike_platforms = surfaces->spike_platforms;
+    const int            spike_platform_count = surfaces->spike_platform_count;
+    const int           *floor_gaps      = surfaces->floor_gaps;
+    const int            floor_gap_count = surfaces->floor_gap_count;
+    const int            world_w         = surfaces->world_w;
+
+    /* Where the landing tests write their answers. */
+    int *out_fp_landed_idx     = &landed->float_platform;
+    int *out_bridge_landed_idx = &landed->bridge;
+    landed->bouncepad_list  = -1;
+    landed->bouncepad_index = -1;
+    landed->float_platform  = -1;
 
     /* No bridge support until the bridge test below finds one; a climbing
      * player returns early and stands on nothing. */
@@ -139,7 +153,8 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
 
     player_resolve_floor_collision(player, bouncepad_lists, bouncepad_list_count,
                                    floor_gaps, floor_gap_count,
-                                   prev_center_x, prev_bottom, out_bounce_idx);
+                                   prev_center_x, prev_bottom,
+                                   &landed->bouncepad_list, &landed->bouncepad_index);
     /* A nearer bridge/spike surface or the floor may have replaced the float
      * platform or bridge candidate. Do not carry the player with, or crumble,
      * a discarded support.

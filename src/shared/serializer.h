@@ -102,8 +102,8 @@ int level_read_recovery_path(const char *path, char *buf, size_t buf_size);
 /*
  * level_load_toml — Read a TOML file and deserialize it into a LevelDef.
  *
- * Opens the file with serializer_fopen_utf8, parses it with
- * toml_parse_file, then walks the resulting table tree to populate `def`.
+ * Reads the file (level_load_toml_file), parses it with toml_parse, then
+ * walks the resulting table tree to populate `def`.
  * Missing arrays are treated as empty (count = 0).  The result must pass
  * level_validate_runtime; `def` is only written when the whole load
  * succeeds.
@@ -128,6 +128,49 @@ typedef void (*LevelLoadProblemFn)(void *context, const char *message, int line)
  * line of the value), or — for a file that is valid TOML but breaks the
  * runtime rules — every runtime error, each with its line.  The editor
  * lists them when a level will not open.
+ *
+ * A level that does load can still have something to say: a file without
+ * format_version is read leniently, and each key or value that was skipped
+ * is reported with a message starting "warning: " (see
+ * serializer_legacy_warnings).  A caller that only cares about failures
+ * can ignore every message of a load that returned 0.
  */
 int level_load_toml_explained(const char *path, LevelDef *def,
                               LevelLoadProblemFn report, void *context);
+
+/*
+ * LEVEL_TEXT_MAX — the largest level file the loader reads, in bytes
+ * (the file plus one NUL).  The shipped levels are about 11 KB and a level
+ * with every array full is well under 100 KB, so 1 MiB refuses nothing a
+ * person would write while keeping a crafted or mistaken file (a level
+ * path pointed at a video, say) from being read into memory whole.
+ */
+#define LEVEL_TEXT_MAX ((size_t)1024 * 1024)
+
+/*
+ * level_load_toml_file — Read a level file once, then hash and parse those
+ * same bytes.
+ *
+ * This is the entry point for a level on disk: level_load_toml and
+ * level_load_toml_explained are this call with fewer arguments.  The file
+ * is read into memory (at most LEVEL_TEXT_MAX bytes), and when fingerprint
+ * is not NULL it receives the size and hash of exactly the bytes that were
+ * parsed.  Hashing the file in a separate read could describe different
+ * bytes if another program rewrote it in between; one read cannot.  The
+ * fingerprint is filled in whenever the file could be read, even if the
+ * level is then rejected.  report is as for level_load_toml_explained.
+ */
+int level_load_toml_file(const char *path, LevelDef *def,
+                         LevelLoadProblemFn report, void *context,
+                         SerializerFileFingerprint *fingerprint);
+
+/*
+ * level_load_toml_text — Parse a level from bytes already in memory.
+ *
+ * text need not be NUL-terminated; size is its length.  label stands in
+ * for the file name in messages.  Everything after the read is the same as
+ * for a file, which makes this the entry point for callers that have no
+ * file: the fuzz harnesses, and tests.
+ */
+int level_load_toml_text(const char *text, size_t size, const char *label,
+                         LevelDef *def, LevelLoadProblemFn report, void *context);

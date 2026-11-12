@@ -40,7 +40,7 @@ so the order of the rows is the order things happen in:
 |-------|------|----------|----------------------------|
 | `s_level_loaders` | `src/levels/level_loader.c` | `load_<things>()` and `LOAD_ONCE` or `LOAD_EVERY_LIFE` | what is placed first (rails before the blocks that ride them) |
 | `s_update_steps` | `src/core/game_update.c` | a name and `update_<things>()` | the simulation order of one fixed step |
-| `s_damage_sources` | `src/collision/game_collision.c` | a debug name, the count field and `<thing>_touches()` | which hit counts when two happen in one step |
+| `s_damage_sources` | `src/collision/game_collision.c` | a debug name, the count field and `<thing>_hitbox()` (the debug overlay draws the same box) | which hit counts when two happen in one step |
 | `s_render_layers` | `src/render/game_render.c` | the layer number, a name and `render_<layer>()` | what is drawn over what |
 
 Every row points at a small function written beside the others like it. That
@@ -59,12 +59,18 @@ loader row and a render row and no update row; its pickup is written in
 Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values.
 
 1. `src/shared/serializer_parse.c` declares the schema entry
-   `ROOT_TABLE_ARRAY("coins", XY_FIELDS, MAX_COINS)`: each element must be a
+   `ROOT_TABLES("coins", XY_FIELDS, coins, coin_count)`: each element must be a
    table whose only keys are `x` and `y`, each a finite number (an omitted one
-   reads as 0), and the array may not exceed `MAX_COINS`. Unknown fields are
-   rejected.
-2. `serializer_load_collectibles()` (`src/shared/serializer_load_collectibles.c`)
-   copies those values into `LevelDef.coins` with its `LOAD_XY_ARRAY` macro.
+   reads as 0), and the array may not exceed the `LevelDef.coins` array
+   (`MAX_COINS`). Unknown fields are rejected. The row also says where the
+   values live: the `coins` array and `coin_count` in `LevelDef`, and, in
+   `XY_FIELDS`, which struct member each key is (`FLOAT_AT("x", CoinPlacement, x)`).
+2. `serializer_load_schema()` (same file) walks every row of the table and
+   copies the values into `LevelDef.coins`. There is no coin-specific loading
+   code: one loop serves every `[[array]]` of tables, and the same loop reads
+   the level-wide keys (`ROOT_INT("music_volume", music_volume, 0)`),
+   `[physics]`, `[last_star]` and `floor_gaps`. Only `format_version` is
+   checked by hand, in `src/shared/serializer_load_header.c`.
 3. `level_validate_runtime()` (`src/levels/level_validate.c`) first checks every
    count in `level_validate_counts()`, then checks that each coin lies inside
    the world.
@@ -83,7 +89,10 @@ Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values
    `s_render_layers` table, so coins are drawn over the ropes (row 14) and
    under the stars (row 16).
 7. The editor saves the same `LevelDef` through `src/shared/serializer_save.c`,
-   where `write_world_and_collectibles()` emits each `[[coins]]` table.
+   where `serializer_write_entry()` emits each `[[coins]]` table from the
+   same schema row, at the place `"coins"` has in `s_table_order`. The
+   level-wide keys before it are written the same way, in the order of
+   `s_key_order`.
 
 The parser does **not** live in `level_loader.c`: that module translates an
 already validated model into runtime state. The shared serializer belongs to
@@ -128,11 +137,11 @@ new `.c` in `src/collectibles/` automatically.
 |------|-----------------|
 | `src/levels/level.h` | Include the Token header (for `MAX_TOKENS`); add `TokenPlacement { float x, y; }`, a bounded placement array and a count to `LevelDef` |
 | `src/game.h` | Include the Token header; add the runtime array and count to `GameWorld`, the `gs->world` part of `GameState` |
-| `src/shared/serializer_parse.c` | Register `ROOT_TABLE_ARRAY("tokens", XY_FIELDS, MAX_TOKENS)` |
-| `src/shared/serializer_load_collectibles.c` | Add `LOAD_XY_ARRAY("tokens", token_count, MAX_TOKENS, tokens)` |
-| `src/shared/serializer_save.c` | In `write_world_and_collectibles()`, emit every token as `[[tokens]]` with x/y through the existing float formatter |
+| `src/shared/serializer_parse.c` | Register `ROOT_TABLES("tokens", XY_FIELDS, tokens, token_count)` and add a `SAME_LAYOUT(CoinPlacement, TokenPlacement, ...)` line for `x` and `y`, since the token shares the coin's field table. That one row is all the loading there is |
+| `src/shared/serializer_save.c` | Add `"tokens"` to `s_table_order`, where the section should appear in a saved file |
+| `tests/fuzz/toml.dict` | Add `"tokens"` (and any new key name); `tests/fuzz_dict_test.py` fails until it is there |
 | `src/levels/level_validate.c` | Add `CHECK_COUNT(token_count, MAX_TOKENS)` to `level_validate_counts()` and a world-bounds check per placement to `level_validate_runtime()` |
-| `tools/validate_levels.py` | Add `"tokens"` to `COUNT_LIMITS` (it reads `MAX_TOKENS` from the headers) and to the schema table as `XY_FIELDS` |
+| `tools/validate_levels.py` | Add `"tokens"` to `COUNT_LIMITS` (it reads `MAX_TOKENS` from the headers) and to the schema table as `XY_FIELDS`. `make validate-levels` compares this copy with the C table (`tests/schema_parity_test.py`) and fails until they agree |
 
 Keep `format_version = 1` at the document root. Unknown fields must still be
 rejected; do not loosen schema validation to make the exercise pass.
@@ -320,10 +329,13 @@ A Token sits still. An enemy or hazard adds three things:
   [Developer Guide](../developer-guide/#adding-physics-to-an-entity) for the
   physics pattern.
 - **Damage.** In `src/collision/game_collision.c`, write a
-  `<thing>_touches()` function beside `circular_saw_touches()`: skip an
-  inactive item, build its box with your `_get_hitbox` helper and test it
-  against the player. Then add one row to the `s_damage_sources` table: the
-  name the debug log prints, `WORLD_COUNT(<things>_count)` and your function.
+  `<thing>_hitbox()` function beside `circular_saw_hitbox()`: return 0 for an
+  inactive item, otherwise store its box (from your `_get_hitbox` helper) and
+  return 1. Then add one row to the `s_damage_sources` table: the name the
+  debug log prints, `WORLD_COUNT(<things>_count)`, your function and `NULL`
+  (the last column is only for a kind that needs more than "the player
+  overlaps the box", as a spike row does). `game_collide()` tests the player
+  against that box, and the F3 debug overlay outlines the same one.
   The row's place in the table is when it is tested; the first hit in a
   step wins. `game_collide()` passes that hit to `apply_damage()` in
   `src/collision/collision_damage.c`, which handles hearts, knockback and the
@@ -343,7 +355,7 @@ automatically. A brand-new source directory needs its own wildcard line there.
 - [ ] Schema entry, loader, saver and C/Python validation (section 3)
 - [ ] `load_<entities>()` in `level_loader.c` and its `s_level_loaders` row: `LOAD_EVERY_LIFE` unless it awards score (then `LOAD_ONCE`)
 - [ ] If it moves: `update_<entities>()` in `src/core/game_update.c` and its `s_update_steps` row, above `collision` if it can hurt
-- [ ] If it hurts: a `_touches()` function and its `s_damage_sources` row in `src/collision/game_collision.c`; if it is collected, pickup code in `game_collide()`
+- [ ] If it hurts: a `_hitbox()` function and its `s_damage_sources` row in `src/collision/game_collision.c` (the F3 debug overlay then outlines it without further code); if it is collected, pickup code in `game_collide()`
 - [ ] `render_<entities>()` in `src/render/game_render.c` and its `s_render_layers` row at the right layer, with the rows after it renumbered
 - [ ] The same rows in the manual's [update order](../architecture/#update-order-one-fixed-step) and [render order](../architecture/#render-order-back-to-front) tables (`make docs-drift` compares them with the code)
 - [ ] Texture row in `game_resources.c` (and `game_resources_require_level_textures()` if optional)

@@ -40,9 +40,7 @@
 void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
                          unsigned int physical_input_mask,
-                         const VineDecor *vines, int vine_count,
-                         const LadderDecor *ladders, int ladder_count,
-                         const RopeDecor *ropes, int rope_count) {
+                         const PlayerSurfaces *surfaces) {
     const int replay_left = (replay_input_mask & PLAYER_INPUT_LEFT) != 0;
     const int replay_right = (replay_input_mask & PLAYER_INPUT_RIGHT) != 0;
     const int replay_up = (replay_input_mask & PLAYER_INPUT_UP) != 0;
@@ -73,9 +71,9 @@ void player_handle_input(Player *player, SoundEffect *snd_jump,
         player->hurt_timer > PLAYER_HURT_TIME - PLAYER_KNOCKBACK_GRAB_LOCK;
     if (!player->on_vine && !jump_down && !knocked_back &&
         (physical_up || replay_up)) {
-        player_try_grab_climbable(player, vines, vine_count,
-                                  ladders, ladder_count,
-                                  ropes, rope_count);
+        player_try_grab_climbable(player, surfaces->vines, surfaces->vine_count,
+                                  surfaces->ladders, surfaces->ladder_count,
+                                  surfaces->ropes, surfaces->rope_count);
     }
 
     if (player->on_vine) {

@@ -224,6 +224,24 @@ static int validate_typed_path(const char *field, const char *value,
         }
         return -1;
     }
+    /*
+     * Every folder and file name in the path must mean the same thing on
+     * each system the game runs on. A sprite named "con.png" is an
+     * ordinary file on macOS and Linux, but Windows opens the console
+     * device for it, and "a:b.png" names a hidden NTFS stream; a level
+     * using either would load on one machine and not on another.
+     */
+    for (const char *segment = value; *segment != '\0';) {
+        const char *end = strchr(segment, '/');
+        size_t length = end ? (size_t)(end - segment) : strlen(segment);
+        if (!level_file_name_portable(segment, length)) {
+            return fail_value(err, err_size, field,
+                              "has a file or folder name that is not valid on every system "
+                              "(a Windows device name such as CON, or one of <>:\"|?*)");
+        }
+        segment += length;
+        if (*segment == '/') segment++;
+    }
     return 0;
 }
 
@@ -394,9 +412,12 @@ static int validate_climbable_rect(char *err, size_t err_size,
                                    int content_h, int step, float world_w)
 {
     float h;
+    /* The most tiles that fit between the top and the bottom of the
+     * screen: the first is content_h tall, each further one adds step. */
+    int max_tiles = 1 + (GAME_H - content_h) / step;
 
-    if (tile_count < 1) {
-        return fail_range(err, err_size, field, tile_count, 1, 999);
+    if (tile_count < 1 || tile_count > max_tiles) {
+        return fail_range(err, err_size, field, tile_count, 1, max_tiles);
     }
 
     h = (float)content_h + (float)(tile_count - 1) * (float)step;
@@ -836,6 +857,27 @@ static int validate_entity_motion(const LevelDef *def,
     return 0;
 }
 
+/*
+ * validation_screen_count — The screen count the position checks measure
+ * against: the level's own, held to 1..MAX_LEVEL_SCREENS.
+ *
+ * validate_level_settings has already reported a screen_count outside that
+ * range. When every error is being collected the checks go on regardless,
+ * and they turn the world width back into an int ((int)world_w). With
+ * screen_count = 2000000000 that width is 8e11 pixels, which no int can
+ * hold, and converting it is undefined behaviour. Holding the count to
+ * the largest legal world keeps every later sum inside int, and the other
+ * errors are then reported against a world of a real size.
+ */
+static int validation_screen_count(const LevelDef *def)
+{
+    int screens = level_screen_count(def);
+
+    if (screens < 1) return 1;
+    if (screens > MAX_LEVEL_SCREENS) return MAX_LEVEL_SCREENS;
+    return screens;
+}
+
 /* validate_player_start — An authored start point must lie inside the
  * world. 0,0 means "use the default start" and is not checked. */
 static int validate_player_start(const LevelDef *def, char *err,
@@ -932,7 +974,8 @@ static int validate_platforms(const LevelDef *def, char *err,
         int tw = p->tile_width > 0 ? p->tile_width : 1;
         if (p->tile_height < 1 || p->tile_height > (FLOOR_Y + 16) / TILE_SIZE) {
             snprintf(field, sizeof(field), "platforms[%d].tile_height", i);
-            fail_range(err, err_size, field, p->tile_height, 1, 999);
+            fail_range(err, err_size, field, p->tile_height, 1,
+                       (FLOOR_Y + 16) / TILE_SIZE);
             if (stop_here(sink, err)) return -1;
         } else if (level_platform_top_y(p->tile_height) < 0.0f) {
             snprintf(field, sizeof(field), "platforms[%d].tile_height", i);
@@ -942,7 +985,8 @@ static int validate_platforms(const LevelDef *def, char *err,
         }
         if (p->tile_width < 0 || p->tile_width > (int)world_w / TILE_SIZE) {
             snprintf(field, sizeof(field), "platforms[%d].tile_width", i);
-            fail_range(err, err_size, field, p->tile_width, 0, 999);
+            fail_range(err, err_size, field, p->tile_width, 0,
+                       (int)world_w / TILE_SIZE);
             if (stop_here(sink, err)) return -1;
             continue;   /* the footprint check below needs a sane width */
         }
@@ -1131,11 +1175,19 @@ static int validate_spike_strips(const LevelDef *def, char *err,
  */
 static int rail_offset_is_on_track(const RailPlacement *rail, float t)
 {
-    int count = rail->layout == RAIL_LAYOUT_RECT
-              ? 2 * rail->w + 2 * (rail->h - 2) : rail->w;
+    /*
+     * The tile count is worked out in double, not int. When every error is
+     * being collected, this runs even for a rail validate_rail has already
+     * rejected, whose w and h can be any int a file can hold: 2 * w in int
+     * arithmetic would then overflow, which is undefined behaviour in C.
+     * A double holds every int exactly, so the same sum is always defined.
+     */
+    double count = rail->layout == RAIL_LAYOUT_RECT
+                 ? 2.0 * (double)rail->w + 2.0 * ((double)rail->h - 2.0)
+                 : (double)rail->w;
 
-    if (!isfinite(t) || t < 0.0f || t >= (float)count) return 0;
-    if (rail->layout == RAIL_LAYOUT_HORIZ && t > (float)(count - 1)) return 0;
+    if (!isfinite(t) || t < 0.0f || (double)t >= count) return 0;
+    if (rail->layout == RAIL_LAYOUT_HORIZ && (double)t > count - 1.0) return 0;
     return 1;
 }
 
@@ -1426,7 +1478,7 @@ static int validate_runtime(const LevelDef *def, char *err, size_t err_size,
     if (validate_level_settings(def, err, err_size, sink) != 0) return -1;
 
     /* Most rules below need the world width; 0 screens means the default. */
-    screens = level_screen_count(def);
+    screens = validation_screen_count(def);
     world_w = (float)screens * (float)GAME_W;
 
     /* Asset paths, physics overrides and per-entity motion values. */
@@ -1494,7 +1546,7 @@ int level_validate_preview(const LevelDef *def, char *err, size_t err_size)
 
     if (level_validate_counts(def, err, err_size) != 0) return -1;
     if (validate_level_settings(def, err, err_size, sink) != 0) return -1;
-    world_w = (float)level_screen_count(def) * (float)GAME_W;
+    world_w = (float)validation_screen_count(def) * (float)GAME_W;
     if (validate_floor_gaps(def, err, err_size, world_w, sink) != 0) return -1;
     if (validate_rails(def, err, err_size, world_w, sink) != 0) return -1;
     if (validate_platforms(def, err, err_size, world_w, sink) != 0) return -1;

@@ -52,24 +52,11 @@ void player_apply_default_physics(Player *player);
 void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
                          unsigned int physical_input_mask,
-                         const VineDecor *vines, int vine_count,
-                         const LadderDecor *ladders, int ladder_count,
-                         const RopeDecor *ropes, int rope_count);
+                         const PlayerSurfaces *surfaces);
 void player_update(Player *player, float dt, SoundEffect *snd_jump,
-                   const Platform *platforms, int platform_count,
-                   const FloatPlatform *float_platforms, int float_platform_count,
-                   const BouncepadList *bouncepad_lists, int bouncepad_list_count,
-                   const VineDecor *vines, int vine_count,
-                   const LadderDecor *ladders, int ladder_count,
-                   const RopeDecor *ropes, int rope_count,
-                   const Bridge *bridges, int bridge_count,
-                   const SpikePlatform *spike_platforms, int spike_platform_count,
-                   const int *floor_gaps, int floor_gap_count,
-                   int *out_bounce_idx,
-                   int *out_fp_landed_idx,
-                   int *out_bridge_landed_idx,
+                   const PlayerSurfaces *surfaces,
                    int prev_fp_landed_idx,
-                   int world_w);
+                   PlayerLanding *landed);
 void player_render(const Player *player, int cam_x, int reduced_motion);
 int player_hurt_tint(const Player *player, int reduced_motion, Color *tint);
 IntRect player_get_hitbox(const Player *player);
@@ -77,11 +64,22 @@ void player_reset(Player *player);
 void player_cleanup(Player *player, AssetCache *cache);
 ```
 
-`player_update` receives the three bouncepad arrays as `BouncepadList` views
-(`{ const Bouncepad *pads; int count; }`) built by `game_bouncepads_lists`; no
-pads are copied each step. `*out_bounce_idx` is a flat index across those lists
-in order (list 0's pads first). Its `dt` is always `GAME_FIXED_STEP`, so jump
-arcs come out the same at any display rate.
+`PlayerSurfaces` is a struct of borrowed views: the arrays of platforms, float
+platforms, bouncepad lists, vines, ladders, ropes, bridges, spike platforms and
+floor gaps, each with its count, plus the world's width. `game_player_step`
+fills it once per step from `GameWorld` and hands it to both calls; a test
+names only the kinds it needs, because fields left out of an initializer are
+zero ("none of that kind"). Nothing in it is owned or changed by the player
+module.
+
+`PlayerLanding` is what `player_update` found under the player this step:
+`float_platform` and `bridge` (an index, or -1), and for a bouncepad launch
+`bouncepad_list` and `bouncepad_index`. The three bouncepad arrays are passed
+as `BouncepadList` views (`{ const Bouncepad *pads; int count; }`) built by
+`game_bouncepads_lists`, in the order of the `GAME_BOUNCEPAD_LIST_*` constants,
+so no pads are copied each step and `game_bouncepads_handle_hit` finds the pad
+again from the list and the index alone. `dt` is always `GAME_FIXED_STEP`, so
+jump arcs come out the same at any display rate.
 
 Inside `player_update` the order is: climbing (returns early while on a
 climbable), gravity, horizontal motion, position integration, platform and

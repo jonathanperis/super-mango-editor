@@ -133,6 +133,9 @@ typedef struct AppSession {
      * the last check, so a new point is recorded only when one changes. */
     float resume_respawn_x, resume_respawn_y;
     int resume_was_paused;
+    /* 1 = a Continue point was recorded at a checkpoint and its write to
+     * disk is waiting for the game to stop being played (native builds). */
+    int resume_save_deferred;
     /* The config's start point, used up by the first game opened (Replay,
      * Level Select and Next Level start levels at their own start). */
     LevelStart start;

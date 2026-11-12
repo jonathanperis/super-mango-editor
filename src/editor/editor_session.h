@@ -62,6 +62,11 @@ typedef enum {
 /* Ask how to handle a source changed on disk. */
 EditorExternalChoice editor_confirm_external_change(EditorState *es);
 
+/* Save on a recovered copy (EDITOR_SOURCE_RECOVERED): "This is a recovered
+ * copy of <path>: replace that file with it, save it as another file, or
+ * cancel."  The answers are the external-change prompt's. */
+EditorExternalChoice editor_confirm_recovered_save(EditorState *es);
+
 /* Frame rates for the editor's window with and without focus, and with
  * focus but no input for EDITOR_IDLE_MS. */
 #define EDITOR_FPS_FOCUSED   60

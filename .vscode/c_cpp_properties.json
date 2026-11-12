@@ -1,15 +1,9 @@
 {
     "configurations": [
         {
-            "name": "Win32",
-            "includePath": [
-                "${workspaceFolder}/**"
-            ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE"
-            ]
+            "name": "Super Mango",
+            "compileCommands": "${workspaceFolder}/compile_commands.json",
+            "cStandard": "c11"
         }
     ],
     "version": 4

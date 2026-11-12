@@ -1269,8 +1269,12 @@ int editor_campaign_save(EditorState *es)
     }
     c->close_armed = 0;
 
-    /* 5. Show the level open in the editor as it now is on disk. */
-    if (reload[0]) (void)editor_load_level(es, reload);
+    /* 5. Show the level open in the editor as it now is on disk. Only its
+     *    name and next_phase were rewritten, so its undo history is still
+     *    good and is kept (editor_refresh_saved_level); opening the file
+     *    afresh is the fallback, and that does clear it. */
+    if (reload[0] && editor_refresh_saved_level(es) != 0)
+        (void)editor_load_level(es, reload);
     editor_set_status(es, "Campaign saved: %zu levels, %d level file%s updated%s",
                       c->catalog.count, written, written == 1 ? "" : "s",
                       unloaded ? "; some listed files do not load" : "");

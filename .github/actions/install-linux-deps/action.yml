@@ -1,0 +1,49 @@
+name: Install Linux build dependencies
+description: >-
+  Installs the apt packages a Linux job needs to build raylib and the game.
+  The package list lives here, once, instead of in every workflow.
+
+inputs:
+  display:
+    description: >-
+      'true' also installs what the rendered tests need: the Xvfb virtual
+      display, Mesa's software OpenGL driver, PulseAudio for a null sound
+      device, and zenity, which the editor's file dialogs call.
+    required: false
+    default: 'false'
+  extra:
+    description: >-
+      More package names, separated by spaces (for example "llvm" for the
+      coverage tools or "clang-tidy").
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install apt packages
+      shell: bash
+      # Inputs reach the script through the environment, never by pasting
+      # them into the script text, so a value can only ever be read as data.
+      env:
+        WITH_DISPLAY: ${{ inputs.display }}
+        EXTRA_PACKAGES: ${{ inputs.extra }}
+      run: |
+        # The compiler, CMake (raylib's build system) and the headers of the
+        # libraries raylib's desktop backend links: OpenGL and the X11
+        # extensions GLFW uses for monitors, cursors and input.
+        packages=(clang cmake libgl1-mesa-dev libx11-dev libxrandr-dev
+                  libxinerama-dev libxcursor-dev libxi-dev)
+        if [ "$WITH_DISPLAY" = "true" ]; then
+          packages+=(xvfb libgl1-mesa-dri pulseaudio zenity)
+        fi
+        # Package names are lower-case letters, digits, ".", "+" and "-".
+        # Anything else is a mistake in the calling workflow.
+        case "$EXTRA_PACKAGES" in
+          *[!a-z0-9.+\ -]*)
+            echo "::error::install-linux-deps: 'extra' may only hold package names, got: $EXTRA_PACKAGES"
+            exit 1 ;;
+        esac
+        read -r -a extra <<< "$EXTRA_PACKAGES"
+        sudo apt-get update -q
+        sudo apt-get install -y "${packages[@]}" "${extra[@]}"

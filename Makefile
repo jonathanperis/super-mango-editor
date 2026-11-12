@@ -37,17 +37,41 @@ else
 HARDEN_CFLAGS  = -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE
 HARDEN_LDFLAGS = -pie -Wl,-z,relro,-z,now
 endif
-MODE_FLAGS_release = -O2 $(HARDEN_CFLAGS)
-# Release binaries ship without a symbol table (-s): nothing reads it, and
-# it was about 12% of each executable (230 KB). Not on macOS, where the
-# linker deprecates -s; the ad-hoc signature is made after the link, so a
-# later strip would invalidate it.
+# Release builds also leave out code and data that nothing uses, and do not
+# record where on the builder's disk the sources were:
+#   -ffunction-sections -fdata-sections  put every function and every global
+#       in a section of its own, so that
+#   -Wl,--gc-sections                    the linker can drop the ones no
+#       code reaches (GNU ld and lld; Linux and MinGW).
+#   -Wl,-dead_strip                      Apple's linker does the same per
+#       symbol and needs no special compile flags.
+#   -ffile-prefix-map=<this folder>=.    rewrites the build path inside
+#       __FILE__ strings, so two checkouts in different folders build the
+#       same bytes and no home directory ends up in a shipped binary.
+# No link-time optimisation (LTO): it would make release builds differ more
+# from the debug builds that the tests run.
+# A folder name with a space in it would split the flag in two, so such a
+# checkout builds without it rather than failing.
+PATH_MAP_CFLAGS = $(if $(word 2,$(CURDIR)),,-ffile-prefix-map=$(CURDIR)=.)
 ifeq ($(shell uname -s),Darwin)
-STRIP_LDFLAGS =
+GC_CFLAGS  =
+GC_LDFLAGS = -Wl,-dead_strip
+else
+GC_CFLAGS  = -ffunction-sections -fdata-sections
+GC_LDFLAGS = -Wl,--gc-sections
+endif
+MODE_FLAGS_release = -O2 $(HARDEN_CFLAGS) $(GC_CFLAGS) $(PATH_MAP_CFLAGS)
+# Release binaries ship without a symbol table (-s): nothing reads it, and
+# it was about 12% of each executable (230 KB). On macOS the linker
+# deprecates -s, so -Wl,-x drops the local (file-private) symbols instead,
+# while it links. That has to happen in the link: the ad-hoc signature is
+# made right after it, and a later strip would invalidate that signature.
+ifeq ($(shell uname -s),Darwin)
+STRIP_LDFLAGS = -Wl,-x
 else
 STRIP_LDFLAGS = -s
 endif
-MODE_LDFLAGS_release = $(HARDEN_LDFLAGS) $(STRIP_LDFLAGS)
+MODE_LDFLAGS_release = $(HARDEN_LDFLAGS) $(GC_LDFLAGS) $(STRIP_LDFLAGS)
 CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
 # Tests write scratch files under their own OUTDIR (tests/test_paths.h), so
 # test, sanitize and coverage trees can run side by side in one checkout.
@@ -173,14 +197,12 @@ SMOKE_SEEDS   ?= 1 7 23
 # raylib calls for test doubles), so those objects live in their own tree that
 # mirrors the source path: src/screens/hud.c -> $(TEST_OBJDIR)/src/screens/hud.o.
 # One pattern rule (after the fuzz targets) builds every one of them; adding a
-# test object is just a new variable here plus its use in a link rule below.
+# test object is just a new variable here plus its use on the program's line in
+# the "Native test programs" section below.
 TEST_OBJDIR = $(OBJDIR)/tests
 TEST_SERIALIZER_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(SHARED_DIR)/%.o,serializer serializer_emit \
-                       serializer_io serializer_load serializer_load_checkpoints \
-                       serializer_load_climbables serializer_load_collectibles \
-                       serializer_load_config serializer_load_enemies serializer_load_geometry \
-                       serializer_load_hazards serializer_load_header serializer_load_layers \
-                       serializer_load_surfaces serializer_parse serializer_save serializer_types)
+                       serializer_io serializer_load serializer_load_header \
+                       serializer_parse serializer_save serializer_types)
 TEST_VALIDATE_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/levels/level_validate.o
 TEST_LEVEL_LOADER_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/levels/level_loader.o
 TEST_TOMLC_OBJ      = $(TEST_OBJDIR)/$(VENDOR_DIR)/tomlc17.o
@@ -221,7 +243,8 @@ TEST_EDITOR_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor_validati
                    editor_textures \
                    editor_playtest editor_shortcuts file_dialog dialog_choice undo \
                    properties_entities properties_config \
-                   tools_bounds tools_place tools_drag tools_nudge)
+                   tools_bounds tools_place tools_drag tools_nudge \
+                   editor_handles editor_entity_list)
 # The editor's own window, chrome and frame, for editor-ui-test.
 TEST_EDITOR_FRAME_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(EDITOR_DIR)/%.o,editor editor_chrome \
                    editor_frame editor_minimap)
@@ -370,30 +393,36 @@ release: ## Build: Game and editor, optimized and hardened, in OUTDIR/release
 -include $(TEST_DEPS)
 
 # ── Tests ────────────────────────────────────────────────────────────
+# Adding a native test takes one name in TEST_TARGETS (near the top) and, when
+# it links more than its own tests/<name>.c, one line of extra objects in the
+# "Native test programs" section below. The run line here and the link rule
+# there are generated from TEST_TARGETS.
+#
+# TEST_ENV_<program> is extra environment for one program's run line. These
+# two open a real window on the desktop backend (MANGO_TEST_WINDOW=1); the
+# others never need one.
+TEST_ENV_editor-validation-test = MANGO_TEST_WINDOW=1
+TEST_ENV_session-test = MANGO_TEST_WINDOW=1
+# A variable holding one line break. $(foreach) joins its results with
+# spaces; ending each result with this makes every test its own recipe
+# line, so Make stops at the first one that fails.
+define newline
+
+
+endef
+run_native_test = $(strip $(TEST_ENV_$(notdir $(1))) $(RUN_PREFIX) "$(abspath $(1))")
+# Python tests of the build and docs tools. They need no compiler, window or
+# network. tools/check_docs_drift.py compares this list (and NODE_TESTS
+# below) with the files in tests/ and with the counts the docs quote.
+PYTHON_TESTS = tests/validate_levels_test.py tests/gen_sounds_test.py \
+               tests/fuzz_dict_test.py tests/coverage_baseline_test.py \
+               tests/clang_tidy_report_test.py tests/doctor_test.py \
+               tests/build_raylib_test.py tests/gen_compile_commands_test.py \
+               tests/roadmap_quality_test.py tests/import_raygui_icons_test.py
+
 test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser-encoding-probe ## Test: Native test binaries plus the Python and Node host checks
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-serializer-test"
-	python3 tests/validate_levels_test.py
-	python3 tests/gen_sounds_test.py
-	python3 tests/coverage_baseline_test.py
-	python3 tests/clang_tidy_report_test.py
-	python3 tests/doctor_test.py
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/level-validate-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/runtime-load-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/rail-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/entity-utils-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/collision-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/phase-transition-test"
-	MANGO_TEST_WINDOW=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-validation-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-undo-recovery-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-damage-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-config-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-score-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-overlay-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-events-test"
-	MANGO_TEST_WINDOW=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/session-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/game-checkpoint-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-mechanics-test"
-	$(RUN_PREFIX) "$(abspath $(OUTDIR))/editor-ui-test"
+	$(foreach script,$(PYTHON_TESTS),python3 $(script)$(newline))
+	$(foreach program,$(TEST_TARGETS),$(call run_native_test,$(program))$(newline))
 
 $(TEST_TARGETS): | $(OUTDIR)
 $(filter-out $(OUTDIR)/session-test $(OUTDIR)/game-events-test,$(TEST_TARGETS)): $(PLATFORM_OBJS)
@@ -432,6 +461,7 @@ LEVEL_CHECK_OBJS = $(filter $(OBJDIR)/$(SHARED_DIR)/serializer%.o,$(OBJS)) \
 validate-levels: $(LEVEL_CHECK) ## Check: Every level, the campaign manifest and asset links
 	$(RUN_PREFIX) "$(abspath $(LEVEL_CHECK))" $(LEVEL_FILES)
 	python3 tools/validate_levels.py
+	python3 tests/schema_parity_test.py "$(abspath $(LEVEL_CHECK))"
 
 $(LEVEL_CHECK): $(TOOL_OBJS) $(LEVEL_CHECK_OBJS) $(LINK_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(CFLAGS) -o $@ $(filter %.o,$^) $(MATH_LIBS)
@@ -442,20 +472,38 @@ $(OBJDIR)/tools/%.o: tools/%.c | $(OUTDIR)
 
 -include $(TOOL_OBJS:.o=.d)
 
+# The browser-side scripts, run under Node with a stand-in document; no
+# browser and no network. boot_test covers web/boot.js on its own,
+# web_host_test how the two pages use it.
+NODE_TESTS = tests/boot_test.cjs tests/web_host_test.cjs tests/profile_storage_test.cjs \
+             tests/touch_controls_test.cjs tests/keyboard_scope_test.cjs \
+             tests/audio_unlock_test.cjs
+# Python tests of the Web page tools and of packaging.
+WEB_PYTHON_TESTS = tests/web_boot_contract_test.py tests/web_shell_test.py \
+                   tests/web_debug_page_test.py tests/wasm_artifacts_test.py \
+                   tests/package_release_test.py tests/filter_codeql_sarif_test.py
 web-host-contract: ## Check: Web shell, storage and packaging contract tests
 	python3 tools/check_web_boot_contract.py
-	$(NODE) tests/web_host_test.cjs
-	$(NODE) tests/profile_storage_test.cjs
-	$(NODE) tests/touch_controls_test.cjs
-	$(NODE) tests/keyboard_scope_test.cjs
-	$(NODE) tests/audio_unlock_test.cjs
-	python3 tests/web_debug_page_test.py
-	python3 tests/package_release_test.py
-	python3 tests/filter_codeql_sarif_test.py
+	$(foreach script,$(NODE_TESTS),$(NODE) $(script)$(newline))
+	$(foreach script,$(WEB_PYTHON_TESTS),python3 $(script)$(newline))
 
-# clangd / IDE compile database uses the same pinned dependency headers.
+# clangd / IDE / clang-tidy compile database. The script is handed the flags
+# this Makefile compiles with (mode flags, the Memory backend define,
+# EXTRA_CFLAGS, the raylib include path of this OUTDIR, the test flags and the
+# per-object test renames), so tools analyse the build you would get from the
+# same command line: `make compile-commands RAYLIB_PLATFORM=memory OUTDIR=...`
+# describes that tree. --flag=VALUE keeps argparse from reading a value that
+# starts with "-" as another option.
+# COMPILE_DB_TEST_SOURCES: the game sources that are also compiled with the
+# test flags (every object under $(TEST_OBJDIR) that is not a tests/*.c file).
+COMPILE_DB_TEST_SOURCES = $(patsubst $(TEST_OBJDIR)/%.o,%.c,$(filter-out $(TEST_SOURCE_DIR)/%,$(filter $(TEST_OBJDIR)/%,$(sort $(TEST_OBJECTS)))))
 compile-commands: ## Build: Write compile_commands.json for clangd and IDEs
-	CC="$(CC)" RAYLIB_BUILD="$(RAYLIB_BUILD)" python3 tools/gen_compile_commands.py
+	python3 tools/gen_compile_commands.py --cc "$(CC)" --objdir "$(OBJDIR)" \
+		--cflags=$(call shell_quote,$(CFLAGS)) \
+		--includes=$(call shell_quote,$(PROJECT_INCLUDES)) \
+		--test-cflags=$(call shell_quote,$(TEST_CFLAGS)) \
+		--test-sources=$(call shell_quote,$(COMPILE_DB_TEST_SOURCES)) \
+		$(foreach v,$(sort $(filter TEST_OBJ_FLAGS_%,$(.VARIABLES))),--object-flags $(call shell_quote,$(patsubst TEST_OBJ_FLAGS_%,%,$(v))=$($(v))))
 
 # clang-tidy over src/ and tools/ with the checks in .clang-tidy; prints the
 # findings and exits 0 (CI's static-analysis.yml shows them in its summary).
@@ -475,6 +523,16 @@ level-catalog: ## Generate: Level catalog page from the campaign manifest
 
 overlay-snapshots: ## Generate: Overlay text snapshots page
 	python3 tools/generate_overlay_snapshots.py
+
+# Regenerate vendor/raygui/raygui_icons.h, the editor's toolbar icons, from
+# the pinned raygui.h. Needed after adding an icon to the ICONS table in the
+# script or after changing the pin in vendor/raygui/manifest.json (see
+# vendor/raygui/README.md). It downloads raygui.h and checks its SHA-256;
+# pass RAYGUI_SOURCE=<file> to read a copy you already have instead.
+.PHONY: raygui-icons
+RAYGUI_SOURCE ?=
+raygui-icons: ## Generate: Editor icon bitmaps from the pinned raygui.h
+	python3 tools/import_raygui_icons.py $(if $(RAYGUI_SOURCE),--source "$(RAYGUI_SOURCE)",)
 
 # Regenerate every assets/sounds QOA file from tools/gen_sounds.py recipes.
 .PHONY: sounds
@@ -611,6 +669,12 @@ FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
                     src/shared/graphics.c \
                     src/levels/level_ref.c src/shared/serializer_io.c \
                     src/shared/platform.c $(VENDOR_DIR)/tomlc17.c
+# The campaign manifest loader and the experiment capture decoder
+# (tests/fuzz_campaign_experiment.c). The campaign loads each listed level,
+# so it needs the level loader too.
+FUZZ_CAMPAIGN_SRCS = tests/fuzz_campaign_experiment.c src/levels/campaign_catalog.c \
+                     src/levels/level_path.c src/core/game_experiment_file.c \
+                     src/shared/platform.c $(FUZZ_SERIALIZER_SRCS)
 FUZZ_HEADERS = $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h $(VENDOR_DIR)/*.h)
 # Seeds are read in place: shipped levels, schema fixtures, extra edge cases.
 FUZZ_LEVEL_SEEDS = levels levels/labs tests/fixtures/serializer_v1 \
@@ -619,15 +683,25 @@ FUZZ_PROFILE_SEEDS = tests/fuzz/corpus/profile
 # Every level seed is an editor seed too; its own folder adds levels that
 # use many fields at once, so a field the saver drops shows up quickly.
 FUZZ_EDITOR_SEEDS = $(FUZZ_LEVEL_SEEDS) tests/fuzz/corpus/editor
+# Manifests (shipped, broken fixtures, edge cases) and captures.
+FUZZ_CAMPAIGN_SEEDS = levels/campaigns tests/fixtures/campaign_manifest \
+                      tests/fuzz/corpus/campaign tests/fuzz/corpus/experiment
 FUZZ_MUTATIONS ?= 0
 FUZZ_SECONDS ?= 60
+# Words libFuzzer may splice into an input, and the longest input it builds:
+# 64 KiB is several times the largest shipped level, and inputs past the
+# readers' own limits are refused before any parsing.
+FUZZ_DICT = tests/fuzz/toml.dict
+FUZZ_RUN_FLAGS = -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
+                 -dict=$(FUZZ_DICT) -max_len=65536
 FUZZ_CC ?= $(firstword $(wildcard /opt/homebrew/opt/llvm/bin/clang /usr/local/opt/llvm/bin/clang) clang)
 
 .PHONY: fuzz-corpus fuzz
-fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay $(OUTDIR)/fuzz-editor-replay ## Test: Replay the fuzz seeds under ASan/UBSan (FUZZ_MUTATIONS=N)
+fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay $(OUTDIR)/fuzz-editor-replay $(OUTDIR)/fuzz-campaign-replay ## Test: Replay the fuzz seeds under ASan/UBSan (FUZZ_MUTATIONS=N)
 	"$(abspath $(OUTDIR))/fuzz-level-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-profile-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_PROFILE_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-editor-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_EDITOR_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz-campaign-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_CAMPAIGN_SEEDS)
 
 # level.h includes raylib's headers, so every replay waits for raylib's build
 # even where it links no raylib code.
@@ -640,10 +714,18 @@ $(OUTDIR)/fuzz-editor-replay: tests/fuzz_replay_main.c $(FUZZ_EDITOR_SRCS) $(FUZ
 $(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(LIBS)
 
+$(OUTDIR)/fuzz-campaign-replay: tests/fuzz_replay_main.c $(FUZZ_CAMPAIGN_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
+	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_CAMPAIGN_SRCS) $(MATH_LIBS)
+
 # -close_fd_mask=2 hides the loaders' per-input error lines; libFuzzer keeps
 # its own and the sanitizer reports.  Crashes land in $(OUTDIR)/fuzz/ and
 # replay with the matching program: $(OUTDIR)/fuzz-level-replay <crash-file>
-# (or fuzz-profile-replay, fuzz-editor-replay).
+# (or fuzz-profile-replay, fuzz-editor-replay, fuzz-campaign-replay).
+#
+# Each harness gets its own folder under $(OUTDIR)/fuzz/. libFuzzer writes
+# every input that reached new code there, and reads them back on the next
+# run, so a folder kept between runs (the weekly CI job caches it) lets the
+# search carry on from where it stopped instead of starting from the seeds.
 fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (needs LLVM clang)
 	@printf 'int LLVMFuzzerTestOneInput(const char *d, unsigned long n) { (void)d; (void)n; return 0; }\n' \
 		| $(FUZZ_CC) -x c -fsanitize=fuzzer -o /dev/null - 2>/dev/null || { \
@@ -652,16 +734,19 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 		echo "      make fuzz FUZZ_CC=\$$(brew --prefix llvm)/bin/clang"; \
 		echo "fuzz: without libFuzzer, 'make fuzz-corpus FUZZ_MUTATIONS=500' runs blind mutations."; \
 		exit 1; }
-	mkdir -p $(OUTDIR)/fuzz/level $(OUTDIR)/fuzz/profile $(OUTDIR)/fuzz/editor
+	mkdir -p $(OUTDIR)/fuzz/level $(OUTDIR)/fuzz/profile $(OUTDIR)/fuzz/editor $(OUTDIR)/fuzz/campaign
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/level-fuzzer $(FUZZ_LEVEL_SRCS) $(MATH_LIBS)
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/profile-fuzzer $(FUZZ_PROFILE_SRCS) $(LIBS)
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/editor-fuzzer $(FUZZ_EDITOR_SRCS) $(MATH_LIBS)
-	"$(abspath $(OUTDIR))/fuzz/level-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
+	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/campaign-fuzzer $(FUZZ_CAMPAIGN_SRCS) $(MATH_LIBS)
+	"$(abspath $(OUTDIR))/fuzz/level-fuzzer" $(FUZZ_RUN_FLAGS) \
 		-artifact_prefix=$(OUTDIR)/fuzz/level- $(OUTDIR)/fuzz/level $(FUZZ_LEVEL_SEEDS)
-	"$(abspath $(OUTDIR))/fuzz/profile-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
+	"$(abspath $(OUTDIR))/fuzz/profile-fuzzer" $(FUZZ_RUN_FLAGS) \
 		-artifact_prefix=$(OUTDIR)/fuzz/profile- $(OUTDIR)/fuzz/profile $(FUZZ_PROFILE_SEEDS)
-	"$(abspath $(OUTDIR))/fuzz/editor-fuzzer" -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
+	"$(abspath $(OUTDIR))/fuzz/editor-fuzzer" $(FUZZ_RUN_FLAGS) \
 		-artifact_prefix=$(OUTDIR)/fuzz/editor- $(OUTDIR)/fuzz/editor $(FUZZ_EDITOR_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz/campaign-fuzzer" $(FUZZ_RUN_FLAGS) \
+		-artifact_prefix=$(OUTDIR)/fuzz/campaign- $(OUTDIR)/fuzz/campaign $(FUZZ_CAMPAIGN_SEEDS)
 
 # Test objects: one rule for every source. $(OUTDIR) is skipped once out/
 # exists, so the recipe also creates its own directory; otherwise a deleted
@@ -693,10 +778,28 @@ TEST_OBJ_FLAGS_src/input/input_backend = -UMANGO_RAYLIB_MEMORY \
 	-DIsGamepadAvailable=test_input_gamepad_available -DglfwJoystickIsGamepad=test_input_joystick_is_gamepad \
 	-DGetGamepadName=test_input_gamepad_name
 
-$(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/level_serializer_test.o $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+# ── Native test programs ─────────────────────────────────────────────
+# Every program in TEST_TARGETS is linked by the one rule this template
+# writes: out/<name>-test is made from tests/<name>_test.c (the same name
+# with "_" for "-") plus whatever extra objects the lines further down list
+# for it, with the same command for all of them. $(eval) reads the template
+# once per program, as if the rule had been typed out by hand; the doubled
+# $$ keep $@ and $^ for the moment the rule runs.
+#
+# The editor tests link the editor's libraries, the others the game's (the
+# two lists are the same today).
+TEST_LINK_LIBS = $(if $(filter editor-%,$(notdir $@)),$(EDITOR_LIBS),$(TEST_LIBS))
+define native_test_rule
+$(1): $$(TEST_SOURCE_DIR)/$(subst -,_,$(notdir $(1))).o
+	$$(CC) $$(TEST_CFLAGS) -o $$@ $$(filter %.o,$$^) $$(TEST_LINK_LIBS)
+endef
+$(foreach program,$(TEST_TARGETS),$(eval $(call native_test_rule,$(program))))
 
-$(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/parser_boundary_test.o
+# Extra objects, one line per program. A line with no recipe only adds
+# prerequisites to the rule above; a program that needs nothing beyond its
+# own tests/<name>_test.c has no line here at all.
+$(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/parser_boundary_test.o \
+		$(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 
 # level_validate.c shares the levels/<name>.toml rule from level_ref.c.
 $(OUTDIR)/level-serializer-test $(OUTDIR)/level-validate-test \
@@ -710,62 +813,58 @@ $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-undo-recovery-test \
 $(OUTDIR)/editor-ui-test: $(OBJDIR)/src/levels/level_start.o \
 		$(OBJDIR)/src/levels/campaign_catalog.o $(OBJDIR)/src/levels/level_path.o
 
-$(OUTDIR)/level-validate-test: $(TEST_SOURCE_DIR)/level_validate_test.o $(TEST_VALIDATE_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+# The editor knows every document by its absolute path (editor_absolute_path).
+$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-undo-recovery-test \
+$(OUTDIR)/editor-ui-test: $(OBJDIR)/src/shared/asset_root.o
 
-$(OUTDIR)/runtime-load-test: $(TEST_SOURCE_DIR)/runtime_load_test.o $(TEST_LEVEL_LOADER_OBJ) \
+$(OUTDIR)/level-validate-test: $(TEST_VALIDATE_OBJ)
+
+$(OUTDIR)/runtime-load-test: $(TEST_LEVEL_LOADER_OBJ) \
 		$(TEST_GAME_RANDOM_OBJ) \
 		$(TEST_VALIDATE_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_RAIL_OBJ) \
 		$(TEST_SPIKE_BLOCK_OBJ) $(TEST_FLOAT_PLATFORM_OBJ) \
 		$(TEST_BOUNCEPAD_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
-$(OUTDIR)/rail-test: $(TEST_SOURCE_DIR)/rail_test.o $(TEST_RAIL_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+$(OUTDIR)/rail-test: $(TEST_RAIL_OBJ)
 
-$(OUTDIR)/entity-utils-test: $(TEST_SOURCE_DIR)/entity_utils_test.o $(TEST_ENTITY_UTILS_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+$(OUTDIR)/entity-utils-test: $(TEST_ENTITY_UTILS_OBJ)
 
-$(OUTDIR)/collision-test: $(TEST_SOURCE_DIR)/collision_test.o $(TEST_SPIKE_PLATFORM_OBJ) \
+$(OUTDIR)/collision-test: $(TEST_SPIKE_PLATFORM_OBJ) \
 		$(TEST_FISH_OBJ) $(TEST_CIRCULAR_SAW_OBJ) $(TEST_ENTITY_UTILS_OBJ) $(TEST_GAME_RANDOM_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
 
-$(OUTDIR)/phase-transition-test: $(TEST_SOURCE_DIR)/phase_transition_test.o $(TEST_PHASE_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+$(OUTDIR)/phase-transition-test: $(TEST_PHASE_OBJ)
 
-$(OUTDIR)/editor-validation-test: $(TEST_SOURCE_DIR)/editor_validation_test.o $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
+# The three editor programs share one set of editor objects. editor-validation
+# drives the validator and the save paths; editor-undo-recovery calls
+# undo/redo, the clipboard and crash recovery directly on a bare EditorState
+# (no window); editor-ui drives the editor as a designer does (events in,
+# document/undo state out) and so also needs the window, chrome and frame.
+$(OUTDIR)/editor-validation-test $(OUTDIR)/editor-undo-recovery-test \
+$(OUTDIR)/editor-ui-test: $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) \
+		$(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
+$(OUTDIR)/editor-ui-test: $(TEST_EDITOR_FRAME_OBJS)
 
-# Undo/redo, the clipboard and crash recovery, called directly on a bare
-# EditorState (no window).
-$(OUTDIR)/editor-undo-recovery-test: $(TEST_SOURCE_DIR)/editor_undo_recovery_test.o $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
+$(OUTDIR)/gameplay-damage-test: $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) \
+		$(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ) $(TEST_GAME_GHOST_OBJ)
 
-# The editor as a designer drives it: events in, document/undo state out.
-$(OUTDIR)/editor-ui-test: $(TEST_SOURCE_DIR)/editor_ui_test.o $(TEST_EDITOR_OBJS) $(TEST_EDITOR_FRAME_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(EDITOR_LIBS)
+$(OUTDIR)/gameplay-config-test: $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
 
-$(OUTDIR)/gameplay-damage-test: $(TEST_SOURCE_DIR)/gameplay_damage_test.o $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ) \
-		$(TEST_GAME_GHOST_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
+$(OUTDIR)/gameplay-score-test: $(TEST_GAME_SCORE_OBJ)
 
-$(OUTDIR)/gameplay-config-test: $(TEST_SOURCE_DIR)/gameplay_config_test.o $(TEST_GAME_CAMERA_OBJ) $(TEST_LEVEL_PHYSICS_OBJ) $(TEST_PLAYER_LIFECYCLE_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
+$(OUTDIR)/game-overlay-test: $(TEST_GAME_OVERLAY_OBJ)
 
-$(OUTDIR)/gameplay-score-test: $(TEST_SOURCE_DIR)/gameplay_score_test.o $(TEST_GAME_SCORE_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+$(OUTDIR)/game-events-test: $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) \
+		$(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) \
+		$(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
 
-$(OUTDIR)/game-overlay-test: $(TEST_SOURCE_DIR)/game_overlay_test.o $(TEST_GAME_OVERLAY_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+# session-test is several test files in one program. The manifest is listed
+# so the program is rebuilt, and so re-run, when the campaign changes; the
+# link command only takes the .o files.
+$(OUTDIR)/session-test: $(TEST_SOURCE_DIR)/game_profile_test.o $(TEST_SOURCE_DIR)/simulation_test.o \
+		$(TEST_SOURCE_DIR)/audio_contract_test.o $(TEST_SOURCE_DIR)/web_frame_pacing_test.o \
+		$(TEST_SOURCE_DIR)/asset_cache_test.o $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
 
-$(OUTDIR)/game-events-test: $(TEST_SOURCE_DIR)/game_events_test.o $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TEST_WEB_INPUT_OBJ) $(TEST_GAME_OVERLAY_OBJ) $(TEST_GAME_TERMINAL_OBJ) $(TEST_SETTINGS_OBJ) $(TEST_BINDINGS_OBJ) $(TEST_EDITOR_UI_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
-
-$(OUTDIR)/session-test: $(TEST_SOURCE_DIR)/session_test.o $(TEST_SOURCE_DIR)/game_profile_test.o $(TEST_SOURCE_DIR)/simulation_test.o $(TEST_SOURCE_DIR)/audio_contract_test.o $(TEST_SOURCE_DIR)/web_frame_pacing_test.o $(TEST_SOURCE_DIR)/asset_cache_test.o $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
-
-$(OUTDIR)/game-checkpoint-test: $(TEST_SOURCE_DIR)/game_checkpoint_test.o $(TEST_GAME_CHECKPOINT_OBJ)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(TEST_LIBS)
+$(OUTDIR)/game-checkpoint-test: $(TEST_GAME_CHECKPOINT_OBJ)
 
 # Every game object except main.o: the mechanics test drives whole levels
 # through game_init/game_update_active/game_frame, as the game does. Like
@@ -773,11 +872,10 @@ $(OUTDIR)/game-checkpoint-test: $(TEST_SOURCE_DIR)/game_checkpoint_test.o $(TEST
 # compiles the MANGO_TESTING input seams.
 GAMEPLAY_TEST_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/input/game_input.o,$(OBJS)) \
                      $(TEST_GAME_INPUT_OBJ)
-$(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/gameplay_mechanics_test.o $(TEST_SOURCE_DIR)/game_replay_test.o \
+$(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/game_replay_test.o \
 		$(TEST_SOURCE_DIR)/creature_update_test.o $(TEST_SOURCE_DIR)/player_climb_test.o \
 		$(TEST_SOURCE_DIR)/thin_coverage_test.o \
 		$(GAMEPLAY_TEST_OBJS)
-	$(CC) $(TEST_CFLAGS) -o $@ $(filter %.o,$^) $(LIBS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).
@@ -800,7 +898,17 @@ WEB_FLAGS = -s USE_GLFW=3 \
             --exclude-file 'assets/sprites/unused/*' \
             --exclude-file '*/.DS_Store' \
             --preload-file levels \
-            --shell-file web/shell.html
+            --shell-file $(WEB_SHELL)
+# The page's own inline script cannot be linked into super-mango.js: it has
+# to run first, to tell Emscripten how to start. tools/web_shell.py writes
+# the shell that emcc uses from web/shell.html, pasting in web/boot.js (the
+# boot sequence shared with the website's home page) and the file version.
+WEB_SHELL = $(WEB_OBJDIR)/shell.html
+# WEB_ASSET_VERSION is added to the address of every game file the page
+# loads (super-mango.js?v=..., .wasm, .data), so a browser that cached an
+# older deploy cannot pair an old file with a new one. CI passes the commit
+# being built. Empty, the default for local builds, keeps the plain names.
+WEB_ASSET_VERSION ?=
 # Same warning set as native builds so Web-only code paths stay warning-free.
 # Emscripten documents EM_JS(...); with a trailing semicolon, which pedantic C
 # reports as an empty file-scope declaration; that one diagnostic is disabled.
@@ -827,7 +935,7 @@ WEB_INCLUDES = -I$(WEB_RAYLIB_BUILD)/build/raylib/include $(PROJECT_INCLUDES)
 WEB_LINK_INPUTS = $(WEB_OBJS) $(WEB_RAYLIB_LIB) $(WEB_LINK_FLAGS_STAMP) \
                   $(filter-out web/debug-boot.js,$(wildcard web/*)) \
                   $(filter-out assets/sprites/unused/%,$(wildcard assets/* assets/*/* assets/*/*/*)) \
-                  $(wildcard levels/* levels/*/*) tools/web_csp.py
+                  $(wildcard levels/* levels/*/*) tools/web_csp.py $(WEB_SHELL)
 
 web: $(WEB_HTML) $(WEB_DEBUG_HTML) ## Build: WebAssembly game with Emscripten (emcc on PATH)
 
@@ -854,9 +962,15 @@ $(WEB_OBJS): $(WEB_RAYLIB_LIB) $(WEB_FLAGS_STAMP)
 
 # Linking needs the optimisation level again (it drives wasm-opt) and the
 # extra flags, so CI's -Werror also covers link-time warnings.
+$(WEB_SHELL): web/shell.html web/boot.js tools/web_shell.py $(WEB_LINK_FLAGS_STAMP)
+	python3 tools/web_shell.py template --version "$(WEB_ASSET_VERSION)" --output $@
+
+# After the link: version the script tag emcc wrote, then pin the page's
+# Content-Security-Policy to the final (minified) inline script.
 $(WEB_HTML): $(WEB_LINK_INPUTS) | $(OUTDIR) web-toolchain
 	emcc $(WEB_OPT) $(EXTRA_WEB_CFLAGS) $(WEB_OBJS) $(WEB_RAYLIB_LIB) -o $@ $(WEB_FLAGS) \
 		$(WEB_LINK_FLAGS)
+	python3 tools/web_shell.py stamp --version "$(WEB_ASSET_VERSION)" $@
 	python3 tools/web_csp.py $@
 
 $(WEB_DEBUG_HTML): $(WEB_HTML) web/debug-boot.js tools/web_debug_page.py tools/web_csp.py
@@ -919,7 +1033,7 @@ LINK_BUILD_FLAGS = $(call stamp_vars,CC CFLAGS TEST_CFLAGS LIBS EDITOR_LIBS TEST
 FUZZ_BUILD_FLAGS = $(call stamp_vars,CC FUZZ_FLAGS LIBS MATH_LIBS)
 WEB_BUILD_FLAGS  = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_CFLAGS WEB_INCLUDES)
 WEB_LINK_BUILD_FLAGS = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_OPT EXTRA_WEB_CFLAGS WEB_FLAGS \
-                         WEB_LINK_FLAGS)
+                         WEB_LINK_FLAGS WEB_ASSET_VERSION)
 WEB_RAYLIB_BUILD_OPTIONS = $(call stamp_vars,EMSCRIPTEN_VERSION WEB_RAYLIB_OPTIONS)
 
 # $(call flag_stamp,FILE,VARIABLE): FILE holds VARIABLE's text, rewritten only

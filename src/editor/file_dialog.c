@@ -26,6 +26,8 @@
 #define FILE_DIALOG_TEST_PATH_MAX 4096
 
 static int file_dialog_finish(FILE *fp, char *buf, int buf_size);
+static int file_dialog_or_prompt(int result, char *buf, int buf_size,
+                                 const char *title, const char *message);
 
 static int file_dialog_test_open_result = -1;
 static int file_dialog_test_save_result = -1;
@@ -125,18 +127,30 @@ int file_dialog_open(char *buf, int buf_size) {
 #else
     /*
      * Linux / other POSIX: use zenity, a GTK dialog utility commonly
-     * installed on GNOME desktops.  Falls back gracefully — if zenity
-     * is not installed, popen returns NULL.
+     * installed on GNOME desktops, or kdialog, its KDE counterpart.
      *
-     * --file-selection shows the open dialog.
-     * --file-filter limits to .toml files.
+     * `command -v NAME` is the shell's portable "is NAME installed?": it
+     * prints nothing useful here (hence > /dev/null) and succeeds only
+     * when the program exists.  With neither installed the snippet exits
+     * with 127, the code a shell itself uses for "command not found", and
+     * file_dialog_result turns that into FILE_DIALOG_UNAVAILABLE.  (popen
+     * does not return NULL for a missing program: it starts `sh`, which
+     * always exists, and sh is what fails to find the picker.)
+     *
+     * --file-selection shows the open dialog; --file-filter limits it to
+     * .toml files.  kdialog takes the start folder and a filter instead.
      */
     const char *cmd =
+        "if command -v zenity >/dev/null 2>&1; then "
         "zenity --file-selection "
         "--title='Open Level TOML' "
         "--file-filter='TOML files | *.toml' "
         "--file-filter='All files | *' "
-        "2>/dev/null";
+        "2>/dev/null; "
+        "elif command -v kdialog >/dev/null 2>&1; then "
+        "kdialog --title 'Open Level TOML' --getopenfilename . "
+        "'TOML files (*.toml)' 2>/dev/null; "
+        "else exit 127; fi";
 #endif
 
     /*
@@ -152,7 +166,10 @@ int file_dialog_open(char *buf, int buf_size) {
         return FILE_DIALOG_ERROR;
     }
 
-    return file_dialog_finish(fp, buf, buf_size);
+    return file_dialog_or_prompt(file_dialog_finish(fp, buf, buf_size), buf, buf_size,
+                                 "Open Level",
+                                 "No file picker was found (install zenity or kdialog "
+                                 "to browse). Type the path of the level to open:");
 }
 
 int file_dialog_read_path(FILE *fp, char *buf, int buf_size)
@@ -201,28 +218,67 @@ int file_dialog_read_path(FILE *fp, char *buf, int buf_size)
     return FILE_DIALOG_SELECTED;
 }
 
+int file_dialog_result(int read_result, int exited, int exit_code)
+{
+    /* The shell could not find any picker program. */
+    if (exited && exit_code == 127) return FILE_DIALOG_UNAVAILABLE;
+
+    if (read_result == FILE_DIALOG_CANCELLED) {
+        /* PowerShell exits successfully without output on cancel; the
+         * others exit with 1. */
+        if (exited && (exit_code == 0 || exit_code == 1)) return FILE_DIALOG_CANCELLED;
+        return FILE_DIALOG_ERROR;
+    }
+    if (read_result == FILE_DIALOG_SELECTED && !(exited && exit_code == 0))
+        return FILE_DIALOG_ERROR;
+    return read_result;
+}
+
 /*
  * file_dialog_finish — Read the picker's answer, then close the pipe.
  *
  * pclose() waits for the picker and returns its exit status, which is
  * how a cancel is told apart from a failure when nothing was printed.
+ * On POSIX that status packs the exit code together with "killed by a
+ * signal" information; WIFEXITED and WEXITSTATUS unpack it.  Windows'
+ * _pclose returns the exit code itself.
  */
 static int file_dialog_finish(FILE *fp, char *buf, int buf_size)
 {
     int result = file_dialog_read_path(fp, buf, buf_size);
     int status = pclose(fp);
+    int exited, exit_code;
 
-    if (result == FILE_DIALOG_CANCELLED) {
-        /* PowerShell exits successfully without output on cancel. */
-        if (status == 0) return FILE_DIALOG_CANCELLED;
 #if defined(__APPLE__) || defined(__unix__)
-        if (status > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 1)
-            return FILE_DIALOG_CANCELLED;
+    exited = status >= 0 && WIFEXITED(status);
+    exit_code = exited ? WEXITSTATUS(status) : -1;
+#else
+    exited = status >= 0;
+    exit_code = status;
 #endif
-        return FILE_DIALOG_ERROR;
-    }
-    if (result == FILE_DIALOG_SELECTED && status != 0) return FILE_DIALOG_ERROR;
-    return result;
+    return file_dialog_result(result, exited, exit_code);
+}
+
+/*
+ * file_dialog_or_prompt — Keep a picker's answer, or ask in the window.
+ *
+ * With no picker program installed the editor could neither open a level
+ * nor give a new one a name, so the path is asked for in the editor's own
+ * window instead (dialog_path).  When that prompt cannot be shown either
+ * (no window), the result stays FILE_DIALOG_UNAVAILABLE so the caller can
+ * say what is missing.
+ */
+static int file_dialog_or_prompt(int result, char *buf, int buf_size,
+                                 const char *title, const char *message)
+{
+    int typed;
+
+    if (result != FILE_DIALOG_UNAVAILABLE) return result;
+    fprintf(stderr, "Warning: no file picker found (zenity or kdialog); "
+                    "asking for the path in the editor window\n");
+    buf[0] = '\0';
+    typed = dialog_path(title, message, buf, buf_size);
+    return typed == FILE_DIALOG_ERROR ? FILE_DIALOG_UNAVAILABLE : typed;
 }
 
 static int file_dialog_add_toml_extension(char *buf, int buf_size)
@@ -284,11 +340,17 @@ int file_dialog_save(char *buf, int buf_size)
         "$d.Title = 'Save Level TOML';"
         "if ($d.ShowDialog() -eq 'OK') { $d.FileName }\"";
 #else
+    /* zenity, else kdialog, else 127 = "no picker" (see file_dialog_open). */
     const char *cmd =
+        "if command -v zenity >/dev/null 2>&1; then "
         "zenity --file-selection --save "
         "--title='Save Level TOML' "
         "--file-filter='TOML files | *.toml' "
-        "--file-filter='All files | *' 2>/dev/null";
+        "--file-filter='All files | *' 2>/dev/null; "
+        "elif command -v kdialog >/dev/null 2>&1; then "
+        "kdialog --title 'Save Level TOML' --getsavefilename untitled.toml "
+        "'TOML files (*.toml)' 2>/dev/null; "
+        "else exit 127; fi";
 #endif
 
     /* `cmd` is a fixed string in this function, not caller input. */
@@ -300,7 +362,10 @@ int file_dialog_save(char *buf, int buf_size)
         return FILE_DIALOG_ERROR;
     }
 
-    result = file_dialog_finish(fp, buf, buf_size);
+    result = file_dialog_or_prompt(file_dialog_finish(fp, buf, buf_size), buf, buf_size,
+                                   "Save Level As",
+                                   "No file picker was found (install zenity or kdialog "
+                                   "to browse). Type the path to save the level to:");
     if (result != FILE_DIALOG_SELECTED) return result;
     if (!file_dialog_add_toml_extension(buf, buf_size)) return FILE_DIALOG_ERROR;
     return FILE_DIALOG_SELECTED;

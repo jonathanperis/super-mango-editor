@@ -85,14 +85,14 @@ static int dropped_level_opens_like_a_recent_file(void)
     moved = 1;
 
     drop_frame(&es, one, 1);
-    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(document_is(&es, "levels/a.toml"));
     CHECK(strcmp(es.level.name, "Alpha") == 0);
     CHECK(strstr(es.status_message, "Loaded levels/a.toml") != NULL);
 
     /* The extension is matched in any case: this one reached the loader,
      * which then could not find it. */
     drop_frame(&es, upper, 1);
-    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(document_is(&es, "levels/a.toml"));
     CHECK(strstr(es.status_message, "Load failed") != NULL);
 
     /* Two files, or one that is not a level, change nothing. */
@@ -100,14 +100,14 @@ static int dropped_level_opens_like_a_recent_file(void)
     CHECK(strcmp(es.status_message, "Drop one .toml level to open it") == 0);
     drop_frame(&es, art, 1);
     CHECK(strcmp(es.status_message, "Drop one .toml level to open it") == 0);
-    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(document_is(&es, "levels/a.toml"));
 
     /* A path as long as raylib's buffer may have been cut short. */
     memset(long_path, 'x', sizeof(long_path) - 1);
     memcpy(long_path + sizeof(long_path) - 1 - 5, ".toml", 5);
     drop_frame(&es, too_long, 1);
     CHECK(strstr(es.status_message, "too long") != NULL);
-    CHECK(strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(document_is(&es, "levels/a.toml"));
 
     /* Unsaved changes ask first: Cancel keeps them, Discard opens. */
     es.level.screen_count = 5;
@@ -115,32 +115,32 @@ static int dropped_level_opens_like_a_recent_file(void)
     CHECK(es.modified);
     editor_test_set_discard_choice(0);
     drop_frame(&es, delta, 1);
-    CHECK(strcmp(es.file_path, "levels/a.toml") == 0 && es.level.screen_count == 5);
+    CHECK(document_is(&es, "levels/a.toml") && es.level.screen_count == 5);
     CHECK(strstr(es.status_message, "cancelled") != NULL);
     editor_test_set_discard_choice(1);
     drop_frame(&es, delta, 1);
-    CHECK(strcmp(es.file_path, "levels/d.toml") == 0 && !es.modified);
+    CHECK(document_is(&es, "levels/d.toml") && !es.modified);
     CHECK(strcmp(es.level.name, "Delta") == 0);
 
     /* The Campaign view closes for the dropped level... */
     CHECK(editor_campaign_open(&es, NULL) == 0 && es.campaign != NULL);
     drop_frame(&es, one, 1);
-    CHECK(es.campaign == NULL && strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(es.campaign == NULL && document_is(&es, "levels/a.toml"));
     /* ...but with unsaved campaign edits only on the second drop. */
     CHECK(editor_campaign_open(&es, NULL) == 0);
     CHECK(editor_campaign_move(&es, 2, -1) == 0);
     drop_frame(&es, delta, 1);
-    CHECK(es.campaign != NULL && strcmp(es.file_path, "levels/a.toml") == 0);
+    CHECK(es.campaign != NULL && document_is(&es, "levels/a.toml"));
     CHECK(strstr(es.status_message, "drop the level again") != NULL);
     drop_frame(&es, delta, 1);
-    CHECK(es.campaign == NULL && strcmp(es.file_path, "levels/d.toml") == 0);
+    CHECK(es.campaign == NULL && document_is(&es, "levels/d.toml"));
 
     /* A playtest owns the editor until it ends. */
     es.playing = 1;
     editor_test_drop_files(one, 1);
     editor_handle_dropped_files(&es);
     es.playing = 0;
-    CHECK(strcmp(es.file_path, "levels/d.toml") == 0);
+    CHECK(document_is(&es, "levels/d.toml"));
     CHECK(strstr(es.status_message, "Playtest running") != NULL);
 done:
     editor_test_drop_files(NULL, 0);
@@ -207,10 +207,10 @@ static int drop_during_the_prompt_waits_its_turn(void)
     editor_test_set_discard_choice(-1);   /* the real prompt answers */
     dialog_choice_test_set_poll_hook(drop_bravo_during_the_prompt);
     drop_frame(&es, delta, 1);
-    CHECK(strcmp(es.file_path, "levels/d.toml") == 0 && !es.modified);
+    CHECK(document_is(&es, "levels/d.toml") && !es.modified);
     CHECK(editor_test_drop_misuses() == misuses);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(strcmp(es.file_path, "levels/b.toml") == 0);
+    CHECK(document_is(&es, "levels/b.toml"));
     CHECK(editor_test_drop_misuses() == misuses);
 done:
     dialog_choice_test_set_poll_hook(NULL);
@@ -1202,6 +1202,59 @@ done:
     /* The generator is the same everywhere, so the trial number is enough
      * to run that very history again. */
     if (failed) fprintf(stderr, "editor_ui_test: (in skipped-step history %d)\n", trial);
+    if (moved && test_change_folder(cwd) != 0) failed = 1;
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
+/*
+ * Campaign Save rewrites the name and next_phase of the level open in the
+ * editor. That level is shown as it now is on disk, but it is still the
+ * same document: its undo history is kept, and an earlier edit can still
+ * be undone afterwards.
+ */
+static int campaign_save_keeps_the_open_levels_history(void)
+{
+    int failed = 0;
+    EditorState es;
+    char cwd[4096];
+    int moved = 0;
+    PlacementData coin;
+    SerializerFileFingerprint on_disk;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(enter_ui_campaign(cwd, sizeof(cwd)) == 0);
+    moved = 1;
+
+    /* Open b, place a coin, save: a clean document with one undo step. */
+    CHECK(editor_load_level(&es, "levels/b.toml") == 0);
+    memset(&coin, 0, sizeof(coin));
+    coin.coin.x = 96.0f;
+    coin.coin.y = 96.0f;
+    CHECK(editor_add_placement(&es, ENT_COIN, &coin, "place") == 0);
+    CHECK(editor_save_current_level(&es) == 0);
+    CHECK(!es.modified && es.undo->top == 1 && es.level.coin_count == 1);
+    CHECK(strcmp(es.level.next_phase, "levels/c.toml") == 0);
+
+    /* Reorder to a c b and save the campaign: b's next_phase is cleared
+     * on disk (it is last now), and the open document follows. */
+    CHECK(editor_campaign_open(&es, NULL) == 0);
+    CHECK(editor_campaign_move(&es, 2, -1) == 0);
+    (void)editor_campaign_link_in_order(&es);
+    CHECK(editor_campaign_save(&es) == 0);
+    CHECK(strstr(es.status_message, "Campaign saved") != NULL);
+    CHECK(document_is(&es, "levels/b.toml") && !es.modified);
+    CHECK(es.level.next_phase[0] == '\0');               /* as rewritten */
+    CHECK(es.level.coin_count == 1);
+    CHECK(es.undo->top == 1);                            /* history kept */
+    CHECK(serializer_fingerprint_utf8("levels/b.toml", &on_disk) == 1);
+    CHECK(serializer_fingerprint_equal(&es.source_fingerprint, &on_disk));
+
+    /* The step from before the campaign save still undoes. */
+    (void)editor_campaign_close(&es, 1);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coin_count == 0 && es.modified);
+done:
     if (moved && test_change_folder(cwd) != 0) failed = 1;
     clear_dialog_seams();
     close_editor(&es);

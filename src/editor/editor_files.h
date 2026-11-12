@@ -59,6 +59,29 @@ int editor_path_fits(const char *path);
 
 /* Copy path into out for display. A path too long for out keeps its end
  * (the file name) and starts with "..." instead of being cut mid-name. */
+/*
+ * editor_refresh_saved_level — Read the open document's file again without
+ * starting a new editing session.
+ *
+ * For when the editor itself rewrote the file behind the document: the
+ * Campaign view saves a level's name and next_phase straight to disk.  The
+ * level in memory is replaced by the file's and the save baseline follows
+ * it, but the undo history and the selection are kept, unlike
+ * editor_load_level, which opens the file as a new document and clears
+ * both.  Only for an unmodified document; returns -1 (changing nothing)
+ * when there is none, it has unsaved edits, or the file does not load.
+ */
+int editor_refresh_saved_level(EditorState *es);
+
+/*
+ * editor_absolute_path — Write the absolute form of path into out.
+ *
+ * A path that is already absolute is copied; a relative one is joined to
+ * the working folder as it is now.  Returns 0, or -1 when the result does
+ * not fit out or EDITOR_PATH_MAX (out is then left alone).
+ */
+int editor_absolute_path(const char *path, char *out, size_t out_size);
+
 void editor_path_for_display(const char *path, char *out, size_t out_size);
 
 #ifdef MANGO_TESTING

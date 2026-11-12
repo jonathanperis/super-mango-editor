@@ -27,6 +27,7 @@ typedef struct {
     int button_count;
     int button_x[3], button_w[3];
     int button_y, button_h;
+    int field_x, field_y, field_w, field_h;  /* dialog_path's text line; 0 = none */
 } DialogLayout;
 
 /*
@@ -38,10 +39,13 @@ typedef struct {
 void dialog_choice_attach(EditorState *es);
 
 /*
- * dialog_choice_keep_frame — Copy the finished frame (es->frame_target)
- * into es->prompt_backdrop.  A prompt opened while the next frame is half
- * drawn shows this complete one behind it.  Call after the frame's
- * drawing, before presenting it; it ends texture mode.
+ * dialog_choice_keep_frame — Keep the frame just shown as the backdrop for
+ * prompts.  es->frame_target and es->prompt_backdrop trade places: the
+ * finished frame becomes the backdrop, and the next frame is drawn into
+ * the texture that held the older one.  A prompt opened while the next
+ * frame is half drawn shows this complete one behind it.  Call after the
+ * frame has been presented (display_present), never while it is still the
+ * bound texture.  Nothing is copied.
  */
 void dialog_choice_keep_frame(EditorState *es);
 

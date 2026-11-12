@@ -6,6 +6,7 @@
  * editor_events.c translates commands into document/history operations.
  */
 #include "editor.h"
+#include "editor_recovery.h"  /* editor_recovery_offer_count */
 #include "dialog_choice.h"    /* dialog_choice_attach */
 #include "editor_campaign.h"  /* editor_campaign_free */
 #include "editor_frame.h"
@@ -70,8 +71,8 @@ int editor_init(EditorState *es, int hidden)
     es->running = 1;
     es->last_autosave_ms = (uint32_t)clock_millis();
     es->last_input_ms = es->last_autosave_ms;
-    editor_set_status(es, es->recovery_entry_count > 1 ? "Recovery copies found: Ctrl+R to choose" :
-        es->recovery_entry_count == 1 ? "Recovery copy found: Ctrl+R to recover" : "Ready");
+    editor_set_status(es, editor_recovery_offer_count(es) > 1 ? "Recovery copies found: Ctrl+R to choose" :
+        editor_recovery_offer_count(es) == 1 ? "Recovery copy found: Ctrl+R to recover" : "Ready");
     return 0;
 fail:
     /* The caller supplies a zero-initialized EditorState. Cleanup accepts

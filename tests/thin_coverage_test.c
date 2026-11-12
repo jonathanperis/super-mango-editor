@@ -128,17 +128,18 @@ static int bounce_hits_each_pad_list(void)
     CHECK(lists[1].pads == gs.world.bouncepads_small && lists[1].count == 1);
     CHECK(lists[2].pads == gs.world.bouncepads_high && lists[2].count == 1);
 
-    game_bouncepads_handle_hit(&gs, -1);
+    game_bouncepads_handle_hit(&gs, -1, -1);
+    game_bouncepads_handle_hit(&gs, GAME_BOUNCEPAD_LIST_MEDIUM, 1);   /* past the end */
     CHECK(gs.world.bouncepads_medium[0].state != BOUNCE_ACTIVE);
 
-    game_bouncepads_handle_hit(&gs, 0);
+    game_bouncepads_handle_hit(&gs, GAME_BOUNCEPAD_LIST_MEDIUM, 0);
     CHECK(gs.world.bouncepads_medium[0].state == BOUNCE_ACTIVE);
     CHECK(gs.world.bouncepads_medium[0].anim_frame == 1);
 
     gs.screen.debug_mode = 1;
-    game_bouncepads_handle_hit(&gs, 1);
+    game_bouncepads_handle_hit(&gs, GAME_BOUNCEPAD_LIST_SMALL, 0);
     CHECK(gs.world.bouncepads_small[0].state == BOUNCE_ACTIVE);
-    game_bouncepads_handle_hit(&gs, 2);
+    game_bouncepads_handle_hit(&gs, GAME_BOUNCEPAD_LIST_HIGH, 0);
     CHECK(gs.world.bouncepads_high[0].state == BOUNCE_ACTIVE);
     CHECK(gs.screen.debug.log_count == 2);
 done:

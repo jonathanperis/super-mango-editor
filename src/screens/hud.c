@@ -57,7 +57,9 @@ void hud_layout(const Hud *hud, int hearts, int lives, int score, HudLayout *lay
                                     HUD_ICON_W, HUD_ICON_H};
 
     int width = 0;
-    snprintf(layout->lives, sizeof(layout->lives), "x%d", lives);
+    /* lives is -1 once the last one is lost (that is what "game over"
+     * tests for); the counter still reads x0, never x-1. */
+    snprintf(layout->lives, sizeof(layout->lives), "x%d", lives < 0 ? 0 : lives);
     font_measure(hud->font, layout->lives, &width, NULL);
     layout->lives_text = (IntRect){icon_x+HUD_ICON_W+4, text_y, width, TEXT_FONT_SIZE};
 

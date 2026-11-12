@@ -142,13 +142,29 @@ typedef struct {
  * consumes it in steps of exactly 1/TARGET_FPS seconds. Leftover time (less
  * than one step) waits for the next frame.
  */
-/* Where one mover was before the latest fixed step. Drawing reads it so a
- * fast display can place the sprite between two steps. The simulation never
- * reads it. y is 0 when the mover's picture height is not a stored
- * coordinate (a spider on the floor, a bird whose height is a sine of x). */
+/*
+ * GameMoverPrev — where each moving thing was before the latest fixed step.
+ *
+ * Drawing reads it so a fast display can place a sprite between two steps;
+ * the simulation never does. One array per kind, holding only the floats
+ * that are blended, in the order the kind's row of s_movers lists them
+ * (core/game_movers.c). The comment beside each array names them.
+ */
 typedef struct {
-    float x, y;
-} RenderPrev;
+    float spiders[MAX_SPIDERS];                         /* x                 */
+    float jumping_spiders[MAX_JUMPING_SPIDERS][2];      /* x, y              */
+    float birds[MAX_BIRDS];                             /* x (y follows it)  */
+    float faster_birds[MAX_FASTER_BIRDS];               /* x                 */
+    float fish[MAX_FISH][2];                            /* x, y              */
+    float faster_fish[MAX_FASTER_FISH][2];              /* x, y              */
+    float spike_blocks[MAX_SPIKE_BLOCKS][2];            /* x, y              */
+    float float_platforms[MAX_FLOAT_PLATFORMS][2];      /* x, y              */
+    float circular_saws[MAX_CIRCULAR_SAWS][2];          /* x, y              */
+    float axe_traps[MAX_AXE_TRAPS];                     /* angle, degrees    */
+    float blue_flames[MAX_BLUE_FLAMES][2];              /* y, angle          */
+    float fire_flames[MAX_FIRE_FLAMES][2];              /* y, angle          */
+    float bridges[MAX_BRIDGES][MAX_BRIDGE_BRICKS];      /* each brick's drop */
+} GameMoverPrev;
 
 typedef struct {
     double prev_time;      /* GetTime() seconds when the previous frame began   */
@@ -161,15 +177,7 @@ typedef struct {
      * (game_timing_render_view and the layer renderers do). */
     float  prev_player_x, prev_player_y, prev_camera_x;
     int    has_prev;         /* 1 once a step has recorded the values above   */
-    RenderPrev prev_spider[MAX_SPIDERS];
-    RenderPrev prev_jumping_spider[MAX_JUMPING_SPIDERS];
-    RenderPrev prev_bird[MAX_BIRDS];
-    RenderPrev prev_faster_bird[MAX_FASTER_BIRDS];
-    RenderPrev prev_fish[MAX_FISH];
-    RenderPrev prev_faster_fish[MAX_FASTER_FISH];
-    RenderPrev prev_spike_block[MAX_SPIKE_BLOCKS];
-    RenderPrev prev_float_platform[MAX_FLOAT_PLATFORMS];
-    RenderPrev prev_saw[MAX_CIRCULAR_SAWS];
+    GameMoverPrev movers;  /* the moving world objects (core/game_movers.h) */
 } GameLoopState;
 
 /*
@@ -244,7 +252,7 @@ typedef struct {
  * acquired and replaced together with the level. "Held" means the world has
  * one reference to each in the asset cache (gs->cache), which owns them.
  */
-typedef struct {
+typedef struct GameWorld {
     /* ---- Which level, and its level-wide settings ------------------- */
     char          level_path[GAME_LEVEL_PATH_MAX]; /* TOML level to load (--level flag) */
     void         *level_def;   /* owned active LevelDef backing storage   */

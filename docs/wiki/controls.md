@@ -61,12 +61,15 @@ The mouse can also click a list row to select that level, **Continue**, **Play**
 | Final completion | Replay, Level Select, Exit |
 | Game over | Retry, Level Select, Exit |
 
-**Next Level** loads the resolved `next_phase` in the current game session. A failed load keeps the completion overlay, shows "Next level failed to load", removes the Next Level row and focuses Replay; Replay, Level Select and Exit keep working. **Retry** restarts the current level in place with level-defined hearts and lives, score reset, and music resumed. **Level Select** returns to the start menu. **Exit** ends the application session.
+**Replay** opens the level again from its file; if the file no longer loads (it was edited or removed while the game was open), the start menu opens with the reason instead of the game ending. **Next Level** loads the resolved `next_phase` in the current game session. A failed load keeps the completion overlay, shows "Next level failed to load", removes the Next Level row and focuses Replay; Replay, Level Select and Exit keep working. **Retry** restarts the current level in place with level-defined hearts and lives, score reset, and music resumed. **Level Select** returns to the start menu. **Exit** ends the application session.
 
 **Release latch.** After a pause resumes, settings close, Retry or Next Level,
 the game records every bound key and button still held (a gamepad A/Start that
-confirmed counts too). Gameplay input reads as zero until all of them are
-released, so the Space or A that resumed a pause does not also jump. A new game
+confirmed counts too). Input from a device reads as zero until all of its
+recorded keys or buttons are released, so the Space or A that resumed a pause
+does not also jump. The keyboard and the controller are released separately: a
+worn stick that rests past the dead zone never "releases", and it must not
+leave a player who uses the keyboard unable to move. A new game
 screen (Play, Replay, a direct `--level` start) arms it once, after the profile's
 bindings are attached, including controls still held from the previous screen.
 
@@ -93,7 +96,11 @@ A normal run records a **Continue point** for the level being played whenever th
 player reaches a new respawn point (an authored checkpoint, or the next screen in
 a level without authored checkpoints), whenever a pause begins (the browser pauses
 when its tab is hidden, the only warning before a tab closes), and when the player
-leaves the level part-way with Exit or Level Select. It holds the respawn point,
+leaves the level part-way with Exit or Level Select. On native builds a point
+recorded at a checkpoint is kept in memory and written to the profile file at
+the next pause, at the end of the level or on leaving it: the write waits for
+the disk, and that wait would otherwise land in the middle of play. (A crash
+before then loses only that newest point.) It holds the respawn point,
 score, lives, the coins already collected and the level timer, plus the level
 file's content hash. Finishing the level or losing its last life clears it; the
 profile keeps only one, for the most recent level. A run started with
@@ -258,7 +265,7 @@ browser download), where `<seconds>` is the calendar time (seconds since
 says which of "Nothing recorded; F8 starts a recording", "Export failed: file
 names already taken" or "Export failed: could not write the file" stopped an
 export. The file
-(`format_version = 3`) has one row per step, `[input bits, nine movement
+(`format_version = 4`) has one row per step, `[input bits, nine movement
 values]`, plus the level path, the seed and `level_hash`, a hash of the level
 file's exact bytes.
 
@@ -270,9 +277,13 @@ than silently producing a different run. So is an older format, with a
 "record it again" error: a `format_version = 1` file came from the earlier
 variable-timestep engine, and a `format_version = 2` file was recorded while
 the camera still panned in from the left edge at a level start and eased back
-after a lost life. The camera now snaps there at once, and a waiting spike
-block starts moving when the camera first shows it, so in a version-2 capture
-it could start on a different step and the run would quietly go another way. The engine version is not checked, so replay
+after a lost life. The camera now snaps there at once, so in a version-2
+capture a waiting spike block could start on a different step and the run
+would quietly go another way. A `format_version = 3` file was recorded while a
+waiting spike block started from the camera's position, which the Reduced
+motion setting changes, and while jump input could replace or shorten a
+bouncepad launch; a block now starts from the player's position and a launch
+ignores the jump key. The engine version is not checked, so replay
 with the same build. Recordings are not save games: they hold no pause time,
 audio or pixels. See [Mechanics Museum](../mechanics-museum/) for levels to
 try it on.

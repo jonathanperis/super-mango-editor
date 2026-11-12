@@ -42,33 +42,21 @@ jobs:
 
       # Ubuntu's clang-tidy matches its clang (18 on ubuntu-24.04).
       - name: Install dependencies
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang clang-tidy cmake libgl1-mesa-dev libx11-dev \
-            libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
-          clang-tidy --version
-
-      - name: Cache pinned raylib source archive
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: ./.github/actions/install-linux-deps
         with:
-          path: .cache/raylib
-          key: raylib-source-${{ runner.os }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+          extra: clang-tidy
+
+      - name: Record the clang-tidy version
+        run: clang-tidy --version
 
       # The sources include raylib.h from the pinned build tree, so raylib is
-      # built (or restored) first. Same fingerprint and exact-match key rules
-      # as the caches in build.yml (see its sanitizers job).
-      - name: Fingerprint the raylib toolchain
-        id: toolchain
-        run: echo "id=$({ echo "$ImageOS $ImageVersion $GITHUB_WORKSPACE"; clang --version; cmake --version; make -s raylib-options; } | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache compiled raylib
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # built (or restored) first. It is the same Linux clang debug tree as
+      # the build workflow's Linux leg and CodeQL, under the same cache entry
+      # (see the raylib-cache action).
+      - name: Cache raylib
+        uses: ./.github/actions/raylib-cache
         with:
-          path: |
-            out/raylib
-            !out/raylib/raylib-*/examples
-            !out/raylib/raylib-*/projects
-          key: raylib-build-linux-tidy-${{ steps.toolchain.outputs.id }}-${{ hashFiles('vendor/raylib/manifest.json', 'vendor/raylib/patches.json', 'tools/build_raylib.py') }}
+          variant: linux-clang-debug
 
       - name: Build pinned raylib
         run: make -j4 out/raylib/build/raylib/libraylib.a

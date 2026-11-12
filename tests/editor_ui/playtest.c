@@ -311,6 +311,70 @@ static int native_pickers_report_choice_cancel_and_failure(void)
     CHECK(pick(1, NULL, "1", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
     CHECK(pick(1, "/levels/x", "3", buf, sizeof(buf)) == FILE_DIALOG_ERROR);
 
+    /* What an exit means, by itself: 127 is the shell's "command not
+     * found", so no picker is installed, whatever was or was not printed. */
+    CHECK(file_dialog_result(FILE_DIALOG_CANCELLED, 1, 127) == FILE_DIALOG_UNAVAILABLE);
+    CHECK(file_dialog_result(FILE_DIALOG_SELECTED, 1, 127) == FILE_DIALOG_UNAVAILABLE);
+    CHECK(file_dialog_result(FILE_DIALOG_CANCELLED, 1, 1) == FILE_DIALOG_CANCELLED);
+    CHECK(file_dialog_result(FILE_DIALOG_CANCELLED, 1, 0) == FILE_DIALOG_CANCELLED);
+    CHECK(file_dialog_result(FILE_DIALOG_CANCELLED, 0, -1) == FILE_DIALOG_ERROR);   /* killed */
+    CHECK(file_dialog_result(FILE_DIALOG_SELECTED, 1, 0) == FILE_DIALOG_SELECTED);
+    CHECK(file_dialog_result(FILE_DIALOG_SELECTED, 0, -1) == FILE_DIALOG_ERROR);
+    CHECK(file_dialog_result(FILE_DIALOG_INVALID_PATH, 1, 0) == FILE_DIALOG_INVALID_PATH);
+
+    /* No picker program and no editor window to ask in: say what is
+     * missing rather than a bare "dialog error". */
+    CHECK(pick(0, NULL, "127", buf, sizeof(buf)) == FILE_DIALOG_UNAVAILABLE);
+    CHECK(pick(1, NULL, "127", buf, sizeof(buf)) == FILE_DIALOG_UNAVAILABLE);
+
+    /* No picker program, but an editor window: the path is asked for
+     * there. Typing it and pressing Enter opens the level; Save As gets
+     * its ".toml" as it would from a picker; Esc cancels; Backspace
+     * removes a whole character, and Space types a space. */
+    {
+        EditorState es;
+        CHECK(open_editor(&es, "levels/labs/04_climbing.toml") == 0);
+        input_clear();
+        push_text("levels/labs/01_collisionx");
+        push_key(KEY_BACKSPACE, 0);
+        push_text(".toml");
+        push_key(KEY_ENTER, 0);
+        CHECK(pick(0, NULL, "127", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+        CHECK(strcmp(buf, "levels/labs/01_collision.toml") == 0);
+        CHECK(dialog_choice_test_layout()->field_w > 0);   /* it had a text line */
+
+        input_clear();
+        /* A real Space arrives as a key press and as the text " ". The
+         * key press must not press OK here, as it does in a button prompt. */
+        push_text("my level");
+        push_key(KEY_SPACE, 0);
+        push_text(" 2");
+        push_key(KEY_ENTER, 0);
+        CHECK(pick(1, NULL, "127", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+        CHECK(strcmp(buf, "my level 2.toml") == 0);
+
+        input_clear();
+        push_text("half typed");
+        push_key(KEY_ESCAPE, 0);
+        CHECK(pick(0, NULL, "127", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
+        CHECK(buf[0] == '\0');
+
+        input_clear();
+        push_key(KEY_ENTER, 0);                 /* OK on an empty line */
+        CHECK(pick(0, NULL, "127", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
+
+        /* The editor's own Open command, through the same prompt. */
+        input_clear();
+        push_text("levels/labs/06_camera.toml");
+        push_key(KEY_ENTER, 0);
+        setenv("MANGO_FAKE_STATUS", "127", 1);
+        editor_open_level_file(&es);
+        setenv("MANGO_FAKE_STATUS", "1", 1);
+        CHECK(strstr(es.file_path, "06_camera.toml") != NULL);
+        input_clear();
+        close_editor(&es);
+    }
+
     /* The editor's Open command with a cancelled picker keeps the document. */
     {
         EditorState es;

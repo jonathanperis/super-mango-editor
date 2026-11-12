@@ -133,8 +133,7 @@ static int physical_release_latch_blocks_transition_input(void)
     if (expect_int("held Space is gated", sampled, 0) != 0 ||
         expect_int("Space latch armed", gs.screen.input_release_latched, 1) != 0)
         goto fail;
-    player_handle_input(&player, NULL, 0, sampled,
-                        NULL, 0, NULL, 0, NULL, 0);
+    player_handle_input(&player, NULL, 0, sampled, &(PlayerSurfaces){0});
     if (expect_int("held Space cannot jump", player.jump_held, 0) != 0)
         goto fail;
 
@@ -163,6 +162,23 @@ static int physical_release_latch_blocks_transition_input(void)
         goto fail;
     game_input_test_set_physical_state(0, 0);
     if (expect_int("D-pad release clears gate", game_input_sample(&gs), 0) != 0)
+        goto fail;
+
+    /* A stick that never comes back to rest keeps the controller gated,
+     * but not the keyboard: that player can still move with the keys. */
+    game_input_test_set_physical_state(0, PLAYER_INPUT_LEFT);
+    game_input_arm_release_latch(&gs, NULL);
+    if (expect_int("stuck stick is gated", game_input_sample(&gs), 0) != 0)
+        goto fail;
+    game_input_test_set_physical_state(PLAYER_INPUT_RIGHT, PLAYER_INPUT_LEFT);
+    if (expect_int("keyboard is heard past a stuck stick",
+                   game_input_sample(&gs), PLAYER_INPUT_RIGHT) != 0 ||
+        expect_int("the controller stays latched", gs.screen.input_release_latched, 1) != 0)
+        goto fail;
+    game_input_test_set_physical_state(PLAYER_INPUT_RIGHT, 0);
+    if (expect_int("stick back at rest clears the gate",
+                   game_input_sample(&gs), PLAYER_INPUT_RIGHT) != 0 ||
+        expect_int("latch cleared", gs.screen.input_release_latched, 0) != 0)
         goto fail;
 
     game_input_test_clear_physical_state();
@@ -220,6 +236,10 @@ static int campaign_manifest_nul_fixtures_reject_transactionally(void)
         "tests/fixtures/campaign_manifest/bad_format_version_key_embedded_nul.toml",
         "tests/fixtures/campaign_manifest/bad_levels_key_embedded_nul.toml",
         "tests/fixtures/campaign_manifest/bad_path_embedded_nul.toml",
+        /* One entry more than CAMPAIGN_MAX_LEVELS. */
+        "tests/fixtures/campaign_manifest/too_many_levels.toml",
+        /* Written below: a manifest larger than the loader reads. */
+        TEST_OUT "campaign_too_large.toml",
     };
     CampaignCatalog catalog = {0};
     CampaignLevel *original_levels;
@@ -232,6 +252,17 @@ static int campaign_manifest_nul_fixtures_reject_transactionally(void)
     original_levels = catalog.levels;
     original_count = catalog.count;
 
+    {
+        /* A valid one-level manifest followed by comment lines until the
+         * file is past CAMPAIGN_MANIFEST_TEXT_MAX: only its size is wrong. */
+        FILE *big = fopen(TEST_OUT "campaign_too_large.toml", "wb");
+        if (!big) { campaign_catalog_cleanup(&catalog); return 1; }
+        fputs("format_version = 1\nlevels = [\"levels/00_sandbox_01.toml\"]\n", big);
+        for (int written = 0; written < CAMPAIGN_MANIFEST_TEXT_MAX; written += 63)
+            /* 63 bytes a line */ fputs("# padding padding padding padding padding padding padding 63b.\n", big);
+        fclose(big);
+    }
+
     for (size_t i = 0; i < sizeof(fixtures) / sizeof(fixtures[0]); i++) {
         if (campaign_catalog_load(fixtures[i], &catalog) == 0 ||
             expect_int("NUL campaign load preserves catalog",
@@ -243,6 +274,7 @@ static int campaign_manifest_nul_fixtures_reject_transactionally(void)
         }
     }
 
+    remove(TEST_OUT "campaign_too_large.toml");
     campaign_catalog_cleanup(&catalog);
     return 0;
 }
@@ -1287,6 +1319,43 @@ static int native_replay_keeps_session_ownership(void)
     return result;
 }
 
+/* Copy one file byte for byte. Returns 0 on success. */
+static int copy_file(const char *from, const char *to)
+{
+    char buffer[4096];
+    size_t n;
+    FILE *in = fopen(from, "rb");
+    FILE *out = in ? fopen(to, "wb") : NULL;
+    int ok = out != NULL;
+    while (ok && (n = fread(buffer, 1, sizeof(buffer), in)) > 0)
+        ok = fwrite(buffer, 1, n, out) == n;
+    if (in) fclose(in);
+    if (out && fclose(out) != 0) ok = 0;
+    return ok ? 0 : -1;
+}
+
+/* Replay frees the old game before it loads the level again. When the file
+ * has gone in the meantime there is no game left, so the session shows the
+ * menu with the reason; it used to end the whole program. */
+static int replay_of_a_vanished_level_opens_the_menu(void)
+{
+    const char *level = TEST_OUT "replay_vanishes.toml";
+    if (copy_file("tests/fixtures/runtime/transition.toml", level)) return 1;
+    AppSessionConfig config = {.level_path = level};
+    AppSession *session = session_create(&config);
+    if (!session) { remove(level); return 1; }
+    remove(level);
+    session->game->screen.route = GAME_ROUTE_REPLAY;
+    session_frame(session);
+    int failed = expect_int("the session is still running", session->ended, 0) ||
+                 expect_int("no game is open", session->game == NULL, 1) ||
+                 expect_int("the menu is showing", session->screen, APP_SCREEN_MENU) ||
+                 expect_int("the menu says why",
+                            session->menu && session->menu->error_message[0] != '\0', 1);
+    session_destroy(&session);
+    return failed;
+}
+
 /* --smoke-test-frames counts the whole run. A Replay used to hand the new
  * game the full count again, so a replay script that finished the level
  * and chose Replay never ended. */
@@ -1564,13 +1633,20 @@ static int nearest_surface_is_order_independent(void)
     SpikePlatform spike = {.x=0,.y=150,.w=100,.active=1};
     Player falling = {.x=10,.y=100,.w=48,.h=48,.vy=1500};
     player_apply_default_physics(&falling);
-    int bounce, support, on_bridge;
-    player_update(&falling, 0.1f, NULL, &pillar, 1, &floating, 1,
-                  NULL, 0, NULL, 0, NULL, 0, NULL, 0, &bridge, 1,
-                  &spike, 1, NULL, 0, &bounce, &support, &on_bridge, -1, 400);
+    /* Only the kinds this case needs; the rest are "none". */
+    const PlayerSurfaces surfaces = {
+        .platforms = &pillar, .platform_count = 1,
+        .float_platforms = &floating, .float_platform_count = 1,
+        .bridges = &bridge, .bridge_count = 1,
+        .spike_platforms = &spike, .spike_platform_count = 1,
+        .world_w = 400,
+    };
+    PlayerLanding landed;
+    player_update(&falling, 0.1f, NULL, &surfaces, -1, &landed);
     if (expect_float("mixed surfaces beat lower floor", falling.y + falling.h - PLAYER_FLOOR_SINK, 150) ||
-        expect_int("discarded float is not ridden", support, -1) ||
-        expect_int("discarded bridge is not crumbled", on_bridge, -1)) return 1;
+        expect_int("discarded float is not ridden", landed.float_platform, -1) ||
+        expect_int("discarded bridge is not crumbled", landed.bridge, -1) ||
+        expect_int("no pad was hit", landed.bouncepad_list, -1)) return 1;
     return 0;
 }
 
@@ -1791,6 +1867,7 @@ int main(void)
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(smoke_frames_count_across_a_replay),
+        CASE(replay_of_a_vanished_level_opens_the_menu),
         CASE(replay_reuses_the_session_assets),
         CASE(asset_cache_contract_test), CASE(session_asset_reuse_test),
         CASE(game_without_session_frees_its_files_test),

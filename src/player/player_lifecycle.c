@@ -131,6 +131,7 @@ int player_init(Player *player, AssetCache *cache)
     player->vine_index   = 0;
     player->climb_source = 0;
     player->jump_held   = 0;
+    player->jump_cut_armed = 0;
     player->coyote_timer = PLAYER_COYOTE_TIME;
     player->jump_buffer_timer = 0.0f;
     player->move_dir       = 0;   /* no direction pressed at startup */
@@ -231,6 +232,7 @@ void player_reset(Player *player)
     player->vine_index = 0;
     player->climb_source = 0;
     player->jump_held = 0;
+    player->jump_cut_armed = 0;
     player->coyote_timer = PLAYER_COYOTE_TIME;
     player->jump_buffer_timer = 0.0f;
     player->move_dir = 0;

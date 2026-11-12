@@ -167,10 +167,13 @@ int serializer_file_exists_utf8(const char *path)
     return 1;
 }
 
-SerializerPathStatus serializer_read_file(const char *path, size_t max_bytes,
-                                          char **out)
+SerializerPathStatus serializer_read_bytes(const char *path, size_t max_bytes,
+                                           char **out, size_t *out_size,
+                                           int *too_large)
 {
     *out = NULL;
+    if (out_size) *out_size = 0;
+    if (too_large) *too_large = 0;
     if (max_bytes == 0) return SERIALIZER_PATH_ERROR;
 
     /* fopen sets errno only when it fails, and the Windows path conversion
@@ -185,18 +188,57 @@ SerializerPathStatus serializer_read_file(const char *path, size_t max_bytes,
         fclose(fp);
         return SERIALIZER_PATH_ERROR;
     }
-    /* Ask for max_bytes: getting all of them means the text and its NUL
+    /* Ask for max_bytes: getting all of them means the bytes and their NUL
      * cannot both fit, so the file is too big. */
     size_t size = fread(text, 1, max_bytes, fp);
-    int failed = ferror(fp) || size >= max_bytes || memchr(text, '\0', size) != NULL;
-    if (fclose(fp) != 0) failed = 1;
-    if (failed) {
+    int read_failed = ferror(fp);
+    int too_big = !read_failed && size >= max_bytes;
+    if (fclose(fp) != 0) read_failed = 1;
+    if (read_failed || too_big) {
         free(text);
+        if (too_large) *too_large = too_big && !read_failed;
         return SERIALIZER_PATH_ERROR;
     }
     text[size] = '\0';
     *out = text;
+    if (out_size) *out_size = size;
     return SERIALIZER_PATH_EXISTING;
+}
+
+SerializerPathStatus serializer_read_file(const char *path, size_t max_bytes,
+                                          char **out)
+{
+    size_t size = 0;
+    SerializerPathStatus status = serializer_read_bytes(path, max_bytes, out, &size, NULL);
+
+    /* Text ends at its first NUL, so a NUL inside the file would hide the
+     * rest of it from every strlen-based reader: refuse it. */
+    if (status == SERIALIZER_PATH_EXISTING && memchr(*out, '\0', size) != NULL) {
+        free(*out);
+        *out = NULL;
+        return SERIALIZER_PATH_ERROR;
+    }
+    return status;
+}
+
+/* FNV-1a, 64 bit: start from the offset basis, then for every byte XOR it
+ * in and multiply by the FNV prime. */
+#define FNV1A_OFFSET_BASIS UINT64_C(1469598103934665603)
+#define FNV1A_PRIME        UINT64_C(1099511628211)
+
+void serializer_fingerprint_bytes(const void *bytes, size_t size,
+                                  SerializerFileFingerprint *fingerprint)
+{
+    const unsigned char *p = bytes;
+    uint64_t hash = FNV1A_OFFSET_BASIS;
+
+    for (size_t i = 0; i < size; i++) {
+        hash ^= p[i];
+        hash *= FNV1A_PRIME;
+    }
+    fingerprint->size = (uint64_t)size;
+    fingerprint->content_hash = hash;
+    fingerprint->valid = 1;
 }
 
 int serializer_fingerprint_utf8(const char *path,
@@ -205,7 +247,7 @@ int serializer_fingerprint_utf8(const char *path,
     FILE *fp;
     unsigned char buffer[4096];
     size_t count;
-    uint64_t hash = UINT64_C(1469598103934665603);
+    uint64_t hash = FNV1A_OFFSET_BASIS;
     uint64_t size = 0;
 
     if (!fingerprint) return -1;
@@ -221,7 +263,7 @@ int serializer_fingerprint_utf8(const char *path,
         count = fread(buffer, 1, sizeof(buffer), fp);
         for (size_t i = 0; i < count; i++) {
             hash ^= buffer[i];
-            hash *= UINT64_C(1099511628211);
+            hash *= FNV1A_PRIME;
         }
         size += (uint64_t)count;
     }
@@ -435,6 +477,18 @@ FILE *serializer_open_temp_shared(const char *target_path, char *temp_path,
     return open_temp_with_mode(target_path, temp_path, temp_path_size, 0666);
 }
 
+/*
+ * 1 = every save is pushed to the disk before it counts (fsync). 0 skips
+ * that wait: the bytes are still written and read back correctly by this
+ * process, they are just not guaranteed to survive a power cut.
+ */
+static int serializer_durable = 1;
+
+void serializer_set_durable(int durable)
+{
+    serializer_durable = durable != 0;
+}
+
 int serializer_flush(FILE *fp)
 {
     if (!fp || serializer_stream_has_error(fp)) return -1;
@@ -444,11 +498,13 @@ int serializer_flush(FILE *fp)
     }
     if (fflush(fp) != 0 || serializer_stream_has_error(fp)) return -1;
 
+    if (serializer_durable) {
 #ifdef _WIN32
-    if (_commit(_fileno(fp)) != 0) return -1;
+        if (_commit(_fileno(fp)) != 0) return -1;
 #elif defined(__APPLE__) || defined(__linux__) || defined(__unix__)
-    if (fsync(fileno(fp)) != 0) return -1;
+        if (fsync(fileno(fp)) != 0) return -1;
 #endif
+    }
 
     return serializer_stream_has_error(fp) ? -1 : 0;
 }
@@ -486,6 +542,7 @@ static int serializer_sync_parent_dir(const char *path)
         serializer_test_failure = SERIALIZER_TEST_FAILURE_NONE;
         return -1;
     }
+    if (!serializer_durable) return 0;
     if (!slash) {
         memcpy(dir, ".", 2);            /* "level.toml" lives in "." */
     } else if (slash == path) {
@@ -838,7 +895,7 @@ static int serializer_create_without_link(const char *temp_path,
             done += put;
         }
     }
-    if (!failed && fsync(out) != 0) failed = 1;
+    if (!failed && serializer_durable && fsync(out) != 0) failed = 1;
     (void)close(in);
     if (close(out) != 0) failed = 1;
     if (failed) {

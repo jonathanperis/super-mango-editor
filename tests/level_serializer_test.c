@@ -14,8 +14,8 @@
 #endif
 
 #include "shared/serializer.h"
-#include "shared/serializer_load_checkpoints.h"
 #include "shared/serializer_load_header.h"
+#include "shared/serializer_parse.h"   /* serializer_load_schema */
 #include "levels/level.h"
 #include "test_paths.h"         /* TEST_OUT scratch directory */
 
@@ -792,6 +792,76 @@ static int control_chars_roundtrip(void)
         level_read_recovery_path(recovery, destination, sizeof(destination)) != 1 ||
         strcmp(destination, "levels/plain \"q\".toml") != 0)
         return fail("plain recovery destination should round-trip");
+    /* The comment is the file's first line, and only that line is read:
+     * a description long enough to make a later line overflow any path
+     * buffer (4080 bytes, most of them escaped to two) must not lose it. */
+    memset(before.description, '\n', 4080);
+    before.description[4080] = '\0';
+    if (level_save_toml_recovery(&before, recovery, "levels/long description.toml") != 0)
+        return fail("could not save recovery with a long description");
+    if (level_read_recovery_path(recovery, destination, sizeof(destination)) != 1 ||
+        strcmp(destination, "levels/long description.toml") != 0)
+        return fail("a long description should keep the recovery destination");
+    /* A normal save has no such comment: 0, not an error. */
+    if (level_save_toml(&before, path) != 0 ||
+        level_read_recovery_path(path, destination, sizeof(destination)) != 0)
+        return fail("a normal save should report no recovery destination");
+    /* The comment is read by hand, one byte at a time, so each way it can
+     * be wrong is tried: 1 = a destination, 0 = no comment, -1 = malformed. */
+    {
+        static const struct { const char *first_line; int result; const char *destination; } cases[] = {
+            { "", 0, "" },                                               /* an empty file */
+            { "# super_mango_recovery_path = \"a\\\\b \\\"c\\\".toml\"\n", 1, "a\\b \"c\".toml" },
+            { "# super_mango_recovery_path = \"levels/a.toml\"\r\n", 1, "levels/a.toml" },
+            { "# super_mango_recovery_path = \"levels/a.toml\n", -1, "" },      /* no closing quote */
+            { "# super_mango_recovery_path = \"levels/a.toml\" x\n", -1, "" }, /* text after it   */
+            { "# super_mango_recovery_path = \"a\\qb\"\n", -1, "" },           /* unknown escape  */
+            { "# super_mango_recovery_path = \"a\\tb\"\n", -1, "" },           /* a control byte  */
+            { "# super_mango_recovery_path = \"a\\nb\"\n", -1, "" },
+            { "# super_mango_recovery_path = \"a\\rb\"\n", -1, "" },
+            { "# super_mango_recovery_path = \"a\\bb\"\n", -1, "" },
+            { "# super_mango_recovery_path = \"a\\fb\"\n", -1, "" },
+        };
+        char small[8];
+
+        for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+            FILE *file = fopen(recovery, "wb");
+            if (!file) return fail("cannot write a recovery comment fixture");
+            fputs(cases[i].first_line, file);
+            if (fclose(file) != 0) return fail("cannot close a recovery comment fixture");
+            if (level_read_recovery_path(recovery, destination, sizeof(destination)) != cases[i].result ||
+                strcmp(destination, cases[i].destination) != 0) {
+                fprintf(stderr, "level_serializer_test: recovery comment case %zu read '%s'\n",
+                        i, destination);
+                return fail("a recovery comment should be read exactly");
+            }
+        }
+        /* A destination that does not fit the caller's buffer is refused,
+         * not cut: half a path would name another file. */
+        {
+            FILE *file = fopen(recovery, "wb");
+            if (!file) return fail("cannot write the long destination fixture");
+            fputs("# super_mango_recovery_path = \"levels/a.toml\"\n", file);
+            if (fclose(file) != 0) return fail("cannot close the long destination fixture");
+        }
+        if (level_read_recovery_path(recovery, small, sizeof(small)) != -1 || small[0] != '\0')
+            return fail("a destination longer than the buffer should be refused");
+        /* So is a comment longer than any path can be. */
+        {
+            FILE *file = fopen(recovery, "wb");
+            if (!file) return fail("cannot write the endless comment fixture");
+            fputs("# super_mango_recovery_path = \"", file);
+            for (int i = 0; i < 3 * SERIALIZER_IO_PATH_MAX; i++) fputc('a', file);
+            fputs("\"\n", file);
+            if (fclose(file) != 0) return fail("cannot close the endless comment fixture");
+        }
+        if (level_read_recovery_path(recovery, destination, sizeof(destination)) != -1)
+            return fail("a comment longer than a path should be refused");
+        if (level_read_recovery_path(TEST_OUT "no_such_recovery.toml", destination,
+                                     sizeof(destination)) != -1)
+            return fail("a missing recovery file should be an error");
+    }
+    remove(path);
     remove(recovery);
     return 0;
 }
@@ -1134,6 +1204,123 @@ static void log_load_problem(void *context, const char *message, int line)
  * following the message's TOML path through the parsed tree), and a load
  * that succeeds reports nothing.
  */
+/*
+ * A level file is read once, with a size limit, and the same bytes are
+ * hashed and parsed: an oversized file is refused before any of it is
+ * parsed, the fingerprint a load reports is the file's own, and bytes
+ * already in memory load exactly as the file does.
+ */
+static int level_file_is_read_once_and_bounded(void)
+{
+    const char *path = TEST_OUT "test_level_too_large.toml";
+    const char *shipped = "levels/00_sandbox_01.toml";
+    static LevelDef from_file, from_text;
+    LoadProblemLog log = {0};
+    SerializerFileFingerprint parsed, on_disk;
+    char *text = NULL;
+    size_t size = 0;
+    int too_large = 0;
+
+    /* Valid TOML all the way through: only the size is wrong. */
+    FILE *file = fopen(path, "wb");
+    if (!file) return fail("cannot write oversized fixture");
+    fputs("format_version = 1\nscreen_count = 1\n", file);
+    for (size_t written = 0; written < LEVEL_TEXT_MAX; written += 63)
+        /* 63 bytes a line */ fputs("# padding padding padding padding padding padding padding 63b.\n", file);
+    if (fclose(file) != 0) return fail("cannot close oversized fixture");
+
+    if (level_load_toml_explained(path, &from_file, log_load_problem, &log) == 0)
+        return fail("a level larger than LEVEL_TEXT_MAX should be refused");
+    if (log.count != 1 || !strstr(log.first, "larger than"))
+        return fail("the oversized-file reason should say so");
+    if (level_load_toml_file(path, &from_file, NULL, NULL, &parsed) == 0 || parsed.valid)
+        return fail("an unread file must not report a fingerprint");
+    if (serializer_read_bytes(path, LEVEL_TEXT_MAX, &text, &size, &too_large) !=
+            SERIALIZER_PATH_ERROR || text != NULL || !too_large)
+        return fail("serializer_read_bytes should report too_large");
+    remove(path);
+    if (serializer_read_bytes(path, LEVEL_TEXT_MAX, &text, &size, &too_large) !=
+            SERIALIZER_PATH_MISSING || too_large)
+        return fail("a missing file is missing, not too large");
+
+    /* The fingerprint of a load is the fingerprint of the file. */
+    if (level_load_toml_file(shipped, &from_file, NULL, NULL, &parsed) != 0 ||
+        serializer_fingerprint_utf8(shipped, &on_disk) != 1 ||
+        !serializer_fingerprint_equal(&parsed, &on_disk))
+        return fail("a load should report the fingerprint of the bytes it parsed");
+
+    /* The same bytes from memory give the same level. */
+    if (serializer_read_bytes(shipped, LEVEL_TEXT_MAX, &text, &size, NULL) !=
+            SERIALIZER_PATH_EXISTING)
+        return fail("cannot read the shipped level into memory");
+    int loaded = level_load_toml_text(text, size, "memory", &from_text, NULL, NULL);
+    free(text);
+    if (loaded != 0 || memcmp(&from_file, &from_text, sizeof(from_file)) != 0)
+        return fail("a level loaded from memory should equal the file's");
+    return 0;
+}
+
+/* Every message of one load, joined, with the count. */
+typedef struct {
+    int count;
+    char all[1024];
+} LoadMessageLog;
+
+static void log_every_message(void *context, const char *message, int line)
+{
+    LoadMessageLog *log = context;
+    char entry[300];
+    log->count++;
+    snprintf(entry, sizeof(entry), "%d: %s\n", line, message);
+    strncat(log->all, entry, sizeof(log->all) - strlen(log->all) - 1);
+}
+
+/*
+ * A file without format_version loads leniently, and says what it skipped:
+ * a misspelt table, an unknown key inside a table and a value of the wrong
+ * type each give a "warning:" with the line. A file that states its
+ * version has nothing to warn about (the same mistakes are errors there).
+ */
+static int legacy_file_warns_about_ignored_values(void)
+{
+    const char *path = TEST_OUT "test_legacy_warnings.toml";
+    static LevelDef def;
+    LoadMessageLog log = {0};
+    FILE *file = fopen(path, "wb");
+    if (!file) return fail("cannot write legacy warning fixture");
+    fputs("name = \"Hand written\"\n"        /* 1 */
+          "screen_count = 1\n"                /* 2 */
+          "music_volume = \"loud\"\n"         /* 3: wrong type */
+          "\n"
+          "[[plataforms]]\n"                  /* 5: misspelt table */
+          "x = 100\n"
+          "\n"
+          "[[coins]]\n"                       /* 8 */
+          "x = 100\n"
+          "y = 100\n"
+          "colour = \"gold\"\n", file);       /* 11: unknown key */
+    if (fclose(file) != 0) return fail("cannot close legacy warning fixture");
+
+    if (level_load_toml_explained(path, &def, log_every_message, &log) != 0)
+        return fail("a legacy file with ignored values should still load");
+    if (def.coin_count != 1 || def.platform_count != 0)
+        return fail("the legacy file should load what it could read");
+    if (log.count != 3 ||
+        !strstr(log.all, "3: warning: root.music_volume has type string") ||
+        !strstr(log.all, "warning: root has unknown key 'plataforms'") ||
+        !strstr(log.all, "warning: root.coins[0] has unknown key 'colour'")) {
+        fprintf(stderr, "level_serializer_test: legacy warnings were:\n%s", log.all);
+        return fail("each ignored value should be reported");
+    }
+    remove(path);
+
+    memset(&log, 0, sizeof(log));
+    if (level_load_toml_explained("levels/00_sandbox_01.toml", &def,
+                                  log_every_message, &log) != 0 || log.count != 0)
+        return fail("a versioned level should load without warnings");
+    return 0;
+}
+
 static int explained_load_gives_schema_lines(void)
 {
     const char *path = TEST_OUT "test_explained_schema.toml";
@@ -1228,9 +1415,228 @@ static int write_format_version_fixture(const char *path, const char *version)
     return 0;
 }
 
+/* What serializer_legacy_warnings reported, for the direct calls below. */
+typedef struct {
+    int count;
+    char all[1024];
+} WarningLog;
+
+static void log_warning(void *context, const char *message)
+{
+    WarningLog *log = context;
+    size_t used = strlen(log->all);
+
+    log->count++;
+    snprintf(log->all + used, sizeof(log->all) - used, "%s\n", message);
+}
+
+/*
+ * The rest of what a file without format_version can lose, asked of
+ * serializer_legacy_warnings directly: some of these files do not load at
+ * all (a level needs its [last_star] to be a table), and the warnings are
+ * about what the lenient reader skipped, not about whether the level is
+ * playable.
+ */
+static int legacy_warnings_name_every_skipped_shape(void)
+{
+    const char *text =
+        "physics = 3\n"                      /* a table was expected  */
+        "coins = 5\n"                        /* an array was expected */
+        "floor_gaps = [16, \"wide\"]\n"      /* one element is unusable */
+        "[last_star]\n"
+        "x = \"left\"\n";                    /* a key of a single table */
+    toml_result_t parsed = toml_parse(text, (int)strlen(text));
+    WarningLog log = {0};
+    int count;
+
+    if (!parsed.ok) {
+        toml_free(parsed);
+        return fail("legacy shape fixture did not parse");
+    }
+    count = serializer_legacy_warnings(parsed.toptab, log_warning, &log);
+    toml_free(parsed);
+    if (count != 4 || log.count != 4 ||
+        !strstr(log.all, "root.physics has type integer, expected table; it is ignored") ||
+        !strstr(log.all, "root.coins has type integer, expected array; it is ignored") ||
+        !strstr(log.all, "root.floor_gaps[1] has type string and is ignored") ||
+        !strstr(log.all, "root.last_star.x has type string and is ignored")) {
+        fprintf(stderr, "level_serializer_test: legacy shape warnings were:\n%s", log.all);
+        return fail("each skipped shape should be reported");
+    }
+
+    /* A file that states its version is checked strictly instead. */
+    parsed = toml_parse("format_version = 1\n", 19);
+    memset(&log, 0, sizeof(log));
+    count = parsed.ok ? serializer_legacy_warnings(parsed.toptab, log_warning, &log) : -1;
+    toml_free(parsed);
+    if (count != 0 || log.count != 0)
+        return fail("a versioned file has nothing to warn about");
+    return 0;
+}
+
+/*
+ * serializer_dump_schema prints the table that tests/schema_parity_test.py
+ * compares the Python validator with.  The lines checked here are one of
+ * each kind, so a row that stops being printed fails in C as well, without
+ * needing Python.
+ */
+static int schema_dump_lists_every_kind_of_row(void)
+{
+    const char *path = TEST_OUT "test_schema_dump.txt";
+    static char text[32768];
+    size_t length;
+    FILE *file = fopen(path, "wb");
+
+    if (!file) return fail("cannot create the schema dump");
+    serializer_dump_schema(NULL);            /* tolerated: prints nothing */
+    serializer_dump_schema(file);
+    if (fclose(file) != 0) return fail("cannot close the schema dump");
+    file = fopen(path, "rb");
+    if (!file) return fail("cannot reopen the schema dump");
+    length = fread(text, 1, sizeof(text) - 1, file);
+    fclose(file);
+    remove(path);
+    text[length] = '\0';
+
+    {
+        char name_line[64], gaps_line[64], checkpoints_line[64];
+        const char *wanted[] = {
+            "value format_version integer\n",
+            name_line,
+            "value music_volume integer\n",
+            "value player_start_x number\n",
+            gaps_line,
+            "table physics\n",
+            "field physics cam_lookahead_vx_factor number\n",
+            "table last_star\n",
+            checkpoints_line,
+            "field checkpoints x number required\n",
+            "field rails layout enum values=RECT,HORIZ\n",
+        };
+        snprintf(name_line, sizeof(name_line), "value name string capacity=%zu\n",
+                 sizeof(((LevelDef *)0)->name));
+        snprintf(gaps_line, sizeof(gaps_line), "integers floor_gaps max=%d\n", MAX_FLOOR_GAPS);
+        snprintf(checkpoints_line, sizeof(checkpoints_line), "tables checkpoints max=%d\n",
+                 MAX_CHECKPOINTS);
+        for (size_t i = 0; i < sizeof(wanted) / sizeof(wanted[0]); i++) {
+            if (!strstr(text, wanted[i])) {
+                fprintf(stderr, "level_serializer_test: schema dump lacks: %s", wanted[i]);
+                return fail("the schema dump should list every kind of row");
+            }
+        }
+    }
+    return 0;
+}
+
+/*
+ * Every level-wide key, [physics], [last_star], floor_gaps and
+ * [[checkpoints]] is a row of the schema table, written by
+ * serializer_write_entry.  The file layout is part of the format, so this
+ * compares the saved text of those rows byte for byte.
+ */
+static int level_wide_rows_keep_their_file_layout(void)
+{
+    const char *path = TEST_OUT "test_root_rows.toml";
+    static LevelDef def;
+    static char text[8192];
+    size_t length;
+    FILE *file;
+    const char *expected_start =
+        "format_version = 1\n"
+        "name = \"Untitled\"\n"              /* an empty name is saved as this */
+        "screen_count = 2\n"
+        "player_start_x = 80.0\n";
+    const char *expected_physics =
+        "\n[physics]\n"
+        "walk_max_speed       = 55.0\n"
+        "run_max_speed        = -1.0\n";
+    const char *expected_long_key = "cam_lookahead_vx_factor = 0.25\n";
+
+    level_def_init_defaults(&def);
+    def.name[0] = '\0';
+    def.screen_count = 2;
+    def.player_start_x = 80.0f;
+    def.player_start_y = 100.0f;
+    def.floor_gaps[0] = 96;
+    def.floor_gaps[1] = 304;
+    def.floor_gap_count = 2;
+    def.checkpoints[0].x = 240.0f;
+    def.checkpoints[0].y = 104.0f;
+    def.checkpoint_count = 1;
+    def.physics.walk_max_speed = 55.0f;
+    def.physics.cam_lookahead_vx_factor = 0.25f;
+    def.last_star.x = 700.0f;
+    def.last_star.y = 150.0f;
+    if (level_save_toml(&def, path) != 0) return fail("the level-wide fixture should save");
+
+    file = fopen(path, "rb");
+    if (!file) return fail("cannot reopen the level-wide fixture");
+    length = fread(text, 1, sizeof(text) - 1, file);
+    fclose(file);
+    text[length] = '\0';
+    if (strncmp(text, expected_start, strlen(expected_start)) != 0 ||
+        strstr(text, "description") || strstr(text, "generated_by") ||
+        !strstr(text, "floor_gaps = [96, 304]\n[[checkpoints]]\nx = 240.0\ny = 104.0\n\n") ||
+        !strstr(text, expected_physics) || !strstr(text, expected_long_key) ||
+        !strstr(text, "[last_star]\nx = 700.0\ny = 150.0\n\n") ||
+        strstr(text, "next_phase")) {
+        fprintf(stderr, "level_serializer_test: saved level-wide rows were:\n%s", text);
+        return fail("level-wide rows should keep their file layout");
+    }
+
+    {
+        static LevelDef loaded;
+        if (level_load_toml(path, &loaded) != 0) return fail("the level-wide fixture should load");
+        if (strcmp(loaded.name, "Untitled") != 0 ||
+            expect_int_value("round-trip floor gap", loaded.floor_gaps[1], 304) != 0 ||
+            expect_float_value("round-trip physics", loaded.physics.cam_lookahead_vx_factor,
+                               0.25f) != 0 ||
+            expect_float_value("round-trip checkpoint", loaded.checkpoints[0].y, 104.0f) != 0 ||
+            expect_float_value("round-trip last star", loaded.last_star.x, 700.0f) != 0)
+            return fail("level-wide rows should round-trip");
+    }
+    remove(path);
+    return 0;
+}
+
+/*
+ * A save refuses a level the game would refuse, before any file is made,
+ * and a destination whose temporary sibling name cannot be built.
+ */
+static int saves_refuse_invalid_levels_and_paths(void)
+{
+    const char *path = TEST_OUT "test_refused_save.toml";
+    static LevelDef def;
+    static char long_path[SERIALIZER_IO_PATH_MAX + 64];
+    char temp[SERIALIZER_IO_PATH_MAX];
+    FILE *probe;
+
+    remove(path);
+    level_def_init_defaults(&def);
+    def.floor_gaps[0] = 12;                    /* not on the 16 px floor grid */
+    def.floor_gap_count = 1;
+    if (level_save_toml(&def, path) != -1)
+        return fail("an invalid level should not be saved");
+    if (level_write_temp(&def, path, temp, sizeof(temp)) != -1)
+        return fail("an invalid level should not be written to a temporary file");
+    probe = fopen(path, "rb");
+    if (probe) {
+        fclose(probe);
+        return fail("a refused save should leave no file behind");
+    }
+
+    level_def_init_defaults(&def);
+    memset(long_path, 'a', sizeof(long_path) - 1);
+    long_path[sizeof(long_path) - 1] = '\0';
+    if (level_save_toml(&def, long_path) != -1)
+        return fail("a path with no room for its temporary name should be refused");
+    return 0;
+}
+
 /* Schema validation rejects a non-integer floor_gaps array before the
- * header loader runs, so these cases parse TOML and call the loaders
- * directly. The integer checkpoint still goes through level_load_toml;
+ * loaders run, so these cases parse TOML and call the loaders directly:
+ * serializer_load_header for format_version, serializer_load_schema (the
+ * one loop over the schema table) for every other key. The integer checkpoint still goes through level_load_toml;
  * its x must sit strictly after the default spawn (80). */
 static int load_header_text(const char *text, LevelDef *def, int *status)
 {
@@ -1246,16 +1652,16 @@ static int load_header_text(const char *text, LevelDef *def, int *status)
     return 0;
 }
 
-static int load_checkpoint_text(const char *text, LevelDef *def, int *status)
+static int load_schema_text(const char *text, LevelDef *def, int *status)
 {
     toml_result_t parsed = toml_parse(text, (int)strlen(text));
 
     if (!parsed.ok) {
         toml_free(parsed);
-        return fail("checkpoint fixture did not parse");
+        return fail("schema fixture did not parse");
     }
     level_def_init_defaults(def);
-    *status = serializer_load_checkpoints(parsed.toptab, def);
+    *status = serializer_load_schema(parsed.toptab, def);
     toml_free(parsed);
     return 0;
 }
@@ -1273,8 +1679,8 @@ static int header_and_checkpoint_rejects(void)
 
     if (serializer_load_header(empty, NULL) != -1)
         return fail("header load should reject a null level");
-    if (serializer_load_checkpoints(empty, NULL) != -1)
-        return fail("checkpoint load should reject a null level");
+    if (serializer_load_schema(empty, NULL) != -1)
+        return fail("schema load should reject a null level");
 
     if (load_header_text("format_version = true\n", &def, &status) != 0)
         return 1;
@@ -1291,11 +1697,11 @@ static int header_and_checkpoint_rejects(void)
                          LEVEL_FORMAT_VERSION) != 0)
         return 1;
 
-    if (load_header_text("floor_gaps = [\"no\"]\n", &def, &status) != 0)
+    if (load_schema_text("floor_gaps = [\"no\"]\n", &def, &status) != 0)
         return 1;
     if (status == 0) return fail("a non-numeric floor gap should be rejected");
 
-    if (load_header_text("floor_gaps = [12.5]\n", &def, &status) != 0)
+    if (load_schema_text("floor_gaps = [12.5]\n", &def, &status) != 0)
         return 1;
     if (status != 0) return fail("a float floor gap should load");
     if (expect_int_value("float floor gap", def.floor_gaps[0], 12) != 0)
@@ -1310,29 +1716,69 @@ static int header_and_checkpoint_rejects(void)
         return fail("could not build too many floor gaps");
     too_many[used++] = ']';
     too_many[used] = '\0';
-    if (load_header_text(too_many, &def, &status) != 0) return 1;
+    if (load_schema_text(too_many, &def, &status) != 0) return 1;
     if (status == 0) return fail("too many floor gaps should be rejected");
 
-    if (load_checkpoint_text("checkpoints = 1\n", &def, &status) != 0)
+    if (load_schema_text("checkpoints = 1\n", &def, &status) != 0)
         return 1;
     if (status == 0) return fail("a non-array checkpoints value should be rejected");
 
-    if (load_checkpoint_text("[[checkpoints]]\nx = \"no\"\ny = 104\n",
+    if (load_schema_text("[[checkpoints]]\nx = \"no\"\ny = 104\n",
                              &def, &status) != 0)
         return 1;
     if (status == 0) return fail("a non-numeric checkpoint should be rejected");
 
-    if (load_checkpoint_text("[[checkpoints]]\nx = inf\ny = 104\n",
+    if (load_schema_text("[[checkpoints]]\nx = inf\ny = 104\n",
                              &def, &status) != 0)
         return 1;
     if (status == 0) return fail("a non-finite checkpoint should be rejected");
 
-    if (load_checkpoint_text("[[checkpoints]]\nx = 240\ny = 104\n",
+    if (load_schema_text("[[checkpoints]]\nx = 240\ny = 104\n",
                              &def, &status) != 0)
         return 1;
     if (status != 0) return fail("integer checkpoint coordinates should parse");
+
     if (expect_float_value("direct integer checkpoint x",
                            def.checkpoints[0].x, 240.0f) != 0)
+        return 1;
+
+    /* The rows of the schema table decide these, not code per key. */
+    if (load_schema_text("[[checkpoints]]\nx = 240\n", &def, &status) != 0) return 1;
+    if (status == 0) return fail("a checkpoint without y should be rejected");
+    if (load_schema_text("checkpoints = [1]\n", &def, &status) != 0) return 1;
+    if (status == 0) return fail("a checkpoint that is not a table should be rejected");
+    if (load_schema_text("floor_gaps = [1e300]\n", &def, &status) != 0) return 1;
+    if (status == 0) return fail("a floor gap outside the int range should be rejected");
+    if (load_schema_text("floor_gaps = [inf]\n", &def, &status) != 0) return 1;
+    if (status == 0) return fail("a non-finite floor gap should be rejected");
+
+    /* A missing key takes its row's fallback; [last_star] keeps the
+     * default position, and a missing [physics] key reads as -1. */
+    {
+        LevelDef defaults;
+        level_def_init_defaults(&defaults);
+        if (load_schema_text("[last_star]\nx = 700\n[physics]\nair_friction = 3\n",
+                             &def, &status) != 0) return 1;
+        if (status != 0) return fail("a partial last_star and physics should load");
+        if (expect_float_value("last star x from the file", def.last_star.x, 700.0f) != 0)
+            return 1;
+        if (expect_float_value("last star y keeps its default", def.last_star.y,
+                               defaults.last_star.y) != 0) return 1;
+        if (expect_float_value("physics key from the file", def.physics.air_friction, 3.0f) != 0)
+            return 1;
+        if (expect_float_value("missing physics key", def.physics.run_max_speed, -1.0f) != 0)
+            return 1;
+        if (strcmp(def.name, "Untitled") != 0)
+            return fail("a missing name should read as Untitled");
+        if (expect_int_value("missing screen_count", def.screen_count, 4) != 0) return 1;
+    }
+    if (load_schema_text("name = \"\"\nscreen_count = 2\nmusic_volume = 7\n"
+                         "player_start_x = 90.5\n", &def, &status) != 0) return 1;
+    if (status != 0) return fail("level-wide keys should load");
+    if (def.name[0] != '\0') return fail("an empty name in the file should stay empty");
+    if (expect_int_value("screen_count from the file", def.screen_count, 2) != 0) return 1;
+    if (expect_int_value("music_volume from the file", def.music_volume, 7) != 0) return 1;
+    if (expect_float_value("player_start_x from the file", def.player_start_x, 90.5f) != 0)
         return 1;
 
     fp = fopen(int_checkpoint, "w");
@@ -1704,6 +2150,8 @@ int main(void)
     }
     if (load_all_repo_levels() != 0) return 1;
     if (explained_load_gives_schema_lines() != 0) return 1;
+    if (level_file_is_read_once_and_bounded() != 0) return 1;
+    if (legacy_file_warns_about_ignored_values() != 0) return 1;
     if (string_fields_use_their_own_capacity() != 0) return 1;
     if (roundtrip_repo_levels() != 0) return 1;
     if (escaped_strings_roundtrip() != 0) return 1;
@@ -1718,6 +2166,10 @@ int main(void)
     if (explicit_version_saves_first_and_roundtrips() != 0) return 1;
     if (rejects_invalid_format_versions_transactionally() != 0) return 1;
     if (header_and_checkpoint_rejects() != 0) return 1;
+    if (legacy_warnings_name_every_skipped_shape() != 0) return 1;
+    if (schema_dump_lists_every_kind_of_row() != 0) return 1;
+    if (level_wide_rows_keep_their_file_layout() != 0) return 1;
+    if (saves_refuse_invalid_levels_and_paths() != 0) return 1;
     if (strict_v1_fixture_suite() != 0) return 1;
     if (rejects_oversized_arrays() != 0) return 1;
     if (rejects_oversized_checkpoints_transactionally() != 0) return 1;

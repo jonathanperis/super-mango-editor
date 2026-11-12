@@ -70,10 +70,33 @@ int display_open(int width, int height, const char *title, int hidden, int resiz
      * blocking limiter would occupy the browser's main thread in EndDrawing.
      * Return control to the browser instead of waiting inside its callback. */
     SetTargetFPS(0);
+#elif defined(MANGO_RAYLIB_MEMORY)
+    /* The Memory backend (tests, headless runs) has no display to keep
+     * pace with, and no monitor to ask: frames run as fast as they are
+     * asked for, hidden or not. */
+    (void)hidden;
+    SetTargetFPS(0);
 #else
-    SetTargetFPS(hidden ? 0 : 60);
+    /*
+     * One frame per refresh of the display the window is on. The
+     * simulation always advances in fixed 1/60 s steps (game_timing.c) and
+     * each frame is drawn between the last two steps, so a 144 Hz display
+     * shows 144 distinct frames a second. A fixed cap of 60 would instead
+     * hold each frame for two or three refreshes in an uneven pattern
+     * (60 does not divide 75, 90 or 144), which is seen as judder.
+     */
+    SetTargetFPS(hidden ? 0 : display_frame_cap(GetMonitorRefreshRate(GetCurrentMonitor())));
 #endif
     return 0;
+}
+
+int display_frame_cap(int refresh_hz)
+{
+    /* 0 or a negative number means the system could not say; a number
+     * outside any real display's range is not to be trusted either. */
+    if (refresh_hz < DISPLAY_FRAME_CAP_MIN || refresh_hz > DISPLAY_FRAME_CAP_MAX)
+        return DISPLAY_FRAME_CAP_DEFAULT;
+    return refresh_hz;
 }
 
 Rectangle display_viewport(int window_w, int window_h, int canvas_w, int canvas_h)

@@ -91,34 +91,37 @@ int option_index(const char *value, const char *const *paths, int count);
 void field_label(EditorState *es, int y, const char *key, int id);
 void draw_section_title(EditorState *es, int x, int y, const char *title, int *open);
 
-void draw_rail_properties(EditorState *es, int y);
+/*
+ * Entities whose fields are a table of rows (properties_entities.c): one
+ * function draws any of them.  draw_table_properties draws the rows of
+ * es->selection's type; properties_type_has_rows says whether a type is
+ * drawn that way.
+ */
+void draw_table_properties(EditorState *es, int y);
+int properties_type_has_rows(EntityType type);
+
+/*
+ * properties_apply_to_selection — Finish a field edit made while several
+ * entities of one type are selected (properties.c).
+ *
+ * The widget has just written a new value into the primary entity
+ * (es->selection).  The value is the `size` bytes at `offset` in its
+ * placement struct; this copies it to the same place in every other
+ * selected entity of `type` and records all of the changes as ONE undo
+ * step.  If that would add a validation error to the level, nothing is
+ * changed at all (the primary's edit is taken back too) and the status
+ * bar says why.  key is the field's name, for the status message.
+ */
+void properties_apply_to_selection(EditorState *es, EntityType type, const char *key,
+                                   size_t offset, size_t size);
+
 void draw_floor_gap_properties(EditorState *es, int y);
 void draw_checkpoint_properties(EditorState *es, int y);
 void draw_platform_properties(EditorState *es, int y);
-void draw_coin_properties(EditorState *es, int y);
-void draw_star_yellow_properties(EditorState *es, int y);
-void draw_star_green_properties(EditorState *es, int y);
-void draw_star_red_properties(EditorState *es, int y);
 void draw_last_star_properties(EditorState *es, int y);
-void draw_player_spawn_properties(EditorState *es, int y);
-void draw_spider_properties(EditorState *es, int y);
-void draw_jumping_spider_properties(EditorState *es, int y);
-void draw_bird_properties(EditorState *es, int y);
-void draw_faster_bird_properties(EditorState *es, int y);
-void draw_fish_properties(EditorState *es, int y);
-void draw_faster_fish_properties(EditorState *es, int y);
-void draw_axe_trap_properties(EditorState *es, int y);
-void draw_circular_saw_properties(EditorState *es, int y);
-void draw_spike_row_properties(EditorState *es, int y);
-void draw_spike_platform_properties(EditorState *es, int y);
-void draw_spike_block_properties(EditorState *es, int y);
 void draw_blue_flame_properties(EditorState *es, int y);
 void draw_fire_flame_properties(EditorState *es, int y);
 void draw_float_platform_properties(EditorState *es, int y);
-void draw_bridge_properties(EditorState *es, int y);
 void draw_bouncepad_small_properties(EditorState *es, int y);
 void draw_bouncepad_medium_properties(EditorState *es, int y);
 void draw_bouncepad_high_properties(EditorState *es, int y);
-void draw_vine_properties(EditorState *es, int y);
-void draw_ladder_properties(EditorState *es, int y);
-void draw_rope_properties(EditorState *es, int y);
