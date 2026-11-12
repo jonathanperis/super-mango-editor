@@ -33,6 +33,14 @@
       "depNameTemplate": "emscripten-core/emsdk"
     },
     {
+      "description": "Bun versions quoted in the manuals, kept equal to the workflow `bun-version` pins and `packageManager` in docs/package.json",
+      "customType": "regex",
+      "managerFilePatterns": ["/^docs/README\\.md$/", "/^docs/wiki/build-system\\.md$/"],
+      "matchStrings": ["Bun \\*\\*(?<currentValue>\\d+\\.\\d+\\.\\d+)\\*\\*"],
+      "datasourceTemplate": "npm",
+      "depNameTemplate": "bun"
+    },
+    {
       "description": "raylib source pin: the tag, its commit and the archive URL built from that commit are rewritten together (tools/build_raylib.py refuses a manifest where they disagree). The sha256 and patches.json need a manual update, so CI fails until a maintainer finishes the bump.",
       "customType": "regex",
       "managerFilePatterns": ["/^vendor/raylib/manifest\\.json$/"],
@@ -72,6 +80,11 @@
       "matchManagers": ["custom.regex"],
       "matchPackageNames": ["emscripten-core/emsdk"],
       "groupName": "emscripten"
+    },
+    {
+      "description": "One pull request for every Bun pin: `bun-version` in the workflows (github-actions), `packageManager` in docs/package.json (npm) and the manual mentions (custom.regex). tests/doctor_test.py fails while they disagree. It comes after the docs site group so this group name wins.",
+      "matchPackageNames": ["bun"],
+      "groupName": "bun"
     },
     {
       "description": "Mesa's archive SHA-256 is updated with the version by github-release-attachments",

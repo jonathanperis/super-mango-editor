@@ -582,7 +582,7 @@ npm run check-site
 
 Keep Bun and `bun.lock` as the CI dependency contract. The npm fallback runs the declared scripts; it does not replace the locked install step.
 
-Astro requires Node.js 22.12+; CI uses Node **26.9.0** and Bun **1.4.2**. The
+Astro requires Node.js 22.12+; CI uses Node **26.9.0** and Bun **1.4.4**. The
 Node version is the single line of the repository's `.node-version` file, which
 every workflow reads (`node-version-file`); the Bun version is also recorded as
 `packageManager` in `docs/package.json`, and `make doctor` warns when the local
