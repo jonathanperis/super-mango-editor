@@ -3,6 +3,15 @@
 #include "graphics.h"
 #include "../input/input_backend.h"
 
+#if !defined(__EMSCRIPTEN__) && !defined(MANGO_RAYLIB_MEMORY)
+/* The monitor the native frame cap was taken from, or -1 while the window
+ * is hidden and so not paced. display_follow_monitor compares the window's
+ * monitor with it every frame. Builds that never pace (browser, Memory
+ * backend) leave it out: an unused static is a warning, and warnings fail
+ * the build. */
+static int s_paced_monitor = -1;
+#endif
+
 /* The player's first sprite frame (48x48 at the top-left of the sheet; see
  * PLAYER_FRAME_W in src/player/player_internal.h) doubles as the window and
  * taskbar icon on Windows and Linux. macOS takes an application's icon from
@@ -85,9 +94,33 @@ int display_open(int width, int height, const char *title, int hidden, int resiz
      * hold each frame for two or three refreshes in an uneven pattern
      * (60 does not divide 75, 90 or 144), which is seen as judder.
      */
-    SetTargetFPS(hidden ? 0 : display_frame_cap(GetMonitorRefreshRate(GetCurrentMonitor())));
+    s_paced_monitor = -1;
+    if (hidden) {
+        SetTargetFPS(0);
+    } else {
+        s_paced_monitor = GetCurrentMonitor();
+        SetTargetFPS(display_frame_cap(GetMonitorRefreshRate(s_paced_monitor)));
+    }
 #endif
     return 0;
+}
+
+int display_monitor_changed(int paced_monitor, int current_monitor)
+{
+    return paced_monitor >= 0 && current_monitor != paced_monitor;
+}
+
+void display_follow_monitor(void)
+{
+#if !defined(__EMSCRIPTEN__) && !defined(MANGO_RAYLIB_MEMORY)
+    int monitor;
+    /* A hidden window is never paced: skip even asking for the monitor. */
+    if (s_paced_monitor < 0) return;
+    monitor = GetCurrentMonitor();
+    if (!display_monitor_changed(s_paced_monitor, monitor)) return;
+    s_paced_monitor = monitor;
+    SetTargetFPS(display_frame_cap(GetMonitorRefreshRate(monitor)));
+#endif
 }
 
 int display_frame_cap(int refresh_hz)

@@ -125,3 +125,10 @@ int editor_resize_begin(EditorState *es, float world_x, float world_y);
 void editor_resize_drag(EditorState *es, float world_x, float world_y);
 void editor_resize_finish(EditorState *es);
 void editor_resize_cancel(EditorState *es);
+
+#ifdef MANGO_TESTING
+/* Test seam: how many candidate sizes a resize has asked level validation
+ * about since the program started (a drag far past a limit should cost a
+ * handful, not one per tile). */
+int editor_resize_test_validations(void);
+#endif

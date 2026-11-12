@@ -98,9 +98,8 @@ void player_resolve_floor_collision(Player *player,
                  * Horizontal overlap test: use the inset PHYS_PAD_X physics box
                  * so only the visible character art overlaps, not transparent padding.
                  */
-                int h_overlap = (player->x + player->w - PHYS_PAD_X > bp->x + BOUNCEPAD_ART_X) &&
-                                (player->x + PHYS_PAD_X < bp->x + BOUNCEPAD_ART_X + BOUNCEPAD_ART_W);
-                if (!h_overlap) continue;
+                if (!bouncepad_launches(bp, player->x + PHYS_PAD_X,
+                                        player->x + player->w - PHYS_PAD_X)) continue;
 
                 /*
                  * The player's physics bottom has reached the floor inside the

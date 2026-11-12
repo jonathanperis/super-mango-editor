@@ -26,6 +26,12 @@ float coin_streak_pitch(CoinStreak *streak, uint32_t step)
     return s_semitones[rise];
 }
 
+IntRect coin_get_hitbox(const Coin *coin)
+{
+    IntRect box = { (int)coin->x, (int)coin->y, COIN_DISPLAY_W, COIN_DISPLAY_H };
+    return box;
+}
+
 /* ------------------------------------------------------------------ */
 
 /*

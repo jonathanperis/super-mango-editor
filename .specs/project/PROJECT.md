@@ -2,7 +2,7 @@
 
 ## Overview
 
-A 2D pixel art platformer written in C11 + raylib 6.0, designed as a learning resource for game development. Every line of code is documented for someone who knows basic programming but is new to C and raylib.
+A 2D pixel art platformer written in C11 + raylib 6.2, designed as a learning resource for game development. Every line of code is documented for someone who knows basic programming but is new to C and raylib.
 
 ## Goals
 
@@ -19,7 +19,7 @@ A 2D pixel art platformer written in C11 + raylib 6.0, designed as a learning re
 - Campaign-driven start menu, HUD, lives system, debug overlay, keyboard/gamepad hot-plug support
 - Builds natively on macOS, Linux, Windows, plus WebAssembly via Emscripten
 - Standalone raylib level editor is shipped with TOML save/load, checkpoint palette/canvas/properties feedback, validation blocking, private-snapshot playtest, recent files, recovery snapshots, and smoke-test mode
-- CI runs native builds, editor builds, 15-native-binary test suite plus Python host checks, level and campaign-manifest validation, native smoke, WebAssembly artifact smoke, docs lint/build, and CodeQL
+- CI runs native builds, editor builds, 18-native-binary test suite plus Python and Node host checks, level and campaign-manifest validation, native smoke, WebAssembly artifact smoke, docs lint/build, and CodeQL
 
 ## Next Milestone
 

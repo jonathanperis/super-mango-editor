@@ -445,6 +445,16 @@ static int resize_target_exists(const EditorState *es)
            es->resize_index < editor_entity_count(&es->level, es->resize_type);
 }
 
+/* How many candidates the level was asked about (a test reads it). */
+static int resize_validations;
+
+#ifdef MANGO_TESTING
+int editor_resize_test_validations(void)
+{
+    return resize_validations;
+}
+#endif
+
 /*
  * try_placement — Write `candidate` over the entity being resized if that
  * leaves the level as sound as it was when the resize began.  Returns 1
@@ -455,10 +465,58 @@ static int try_placement(EditorState *es, const PlacementData *candidate)
     PlacementData shown = editor_snapshot_entity(&es->level, es->resize_type,
                                                  es->resize_index);
 
+    resize_validations++;
     (void)editor_entity_write(&es->level, es->resize_type, es->resize_index, candidate);
     if (editor_edit_kept_level(&es->level, &resize_issues, NULL, 0) == 0) return 1;
     (void)editor_entity_write(&es->level, es->resize_type, es->resize_index, &shown);
     return 0;
+}
+
+/*
+ * try_count — Ask for `count` tiles on one axis (across when `across` is
+ * 1, down otherwise), the other axis kept as `base` has it.  Returns 1 when
+ * the level took it (it is now written), 0 when it was refused.
+ */
+static int try_count(EditorState *es, const PlacementData *base, int across, int count)
+{
+    PlacementData candidate = *base;
+    int base_across, base_down;
+
+    (void)get_sizes(es->resize_type, base, &base_across, &base_down);
+    if (across) set_sizes(es->resize_type, &candidate, count, base_down);
+    else        set_sizes(es->resize_type, &candidate, base_across, count);
+    return try_placement(es, &candidate);
+}
+
+/*
+ * nearest_count — Resize one axis from `have` tiles (what `base` has, which
+ * the level accepts) toward `want`, and return the count it stopped at.
+ *
+ * Most moves ask for a count the level takes: one validation, done.  When
+ * it is refused (too many tiles, past the edge of the world, a rail rider
+ * left off its rail), the answer lies between `have` and `want`.  Every
+ * one of those limits refuses each count past the first one it refuses,
+ * so a binary search finds that boundary: keep the nearest count known to
+ * be accepted and the nearest known to be refused, try the one halfway,
+ * and close in.  A 128-tile drag costs about eight validations instead
+ * of up to 128 one tile at a time.  The entity is left holding the
+ * accepted count.
+ */
+static int nearest_count(EditorState *es, const PlacementData *base, int across,
+                         int have, int want)
+{
+    int accepted = have;
+    int refused = want;
+
+    if (want == have) return have;
+    if (try_count(es, base, across, want)) return want;
+    /* Until the two are neighbours (either may be the larger). */
+    while (refused - accepted > 1 || accepted - refused > 1) {
+        int middle = accepted + (refused - accepted) / 2;
+        if (try_count(es, base, across, middle)) accepted = middle;
+        else refused = middle;
+    }
+    return accepted;
 }
 
 /* Say in the status bar what the entity measures now. */
@@ -560,37 +618,19 @@ void editor_resize_drag(EditorState *es, float world_x, float world_y)
     /*
      * Tile counts.  `shown` is the entity as it is now, which the level
      * accepts.  Ask for the count under the pointer; if validation refuses
-     * it (too many tiles, past the edge of the world, a rail rider left
-     * off its rail), try one tile nearer to what is shown, and so on.  The
-     * search ends at the first count that is accepted, or leaves the entity
-     * alone when it gets back to the count already shown.  Across is
-     * settled first and down second, so a rail's corner can stop at a
-     * different limit on each axis.
+     * it, take the accepted count nearest to it (nearest_count), or leave
+     * the entity alone when none between is accepted.  Across is settled
+     * first and down second, so a rail's corner can stop at a different
+     * limit on each axis.
      */
     shown = editor_snapshot_entity(&es->level, es->resize_type, es->resize_index);
     if (!editor_entity_bounds(&es->level, es->resize_type, es->resize_index, &bounds)) return;
     if (!get_sizes(es->resize_type, &shown, &across, &down)) return;
     wanted_sizes(es->resize_type, handle, &shown, &bounds, x, y, &want_across, &want_down);
 
-    while (want_across != across) {
-        candidate = shown;
-        set_sizes(es->resize_type, &candidate, want_across, down);
-        if (try_placement(es, &candidate)) {
-            across = want_across;
-            shown = candidate;
-            break;
-        }
-        want_across += want_across < across ? 1 : -1;
-    }
-    while (want_down != down) {
-        candidate = shown;
-        set_sizes(es->resize_type, &candidate, across, want_down);
-        if (try_placement(es, &candidate)) {
-            down = want_down;
-            break;
-        }
-        want_down += want_down < down ? 1 : -1;
-    }
+    (void)nearest_count(es, &shown, 1, across, want_across);
+    shown = editor_snapshot_entity(&es->level, es->resize_type, es->resize_index);
+    (void)nearest_count(es, &shown, 0, down, want_down);
     show_live_value(es);
 }
 

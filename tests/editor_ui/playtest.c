@@ -363,6 +363,23 @@ static int native_pickers_report_choice_cancel_and_failure(void)
         push_key(KEY_ENTER, 0);                 /* OK on an empty line */
         CHECK(pick(0, NULL, "127", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
 
+        /* A picker that is there but fails (exit 2, or a path with a
+         * failing exit) gets the same prompt, which says why. */
+        input_clear();
+        push_text("levels/labs/01_collision.toml");
+        push_key(KEY_ENTER, 0);
+        CHECK(pick(0, NULL, "2", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+        CHECK(strcmp(buf, "levels/labs/01_collision.toml") == 0);
+        input_clear();
+        push_text("broken picker");
+        push_key(KEY_ENTER, 0);
+        CHECK(pick(1, "/levels/x", "3", buf, sizeof(buf)) == FILE_DIALOG_SELECTED);
+        CHECK(strcmp(buf, "broken picker.toml") == 0);
+        /* Esc there cancels, as in any prompt. */
+        input_clear();
+        push_key(KEY_ESCAPE, 0);
+        CHECK(pick(0, NULL, "2", buf, sizeof(buf)) == FILE_DIALOG_CANCELLED);
+
         /* The editor's own Open command, through the same prompt. */
         input_clear();
         push_text("levels/labs/06_camera.toml");

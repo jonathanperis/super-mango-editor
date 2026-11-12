@@ -1,0 +1,14 @@
+# The engine's own movement values (player_lifecycle.c), in the order the
+# inspector records them: walk and run top speed, walk and run ground
+# acceleration, ground friction, counter acceleration, air acceleration
+# walking and running, air friction. Input bits walk right, then jump.
+format_version = 4
+level_path = "levels/labs/01_collision.toml"
+seed = 123456789
+level_hash = "0123456789abcdef"
+frames = [
+    [2, 100, 250, 750, 600, 550, 100, 350, 180, 80],
+    [2, 100, 250, 750, 600, 550, 100, 350, 180, 80],
+    [18, 100, 250, 750, 600, 550, 100, 350, 180, 80],
+    [16, 100, 250, 750, 600, 550, 100, 350, 180, 80],
+]

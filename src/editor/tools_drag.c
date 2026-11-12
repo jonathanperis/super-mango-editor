@@ -172,7 +172,7 @@ static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
 
     if (shift && !alt) {
         es->last_click_valid = 0;
-        if (top.index >= 0) editor_selection_toggle(es, top.type, top.index);
+        if (top.index >= 0) (void)editor_selection_toggle(es, top.type, top.index);
         else start_box(es, world_x, world_y, 1);
         return;
     }

@@ -9,6 +9,8 @@
 #define display_scale_fit web_pacing_display_scale_fit
 #define display_keep_on_monitor web_pacing_display_keep_on_monitor
 #define display_frame_cap web_pacing_display_frame_cap
+#define display_follow_monitor web_pacing_display_follow_monitor
+#define display_monitor_changed web_pacing_display_monitor_changed
 #define SetTraceLogLevel web_pacing_trace
 #define SetConfigFlags web_pacing_flags
 #define InitWindow web_pacing_init

@@ -28,8 +28,8 @@ Informational. Read them, and do not treat a red or noisy run as a merge
 blocker unless the release checklist says otherwise:
 
 - `Coverage (Linux x86_64)`, `clang-tidy (informational)`, the weekly fuzz
-  workflow, `Windows x86_64 clang -Werror (rolling MSYS2 toolchain)`,
-  `Desktop backend`, and `Docs lint and build` (that job only runs when the
+  workflow, `Windows x86_64 extras (clang -Werror, Mesa desktop backend)`,
+  and `Docs lint and build` (that job only runs when the
   pull request touches the site)
 
 ## Building and testing

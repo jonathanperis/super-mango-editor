@@ -27,6 +27,7 @@
 #include <string.h> /* memcpy, memmove, memset */
 
 #include "editor_clipboard.h" /* keep a copied rail rider on its rail */
+#include "editor_session.h"   /* editor_set_status: a full selection */
 #include "../game_constants.h" /* GAME_H, FLOOR_Y, TILE_SIZE, FLOOR_GAP_W */
 
 /*
@@ -800,25 +801,33 @@ int editor_select_items(EditorState *es, const Selection *items, int count)
     return editor_selection_count(es);
 }
 
-void editor_selection_toggle(EditorState *es, EntityType type, int index)
+int editor_selection_toggle(EditorState *es, EntityType type, int index)
 {
     Selection item;
 
-    if (!es) return;
+    if (!es) return 0;
     item.type = type;
     item.index = index;
-    if (!entity_exists(es, item)) return;
+    if (!entity_exists(es, item)) return 0;
     if (!editor_is_selected(es, type, index)) {
-        if (!editor_selection_is_valid(es)) es->selection = item;
-        else if (es->selection_more_count < EDITOR_MAX_SELECTION - 1)
+        if (!editor_selection_is_valid(es)) {
+            es->selection = item;
+        } else if (es->selection_more_count < EDITOR_MAX_SELECTION - 1) {
             es->selection_more[es->selection_more_count++] = item;
-        return;
+        } else {
+            /* Full: nothing is added.  Say so, in the words a box
+             * selection that hit the limit uses (tools_drag.c). */
+            editor_set_status(es, "Selected %d entities (a selection holds at most %d)",
+                              editor_selection_count(es), EDITOR_MAX_SELECTION);
+            return 0;
+        }
+        return 1;
     }
     if (same_entity(es->selection, type, index)) {
         /* The primary goes: the first of the others takes its place. */
         if (es->selection_more_count == 0) {
             es->selection.index = -1;
-            return;
+            return 1;
         }
         es->selection = es->selection_more[0];
         index = 0;
@@ -830,6 +839,7 @@ void editor_selection_toggle(EditorState *es, EntityType type, int index)
     for (int i = index; i + 1 < es->selection_more_count; i++)
         es->selection_more[i] = es->selection_more[i + 1];
     es->selection_more_count--;
+    return 1;
 }
 
 void editor_selection_reconcile(EditorState *es)

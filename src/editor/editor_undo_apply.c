@@ -46,14 +46,28 @@ LevelConfigSnapshot editor_snapshot_config(const LevelDef *level)
     return snapshot;
 }
 
+/*
+ * editor_apply_config_snapshot — Put one side of a config step back.
+ *
+ * snapshot is the side to restore and other is the step's other side.
+ * Most fields are simply copied.  The level's name and next_phase are the
+ * exception: Campaign Save rewrites them in the open level's file (a
+ * renamed level, a relinked campaign) and keeps the undo history, so a
+ * step recorded earlier still holds the names from before that save.
+ * They are restored only when this step changed them itself; a step about
+ * the music or the physics leaves them as the campaign last wrote them.
+ */
 static void editor_apply_config_snapshot(LevelDef *level,
-                                         const LevelConfigSnapshot *snapshot)
+                                         const LevelConfigSnapshot *snapshot,
+                                         const LevelConfigSnapshot *other)
 {
-    memcpy(level->name, snapshot->name, sizeof(level->name));
+    if (strncmp(snapshot->name, other->name, sizeof(snapshot->name)) != 0)
+        memcpy(level->name, snapshot->name, sizeof(level->name));
     memcpy(level->description, snapshot->description, sizeof(level->description));
     memcpy(level->generated_by, snapshot->generated_by, sizeof(level->generated_by));
     level->screen_count = snapshot->screen_count;
-    memcpy(level->next_phase, snapshot->next_phase, sizeof(level->next_phase));
+    if (strncmp(snapshot->next_phase, other->next_phase, sizeof(snapshot->next_phase)) != 0)
+        memcpy(level->next_phase, snapshot->next_phase, sizeof(level->next_phase));
     memcpy(level->background_layers, snapshot->background_layers,
            sizeof(level->background_layers));
     level->background_layer_count = snapshot->background_layer_count;
@@ -168,7 +182,8 @@ void editor_commit_change(EditorState *es)
             cmd.config_before = es->pending_config_before;
             cmd.config_after = after;
             if (!undo_push(es->undo, &cmd)) {
-                editor_apply_config_snapshot(&es->level, &cmd.config_before);
+                editor_apply_config_snapshot(&es->level, &cmd.config_before,
+                                             &cmd.config_after);
                 editor_set_status(es, "Config edit cancelled: cannot allocate undo history");
             }
             editor_sync_config_resources(es);
@@ -226,7 +241,9 @@ void editor_apply_undo_command(EditorState *es, const Command *cmd, int reverse)
     if (cmd->type == CMD_CONFIG) {
         editor_apply_config_snapshot(&es->level,
                                      reverse ? &cmd->config_before
-                                             : &cmd->config_after);
+                                             : &cmd->config_after,
+                                     reverse ? &cmd->config_after
+                                             : &cmd->config_before);
         editor_selection_reconcile(es);
         editor_sync_config_resources(es);
         editor_refresh_dirty(es);

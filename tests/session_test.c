@@ -1,9 +1,10 @@
 #ifndef _WIN32
-#define _POSIX_C_SOURCE 200809L  /* chdir under -std=c11 */
+#define _XOPEN_SOURCE 700  /* chdir and realpath under -std=c11 */
 #endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>     /* time: the F9 export's file name */
 #ifdef _WIN32
 #include <direct.h>   /* _chdir */
 #else
@@ -441,6 +442,39 @@ static int same_path_spelling_prefix(const char *path, const char *prefix,
 }
 
 /*
+ * The same as same_path_spelling_prefix, after resolving symbolic links in
+ * the folder part on both sides. On macOS a temporary folder under /var is
+ * reached through the /var -> /private/var link, and the working folder the
+ * system reports after a chdir is the resolved /private/var spelling, so an
+ * OUTDIR made with mktemp -d never matched. Windows has no such link here.
+ */
+static int same_folder_then_name(const char *path, const char *folder,
+                                 const char *name)
+{
+    if (same_path_spelling_prefix(path, folder, name)) return 1;
+#ifdef _WIN32
+    return 0;
+#else
+    size_t path_len = strlen(path), name_len = strlen(name);
+    char path_folder[4096];
+    char *real_path_folder, *real_folder;
+    int same;
+
+    if (path_len <= name_len || path_len - name_len >= sizeof(path_folder) ||
+        strcmp(path + path_len - name_len, name) != 0)
+        return 0;
+    memcpy(path_folder, path, path_len - name_len);
+    path_folder[path_len - name_len] = '\0';
+    real_path_folder = realpath(path_folder, NULL);
+    real_folder = realpath(folder, NULL);
+    same = real_path_folder && real_folder && strcmp(real_path_folder, real_folder) == 0;
+    free(real_path_folder);
+    free(real_folder);
+    return same;
+#endif
+}
+
+/*
  * Started from another folder, the game and editor used to find no assets:
  * every path is relative and nothing moved the working folder. The helper
  * must move it to the folder that holds assets/ and levels/, and turn typed
@@ -535,7 +569,7 @@ static int asset_root_moves_a_foreign_working_folder(void)
      * joined with '/', so compare with one separator spelling. */
     if (expect_int("scratch folder holds no assets", asset_root_contains(""), 0) ||
         expect_int("typed path keeps the launch folder",
-                   typed && same_path_spelling_prefix(typed, scratch, "mine.toml"), 1))
+                   typed && same_folder_then_name(typed, scratch, "mine.toml"), 1))
         goto done;
     /* Nothing within reach: report failure and stay put. */
     if (expect_int("no asset root found", asset_root_enter_from(missing), -1) ||
@@ -1260,11 +1294,11 @@ static int pending_profile_keeps_exit_alive(void)
     session->game->screen.route = GAME_ROUTE_EXIT;
     session->game->screen.loop.clock_started = 1;
     session->game->screen.loop.prev_time = GetTime() - 0.1; /* 100 ms pending */
-    float elapsed = session->game->screen.completion.level_elapsed;
+    int elapsed = (int)session->game->screen.completion.level_steps;
     session_frame(session);
     if (expect_int("pending save retains session", session->ended, 0) ||
         expect_int("pending save retains game", session->game_close_count, 0) ||
-        expect_float("pending exit freezes gameplay", session->game->screen.completion.level_elapsed, elapsed)) {
+        expect_int("pending exit freezes gameplay", (int)session->game->screen.completion.level_steps, elapsed)) {
         session_destroy(&session);
         return 1;
     }
@@ -1837,6 +1871,24 @@ done:
     return result;
 }
 
+/*
+ * The native frame cap is set again when the window lands on another
+ * monitor, and only then; a window that is not paced (hidden, browser,
+ * Memory backend: paced monitor -1) is never re-capped.
+ */
+static int frame_cap_follows_the_monitor(void)
+{
+    if (expect_int("same monitor keeps the cap", display_monitor_changed(0, 0), 0) ||
+        expect_int("another monitor sets it again", display_monitor_changed(0, 1), 1) ||
+        expect_int("and back again", display_monitor_changed(1, 0), 1) ||
+        expect_int("an unpaced window is left alone", display_monitor_changed(-1, 0), 0) ||
+        expect_int("even on another monitor", display_monitor_changed(-1, 2), 0))
+        return 1;
+    /* Safe to call every frame where nothing is paced. */
+    display_follow_monitor();
+    return 0;
+}
+
 int game_profile_contract_test(void);
 int game_simulation_contract_test(void);
 int audio_contract_test(void);
@@ -1857,13 +1909,139 @@ static int setup_raylib(void)
     return audio_open() != 0;
 }
 
+/*
+ * F9 writes a recording into the player's data folder, the one that holds
+ * profile.toml. It used to write into the working folder, and main.c moves
+ * into the install folder at startup, so the file landed next to the
+ * program (often a folder the player cannot write). HOME and XDG_DATA_HOME
+ * point at a scratch folder here, so the real data folder is not touched.
+ */
+#define EXPORT_HOME TEST_OUT "export-home"
+
+/* Keep a copy of an environment variable ("" and set = 0 when unset). */
+static void save_env(const char *name, char *copy, size_t size, int *set)
+{
+    const char *value = getenv(name);
+    *set = value != NULL;
+    snprintf(copy, size, "%s", value ? value : "");
+}
+
+static void restore_env(const char *name, const char *copy, int set)
+{
+#ifndef _WIN32
+    if (set) setenv(name, copy, 1);
+    else unsetenv(name);
+#else
+    (void)name; (void)copy; (void)set;
+#endif
+}
+
+static int experiment_export_goes_to_the_player_data_folder(void)
+{
+    static GameState gs;
+    static GameExperiment tape;
+    static ExperimentFrame frame;
+    char home[4096], xdg[4096], exported[4096], misplaced[64];
+    int home_set, xdg_set, found = 0, result = 1;
+    char *folder = NULL, *expected = NULL;
+
+    save_env("HOME", home, sizeof(home), &home_set);
+    save_env("XDG_DATA_HOME", xdg, sizeof(xdg), &xdg_set);
+#ifndef _WIN32
+    /* preference_path makes every missing folder below the base. */
+    (void)mkdir(EXPORT_HOME, 0700);
+    setenv("HOME", EXPORT_HOME, 1);
+    setenv("XDG_DATA_HOME", EXPORT_HOME, 1);
+#endif
+    folder = game_experiment_export_folder();
+    expected = preference_path(GAME_DATA_ORGANIZATION, GAME_DATA_APPLICATION);
+    if (expect_int("export folder found", folder != NULL && expected != NULL, 1) ||
+        expect_int("export folder is the data folder", strcmp(folder, expected), 0) ||
+        expect_int("export folder is not the working folder", folder[0] != '\0', 1))
+        goto done;
+#ifndef _WIN32
+    if (expect_int("export folder under HOME",
+                   strncmp(folder, EXPORT_HOME "/", strlen(EXPORT_HOME "/")), 0))
+        goto done;
+#endif
+
+    memset(&gs, 0, sizeof(gs));
+    memset(&tape, 0, sizeof(tape));
+    tape.frames = &frame;
+    tape.count = 1;
+    snprintf(tape.level_path, sizeof(tape.level_path), "%s", "levels/00_sandbox_01.toml");
+    gs.screen.experiment = &tape;
+    long long before = (long long)time(NULL);
+    game_experiment_export(&gs);
+    long long after = (long long)time(NULL);
+    gs.screen.experiment = NULL;
+
+    for (long long stamp = before; stamp <= after; stamp++) {
+        snprintf(exported, sizeof(exported), "%smango-experiment-%lld.toml", folder, stamp);
+        snprintf(misplaced, sizeof(misplaced), "mango-experiment-%lld.toml", stamp);
+        if (serializer_probe_path_utf8(exported) == SERIALIZER_PATH_EXISTING) found = 1;
+        (void)remove(exported);
+        if (serializer_probe_path_utf8(misplaced) == SERIALIZER_PATH_EXISTING) {
+            (void)remove(misplaced);
+            fprintf(stderr, "session_test: F9 wrote %s into the working folder\n", misplaced);
+            goto done;
+        }
+    }
+    if (expect_int("export written in the data folder", found, 1) ||
+        expect_int("the log names the folder",
+                   strncmp(gs.screen.debug.log[0].text, "Exported to player data: mango-experiment-",
+                           strlen("Exported to player data: mango-experiment-")) == 0, 1))
+        goto done;
+    result = 0;
+
+done:
+    free(folder);
+    free(expected);
+    restore_env("HOME", home, home_set);
+    restore_env("XDG_DATA_HOME", xdg, xdg_set);
+    return result;
+}
+
+/*
+ * A capture's physics columns have the caps of a level's [physics]: 960
+ * px/s for the two top speeds (16 px a step, so no wall can be skipped),
+ * 10000 for the rest. A capture used to accept 10000 px/s top speeds.
+ */
+static int experiment_rows_keep_the_physics_caps(void)
+{
+    static const char head[] =
+        "format_version = 4\nlevel_path = \"levels/00_sandbox_01.toml\"\nseed = 1\n"
+        "level_hash = \"0123456789abcdef\"\nframes = [[0, ";
+    const struct { const char *values; int decodes; } rows[] = {
+        { "960, 960, 10000, 10000, 10000, 10000, 10000, 10000, 10000", 1 },
+        { "961, 250, 750, 600, 550, 100, 350, 180, 80", 0 },
+        { "100, 10000, 750, 600, 550, 100, 350, 180, 80", 0 },
+        { "100, 250, 750, 600, 550, 100, 350, 180, 10001", 0 },
+    };
+    char text[512];
+    static GameExperiment tape;
+
+    for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+        int length = snprintf(text, sizeof(text), "%s%s]]\n", head, rows[i].values);
+        int decoded = game_experiment_decode(text, (size_t)length, "caps",
+                                             UINT64_C(0x0123456789abcdef), &tape) == 0;
+        free(tape.frames);
+        if (expect_int(rows[i].values, decoded, rows[i].decodes)) return 1;
+    }
+    if (expect_int("speed column cap", (int)game_experiment_physics_max(1), MAX_PLAYER_SPEED) ||
+        expect_int("accel column cap", (int)game_experiment_physics_max(8), MAX_PLAYER_ACCEL) ||
+        expect_int("no such column", (int)game_experiment_physics_max(9), 0))
+        return 1;
+    return 0;
+}
+
 int main(void)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
     const struct { const char *name; int (*run)(void); } cases[] = {
 #define CASE(fn) {#fn, fn}
         CASE(audio_contract_test), CASE(qoa_bounds_contract_test),
-        CASE(web_frame_pacing_contract_test),
+        CASE(web_frame_pacing_contract_test), CASE(frame_cap_follows_the_monitor),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
         CASE(pending_profile_keeps_exit_alive), CASE(native_replay_keeps_session_ownership),
         CASE(smoke_frames_count_across_a_replay),
@@ -1892,7 +2070,9 @@ int main(void)
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),
         CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),
-        CASE(browser_replay_replaces_the_game_in_place)
+        CASE(browser_replay_replaces_the_game_in_place),
+        CASE(experiment_export_goes_to_the_player_data_folder),
+        CASE(experiment_rows_keep_the_physics_caps)
 #undef CASE
     };
     int failures = 0;

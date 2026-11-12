@@ -19,7 +19,7 @@
 #include "app_session.h"
 #include "../shared/platform.h"  /* str_copy */
 #include "../shared/geometry.h"  /* float_same_value */
-#include "../shared/graphics.h"  /* display_scale_fit */
+#include "../shared/graphics.h"  /* display_scale_fit, display_follow_monitor */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -899,6 +899,8 @@ fail:
 static void session_step(AppSession *session, int callback_owned)
 {
     if (!session || session->ended) return;
+    /* A window moved to another display draws at that display's rate. */
+    display_follow_monitor();
     session_apply_preferences(session);
     /* EndDrawing captured backend commands at the end of the previous frame.
      * Add sampled focus/gamepad changes, then let the active screen consume

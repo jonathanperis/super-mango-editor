@@ -233,8 +233,6 @@ int level_load_toml_text(const char *text, size_t size, const char *label,
 
     if (!text || !def || size >= LEVEL_TEXT_MAX) return -1;
 
-    LevelDef *caller_def = def;
-
     /*
      * toml_parse returns a toml_result_t.  If parsing fails, r.ok is false
      * and r.errmsg contains a human-readable error description.  On
@@ -250,7 +248,10 @@ int level_load_toml_text(const char *text, size_t size, const char *label,
         return -1;
     }
     problems.top = r.toptab;
+    problems.label = path;
 
+    LevelDef *staged = NULL;
+    int result = -1;
     {
         char schema_error[256];
         if (serializer_validate_schema(r.toptab, NULL, schema_error,
@@ -259,8 +260,7 @@ int level_load_toml_text(const char *text, size_t size, const char *label,
                     path, schema_error);
             report_problem(&problems, serializer_toml_line(r.toptab, schema_error),
                            "%s", schema_error);
-            toml_free(r);
-            return -1;
+            goto finish;
         }
     }
 
@@ -270,62 +270,62 @@ int level_load_toml_text(const char *text, size_t size, const char *label,
      * a LevelDef is about 16 KB (LEVEL_DEF_SIZE_BUDGET in level.h), and the
      * browser build has only a 64 KB stack to share with its callers.
      */
-    def = malloc(sizeof(*def));
-    if (!def) {
+    if (!serializer_test_take_failure(SERIALIZER_TEST_FAILURE_LOAD_MEMORY))
+        staged = malloc(sizeof(*staged));
+    if (!staged) {
         fprintf(stderr, "serializer: out of memory loading '%s'\n", path);
         report_problem(&problems, 0, "out of memory");
-        toml_free(r);
-        return -1;
+        goto finish;
     }
-    level_def_init_defaults(def);
-
-    toml_datum_t top = r.toptab;
+    level_def_init_defaults(staged);
 
     /* Read the file one section at a time; the first section that cannot
      * be read stops the load, and the caller's LevelDef is left untouched. */
     for (size_t i = 0; i < SECTION_LOADER_COUNT; i++) {
         const SectionLoader *section = &s_section_loaders[i];
 
-        if (section->load(top, def) != 0) {
+        if (section->load(r.toptab, staged) != 0) {
             report_problem(&problems, 0, "cannot read the level's %s",
                            section->name);
-            free(def);
-            toml_free(r);
-            return -1;
+            goto finish;
         }
     }
 
     /* One value is changed after it is read (see the function). */
-    rename_shipped_wav_loop(def->music_path);
+    rename_shipped_wav_loop(staged->music_path);
 
     {
         char err[128];
-        if (level_validate_runtime(def, err, sizeof(err)) != 0) {
+        if (level_validate_runtime(staged, err, sizeof(err)) != 0) {
             fprintf(stderr, "serializer: invalid level '%s': %s\n", path, err);
             /* The file is well-formed but breaks runtime rules: list every
              * one, each with the line of the value it is about. */
             if (problems.report)
-                (void)level_validate_runtime_each(def, report_runtime_issue, &problems);
-            free(def);
-            toml_free(r);
-            return -1;
+                (void)level_validate_runtime_each(staged, report_runtime_issue, &problems);
+            goto finish;
         }
     }
 
-    /* A file without format_version was read leniently; say what that
-     * skipped, so a misspelt key is not lost in silence. */
-    problems.label = path;
-    (void)serializer_legacy_warnings(top, report_legacy_warning, &problems);
+    *def = *staged;
+    result = 0;
+
+finish:
+    /*
+     * A file without format_version was read leniently; say what that
+     * skipped, so a misspelt key is not lost in silence. This runs whether
+     * the load worked or not: when it failed, a skipped key is often the
+     * reason (a misspelt [[checkpoints]] key leaves the level without its
+     * checkpoints, say). The warnings come after the errors, so the first
+     * problem a listener hears is still why the load failed.
+     */
+    (void)serializer_legacy_warnings(r.toptab, report_legacy_warning, &problems);
 
     /*
      * toml_free — release all memory allocated by toml_parse.
      * The LevelDef struct now holds its own copies of all data, so
      * the TOML tree is safe to destroy.
      */
+    free(staged);
     toml_free(r);
-
-    *caller_def = *def;
-    free(def);
-
-    return 0;
+    return result;
 }

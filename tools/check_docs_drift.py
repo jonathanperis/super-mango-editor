@@ -447,9 +447,14 @@ def check_wasm_authority_docs() -> None:
             fail(f"{rel}: missing current CI-authoritative WebAssembly verification note")
 
 
-# Tracked project notes outside the manual (.specs/ is otherwise gitignored).
-SPEC_PAGES = sorted((ROOT / ".specs" / "project").glob("*.md"))
-NATIVE_COUNT_RE = re.compile(r"\b(\d+) native (?:regression |test )?(?:binaries|harnesses|tests)\b")
+# The project notes and feature specs under .specs/ that describe the current
+# tree. .specs/archive/ is history and the loose .specs/*.md files are old pull
+# request bodies, so neither is checked.
+SPEC_PAGES = sorted((ROOT / ".specs" / "project").glob("*.md")) + \
+    sorted((ROOT / ".specs" / "features").rglob("*.md"))
+# "18 native binaries", "18 native test binaries", "an 18-native-binary suite".
+NATIVE_COUNT_RE = re.compile(
+    r"\b(\d+)[ -]native[ -](?:regression[ -]|test[ -])?(?:binar(?:y|ies)|harness(?:es)?|tests?)\b")
 
 
 def check_native_test_counts() -> None:
@@ -600,17 +605,28 @@ def check_workflow_claims() -> None:
                 fail(f"{page_label(page, line_no)}: docs.yml does not run on main pushes")
 
 
+# "raylib 6.2", "raylib **6.2**", the README table's "| raylib | 6.2". Renovate
+# rewrites only vendor/raylib/manifest.json, so every other mention is held to
+# that pin here. vendor/raylib/README.md is left out: it narrates past releases.
+RAYLIB_MENTION_RE = re.compile(r"\braylib(?: \*{0,2}| \| )v?(\d+\.\d+(?:\.\d+)?)\b")
+
+
+def raylib_mention_pages() -> list[Path]:
+    return doc_pages() + SPEC_PAGES + [ROOT / name for name in
+                                       ("THIRD_PARTY_NOTICES.md", "PRODUCT.md", "docs/README.md")]
+
+
 def check_state_stack_claims() -> None:
-    """STATE.md's raylib pin and sound format follow the manifest and the generator."""
+    """Quoted raylib versions follow the manifest; STATE.md's sound format follows the generator."""
     manifest = json.loads(read(ROOT / "vendor" / "raylib" / "manifest.json"))
     pin = str(manifest["version"])
-    state_path = ROOT / ".specs" / "project" / "STATE.md"
-    state = read(state_path)
-    for line_no, line in enumerate(state.splitlines(), start=1):
-        for found in re.findall(r"\braylib (\d+\.\d+)\b", line):
-            if found != pin:
-                fail(f"{page_label(state_path, line_no)}: says raylib {found}; "
-                     f"vendor/raylib/manifest.json pins {pin}")
+    for page in raylib_mention_pages():
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for found in RAYLIB_MENTION_RE.findall(line):
+                if found != pin:
+                    fail(f"{page_label(page, line_no)}: says raylib {found}; "
+                         f"vendor/raylib/manifest.json pins {pin}")
+    state = read(ROOT / ".specs" / "project" / "STATE.md")
     audio = next((line for line in state.splitlines() if line.startswith("- Audio:")), "")
     if "QOA" not in audio or re.search(r"\bWAVs?\b", audio):
         fail(".specs/project/STATE.md: the `- Audio:` line must name the QOA files "
@@ -638,22 +654,18 @@ def locked_frontend_versions() -> dict[str, str]:
     return resolved
 
 
-# Bold versions in the two maintainer pages that name the docs toolchain.
-# The Tailwind sentence covers both the package and its Vite plugin.
-FRONTEND_VERSION_CLAIMS = [
-    ("docs/README.md", r"Astro \*\*([^*]+)\*\*", "astro"),
-    ("docs/README.md", r"`@astrojs/markdown-satteri`\s+\*\*([^*]+)\*\*", "@astrojs/markdown-satteri"),
-    ("docs/README.md", r"`@astrojs/sitemap` \*\*([^*]+)\*\*", "@astrojs/sitemap"),
-    ("docs/README.md", r"`@astrojs/check` \*\*([^*]+)\*\*", "@astrojs/check"),
-    ("docs/README.md", r"and TypeScript \*\*([^*]+)\*\*", "typescript"),
-    ("docs/README.md", r"Tailwind CSS\s+and its Vite plugin \*\*([^*]+)\*\*", "tailwindcss"),
-    ("docs/wiki/build-system.md", r"Astro \*\*([^*]+)\*\*", "astro"),
-    ("docs/wiki/build-system.md", r"`@astrojs/markdown-satteri` \*\*([^*]+)\*\*", "@astrojs/markdown-satteri"),
-    ("docs/wiki/build-system.md", r"`@astrojs/sitemap` \*\*([^*]+)\*\*", "@astrojs/sitemap"),
-    ("docs/wiki/build-system.md", r"`@astrojs/check` \*\*([^*]+)\*\*", "@astrojs/check"),
-    ("docs/wiki/build-system.md", r"and TypeScript \*\*([^*]+)\*\*", "typescript"),
-    ("docs/wiki/build-system.md", r"Tailwind CSS and its Vite\s+plugin \*\*([^*]+)\*\*", "tailwindcss"),
-]
+# The two maintainer pages that describe the docs toolchain. They name the
+# packages but not their versions: docs/package.json and docs/bun.lock are the
+# record, and a Renovate pull request that bumps them must not fail on prose.
+FRONTEND_PAGES = ["docs/README.md", "docs/wiki/build-system.md"]
+FRONTEND_PACKAGE_WORDS = {
+    "astro": r"Astro",
+    "@astrojs/markdown-satteri": r"`@astrojs/markdown-satteri`",
+    "@astrojs/sitemap": r"`@astrojs/sitemap`",
+    "@astrojs/check": r"`@astrojs/check`|Astro Check",
+    "typescript": r"TypeScript",
+    "tailwindcss": r"Tailwind CSS(?: and its Vite\s+plugin)?",
+}
 
 
 def major_minor(version: str) -> str | None:
@@ -665,32 +677,28 @@ def major_minor(version: str) -> str | None:
 
 
 def check_frontend_versions() -> None:
-    """Maintainer pages quote the major.minor line bun.lock installed.
+    """bun.lock keeps Tailwind and its Vite plugin together; the pages quote no versions.
 
-    A lockfile-only patch bump stays on that line, so it does not need a
-    docs edit. A minor or major bump still has to update the quoted line.
+    The pages used to quote the major.minor line bun.lock resolved, so every
+    minor Astro or Tailwind lock bump and every major (TypeScript 7) failed
+    this gate until someone edited prose. Now a quoted version for one of the
+    docs site's packages is the failure, and the lock is the only record.
     """
     locked = locked_frontend_versions()
     vite = locked.get("@tailwindcss/vite")
     tailwind = locked.get("tailwindcss")
     if vite and tailwind and major_minor(vite) != major_minor(tailwind):
         fail(f"docs/bun.lock: tailwindcss {tailwind} and @tailwindcss/vite {vite} "
-             "are on different major.minor lines; the maintainer pages describe them as one")
-    for rel, pattern, package in FRONTEND_VERSION_CLAIMS:
+             "are on different major.minor lines; they must move together")
+    for rel in FRONTEND_PAGES:
         text = read(ROOT / rel)
-        found = re.findall(pattern, text)
-        if not found:
-            fail(f"{rel}: missing the locked version of {package}")
-            continue
-        expected = locked.get(package)
-        line = major_minor(expected) if expected else None
-        if not line:
-            fail(f"docs/bun.lock: {package} resolved {expected}, which is not major.minor.patch")
-            continue
-        for version in found:
-            if version != line:
-                fail(f"{rel}: says {package} {version}; quote {line}, "
-                     f"the major.minor docs/bun.lock resolved from {expected}")
+        for package, words in FRONTEND_PACKAGE_WORDS.items():
+            if not re.search(words, text):
+                fail(f"{rel}: the toolchain paragraph must still name {package}")
+            quoted = re.search(rf"(?:{words})\s+\*\*v?\d+(?:\.\d+)*\*\*", text)
+            if quoted:
+                fail(f"{rel}: quotes a version for {package} ({quoted.group(0)!r}); "
+                     "docs/bun.lock is the record, so leave the number out")
 
 
 def check_docs_readme_workflow() -> None:
@@ -718,6 +726,11 @@ def check_docs_readme_workflow() -> None:
             fail(f"{rel}: docs.yml does not run the docs drift check")
 
 
+# The form renovate.json's Node manager matches; keep the two patterns equal.
+NODE_MENTION_RE = r"CI (?:uses|pins) Node \*{0,2}(\d+\.\d+\.\d+)"
+NODE_MENTION_PAGES = ["README.md", "docs/README.md", "docs/wiki/build-system.md"]
+
+
 def check_readme_prerequisites() -> None:
     """`make test` runs Node tests, so the README prerequisites must name Node.js and CI's version."""
     makefile = read(ROOT / "Makefile")
@@ -737,12 +750,18 @@ def check_readme_prerequisites() -> None:
     if not re.fullmatch(r"\d+\.\d+\.\d+", ci_node):
         fail(".node-version: must hold the Node.js version CI uses, as MAJOR.MINOR.PATCH")
         return
-    quoted = re.findall(r"CI uses ([\d.]+)", section)
+    quoted = re.findall(NODE_MENTION_RE, section)
     if not quoted:
-        fail("README.md: the Prerequisites must say which Node.js version CI uses")
-    for version in quoted:
-        if version != ci_node:
-            fail(f"README.md: Prerequisites say CI uses Node.js {version}; .node-version says {ci_node}")
+        fail("README.md: the Prerequisites must say which Node.js version CI uses (`CI uses Node X.Y.Z`)")
+    # Every page Renovate's Node manager rewrites (renovate.json) quotes the pin.
+    for rel in NODE_MENTION_PAGES:
+        found = re.findall(NODE_MENTION_RE, read(ROOT / rel))
+        if not found:
+            fail(f"{rel}: must quote the Node.js version CI uses as `CI uses Node X.Y.Z` "
+                 "or `CI pins Node **X.Y.Z**` (renovate.json rewrites that form)")
+        for version in found:
+            if version != ci_node:
+                fail(f"{rel}: says CI uses Node.js {version}; .node-version says {ci_node}")
     for workflow in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
         text = read(workflow)
         if re.search(r"^\s*node-version:", text, re.M):
@@ -1004,12 +1023,18 @@ def ignored_src_prefixes() -> list[str]:
 
 def check_src_paths_exist() -> None:
     ignored = ignored_src_prefixes()
-    for page in doc_pages():
+    for page in doc_pages() + SPEC_PAGES:
         spans, _ = split_code(read(page))
         for line_no, span in spans:
             for raw in re.findall(r"(?<![\w./-])src/[\w./*<>{}-]+", span):
                 path = re.sub(r":\d+$", "", raw).rstrip(".")
-                if any(ch in path for ch in "<>*{}") or path in ABSENT_SRC_PATHS:
+                if any(ch in path for ch in "<>{}") or path in ABSENT_SRC_PATHS:
+                    continue
+                if "*" in path:
+                    # `src/shared/serializer.*` names a group of files: one must exist.
+                    if not any(ROOT.glob(path)):
+                        fail(f"{page_label(page, line_no)}: `{path}` matches no file; "
+                             "update the path or remove the reference")
                     continue
                 if any(path.startswith(prefix) for prefix in ignored):
                     continue

@@ -136,3 +136,83 @@ done:
     return failed;
 }
 
+
+/*
+ * A selection holds at most EDITOR_MAX_SELECTION entities.  Shift+click on
+ * one more, on the canvas or in the Entities list, adds nothing and says
+ * why, in the words a box selection that reaches the limit uses.
+ */
+static int shift_click_on_a_full_selection_says_so(void)
+{
+    int failed = 0;
+    EditorState es;
+    PlacementData pd;
+    EditorRect spawn;
+    static Selection coins[EDITOR_MAX_SELECTION];
+    float fx, fy;
+    int sx, sy;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 4;
+    es.tool = TOOL_SELECT;
+
+    /* A full selection of coins in a row above the player spawn. */
+    for (int i = 0; i < EDITOR_MAX_SELECTION; i++) {
+        memset(&pd, 0, sizeof(pd));
+        pd.coin.x = 40.0f + 12.0f * (float)i;
+        pd.coin.y = 40.0f;
+        CHECK(add_entity(&es, ENT_COIN, &pd) == i);
+        coins[i].type = ENT_COIN;
+        coins[i].index = i;
+    }
+    CHECK(editor_select_items(&es, coins, EDITOR_MAX_SELECTION) == EDITOR_MAX_SELECTION);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+
+    /* Shift+click on the player spawn, on the canvas. */
+    CHECK(editor_entity_bounds(&es.level, ENT_PLAYER_SPAWN, 0, &spawn));
+    world_to_screen(&es, spawn.x + spawn.w / 2.0f, spawn.y + spawn.h / 2.0f, &fx, &fy);
+    sx = (int)roundf(fx);
+    sy = (int)roundf(fy);
+    es.status_message[0] = '\0';
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, sx, sy);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, sx, sy);
+    ui_frame(&es, sx, sy);
+    CHECK(editor_selection_count(&es) == EDITOR_MAX_SELECTION);
+    CHECK(!editor_is_selected(&es, ENT_PLAYER_SPAWN, 0));
+    CHECK(strstr(es.status_message, "a selection holds at most 64") != NULL);
+
+    /* The same in the Entities list (searched, so the row is in view). */
+    list_search(&es, "spawn");
+    key_frame(&es, KEY_ENTER, 0);               /* keep the search, leave the field */
+    CHECK(es.entity_list_open);
+    sy = list_row_y(&es, ENT_PLAYER_SPAWN, 0);
+    CHECK(sy > 0);
+    es.status_message[0] = '\0';
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, LIST_X, sy);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, LIST_X, sy);
+    ui_frame(&es, LIST_X, sy);
+    CHECK(editor_selection_count(&es) == EDITOR_MAX_SELECTION);
+    CHECK(!editor_is_selected(&es, ENT_PLAYER_SPAWN, 0));
+    CHECK(strstr(es.status_message, "a selection holds at most 64") != NULL);
+
+    /* Taking one out still works, and then there is room again. */
+    list_search(&es, "coin");
+    key_frame(&es, KEY_ENTER, 0);
+    sy = list_row_y(&es, ENT_COIN, 0);
+    CHECK(sy > 0);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, LIST_X, sy);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, LIST_X, sy);
+    ui_frame(&es, LIST_X, sy);
+    CHECK(editor_selection_count(&es) == EDITOR_MAX_SELECTION - 1);
+    list_search(&es, "spawn");
+    key_frame(&es, KEY_ENTER, 0);
+    sy = list_row_y(&es, ENT_PLAYER_SPAWN, 0);
+    push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, LIST_X, sy);
+    push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, LIST_X, sy);
+    ui_frame(&es, LIST_X, sy);
+    CHECK(editor_selection_count(&es) == EDITOR_MAX_SELECTION);
+    CHECK(editor_is_selected(&es, ENT_PLAYER_SPAWN, 0));
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}

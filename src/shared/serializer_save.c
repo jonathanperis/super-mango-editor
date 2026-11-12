@@ -118,6 +118,29 @@ static void write_level_toml(FILE *fp, const LevelDef *def,
         serializer_write_entry(fp, def, s_table_order[i]);
 }
 
+/*
+ * The whole order in one list, for the test that every row of the schema
+ * table is saved exactly once (tests/level_serializer_test.c): a row
+ * added to the table but to neither list above would load and then be
+ * lost on the next save, silently.
+ */
+#define KEY_ORDER_COUNT   (sizeof(s_key_order) / sizeof(s_key_order[0]))
+#define TABLE_ORDER_COUNT (sizeof(s_table_order) / sizeof(s_table_order[0]))
+
+size_t serializer_save_order_count(void)
+{
+    return KEY_ORDER_COUNT + 1 + TABLE_ORDER_COUNT;   /* + [physics] */
+}
+
+const char *serializer_save_order_name(size_t index)
+{
+    if (index < KEY_ORDER_COUNT) return s_key_order[index];
+    if (index == KEY_ORDER_COUNT) return "physics";   /* write_header_and_config */
+    index -= KEY_ORDER_COUNT + 1;
+    if (index < TABLE_ORDER_COUNT) return s_table_order[index];
+    return NULL;
+}
+
 /* ================================================================== */
 /* level_save_toml — Write a LevelDef to a human-readable TOML file    */
 /* ================================================================== */

@@ -249,9 +249,13 @@ static int changed_on_disk_save_has_its_own_message(void)
     es.level.coin_score = 31;
     editor_refresh_dirty(&es);
     serializer_test_set_failure(SERIALIZER_TEST_FAILURE_SOURCE_CHANGED);
+    /* The status bar shows a long path as "..." plus its tail (an absolute
+     * OUTDIR from mktemp -d is long), so check the lead and the tail that
+     * always survive rather than the whole path. */
     if (expect_int("changed save refused", editor_save_current_level(&es), -1) != 0 ||
-        expect_prefix("changed save explained", es.status_message,
-                      "Save stopped: " TEST_OUT "editor_changed_on_disk.toml changed on disk") != 0 ||
+        expect_prefix("changed save explained", es.status_message, "Save stopped: ") != 0 ||
+        expect_int("changed save names the file",
+                   strstr(es.status_message, "editor_changed_on_disk.toml changed on disk") != NULL, 1) != 0 ||
         expect_int("changed save keeps edits", es.modified, 1) != 0)
         goto cleanup;
     /* Nothing was written: the file still holds the old level. */

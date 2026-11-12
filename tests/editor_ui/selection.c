@@ -76,6 +76,49 @@ done:
  * nudges is one undo step; a pause starts a new one.  Backspace deletes
  * the selection like Delete (Mac laptops have no Delete key).
  */
+/*
+ * A quick run of nudges is one step, but only while nothing waits to be
+ * redone.  Nudge, make another edit, undo that edit, and nudge again at
+ * once: the nudge step is the newest applied one again, yet amending it
+ * would leave the undone edit to be redone on top.  The new nudge is a
+ * step of its own and forgets the undone edit, like any new edit.
+ */
+static int nudge_after_undo_is_a_new_step(void)
+{
+    int failed = 0;
+    EditorState es;
+    PlacementData other;
+    CHECK(open_editor(&es, NULL) == 0);
+    CHECK(place_and_select_coin(&es, 300, 300) == 0);
+    const int coin = es.selection.index;
+    const float x0 = es.level.coins[coin].x;
+    const int undo_top = es.undo->top;
+
+    key_frame(&es, KEY_RIGHT, 0);                       /* step: x0 + 1 */
+    CHECK(es.undo->top == undo_top + 1);
+    memset(&other, 0, sizeof(other));
+    other.coin.x = 500.0f;
+    other.coin.y = 100.0f;
+    CHECK(editor_add_placement(&es, ENT_COIN, &other, "place") == 0);
+    key_frame(&es, KEY_Z, INPUT_CTRL);                  /* the place, undone */
+    CHECK(es.undo->top == undo_top + 1 && es.undo->redo_top == 1);
+
+    editor_select_only(&es, ENT_COIN, coin);
+    es.nudge_ms = (uint32_t)clock_millis();             /* well inside the run */
+    key_frame(&es, KEY_RIGHT, 0);
+    CHECK(es.level.coins[coin].x == x0 + 2.0f);
+    CHECK(es.undo->top == undo_top + 2);                /* a step of its own */
+    CHECK(es.undo->redo_top == 0);                      /* the undone place is gone */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[coin].x == x0 + 1.0f);
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[coin].x == x0);
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 static int arrow_keys_nudge_and_backspace_deletes(void)
 {
     int failed = 0;

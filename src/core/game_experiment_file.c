@@ -16,15 +16,36 @@
 #include <string.h>
 
 #include "tomlc17.h"
+#include "../levels/level.h"  /* MAX_PLAYER_SPEED, MAX_PLAYER_ACCEL */
 
-/* One physics value: a finite number in 0..MAX_LEVEL_MOTION. */
-static int number(toml_datum_t datum, float *out)
+/*
+ * The largest value of each physics column of a row, in the order
+ * game_inspector.c records them: the two top speeds, then seven
+ * accelerations and frictions. These are the caps a level's [physics]
+ * overrides have (MAX_PLAYER_SPEED and MAX_PLAYER_ACCEL in level.h), so a
+ * capture cannot replay a player faster than any level could make it.
+ */
+static const float s_physics_max[INSPECTOR_PHYSICS_COUNT] = {
+    MAX_PLAYER_SPEED, MAX_PLAYER_SPEED,                    /* walk, run top speed */
+    MAX_PLAYER_ACCEL, MAX_PLAYER_ACCEL, MAX_PLAYER_ACCEL,  /* ground accel, friction */
+    MAX_PLAYER_ACCEL, MAX_PLAYER_ACCEL, MAX_PLAYER_ACCEL,  /* counter, air accel */
+    MAX_PLAYER_ACCEL                                        /* air friction */
+};
+
+float game_experiment_physics_max(int column)
+{
+    if (column < 0 || column >= INSPECTOR_PHYSICS_COUNT) return 0.0f;
+    return s_physics_max[column];
+}
+
+/* One physics value: a finite number from 0 to max. */
+static int number(toml_datum_t datum, float max, float *out)
 {
     double value;
     if (datum.type == TOML_FP64) value = datum.u.fp64;
     else if (datum.type == TOML_INT64) value = (double)datum.u.int64;
     else return -1;
-    if (!isfinite(value) || value < 0 || value > MAX_LEVEL_MOTION) return -1;
+    if (!isfinite(value) || value < 0 || value > max) return -1;
     *out = (float)value;
     return 0;
 }
@@ -99,7 +120,7 @@ int game_experiment_decode(const char *text, size_t size, const char *label,
         if (values[0].type != TOML_INT64 || values[0].u.int64 < 0 || values[0].u.int64 > 63) goto done;
         frame->input = (unsigned int)values[0].u.int64;
         for (int j = 0; j < INSPECTOR_PHYSICS_COUNT; j++)
-            if (number(values[j + 1], &frame->physics[j])) goto done;
+            if (number(values[j + 1], s_physics_max[j], &frame->physics[j])) goto done;
     }
     result = 0;
 done:

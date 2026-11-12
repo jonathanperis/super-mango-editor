@@ -8,12 +8,13 @@
  */
 
 #include "../shared/graphics.h"
-#include <math.h>    /* sinf, fabsf, fmodf, M_PI */
+#include <math.h>    /* fabsf, fmodf, M_PI */
 #include <stdio.h>
 
 #include "axe_trap.h"
 #include "../game_constants.h"     /* FLOOR_Y, TILE_SIZE — for placement */
 #include "../core/entity_utils.h"  /* sound_volume_for_distance */
+#include "../core/game_trig.h"     /* game_sinf, game_cosf: same on every machine */
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -93,7 +94,7 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
              */
             t->time = fmodf(t->time + dt, AXE_SWING_PERIOD);
             float omega = 2.0f * (float)M_PI / AXE_SWING_PERIOD;
-            t->angle = AXE_SWING_AMPLITUDE * sinf(omega * t->time);
+            t->angle = AXE_SWING_AMPLITUDE * game_sinf(omega * t->time);
 
             /*
              * Sound trigger — fire once when the axe nears a swing extreme.
@@ -237,13 +238,13 @@ IntRect axe_trap_get_hitbox(const AxeTrap *trap) {
      * Rotate the blade centre point around the pivot.
      *
      * Positive rotation is clockwise: at +90° the blade (bottom of the
-     * sprite) points LEFT in screen space.  Standard sinf(+90°) returns +1
+     * sprite) points LEFT in screen space.  sin(+90°) returns +1
      * (rightward), so we negate the sin term to match the visual rotation.
-     * cosf is correct as-is: at 0° the blade is straight down (max cos),
+     * cos is correct as-is: at 0° the blade is straight down (max cos),
      * and at ±90° it is level with the pivot (cos = 0).
      */
-    float blade_cx = trap->x - arm * sinf(rad);
-    float blade_cy = trap->y + 4.0f + arm * cosf(rad);
+    float blade_cx = trap->x - arm * game_sinf(rad);
+    float blade_cy = trap->y + 4.0f + arm * game_cosf(rad);
 
     /* Return a 28×28 hitbox centred on the blade */
     int hw = 14;

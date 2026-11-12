@@ -52,7 +52,7 @@ The [manual](https://super-mango-editor.jonathanperis.tech/docs/) covers each of
 ### Prerequisites
 
 A C11 compiler (`clang` or `gcc`), `make`, CMake, Python 3 (3.12+
-recommended) and Node.js 22.12+ (CI uses 26.9.0), which `make test` needs for
+recommended) and Node.js 22.12+ (CI uses Node 26.9.0), which `make test` needs for
 its six JavaScript host-contract tests. The first build downloads and verifies
 the pinned raylib 6.2 source; no system raylib is needed. See [dependency provenance](vendor/raylib/README.md).
 
@@ -130,8 +130,12 @@ super-mango-editor/
 ├── labs/         Small standalone C files with planted bugs for Debugging C
 ├── tests/        Native, fuzz, Python and Node tests and their fixtures
 ├── tools/        Build, validation, generator, packaging and docs-check scripts
-├── vendor/       Pinned raylib source/checksum and the tomlc17 parser
-├── web/          Emscripten shell, touch controls and keyboard scoping
+├── vendor/       Pinned raylib source/checksum, its patches and the SDL gamepad
+│                 database (raylib/gamecontrollerdb/), raygui's icon set
+│                 (raygui/raygui_icons.h) and the tomlc17 parser
+├── web/          Emscripten shell (shell.html), the boot script both pages share
+│                 (boot.js, debug-boot.js), the browser audio unlock
+│                 (audio-unlock.js), touch controls and keyboard scoping
 ├── docs/         The Astro website; manual pages in docs/wiki/
 └── .github/      CI workflows and SECURITY_TRIAGE.md
 ```
@@ -160,14 +164,17 @@ checks that guard them together.
 `build.yml` and `codeql.yml` run on every pull request and every push to
 `main`; `docs.yml` runs only on pull requests that touch the website's inputs,
 plus a weekly and a manual run. `fuzz.yml` runs weekly and on demand, and is
-not a required check. `static-analysis.yml` runs on pull requests, `main`
-pushes and on demand; it only reports, so it is not a required check either.
+not a required check. `static-analysis.yml` runs on pull requests (except
+documentation-only ones) and on demand; it only reports, so it is not a
+required check either.
 
 - **`build.yml`** builds and tests the game and editor on Linux, macOS and
   Windows with warnings as errors, renders every level briefly, and builds the
   WebAssembly version. It also runs the sanitizers (with the fuzz seeds) and
   scripted replay smoke on Linux. An always-on `Docs drift` job runs
-  `make docs-drift`. On `main` it publishes the website; on a `v*` tag
+  `make docs-drift`. A pull request that only changes documentation (the
+  manual, `.specs/`, top-level Markdown) skips the C build, test and
+  sanitizer work; the required checks still report. On `main` it publishes the website; on a `v*` tag
   or a manual release run it adds checksums and build provenance and publishes
   the release archives.
 - **`docs.yml`** lints, audits, builds and link-checks the website. It does
@@ -177,8 +184,11 @@ pushes and on demand; it only reports, so it is not a required check either.
 - **`codeql.yml`** runs CodeQL security and quality analysis on the C code, the
   workflows, the Python tools and the JavaScript/TypeScript.
 - **`fuzz.yml`** runs coverage-guided libFuzzer against the level loader, the
-  editor's save and reload, and the profile and ghost decoders (`make fuzz`).
-  Sanitizer runs still replay the seed corpus on every pull request.
+  editor's save and reload, the profile and ghost decoders, and the campaign
+  manifest and experiment capture loaders (`make fuzz`, four harnesses). It
+  minimises what it found (`make fuzz-merge`) and keeps that corpus in the
+  Actions cache and in a `fuzz-corpus` artifact. Sanitizer runs still replay
+  the seed corpus on every pull request.
 - **`static-analysis.yml`** runs clang-tidy over `src/` and `tools/`
   (`make tidy`) and lists the findings in the job summary.
 

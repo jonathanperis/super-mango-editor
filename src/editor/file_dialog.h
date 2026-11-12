@@ -9,8 +9,9 @@
  *
  * These are launched via popen() — no library dependencies required.
  * When the system has no such program (a Linux desktop with neither
- * zenity nor kdialog), the path is asked for inside the editor window
- * instead (dialog_path), so Open and Save As always work.
+ * zenity nor kdialog), or the one it has fails, the path is asked for
+ * inside the editor window instead (dialog_path), so Open and Save As
+ * always work.
  */
 #pragma once
 
@@ -30,7 +31,8 @@
  *
  * Returns FILE_DIALOG_SELECTED if the user selected a file,
  *         FILE_DIALOG_CANCELLED if the user cancelled,
- *         FILE_DIALOG_ERROR if the dialog failed (buf untouched),
+ *         FILE_DIALOG_ERROR if the picker failed and the in-window
+ *         prompt could not be shown either,
  *         FILE_DIALOG_UNAVAILABLE if there is no picker program and the
  *         in-window prompt could not be shown either.
  *
@@ -64,7 +66,7 @@ int dialog_choice(const char *title, const char *message, const char *const *lab
  * and Esc is Cancel.  Returns FILE_DIALOG_SELECTED, FILE_DIALOG_CANCELLED
  * (Cancel, or OK on an empty line) or FILE_DIALOG_ERROR when no one can
  * answer.  file_dialog_open and file_dialog_save fall back to it when the
- * system has no file picker to show.
+ * system has no file picker to show, or the picker fails.
  */
 int dialog_path(const char *title, const char *message, char *buf, int buf_size);
 

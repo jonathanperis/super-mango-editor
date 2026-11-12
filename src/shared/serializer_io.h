@@ -200,6 +200,9 @@ int serializer_install_temp(const char *temp_path, const char *target_path,
  * reaches the fallback, which uses rename().  Arm it with
  * serializer_test_set_half_replace. */
 #define SERIALIZER_TEST_FAILURE_REPLACE_HALF_DONE 9
+/* A level load cannot get the memory for its staging copy, so it fails with
+ * "out of memory" and leaves the caller's LevelDef as it was. */
+#define SERIALIZER_TEST_FAILURE_LOAD_MEMORY 10
 #ifdef MANGO_TESTING
 void serializer_test_set_failure(int failure);  /* test builds only */
 /* Like serializer_test_set_failure, but REPLACE_STRANDED and REPLACE only

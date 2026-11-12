@@ -14,7 +14,7 @@ Collectibles are items the player can pick up. Surfaces are interactive terrain 
 
 **File:** `src/collectibles/coin.c` / `coin.h`  
 **Sprite:** `assets/sprites/collectibles/coin.png` — 16×16 px display size  
-**Pickup:** AABB overlap with player. Plays `gs->assets.audio.coin` on collection. A coin picked up within 0.75 s (`COIN_STREAK_GAP_STEPS`, 45 fixed steps) of the previous one plays its chime a semitone higher, up to eight semitones (`COIN_STREAK_MAX_RISE`); a longer gap, a lost life, a Retry or a new level starts again at the recorded pitch (`level_reset` and `level_apply` clear the streak). The streak (`CoinStreak` in `GameScreen`, `coin_streak_pitch` in `coin.c`) reads only the world's step clock and nothing in the simulation reads it, so it is the same in every replay and never changes one.
+**Pickup:** AABB overlap between the player and `coin_get_hitbox()` (the coin's drawn 16×16 square), the same box the `--debug` overlay outlines. Plays `gs->assets.audio.coin` on collection. A coin picked up within 0.75 s (`COIN_STREAK_GAP_STEPS`, 45 fixed steps) of the previous one plays its chime a semitone higher, up to eight semitones (`COIN_STREAK_MAX_RISE`); a longer gap, a lost life, a Retry or a new level starts again at the recorded pitch (`level_reset` and `level_apply` clear the streak). The streak (`CoinStreak` in `GameScreen`, `coin_streak_pitch` in `coin.c`) reads only the world's step clock and nothing in the simulation reads it, so it is the same in every replay and never changes one.
 
 | Constant | Value | Description |
 |----------|-------|-------------|
@@ -197,7 +197,7 @@ brick_count = 8   # number of 16×16 brick tiles (1–16)
 **File:** `src/surfaces/bouncepad.c` / `bouncepad.h`  
 **Sprites:** `bouncepad_small.png`, `bouncepad_medium.png` (wood), `bouncepad_high.png`  
 **Sheet:** 144×48 px, 3 columns × 1 row — Frame 0: extended, Frame 1: mid-compress, Frame 2: compressed (default idle state)  
-**Behaviour:** Spring pad that launches the player upward on landing. Plays a 3-frame squash/release animation (2→1→0, 80 ms/frame) then resets to idle. The small, medium and high pads stay in their three `GameState` arrays; `player_update` receives them as `BouncepadList` views (pointer + count) and reports the landed pad as a flat index across the lists, so nothing is copied per frame.
+**Behaviour:** Spring pad that launches the player upward on landing. Plays a 3-frame squash/release animation (2→1→0, 80 ms/frame) then resets to idle. A pad is a part of the floor that bounces, not a box: a player launches when their feet reach the floor and their physics box overlaps the art columns (`BOUNCEPAD_ART_X` to `+ BOUNCEPAD_ART_W`; `bouncepad_launches()`), and the `--debug` overlay outlines that strip on the floor's top pixel row (`bouncepad_trigger_rect()`). The small, medium and high pads stay in their three `GameState` arrays; `player_update` receives them as `BouncepadList` views (pointer + count) and reports the landed pad as a flat index across the lists, so nothing is copied per frame.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

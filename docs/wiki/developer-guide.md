@@ -124,6 +124,13 @@ happens, edit the module. Moving a row in `s_level_loaders` or
 `s_update_steps` can change what a seeded run does, and then recorded
 experiments and the replay tests no longer match.
 
+These four tables are not the whole job. The complete list of places a new
+enemy needs (the file format, the movers table that draws it smoothly between
+steps, its sprite, the editor and the tests) is the checklist comment above
+`s_update_steps` in `src/core/game_update.c`; the
+[Entity Walkthrough checklist](../entity-walkthrough/#checklist) follows it
+step by step.
+
 ---
 
 ## Adding Physics to an Entity

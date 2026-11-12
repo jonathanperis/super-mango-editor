@@ -93,11 +93,18 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
      * undo step per pixel would bury everything else in the history.  So
      * a nudge of the same entities soon after the last one, with nothing
      * else recorded in between, extends that step's "after" instead.
+     *
+     * Only while nothing waits to be redone, though.  After an Undo the
+     * nudge step can be the newest applied one again with undone steps
+     * above it; amending it then would leave those steps to be redone on
+     * top of a position they never saw.  A new step instead, which (like
+     * every new edit) forgets what was undone.
      */
     now = (uint32_t)clock_millis();
     key = selection_key(items, count);
     merge = es->nudge_group != 0 &&
             undo_top_group(es->undo) == es->nudge_group &&
+            es->undo->redo_top == 0 &&
             now - es->nudge_ms < NUDGE_COALESCE_MS &&
             key == es->nudge_selection_key;
     if (!merge) {

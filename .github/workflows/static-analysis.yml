@@ -5,18 +5,29 @@ name: Static analysis
 # rules. Informational: the findings go to the job summary and the job never
 # fails because of them, so it is not a required check. CodeQL (codeql.yml)
 # stays the gating analysis.
+#
+# Pull requests and manual runs only: a main push re-analysed the code its
+# pull request had just analysed, and the raylib tree this job restores is
+# saved by build.yml's main runs (same cache entry). Documentation-only pull
+# requests are skipped, with the paths build.yml's changes job treats as
+# docs-only; this workflow is not required, so a skipped run leaves no check
+# waiting.
 on:
-  push:
-    branches:
-      - main
   pull_request:
+    paths-ignore:
+      - 'docs/wiki/**'
+      - 'docs/archive/**'
+      - 'docs/README.md'
+      - '.specs/**'
+      - '.github/*.md'
+      - '*.md'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A new push to a pull request cancels that PR's superseded run; main and
-# manual runs are keyed by their unique run id and never cancelled.
+# A new push to a pull request cancels that PR's superseded run; manual runs
+# are keyed by their unique run id and never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -52,7 +63,7 @@ jobs:
       # The sources include raylib.h from the pinned build tree, so raylib is
       # built (or restored) first. It is the same Linux clang debug tree as
       # the build workflow's Linux leg and CodeQL, under the same cache entry
-      # (see the raylib-cache action).
+      # (see the raylib-cache action), which build.yml's main runs save.
       - name: Cache raylib
         uses: ./.github/actions/raylib-cache
         with:

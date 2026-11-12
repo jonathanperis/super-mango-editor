@@ -11,8 +11,8 @@ Standalone C11/raylib editor for creating and editing Super Mango TOML levels. B
 | D-001 | Level format | TOML is canonical. Runtime/editor serialization uses vendored `tomlc17`. |
 | D-002 | UI framework | Custom immediate-mode widgets drawn with raylib and its built-in font (originally SDL2 + SDL2_ttf). No external UI library. |
 | D-003 | Runtime loading | Bare launch selects from v1 `levels/campaigns/main.toml`; `--level <path>` / `make run-level LEVEL=...` loads TOML directly. |
-| D-004 | Validation | `tools/validate_levels.py`, `make validate-levels`, C validation tests, editor in-memory validation, and CI validation protect shipped levels. |
-| D-005 | CI quality gates | Native game/editor builds, 15 native test binaries plus Python host checks, TOML and campaign-manifest validation, game/editor smoke, WebAssembly artifact smoke, and docs lint/build are CI-gated. |
+| D-004 | Validation | `make validate-levels` (the game's loader through `out/level-check`, plus `tools/validate_levels.py`), C validation tests, editor in-memory validation, and CI validation protect shipped levels. |
+| D-005 | CI quality gates | Native game/editor builds, 18 native test binaries plus Python and Node host checks, TOML and campaign-manifest validation, game/editor smoke, WebAssembly artifact smoke, and docs lint/build are CI-gated. |
 
 ## Shipped Baseline Requirements
 
@@ -67,7 +67,7 @@ make test
 make validate-levels
 ```
 
-`make test` currently runs 15 native binaries: level-serializer, level-validate, runtime-load, rail, entity-utils, collision, phase-transition, editor-validation, gameplay-damage, gameplay-config, gameplay-score, game-overlay, game-events, session, and game-checkpoint. It also runs `tests/validate_levels_test.py` and the `web-host-contract` Python check.
+`make test` currently runs 18 native binaries: level-serializer, level-validate, runtime-load, rail, entity-utils, collision, phase-transition, editor-validation, editor-undo-recovery, gameplay-damage, gameplay-config, gameplay-score, game-overlay, game-events, session, game-checkpoint, gameplay-mechanics, and editor-ui. It also runs the Python tests listed in `PYTHON_TESTS` and the `web-host-contract` Node and Python checks.
 
 ## Next Requirements
 

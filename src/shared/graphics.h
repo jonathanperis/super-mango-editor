@@ -18,12 +18,38 @@ int display_open(int width, int height, const char *title, int hidden, int resiz
  * shows a new frame.  A rate the system cannot report (0), or one outside
  * DISPLAY_FRAME_CAP_MIN..DISPLAY_FRAME_CAP_MAX, gives
  * DISPLAY_FRAME_CAP_DEFAULT.  display_open applies it to a visible native
- * window; the browser paces itself and tests run unpaced.
+ * window, and display_follow_monitor applies it again when that window is
+ * moved to another display; the browser paces itself and tests run unpaced.
  */
 #define DISPLAY_FRAME_CAP_DEFAULT 60
 #define DISPLAY_FRAME_CAP_MIN     30
 #define DISPLAY_FRAME_CAP_MAX     360
 int display_frame_cap(int refresh_hz);
+
+/*
+ * display_follow_monitor — Keep the frame cap on the window's display.
+ *
+ * Call it once a frame. A window dragged from a 60 Hz laptop screen to a
+ * 144 Hz monitor would otherwise keep drawing 60 frames a second there
+ * (and one going the other way would draw frames nobody sees). When the
+ * window's monitor has changed since the cap was set, the cap is set again
+ * from the new display's refresh rate. Asking which monitor the window is
+ * on is cheap; the refresh rate is only asked for after a change.
+ *
+ * Does nothing for a window that is not paced: a hidden one, the browser
+ * build, and the Memory test backend.
+ */
+void display_follow_monitor(void);
+
+/*
+ * display_monitor_changed — The decision display_follow_monitor makes,
+ * written out so a test can check it without a second display.
+ * paced_monitor is the monitor the current cap came from, or -1 when the
+ * window is not paced; current_monitor is the one it is on now. 1 means
+ * "set the cap again".
+ */
+int display_monitor_changed(int paced_monitor, int current_monitor);
+
 void display_present(RenderTexture2D target);
 /* Where display_present draws a canvas_w x canvas_h canvas inside a
  * window_w x window_h window, in window units. At 1x or more it is the

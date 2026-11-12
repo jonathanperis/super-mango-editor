@@ -1,0 +1,24 @@
+# A Continue point before the first checkpoint (checkpoint = -1),
+# with no coins taken yet, no lives left and integer coordinates.
+format_version = 2
+last_level = "levels/00_sandbox_01.toml"
+
+[resume]
+path = "levels/00_sandbox_01.toml"
+level_hash = "0000000000000001"
+coins = "0000000000000000"
+checkpoint = -1
+legacy_screen = 0
+score = 0
+level_score_start = 0
+score_life_next = 500
+lives = 0
+respawn_x = 80
+respawn_y = 252
+elapsed = 0
+
+[[levels]]
+path = "levels/00_sandbox_01.toml"
+score = 0
+coins = 0
+time = 0.0166666675

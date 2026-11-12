@@ -5,7 +5,7 @@ description: >-
 
 inputs:
   clang:
-    description: "'true' also installs UCRT64 Clang (the windows-clang job)."
+    description: "'true' also installs UCRT64 Clang (the windows-extras job)."
     required: false
     default: 'false'
 
@@ -22,18 +22,27 @@ runs:
     # keep the newest build of each package, so the package list that ships
     # inside the installer goes stale and installing from it starts to fail
     # with 404s. `update: true` refreshes that list (pacman -Syuu) first.
-    # It is also the point of the windows-clang job, which exists to meet a
+    # It is also the point of the windows-extras job's Clang half, which exists to meet a
     # new Clang's warnings early. The cost is that the toolchain is whatever
     # MSYS2 ships today; the versions step below prints it for triage.
     #
     # path-type: inherit keeps the runner's own PATH inside the MSYS2 shell,
     # which is how the steps there find Node.js.
+    #
+    # cache: only runs on main use the action's package cache. The action has
+    # no restore-only mode (it restores and then saves in one step whenever
+    # the downloaded package set changed, which a rolling `update: true` makes
+    # common), so a pull request that turned it on stored its own copy under
+    # its own ref on every MSYS2 update. Pull requests and tags download the
+    # packages instead (roughly 100 s per Windows job), as the raylib-cache
+    # action's main-saves rule does for raylib.
     - name: Install MSYS2 and the toolchain packages
       uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884 # v2.32.0
       with:
         msystem: UCRT64
         update: true
         path-type: inherit
+        cache: ${{ github.ref == 'refs/heads/main' }}
         # make: MSYS2's own make, which runs the project Makefile.
         # gcc / clang: the C compilers. python: runs tools/*.py.
         # cmake and mingw-w64 make: build the pinned raylib.

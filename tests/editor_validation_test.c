@@ -323,6 +323,7 @@ int main(void)
     if (rejects_unsafe_asset_paths() != 0) return 1;
     if (editor_checks_do_not_repeat_runtime_errors() != 0) return 1;
     if (save_and_load_resets_editor_session() != 0) return 1;
+    if (save_refuses_a_path_with_control_characters() != 0) return 1;
     if (invalid_save_preserves_existing_file() != 0) return 1;
     if (atomic_save_replaces_and_preserves_on_injected_errors() != 0) return 1;
     if (save_policy_and_fingerprint_seams() != 0) return 1;
@@ -360,6 +361,7 @@ int main(void)
     if (campaign_view_edits_and_saves_the_manifest() != 0) return 1;
     if (campaign_save_writes_everything_before_replacing() != 0) return 1;
     if (campaign_save_keeps_a_manifest_changed_by_hand() != 0) return 1;
+    if (campaign_names_a_nameless_level_by_its_file() != 0) return 1;
     if (float_platform_rail_switch_rechecks_its_rail() != 0) return 1;
     if (drag_round_trips_and_follows_grab_point() != 0) return 1;
     if (editor_mutations_keep_level_valid() != 0) return 1;

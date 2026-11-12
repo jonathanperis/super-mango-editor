@@ -425,27 +425,50 @@ static int validate_climbable_rect(char *err, size_t err_size,
                                (float)width, h, world_w);
 }
 
+/*
+ * validate_physics_value — One [physics] override: exactly -1 (keep the
+ * engine's value, LEVEL_PHYSICS_ENGINE_DEFAULT) or a number from 0 to
+ * max. A negative value other than -1 used to pass and was then treated
+ * as "engine default" by level_physics.c, and a top speed of thousands
+ * of px/s let the player pass through a wall in one step (see
+ * MAX_PLAYER_SPEED in level.h).
+ */
+static int validate_physics_value(char *err, size_t err_size, const char *field,
+                                  float value, float max)
+{
+    if (value == LEVEL_PHYSICS_ENGINE_DEFAULT) return 0;
+    if (!isfinite(value) || value < 0.0f || value > max) {
+        if (err && err_size > 0) {
+            snprintf(err, err_size,
+                     "%s is %.2f (must be -1 for the engine default, or 0 to %.0f)",
+                     field, value, max);
+        }
+        return -1;
+    }
+    return 0;
+}
+
 static int validate_physics_finite(const LevelDef *def,
                                    char *err, size_t err_size, IssueSink *sink)
 {
-#define CHECK_PHYSICS_FIELD(field) \
+#define CHECK_PHYSICS_FIELD(field, max) \
     do { \
-        if (validate_motion(err, err_size, "physics." #field, \
-                            def->physics.field) != 0 && \
+        if (validate_physics_value(err, err_size, "physics." #field, \
+                                   def->physics.field, (float)(max)) != 0 && \
             stop_here(sink, err)) return -1; \
     } while (0)
 
-    CHECK_PHYSICS_FIELD(walk_max_speed);
-    CHECK_PHYSICS_FIELD(run_max_speed);
-    CHECK_PHYSICS_FIELD(walk_ground_accel);
-    CHECK_PHYSICS_FIELD(run_ground_accel);
-    CHECK_PHYSICS_FIELD(ground_friction);
-    CHECK_PHYSICS_FIELD(ground_counter_accel);
-    CHECK_PHYSICS_FIELD(air_accel_walk);
-    CHECK_PHYSICS_FIELD(air_accel_run);
-    CHECK_PHYSICS_FIELD(air_friction);
-    CHECK_PHYSICS_FIELD(cam_lookahead_vx_factor);
-    CHECK_PHYSICS_FIELD(cam_lookahead_max);
+    CHECK_PHYSICS_FIELD(walk_max_speed, MAX_PLAYER_SPEED);
+    CHECK_PHYSICS_FIELD(run_max_speed, MAX_PLAYER_SPEED);
+    CHECK_PHYSICS_FIELD(walk_ground_accel, MAX_PLAYER_ACCEL);
+    CHECK_PHYSICS_FIELD(run_ground_accel, MAX_PLAYER_ACCEL);
+    CHECK_PHYSICS_FIELD(ground_friction, MAX_PLAYER_ACCEL);
+    CHECK_PHYSICS_FIELD(ground_counter_accel, MAX_PLAYER_ACCEL);
+    CHECK_PHYSICS_FIELD(air_accel_walk, MAX_PLAYER_ACCEL);
+    CHECK_PHYSICS_FIELD(air_accel_run, MAX_PLAYER_ACCEL);
+    CHECK_PHYSICS_FIELD(air_friction, MAX_PLAYER_ACCEL);
+    CHECK_PHYSICS_FIELD(cam_lookahead_vx_factor, MAX_LEVEL_MOTION);
+    CHECK_PHYSICS_FIELD(cam_lookahead_max, MAX_LEVEL_MOTION);
 
     return 0;
 

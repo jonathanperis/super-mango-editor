@@ -31,8 +31,14 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   # DOCS DRIFT
   # docs.yml only runs for PRs touching docs-related paths, so a check there
-  # would never report on other PRs. This cheap job always runs, so the main
-  # branch ruleset requires it.
+  # would never report on other PRs. This cheap job always runs, docs-only
+  # pull requests included, so the main branch ruleset requires it.
+  #
+  # On main pushes it also does what the separate "Release freshness" job
+  # did: warn (never fail) when main has moved more than RELEASE_STALE_AFTER
+  # commits past the latest v* tag it contains, so a long-unreleased main is
+  # noticed. See docs/wiki/release-checklist.md for the release cadence this
+  # nudges towards. Only main pushes fetch the full history it needs.
   # ────────────────────────────────────────────────────────────────────────────
   docs-drift:
     name: Docs drift
@@ -43,26 +49,114 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # Full history and tags on main pushes, so the latest tag and the
+          # distance below are real; one commit everywhere else.
+          fetch-depth: ${{ (github.ref == 'refs/heads/main' && github.event_name == 'push') && 0 || 1 }}
 
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
 
+      # The drift checks, then the unit tests of the checkers themselves
+      # (tests/docs_drift_unit_test.py); see the docs-drift target.
       - name: Check semantic docs drift
         run: make docs-drift
+
+      - name: Warn when main is far past the latest release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        continue-on-error: true
+        env:
+          RELEASE_STALE_AFTER: '50'
+        run: |
+          latest=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
+          if [ -z "$latest" ]; then
+            echo "::warning title=No release yet::main contains no v* tag."
+            exit 0
+          fi
+          ahead=$(git rev-list --count "$latest..HEAD")
+          echo "main is $ahead commits past $latest" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$ahead" -gt "$RELEASE_STALE_AFTER" ]; then
+            echo "::warning title=Release is stale::main is $ahead commits past $latest (more than $RELEASE_STALE_AFTER). Consider cutting a release; see docs/wiki/release-checklist.md."
+          fi
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # CHANGED PATHS
+  # Decides whether a pull request touches anything the C jobs build or test.
+  # `code` is 'false' only for a pull request whose every changed file is
+  # documentation: docs/wiki/, docs/archive/, docs/README.md, .specs/, or a
+  # Markdown file at the top of the repository or in .github/ (except
+  # THIRD_PARTY_NOTICES.md, which every release archive packs). Anything
+  # else, docs/src/ and docs/package.json included (make test reads both),
+  # counts as code. Pushes to main, tags and manual runs always say 'true',
+  # and any failure here says 'true' too: the jobs below run unless this job
+  # positively found a docs-only change.
+  #
+  # The jobs that use it skip their work rather than fail, so the required
+  # checks still report: Sanitizers is skipped through a job-level `if:` (a
+  # skipped job counts as passing). The build matrix is not, because a matrix
+  # job skipped that way reports one check named "Build (${{ matrix.platform
+  # }})" and the four required "Build (<platform>)" checks would wait
+  # forever; instead each leg runs on a Linux runner and skips every step.
+  # Docs drift above and docs.yml's site build still run on docs-only pull
+  # requests.
+  # ────────────────────────────────────────────────────────────────────────────
+  changes:
+    name: Changed paths
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      # A pull request's checkout is the merge commit, whose first parent is
+      # the base branch, so two commits are enough for the diff below.
+      # --no-renames lists both sides of a rename, so moving a source file
+      # into docs/ still counts as a code change.
+      - name: Checkout source
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Classify the changed files
+        id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          code=true
+          if [ "$EVENT_NAME" = "pull_request" ] && files=$(git diff --name-only --no-renames HEAD^1 HEAD) && [ -n "$files" ]; then
+            code=false
+            while IFS= read -r file; do
+              case "$file" in
+                THIRD_PARTY_NOTICES.md) code=true ;;
+                docs/wiki/*|docs/archive/*|docs/README.md|.specs/*|.github/*.md) ;;
+                */*) code=true ;;
+                *.md) ;;
+                *) code=true ;;
+              esac
+            done <<< "$files"
+            printf '%s\n' "$files" | sed 's/^/  /'
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
 
   # ────────────────────────────────────────────────────────────────────────────
   # BUILD JOB
   # Compiles the game on Linux (x86_64), macOS (arm64), Windows (x86_64, GCC),
   # and WebAssembly in parallel. Every leg here ships a release archive, so the
   # release job waits for all of them; the Windows Clang check lives in the
-  # separate windows-clang job below.
-  # Runs on every push to main AND every pull request.
+  # separate windows-extras job below.
+  # Runs on every push to main AND every pull request. On a docs-only pull
+  # request (see the changes job) each leg runs on a Linux runner and skips
+  # every step, so the four required checks still report.
   # ────────────────────────────────────────────────────────────────────────────
   build:
     name: Build (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
+    needs: changes
+    # Runs even when the changes job failed: its output is then empty, which
+    # is not 'false', so every step below runs.
+    if: ${{ !cancelled() }}
+    runs-on: ${{ needs.changes.outputs.code == 'false' && 'ubuntu-latest' || matrix.os }}
     # A leg takes 1 to 6 minutes with raylib restored from the cache. Pull
     # requests only restore what main saved, so a pull request that changes
     # the cache key (the raylib pin, its patches, the toolchain) builds
@@ -86,6 +180,8 @@ jobs:
             # action). CodeQL and clang-tidy build the same Linux clang debug
             # tree and pass the same name, so the three share one entry.
             raylib_cache: linux-clang-debug
+            # The optimized tree `make dist-native` builds (out/release/raylib).
+            raylib_release_cache: linux-clang-release
           - os: macos-latest
             platform: macOS arm64
             artifact: super-mango-macos-arm64
@@ -94,12 +190,13 @@ jobs:
             extra_cflags: -Werror
             package: true
             raylib_cache: macos-clang-debug
+            raylib_release_cache: macos-clang-release
           # Ships the Windows release archive. MSYS2 packages are rolling (see
           # the windows-clang job note), so a new GCC warning can fail this leg.
           # Of the three Windows jobs, only this one builds and checks the
           # release zip (dist-native with the bundled UCRT64 DLLs) and gates
-          # the release; it tests on the Memory backend. windows-clang and
-          # desktop-backend below cover what it does not.
+          # the release; it tests on the Memory backend. The windows-extras job
+          # below covers what it does not.
           - os: windows-latest
             platform: Windows x86_64
             artifact: super-mango-windows-x86_64
@@ -108,6 +205,7 @@ jobs:
             extra_cflags: -Werror
             package: true
             raylib_cache: windows-gcc-debug
+            raylib_release_cache: windows-gcc-release
           - os: ubuntu-latest
             platform: WebAssembly
             artifact: super-mango-wasm
@@ -120,6 +218,7 @@ jobs:
             # a restored CMake build tree would name an emcc that no longer
             # exists and its reconfigure would fail.
             raylib_cache: ''
+            raylib_release_cache: ''
 
     env:
       # Warnings fail CI (see extra_cflags above); local builds stay tolerant.
@@ -139,10 +238,17 @@ jobs:
       # older deploy cannot pair an old file with a new one. Only `make web`
       # reads it.
       WEB_ASSET_VERSION: ${{ github.sha }}
+      # 'false' on a docs-only pull request: every step below is skipped.
+      CODE_CHANGED: ${{ needs.changes.outputs.code }}
 
     steps:
+      - name: Docs-only pull request, nothing to build
+        if: env.CODE_CHANGED == 'false'
+        run: echo "Only documentation changed; the build, tests and packaging are skipped."
+
       # Check out the repository so the runner has access to the source code.
       - name: Checkout source
+        if: env.CODE_CHANGED != 'false'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -150,12 +256,13 @@ jobs:
       # Release zips date every entry with SOURCE_DATE_EPOCH (see
       # tools/package_release.py), so the same commit packs the same bytes.
       - name: Date release archives by the commit
+        if: env.CODE_CHANGED != 'false'
         shell: bash
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
 
       # MSYS2 provides its own Python on Windows; pin the runner Python elsewhere.
       - name: Setup Python
-        if: runner.os != 'Windows'
+        if: env.CODE_CHANGED != 'false' && (runner.os != 'Windows')
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
@@ -165,59 +272,73 @@ jobs:
       # The package list and the Xvfb/PulseAudio start-up live in two local
       # actions (.github/actions/), shared with the sanitizers job.
       - name: Install dependencies (Linux)
-        if: matrix.target == 'native' && runner.os == 'Linux'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os == 'Linux')
         uses: ./.github/actions/install-linux-deps
         with:
           display: 'true'
 
       - name: Start rendered-test display and audio (Linux)
-        if: matrix.target == 'native' && runner.os == 'Linux'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os == 'Linux')
         uses: ./.github/actions/setup-linux-display
 
       # ── macOS dependency install ────────────────────────────────────────────
       # Homebrew is pre-installed on macOS GitHub runners.
       - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'macOS')
         run: cmake --version
 
       # ── Windows dependency install ──────────────────────────────────────────
       # The local action installs MSYS2's UCRT64 environment with the MinGW-w64
       # compiler and the pinned-source build tools, and prints their versions.
       - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows')
         uses: ./.github/actions/setup-msys2-toolchain
 
       # The pinned source archive (.cache/raylib, every leg) and the compiled
       # raylib of the debug/test trees: out/raylib (desktop) and, on macOS and
       # Windows, out/headless/raylib (Memory backend tests). Without the
       # compiled trees, Windows built raylib from scratch two or three times
-      # per job. Release archives always build raylib from source (dist-native
-      # uses out/release/raylib). The action explains why a restored tree is
-      # safe to reuse and why only runs on main save. It comes after the
-      # toolchain steps because its fingerprint asks this leg's compiler
-      # (matrix.cc) for its version, which on Windows needs the MSYS2 shell.
+      # per job. The action explains why a restored tree is safe to reuse and
+      # why only runs on main save. It comes after the toolchain steps because
+      # its fingerprint asks this leg's compiler (matrix.cc) for its version,
+      # which on Windows needs the MSYS2 shell.
       - name: Cache raylib
+        if: env.CODE_CHANGED != 'false'
         uses: ./.github/actions/raylib-cache
         with:
           variant: ${{ matrix.raylib_cache }}
           cc: ${{ matrix.cc }}
 
+      # The optimized raylib tree `make dist-native` links (out/release/raylib),
+      # in an entry of its own (variant *-release). Without it "Package release
+      # archive" rebuilt raylib on every run (22-51 s). The source archive was
+      # handled by the step above.
+      - name: Cache release raylib
+        if: env.CODE_CHANGED != 'false' && (matrix.raylib_release_cache != '')
+        uses: ./.github/actions/raylib-cache
+        with:
+          variant: ${{ matrix.raylib_release_cache }}
+          cc: ${{ matrix.cc }}
+          paths: out/release/raylib
+          source: 'false'
+
       # ── Emscripten SDK install (WebAssembly) ────────────────────────────────
       # The same emcc toolchain builds raylib's Web backend and the application.
       - name: Install Emscripten SDK
-        if: matrix.target == 'wasm'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'wasm')
         uses: emscripten-core/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
         with:
           # renovate: datasource=github-tags depName=emscripten-core/emsdk
           version: 6.0.13
 
       - name: Verify Emscripten
-        if: matrix.target == 'wasm'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'wasm')
         run: emcc --version
 
       # The Node.js version is the one line in the repository's .node-version
       # file; every workflow reads it from there (Renovate updates that file).
       - name: Install Node.js for host contracts and WebAssembly smoke
+        if: env.CODE_CHANGED != 'false'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
@@ -225,26 +346,26 @@ jobs:
       # ── Compile (Linux / macOS) ─────────────────────────────────────────────
       # Produces out/super-mango via the project Makefile.
       - name: Build (Linux / macOS)
-        if: matrix.target == 'native' && runner.os != 'Windows'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os != 'Windows')
         run: make
 
       # The tests take about two minutes. A step limit stops a test that
       # hangs (a window that never opens, say) after 10 minutes and leaves
       # its output in the log, instead of waiting for the job limit.
       - name: Desktop tests (Linux virtual display)
-        if: matrix.target == 'native' && runner.os == 'Linux'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os == 'Linux')
         timeout-minutes: 10
         run: make test
 
       # The real macOS desktop backend runs in the separate "Desktop backend"
       # job below; this gate keeps the deterministic software backend.
       - name: Software-rendered tests (macOS)
-        if: runner.os == 'macOS'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'macOS')
         timeout-minutes: 10
         run: make test OUTDIR=out/headless RAYLIB_PLATFORM=memory
 
       - name: Diagnose macOS native test failure
-        if: failure() && runner.os == 'macOS'
+        if: env.CODE_CHANGED != 'false' && (failure() && runner.os == 'macOS')
         continue-on-error: true
         timeout-minutes: 2
         env:
@@ -252,34 +373,34 @@ jobs:
         run: lldb --batch -o run -k "thread backtrace all" -- out/headless/session-test
 
       - name: Validate levels (Linux / macOS)
-        if: matrix.target == 'native' && runner.os != 'Windows'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os != 'Windows')
         run: make validate-levels
 
       - name: Build editor (Linux / macOS)
-        if: matrix.target == 'native' && runner.os != 'Windows'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os != 'Windows')
         run: make editor
 
       - name: Desktop smoke (Linux virtual display)
-        if: matrix.target == 'native' && runner.os == 'Linux'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os == 'Linux')
         run: make smoke SMOKE_FRAMES=5 SMOKE_SEED=1
 
       - name: Software-rendered smoke (macOS)
-        if: runner.os == 'macOS'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'macOS')
         run: make smoke OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
 
       - name: Scripted smoke scenarios (Linux)
-        if: matrix.target == 'native' && runner.os == 'Linux'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os == 'Linux')
         run: make scripted-smoke SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
       # ── Compile (Windows) ───────────────────────────────────────────────────
       # The msys2 shell keeps the UCRT64 compiler/CMake/MinGW make on PATH.
       - name: Build (Windows)
-        if: runner.os == 'Windows'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows')
         shell: msys2 {0}
         run: make CC="$MANGO_CC"
 
       - name: Software-rendered tests (Windows)
-        if: runner.os == 'Windows'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows')
         timeout-minutes: 5
         shell: msys2 {0}
         run: make test CC="$MANGO_CC" OUTDIR=out/headless RAYLIB_PLATFORM=memory
@@ -287,17 +408,17 @@ jobs:
       # The level checker is C and reuses the objects built above, so it
       # must use the same compiler.
       - name: Validate levels (Windows)
-        if: runner.os == 'Windows'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows')
         shell: msys2 {0}
         run: make validate-levels CC="$MANGO_CC"
 
       - name: Build editor (Windows)
-        if: runner.os == 'Windows'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows')
         shell: msys2 {0}
         run: make editor CC="$MANGO_CC"
 
       - name: Software-rendered smoke (Windows)
-        if: runner.os == 'Windows'
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows')
         shell: msys2 {0}
         run: make smoke CC="$MANGO_CC" OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
 
@@ -305,11 +426,11 @@ jobs:
       # Uses the 'web' Makefile target with emcc. Assets are bundled into
       # the .data file via --preload-file.
       - name: Build (WebAssembly)
-        if: matrix.target == 'wasm'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'wasm')
         run: make web
 
       - name: Smoke test (WebAssembly artifacts)
-        if: matrix.target == 'wasm'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'wasm')
         run: python3 tools/check_wasm_artifacts.py
 
       # dist-native builds isolated optimized game/editor binaries and collects
@@ -319,13 +440,13 @@ jobs:
       # do not need to clone the repository just to play. WebAssembly archives
       # include the generated HTML/JS/WASM/data artifacts.
       - name: Package release archive (Linux / macOS)
-        if: matrix.target == 'native' && runner.os != 'Windows'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'native' && runner.os != 'Windows')
         env:
           RELEASE_PLATFORM: ${{ matrix.artifact }}
         run: make dist-native
 
       - name: Package release archive (Windows)
-        if: runner.os == 'Windows' && matrix.package
+        if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows' && matrix.package)
         shell: msys2 {0}
         env:
           RELEASE_PLATFORM: ${{ matrix.artifact }}
@@ -334,7 +455,7 @@ jobs:
 
       # dist-wasm depends on web, so this reuses the verified build above.
       - name: Package release archive (WebAssembly)
-        if: matrix.target == 'wasm'
+        if: env.CODE_CHANGED != 'false' && (matrix.target == 'wasm')
         env:
           RELEASE_PLATFORM: ${{ matrix.artifact }}
         run: |
@@ -344,7 +465,7 @@ jobs:
       # Upload the standalone zip as a workflow artifact. retention-days: 1 keeps
       # PR build storage low; releases immediately reattach the zip assets.
       - name: Upload release archive
-        if: matrix.package
+        if: env.CODE_CHANGED != 'false' && (matrix.package)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact }}
@@ -363,6 +484,10 @@ jobs:
   # ────────────────────────────────────────────────────────────────────────────
   sanitizers:
     name: Sanitizers (Linux x86_64)
+    # Skipped (which counts as passing) on a docs-only pull request; runs when
+    # the changes job failed, since its empty output is not 'false'.
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45  # see the build job
 
@@ -427,10 +552,13 @@ jobs:
   # COVERAGE_TOLERANCE=2 also fails the job when any file falls more than 2
   # points below its line in tools/coverage_baseline.txt (refresh it with
   # `make coverage-baseline` when coverage changes on purpose). It reports
-  # separately and stays out of the release `needs`.
+  # separately and stays out of the release `needs`. Skipped on docs-only
+  # pull requests (see the changes job).
   # ────────────────────────────────────────────────────────────────────────────
   coverage:
     name: Coverage (Linux x86_64)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -498,61 +626,50 @@ jobs:
           retention-days: 14
 
   # ────────────────────────────────────────────────────────────────────────────
-  # RELEASE FRESHNESS
-  # Main pushes only. Warns (never fails) when main has moved more than
-  # RELEASE_STALE_AFTER commits past the latest v* tag it contains, so a
-  # long-unreleased main is noticed. See docs/wiki/release-checklist.md for
-  # the release cadence this nudges towards.
-  # ────────────────────────────────────────────────────────────────────────────
-  release-freshness:
-    name: Release freshness
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      # Full history and tags, so the latest tag and the distance are real.
-      - name: Checkout source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: Warn when main is far past the latest release
-        env:
-          RELEASE_STALE_AFTER: '50'
-        run: |
-          latest=$(git describe --tags --abbrev=0 --match 'v*' HEAD 2>/dev/null || true)
-          if [ -z "$latest" ]; then
-            echo "::warning title=No release yet::main contains no v* tag."
-            exit 0
-          fi
-          ahead=$(git rev-list --count "$latest..HEAD")
-          echo "main is $ahead commits past $latest" | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ "$ahead" -gt "$RELEASE_STALE_AFTER" ]; then
-            echo "::warning title=Release is stale::main is $ahead commits past $latest (more than $RELEASE_STALE_AFTER). Consider cutting a release; see docs/wiki/release-checklist.md."
-          fi
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # WINDOWS CLANG JOB
-  # Builds and tests with UCRT64 Clang, the Makefile's local Windows default,
-  # under -Werror. It ships nothing, so it stays out of the release `needs`: a
-  # Clang-only warning reports here without blocking a release. MSYS2 is a
-  # rolling distribution (the setup-msys2-toolchain action keeps
-  # `update: true`, with unversioned pacman packages; old package versions
-  # are not reliably installable), so a new Clang release can introduce
-  # warnings with no source change. That action prints the exact compiler
-  # for triage.
+  # WINDOWS EXTRAS JOB
+  # Two informational Windows checks in one job, so they share one runner,
+  # one MSYS2 install and one checkout. It ships nothing and stays out of the
+  # release `needs`: a failure here reports without blocking a release.
+  # Skipped on docs-only pull requests (see the changes job).
   #
-  # What only this job catches: Clang's warnings in the _WIN32-only code.
-  # Linux and macOS Clang never compile those branches, and the build leg
-  # uses GCC, whose warning set differs. It also proves that a plain `make`
-  # on Windows (whose default CC is this Clang) still builds and passes.
+  # 1. Clang -Werror. Builds and tests with UCRT64 Clang, the Makefile's local
+  #    Windows default. MSYS2 is a rolling distribution (the
+  #    setup-msys2-toolchain action keeps `update: true`, with unversioned
+  #    pacman packages; old package versions are not reliably installable),
+  #    so a new Clang release can introduce warnings with no source change.
+  #    That action prints the exact compiler for triage. What only this half
+  #    catches: Clang's warnings in the _WIN32-only code. Linux and macOS
+  #    Clang never compile those branches, and the build leg uses GCC, whose
+  #    warning set differs. It also proves that a plain `make` on Windows
+  #    (whose default CC is this Clang) still builds and passes.
+  #
+  # 2. Desktop backend (Mesa). The gating build legs test macOS and Windows on
+  #    raylib's Memory backend. This half runs the same suites on the real
+  #    GLFW/OpenGL backend on Windows with GCC, using Mesa's llvmpipe software
+  #    OpenGL as an opengl32.dll drop-in beside the binaries and miniaudio's
+  #    null playback device (RAYLIB_AUDIO=null), because the hosted VM has no
+  #    sound hardware. What only this half catches: the real GLFW window,
+  #    OpenGL and input code on Windows, and the scripted smoke scenarios,
+  #    which no other Windows job runs. macOS is not included: GitHub's hosted
+  #    macOS VMs have a window server but no OpenGL pixel format ("NSGL:
+  #    Failed to find a suitable pixel format"), so GLFW cannot create the
+  #    window. The real macOS backend is verified locally.
+  #
+  # The halves share out/ and out/headless/: the object flag stamps record the
+  # compiler, so the GCC half recompiles what Clang built, and each raylib
+  # tree has its own folder (out/raylib for Clang, out/raylib-nullaudio for
+  # the null-audio GCC build). The Mesa steps run even when a Clang step
+  # failed (`!cancelled()`), so one run reports both halves.
   # ────────────────────────────────────────────────────────────────────────────
-  windows-clang:
-    name: Windows x86_64 clang -Werror (rolling MSYS2 toolchain)
+  windows-extras:
+    name: Windows x86_64 extras (clang -Werror, Mesa desktop backend)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: windows-latest
-    timeout-minutes: 60  # see the build job
+    # The two former jobs had 60 and 45 minutes, each sized for building its
+    # raylib trees from source under MSYS2 when the cache key changes; one
+    # job that may build both needs their sum, less the shared setup.
+    timeout-minutes: 90
 
     env:
       EXTRA_CFLAGS: -Werror
@@ -569,25 +686,43 @@ jobs:
         with:
           persist-credentials: false
 
+      # No Setup Python step: MSYS2's UCRT64 Python runs the tools, as in the
+      # build job's Windows leg. Clang comes on top of the usual GCC set.
       - name: Install MSYS2 with Clang
         uses: ./.github/actions/setup-msys2-toolchain
         with:
           clang: 'true'
-
-      # Desktop and Memory raylib trees, cached as in the build job. The
-      # rolling toolchain changes the fingerprint, and so the key, whenever
-      # MSYS2 ships a new Clang or CMake.
-      - name: Cache raylib
-        uses: ./.github/actions/raylib-cache
-        with:
-          variant: windows-clang-debug
-          cc: clang
 
       - name: Install Node.js for host contracts
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
 
+      # Desktop and Memory raylib trees, cached as in the build job. The
+      # rolling toolchain changes the fingerprint, and so the key, whenever
+      # MSYS2 ships a new Clang or CMake.
+      - name: Cache raylib (clang)
+        uses: ./.github/actions/raylib-cache
+        with:
+          variant: windows-clang-debug
+          cc: clang
+
+      # RAYLIB_AUDIO=null builds both trees under their -nullaudio names
+      # (desktop GLFW and Memory). The fingerprint reads the raylib options,
+      # so it sees the same RAYLIB_AUDIO as the steps that build them.
+      - name: Cache raylib (gcc, null audio)
+        uses: ./.github/actions/raylib-cache
+        env:
+          RAYLIB_AUDIO: 'null'
+        with:
+          variant: windows-gcc-nullaudio
+          cc: gcc
+          source: 'false'
+          paths: |
+            out/raylib-nullaudio
+            out/headless/raylib-nullaudio
+
+      # ── 1. Clang -Werror ───────────────────────────────────────────────────
       - name: Build with -Werror (Windows clang)
         run: make CC=clang
 
@@ -604,82 +739,13 @@ jobs:
       - name: Software-rendered smoke (Windows clang)
         run: make smoke CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEED=1
 
-  # ────────────────────────────────────────────────────────────────────────────
-  # DESKTOP BACKEND JOB
-  # The gating build legs above test macOS and Windows on raylib's Memory
-  # backend. This job runs the same suites on the real GLFW/OpenGL backend on
-  # Windows, using Mesa's llvmpipe software OpenGL as an opengl32.dll drop-in
-  # beside the binaries and miniaudio's null playback device (RAYLIB_AUDIO=null)
-  # because the hosted VM has no sound hardware. Kept separate
-  # (and out of the release `needs`) so its results are visible before the
-  # owner decides to make it a required check.
-  #
-  # macOS is not included: GitHub's hosted macOS VMs have a window server but
-  # no OpenGL pixel format ("NSGL: Failed to find a suitable pixel format"), so
-  # GLFW cannot create the window. The real macOS backend is verified locally.
-  #
-  # What only this job catches on Windows: the real GLFW window, OpenGL and
-  # input code (the other two Windows jobs use the Memory backend) and the
-  # scripted smoke scenarios, which no other Windows job runs. It compiles
-  # with GCC like the build leg, so it adds no compiler coverage.
-  # ────────────────────────────────────────────────────────────────────────────
-  desktop-backend:
-    name: Desktop backend (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45  # see the build job
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            platform: Windows x86_64 Mesa
-            extra_cflags: -Werror
-
-    env:
-      EXTRA_CFLAGS: ${{ matrix.extra_cflags }}
-      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
-      MAKEFLAGS: -j4  # see the build job
-      # Hosted Windows VMs have no audio endpoint, and the game requires an
-      # audio device to start. Real GLFW/OpenGL graphics with miniaudio's null
-      # playback device keeps every test meaningful (see build-system.md).
-      RAYLIB_AUDIO: 'null'
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # No Setup Python step: this matrix is Windows-only and MSYS2's UCRT64
-      # Python (installed below) runs the tools, as in the other Windows jobs.
-      - name: Install Node.js for host contracts
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-
-      - name: Install MSYS2 (Windows)
-        if: runner.os == 'Windows'
-        uses: ./.github/actions/setup-msys2-toolchain
-
-      # RAYLIB_AUDIO=null builds both trees under their -nullaudio names
-      # (desktop GLFW and Memory). Cached as in the build job.
-      - name: Cache raylib
-        if: runner.os == 'Windows'
-        uses: ./.github/actions/raylib-cache
-        with:
-          variant: windows-gcc-nullaudio
-          cc: gcc
-          paths: |
-            out/raylib-nullaudio
-            out/headless/raylib-nullaudio
-
+      # ── 2. Desktop backend (GCC, Mesa, null audio) ─────────────────────────
       # Third-party Actions are allowlisted for this repository, so Mesa is
       # fetched directly from the pinned mesa-dist-win release and checked
       # against its published SHA-256. Windows loads opengl32.dll from the
       # executable's directory first, so the drop-in only affects out/.
       - name: Install Mesa software OpenGL next to the binaries (Windows)
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() }}
         shell: pwsh
         env:
           # renovate-attachment: datasource=github-release-attachments depName=pal1000/mesa-dist-win
@@ -700,23 +766,28 @@ jobs:
           "GALLIUM_DRIVER=llvmpipe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # Windows scripted smoke has no OpenGL dependency, so it runs first on
-      # the deterministic Memory backend.
+      # the deterministic Memory backend. Hosted Windows VMs have no audio
+      # endpoint and the game requires an audio device to start, so these
+      # steps build with miniaudio's null playback device (see build-system.md).
       - name: Scripted smoke scenarios (Windows, Memory backend)
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() }}
         timeout-minutes: 10
-        shell: msys2 {0}
+        env:
+          RAYLIB_AUDIO: 'null'
         run: make scripted-smoke CC=gcc OUTDIR=out/headless RAYLIB_PLATFORM=memory SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"
 
       - name: Desktop tests (Windows, Mesa)
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() }}
         timeout-minutes: 10
-        shell: msys2 {0}
+        env:
+          RAYLIB_AUDIO: 'null'
         run: make test CC=gcc
 
       - name: Desktop smoke and scripted scenarios (Windows, Mesa)
-        if: runner.os == 'Windows'
+        if: ${{ !cancelled() }}
         timeout-minutes: 10
-        shell: msys2 {0}
+        env:
+          RAYLIB_AUDIO: 'null'
         run: |
           make smoke CC=gcc SMOKE_FRAMES=5 SMOKE_SEED=1
           make scripted-smoke CC=gcc SMOKE_FRAMES=5 SMOKE_SEEDS="1 7 23"

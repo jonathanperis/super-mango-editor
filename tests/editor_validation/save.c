@@ -325,3 +325,38 @@ static int unreadable_existing_probe_is_not_missing(void)
                       SERIALIZER_PATH_EXISTING);
 }
 
+
+/*
+ * A plain Save writes only to a name it has checked
+ * (editor_checked_write_path): a document path holding a control
+ * character, such as a line break given on the command line, is refused
+ * with a message, and no file is created.
+ */
+static int save_refuses_a_path_with_control_characters(void)
+{
+    static const char bad_path[] = TEST_OUT "line\nbreak.toml";
+    EditorState es;
+    int result = 1;
+
+    ensure_out_dir();
+    remove(bad_path);
+    memset(&es, 0, sizeof(es));
+    es.undo = undo_create();
+    if (!es.undo) return 1;
+    editor_level_init_defaults(&es.level);
+    memcpy(es.file_path, bad_path, sizeof(bad_path));
+    es.source_state = EDITOR_SOURCE_EXPECTED_MISSING;
+    es.modified = 1;
+
+    if (expect_int("save refused", editor_save_current_level(&es), -1) != 0) goto cleanup;
+    if (expect_prefix("refusal status", es.status_message,
+                      "Save failed: the file name holds characters") != 0) goto cleanup;
+    if (expect_int("nothing written", editor_file_exists(bad_path), 0) != 0) goto cleanup;
+    if (expect_int("still modified", es.modified, 1) != 0) goto cleanup;
+    result = 0;
+
+cleanup:
+    remove(bad_path);
+    undo_destroy(es.undo);
+    return result;
+}

@@ -184,6 +184,130 @@ done:
     return failed;
 }
 
+#ifndef _WIN32
+/* A playtest launcher that never starts anything (F5 below). */
+static int refuse_launch(const char *const *argv)
+{
+    (void)argv;
+    return -1;
+}
+#endif
+
+/* Three coins at heights 100, 110 and 120, all selected, and one frame
+ * drawn so the panel shows their shared rows. */
+static int select_three_coins_at_different_heights(EditorState *es)
+{
+    static const Selection coins[3] = { {ENT_COIN, 0}, {ENT_COIN, 1}, {ENT_COIN, 2} };
+    for (int i = 0; i < 3; i++) es->level.coins[i].y = 100.0f + 10.0f * i;
+    if (editor_select_items(es, coins, 3) != 3) return -1;
+    ui_frame(es, NEUTRAL_X, NEUTRAL_Y);
+    return 0;
+}
+
+/* Click the field of shared row `row` and type `text`, without Enter. */
+static void start_typing_into_shared_row(EditorState *es, int row, const char *text)
+{
+    int y = props_top(es) + 24 + 8 + 20 + row * 24 + 6;
+    click_frame(es, PANEL_FIELD_X, y);
+    snprintf(es->ui.edit_buf, sizeof(es->ui.edit_buf), "%s", text);
+    es->ui.edit_cursor = (int)strlen(text);
+}
+
+/* All three coins at height y, and one undo step since `steps`. */
+static int three_coins_at(const EditorState *es, float y, int steps)
+{
+    return es->level.coins[0].y == y && es->level.coins[1].y == y &&
+           es->level.coins[2].y == y && es->undo->top == steps + 1;
+}
+
+/*
+ * A value typed into a shared row reaches every selected entity however
+ * the field is left, not only with Enter: Tab, a click on the canvas or on
+ * another field, Ctrl+S and F5 all finish the edit first, and each is one
+ * undo step for all of them.
+ */
+static int a_shared_field_reaches_every_entity_however_it_is_left(void)
+{
+    int failed = 0;
+    EditorState es;
+    PlacementData data;
+    int steps;
+    CHECK(open_editor(&es, NULL) == 0);
+    es.level.screen_count = 4;
+    es.tool = TOOL_SELECT;
+    for (int i = 0; i < 3; i++) {
+        memset(&data, 0, sizeof(data));
+        data.coin.x = 100.0f + 40.0f * i;
+        data.coin.y = 100.0f;
+        CHECK(editor_add_placement(&es, ENT_COIN, &data, "place") == 0);
+    }
+
+    /* A click on an empty part of the canvas. */
+    CHECK(select_three_coins_at_different_heights(&es) == 0);
+    steps = es.undo->top;
+    start_typing_into_shared_row(&es, 1, "65");
+    click_frame(&es, CANVAS_W / 2, TOOLBAR_H + 40);
+    CHECK(three_coins_at(&es, 65.0f, steps));
+    /* One step: one undo puts all three back. */
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.level.coins[0].y == 100.0f && es.level.coins[1].y == 110.0f &&
+          es.level.coins[2].y == 120.0f);
+
+    /* A click on another field of the same panel. */
+    CHECK(select_three_coins_at_different_heights(&es) == 0);
+    steps = es.undo->top;
+    start_typing_into_shared_row(&es, 1, "66");
+    click_frame(&es, PANEL_FIELD_X, props_top(&es) + 24 + 8 + 20 + 6);   /* row 0 */
+    CHECK(three_coins_at(&es, 66.0f, steps));
+    CHECK(es.level.coins[0].x == 100.0f && es.level.coins[2].x == 180.0f);
+    key_frame(&es, KEY_ESCAPE, 0);
+
+    /* Ctrl+S (the Save As picker answers Cancel). */
+    CHECK(select_three_coins_at_different_heights(&es) == 0);
+    steps = es.undo->top;
+    start_typing_into_shared_row(&es, 1, "67");
+    key_frame(&es, KEY_S, INPUT_CTRL);
+    CHECK(three_coins_at(&es, 67.0f, steps));
+
+#ifndef _WIN32
+    /* F5 (the launcher starts nothing). */
+    editor_test_set_play_launcher(refuse_launch);
+    CHECK(select_three_coins_at_different_heights(&es) == 0);
+    steps = es.undo->top;
+    start_typing_into_shared_row(&es, 1, "68");
+    key_frame(&es, KEY_F5, 0);
+    CHECK(three_coins_at(&es, 68.0f, steps));
+    CHECK(!es.playing);
+#endif
+
+    /* Undo straight from the field: the edit lands for all three first,
+     * and that step is the one undone. */
+    CHECK(select_three_coins_at_different_heights(&es) == 0);
+    steps = es.undo->top;
+    start_typing_into_shared_row(&es, 1, "69");
+    key_frame(&es, KEY_Z, INPUT_CTRL);
+    CHECK(es.undo->top == steps);
+    CHECK(es.level.coins[0].y == 100.0f && es.level.coins[1].y == 110.0f &&
+          es.level.coins[2].y == 120.0f);
+    key_frame(&es, KEY_Z, INPUT_CTRL | INPUT_SHIFT);
+    CHECK(es.level.coins[0].y == 69.0f && es.level.coins[1].y == 69.0f &&
+          es.level.coins[2].y == 69.0f);
+
+    /* Tab (last: the field it moves to may scroll the panel). */
+    CHECK(select_three_coins_at_different_heights(&es) == 0);
+    steps = es.undo->top;
+    start_typing_into_shared_row(&es, 1, "64");
+    key_frame(&es, KEY_TAB, 0);
+    CHECK(three_coins_at(&es, 64.0f, steps));
+done:
+#ifndef _WIN32
+    editor_test_set_play_launcher(NULL);
+#endif
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}
+
 static int level_config_sections_resize_the_panel(void)
 {
     int failed = 0, changes = 0;

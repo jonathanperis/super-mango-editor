@@ -41,6 +41,14 @@
       "depNameTemplate": "bun"
     },
     {
+      "description": "Node.js versions quoted in the manuals (`CI uses Node 26.9.0`, `CI pins Node **26.9.0**`), kept equal to .node-version, which the nodenv manager updates (make docs-drift checks every mention)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^README\\.md$/", "/^docs/README\\.md$/", "/^docs/wiki/build-system\\.md$/"],
+      "matchStrings": ["CI (?:uses|pins) Node \\*{0,2}(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "datasourceTemplate": "node-version",
+      "depNameTemplate": "node"
+    },
+    {
       "description": "raylib source pin: the tag, its commit and the archive URL built from that commit are rewritten together (tools/build_raylib.py refuses a manifest where they disagree). The sha256 and patches.json need a manual update, so CI fails until a maintainer finishes the bump.",
       "customType": "regex",
       "managerFilePatterns": ["/^vendor/raylib/manifest\\.json$/"],
@@ -85,6 +93,11 @@
       "description": "One pull request for every Bun pin: `bun-version` in the workflows (github-actions), `packageManager` in docs/package.json (npm) and the manual mentions (custom.regex). tests/doctor_test.py fails while they disagree. It comes after the docs site group so this group name wins.",
       "matchPackageNames": ["bun"],
       "groupName": "bun"
+    },
+    {
+      "description": "One pull request for every Node.js pin: .node-version (nodenv), which every workflow reads, and the manual mentions (custom.regex). make docs-drift fails while they disagree.",
+      "matchPackageNames": ["node"],
+      "groupName": "node"
     },
     {
       "description": "Mesa's archive SHA-256 is updated with the version by github-release-attachments",

@@ -527,6 +527,53 @@ void editor_open_level_file(EditorState *es)
 }
 
 /*
+ * checked_path_char — One byte of a path a Save may write, as a number, or
+ * -1 for a byte no level file name holds: a control character (a line
+ * break, a tab, DEL).  Such a name could not be shown in the status bar or
+ * typed back into the path prompt, and the pickers' own names are refused
+ * for the same reason (file_dialog_read_path).
+ */
+static int checked_path_char(char c)
+{
+    unsigned char byte = (unsigned char)c;
+
+    if (byte < 0x20 || byte == 0x7f) return -1;
+    return byte;
+}
+
+/*
+ * editor_checked_write_path — Copy `path` into out (out_size bytes) when it
+ * is a path a Save may write to: not empty, short enough, and made of
+ * printable bytes (checked_path_char).  Returns 0, or -2 with out empty.
+ *
+ * The document's path can come from the command line, so it is checked
+ * here, at the one place every plain Save takes its file name from
+ * (editor_document_write_target), rather than trusted because an earlier
+ * step opened it.  Copying it byte by byte through checked_path_char also
+ * makes the check visible to CodeQL's cpp/path-injection query: the query
+ * treats the number a function returns as a new value, not as user text
+ * passed along, so the copy is no longer "a command-line argument".
+ */
+static int editor_checked_write_path(const char *path, char *out, size_t out_size)
+{
+    size_t length = 0;
+
+    if (!out || out_size == 0) return -2;
+    out[0] = '\0';
+    if (!path || path[0] == '\0') return -2;
+    for (; path[length] != '\0'; length++) {
+        int byte = checked_path_char(path[length]);
+        if (byte < 0 || length + 1 >= out_size) {
+            out[0] = '\0';
+            return -2;
+        }
+        out[length] = (char)byte;
+    }
+    out[length] = '\0';
+    return 0;
+}
+
+/*
  * editor_document_write_target — Pick the file a plain Save will replace.
  *
  * Usually that is file_path itself.  When file_path is a symlink, Save
@@ -534,24 +581,26 @@ void editor_open_level_file(EditorState *es)
  * still points at file_target, the file this session actually read.  A link
  * that was repointed, or a regular file swapped for a link, could aim the
  * save at a file the user never opened, so that case returns -1 instead.
+ * Either way the name handed back has passed editor_checked_write_path
+ * (-2 when it does not).
  */
 static int editor_document_write_target(const EditorState *es,
                                         char *target, size_t target_size)
 {
-    if (!serializer_path_is_symlink(es->file_path)) {
-        if (strlen(es->file_path) >= target_size) return -1;
-        memcpy(target, es->file_path, strlen(es->file_path) + 1);
-        return 0;
-    }
+    char resolved[EDITOR_PATH_MAX];
+
+    if (!serializer_path_is_symlink(es->file_path))
+        return editor_checked_write_path(es->file_path, target, target_size);
     if (es->file_target[0] == '\0' ||
-        serializer_resolve_save_target(es->file_path, target, target_size) != 0 ||
-        strcmp(target, es->file_target) != 0) return -1;
-    return 0;
+        serializer_resolve_save_target(es->file_path, resolved, sizeof(resolved)) != 0 ||
+        strcmp(resolved, es->file_target) != 0) return -1;
+    return editor_checked_write_path(resolved, target, target_size);
 }
 
 int editor_save_current_level(EditorState *es)
 {
     int source_status;
+    int write_target;
     EditorExternalChoice choice;
     char target[EDITOR_PATH_MAX];
 
@@ -561,7 +610,13 @@ int editor_save_current_level(EditorState *es)
     if (es->file_path[0] == '\0') {
         return editor_save_current_level_as_validated(es);
     }
-    if (editor_document_write_target(es, target, sizeof(target)) != 0) {
+    write_target = editor_document_write_target(es, target, sizeof(target));
+    if (write_target == -2) {
+        editor_set_status(es, "Save failed: the file name holds characters a "
+                          "level file cannot have; use Save As");
+        return -1;
+    }
+    if (write_target != 0) {
         editor_set_status(es, "Save failed: %s links to a file this editor "
                           "did not open; use Save As", es->file_path);
         return -1;

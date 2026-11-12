@@ -11,9 +11,10 @@
  */
 #include "bird.h"
 
-#include <math.h>   /* fabsf, sinf */
+#include <math.h>   /* fabsf */
 
 #include "../core/entity_utils.h"
+#include "../core/game_trig.h"     /* game_sinf: same on every machine */
 #include "../game_constants.h"     /* GAME_W */
 
 /* Loudest wing flap, heard right next to the player. */
@@ -37,7 +38,7 @@ static const BirdSpec s_regular_bird = {
 /* The bird's top y at horizontal position x: base_y plus the sine wave. */
 static float bird_screen_y(const BirdSpec *spec, float x, float base_y)
 {
-    return base_y + sinf(x * spec->wave_freq) * spec->wave_amp;
+    return base_y + game_sinf(x * spec->wave_freq) * spec->wave_amp;
 }
 
 /*

@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "game_checkpoint.h"
+#include "game_completion.h"  /* game_level_seconds, game_level_steps_from_seconds */
 #include "game_state.h"
 #include "../levels/level.h"
 #include "../shared/geometry.h"  /* float_same_value */
@@ -33,7 +34,9 @@ void game_resume_capture(const GameState *gs, GameResume *resume)
     resume->lives = gs->world.lives < 0 ? 0 :
                     gs->world.lives > GAME_RESUME_LIVES_MAX ? GAME_RESUME_LIVES_MAX :
                     gs->world.lives;
-    resume->elapsed = gs->screen.completion.level_elapsed;
+    /* The profile stores the timer in seconds (format unchanged); the
+     * game counts steps. game_level_steps_from_seconds turns it back. */
+    resume->elapsed = game_level_seconds(gs);
     /* One bit per coin: bit i set means coins[i] was already collected. */
     for (int i = 0; i < gs->world.coin_count && i < 64; i++)
         if (!gs->world.coins[i].active) resume->coins |= (uint64_t)1 << i;
@@ -98,7 +101,7 @@ int game_resume_apply(GameState *gs, const GameResume *resume)
     gs->world.level_score_start = resume->level_score_start;
     gs->world.score_life_next = resume->score_life_next;
     gs->world.lives = resume->lives;
-    gs->screen.completion.level_elapsed = resume->elapsed;
+    gs->screen.completion.level_steps = game_level_steps_from_seconds(resume->elapsed);
     for (int i = 0; i < gs->world.coin_count; i++)
         gs->world.coins[i].active = (resume->coins & ((uint64_t)1 << i)) == 0;
 

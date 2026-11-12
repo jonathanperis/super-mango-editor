@@ -75,8 +75,24 @@ def main() -> None:
            "replay smoke must inject semantic commands")
 
     expect(failures(quality.check_level_line_endings,
-                    {".gitattributes": ("levels/*.toml text eol=lf", "levels/*.toml text")}),
+                    {".gitattributes": ("levels/**/*.toml text eol=lf", "levels/**/*.toml text")}),
            "must enforce LF checkouts")
+    # The old top-folder-only pattern is not enough any more.
+    expect(failures(quality.check_level_line_endings,
+                    {".gitattributes": ("levels/**/*.toml text eol=lf", "levels/*.toml text eol=lf")}),
+           "must enforce LF checkouts")
+    # A CRLF file in a subfolder is found, not only in levels/ itself.
+    for rel in ("levels/labs/02_moving_platforms.toml", "levels/campaigns/main.toml"):
+        target = ROOT / rel
+        assert target.is_file(), f"test is stale: {rel} does not exist"
+        real = quality.read_bytes
+
+        def crlf(path: Path, target=target, real=real) -> bytes:
+            data = real(path)
+            return data.replace(b"\n", b"\r\n") if path == target else data
+
+        with patch.object(quality, "read_bytes", crlf):
+            expect(failures(quality.check_level_line_endings), f"{rel}: normalize level TOML line endings")
     expect(failures(quality.check_overlay_snapshot_doc,
                     {"docs/wiki/overlay-snapshots.md": ("tools/generate_overlay_snapshots.py", "a script")}),
            "missing generated-file source note")

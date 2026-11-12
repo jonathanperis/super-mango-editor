@@ -72,7 +72,7 @@ else
 STRIP_LDFLAGS = -s
 endif
 MODE_LDFLAGS_release = $(HARDEN_LDFLAGS) $(GC_LDFLAGS) $(STRIP_LDFLAGS)
-CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
+CFLAGS  = -std=c11 -Wall -Wextra -Wpedantic -ffp-contract=off $(MODE_FLAGS_$(BUILD_MODE)) -I$(RAYLIB_BUILD)/build/raylib/include $(if $(filter memory,$(RAYLIB_PLATFORM)),-DMANGO_RAYLIB_MEMORY,) $(EXTRA_CFLAGS)
 # Tests write scratch files under their own OUTDIR (tests/test_paths.h), so
 # test, sanitize and coverage trees can run side by side in one checkout.
 # MANGO_TESTING turns on the *_test_set_* seams (canned dialog answers,
@@ -539,6 +539,11 @@ raygui-icons: ## Generate: Editor icon bitmaps from the pinned raygui.h
 sounds: ## Generate: Every assets/sounds QOA file from tools/gen_sounds.py
 	python3 tools/gen_sounds.py
 
+# The unit tests of the docs checkers need no built site, so they run here,
+# after the checks. The probes of the built site run from `bun run
+# check-site` in docs/ (tools/check_docs_drift.py knows that file by name, so
+# it is not spelled out here, where it would count as run by make).
+DOCS_PYTHON_TESTS = tests/docs_drift_unit_test.py
 docs-drift: ## Check: Generated docs, sounds and manual facts match the code
 	python3 tools/content_inventory.py --check
 	python3 tools/gen_sounds.py --check
@@ -546,6 +551,7 @@ docs-drift: ## Check: Generated docs, sounds and manual facts match the code
 	python3 tools/generate_overlay_snapshots.py --check
 	python3 tools/check_docs_drift.py
 	python3 tools/check_roadmap_quality.py
+	$(foreach script,$(DOCS_PYTHON_TESTS),python3 $(script)$(newline))
 
 roadmap-quality: ## Check: Roadmap entries are complete
 	python3 tools/check_roadmap_quality.py
@@ -748,6 +754,26 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 	"$(abspath $(OUTDIR))/fuzz/campaign-fuzzer" $(FUZZ_RUN_FLAGS) \
 		-artifact_prefix=$(OUTDIR)/fuzz/campaign- $(OUTDIR)/fuzz/campaign $(FUZZ_CAMPAIGN_SEEDS)
 
+# A corpus only grows: every run adds the inputs that reached new code, and
+# many of them are later covered by other inputs too. libFuzzer's -merge=1
+# copies into an empty folder just the inputs that add coverage, smallest
+# first, and that folder then replaces the old one. It reuses the fuzzers
+# `make fuzz` built; the weekly CI job runs it after each search, before the
+# corpus goes into the cache and the fuzz-corpus artifact.
+FUZZ_HARNESSES = level profile editor campaign
+.PHONY: fuzz-merge
+fuzz-merge: ## Test: Minimise the libFuzzer corpora in OUTDIR/fuzz with -merge=1 (after make fuzz)
+	@for harness in $(FUZZ_HARNESSES); do \
+		fuzzer="$(abspath $(OUTDIR))/fuzz/$$harness-fuzzer"; \
+		corpus="$(OUTDIR)/fuzz/$$harness"; \
+		[ -x "$$fuzzer" ] || { echo "fuzz-merge: $$fuzzer is missing; run make fuzz first"; exit 1; }; \
+		rm -rf "$$corpus.merged" && mkdir -p "$$corpus.merged" "$$corpus" || exit 1; \
+		"$$fuzzer" -merge=1 -close_fd_mask=2 "$$corpus.merged" "$$corpus" || exit 1; \
+		before=$$(ls "$$corpus" | wc -l | tr -d ' '); after=$$(ls "$$corpus.merged" | wc -l | tr -d ' '); \
+		rm -rf "$$corpus" && mv "$$corpus.merged" "$$corpus" || exit 1; \
+		echo "fuzz-merge: $$harness corpus $$before -> $$after inputs"; \
+	done
+
 # Test objects: one rule for every source. $(OUTDIR) is skipped once out/
 # exists, so the recipe also creates its own directory; otherwise a deleted
 # out/obj/tests would break every later `make test`.
@@ -917,7 +943,7 @@ WEB_ASSET_VERSION ?=
 # wait for. Against -O2 the .wasm went from 469 KB to 371 KB (190 KB to
 # 166 KB gzipped).
 WEB_OPT = -Os
-WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi $(WEB_OPT) -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
+WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi -ffp-contract=off $(WEB_OPT) -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
 # The page only runs in browsers; Node merely syntax-checks the .js and
 # compiles the .wasm (tools/check_wasm_artifacts.py), so drop Node support.
 WEB_LINK_FLAGS = -s ENVIRONMENT=web -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'

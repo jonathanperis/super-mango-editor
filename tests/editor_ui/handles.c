@@ -447,3 +447,70 @@ done:
     close_editor(&es);
     return failed;
 }
+
+/*
+ * A drag far past a size limit asks level validation about a handful of
+ * counts, not one per tile: the search halves the gap between the nearest
+ * accepted and the nearest refused count.  It stops where the old
+ * one-tile-at-a-time search did, at the largest count the level accepts
+ * (one more is refused), and a drag back in stops at one tile.
+ */
+static int size_handle_search_is_bounded(void)
+{
+    int failed = 0;
+    EditorState es;
+    PlacementData pd;
+    int sx, sy, before;
+    CHECK(open_editor(&es, NULL) == 0);
+    ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
+
+    memset(&pd, 0, sizeof(pd));
+    pd.spike_row.x = 96.0f;
+    pd.spike_row.count = 3;
+    CHECK(add_entity(&es, ENT_SPIKE_ROW, &pd) == 0 && level_is_valid(&es));
+    editor_select_only(&es, ENT_SPIKE_ROW, 0);
+    CHECK(handle_screen_point(&es, ENT_SPIKE_ROW, 0, EDITOR_HANDLE_WIDTH, &sx, &sy));
+    /* 3000 canvas px at 2x zoom asks for the 128-tile maximum. */
+    before = editor_resize_test_validations();
+    press_and_move(&es, sx, sy, 3000, 0);
+    CHECK(es.resizing);
+    CHECK(editor_resize_test_validations() - before <= 9);   /* 1 + log2(128) */
+    {
+        const int most = es.level.spike_rows[0].count;
+        CHECK(most > 3 && level_is_valid(&es));
+        es.level.spike_rows[0].count = most + 1;
+        CHECK(!level_is_valid(&es));
+        es.level.spike_rows[0].count = most;
+    }
+    /* Back far to the left: one tile, as cheaply. */
+    before = editor_resize_test_validations();
+    push_event(INPUT_MOUSE_MOVE, 0, 0, sx - 3000, sy);
+    ui_frame(&es, sx - 3000, sy);
+    CHECK(es.level.spike_rows[0].count == 1);
+    CHECK(editor_resize_test_validations() - before <= 9);
+    release_at(&es, sx - 3000, sy);
+    CHECK(level_is_valid(&es));
+
+    /* A vine dragged far down stops at the bottom of the level. */
+    memset(&pd, 0, sizeof(pd));
+    pd.vine.x = 240.0f;
+    pd.vine.y = 40.0f;
+    pd.vine.tile_count = 2;
+    CHECK(add_entity(&es, ENT_VINE, &pd) == 0 && level_is_valid(&es));
+    editor_select_only(&es, ENT_VINE, 0);
+    CHECK(handle_screen_point(&es, ENT_VINE, 0, EDITOR_HANDLE_HEIGHT, &sx, &sy));
+    before = editor_resize_test_validations();
+    drag_handle(&es, sx, sy, 0, 3000);
+    CHECK(editor_resize_test_validations() - before <= 10);  /* the release checks once more */
+    {
+        const int most = es.level.vines[0].tile_count;
+        CHECK(most > 2 && level_is_valid(&es));
+        es.level.vines[0].tile_count = most + 1;
+        CHECK(!level_is_valid(&es));
+        es.level.vines[0].tile_count = most;
+    }
+done:
+    clear_dialog_seams();
+    close_editor(&es);
+    return failed;
+}

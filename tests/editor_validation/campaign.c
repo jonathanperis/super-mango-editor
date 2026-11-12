@@ -363,3 +363,50 @@ done:
     if (test_change_folder(cwd) != 0) result = 1;
     return result;
 }
+
+/*
+ * A campaign entry whose level has no `name` key, an empty one or a blank
+ * one is shown by its file name (campaign_catalog.c, and
+ * campaign_display_name in tools/validate_levels.py). A missing name used
+ * to load as "Untitled", so the level selector showed "Untitled" for it.
+ */
+static int campaign_names_a_nameless_level_by_its_file(void)
+{
+    static const char manifest[] =
+        "format_version = 1\nlevels = [\"levels/missing_name.toml\", "
+        "\"levels/empty_name.toml\", \"levels/blank_name.toml\"]\n";
+    static const char level_tail[] =
+        "screen_count = 4\n\n[last_star]\nx = 300.0\ny = 200.0\n";
+    char cwd[4096];
+    char text[256];
+    CampaignCatalog catalog = {0};
+    int result = 1;
+
+    test_make_folder(CAMPAIGN_ROOT);
+    test_make_folder(CAMPAIGN_ROOT "/levels");
+    snprintf(text, sizeof(text), "format_version = 1\n%s", level_tail);
+    if (write_text_file(CAMPAIGN_ROOT "/levels/missing_name.toml", text) != 0) return 1;
+    snprintf(text, sizeof(text), "format_version = 1\nname = \"\"\n%s", level_tail);
+    if (write_text_file(CAMPAIGN_ROOT "/levels/empty_name.toml", text) != 0) return 1;
+    snprintf(text, sizeof(text), "format_version = 1\nname = \" \\t \"\n%s", level_tail);
+    if (write_text_file(CAMPAIGN_ROOT "/levels/blank_name.toml", text) != 0) return 1;
+    if (write_text_file(CAMPAIGN_ROOT "/levels/nameless_campaign.toml", manifest) != 0 ||
+        test_working_folder(cwd, sizeof(cwd)) != 0 ||
+        test_change_folder(CAMPAIGN_ROOT) != 0) return 1;
+
+    /* campaign_catalog_read: the entries are not chained by next_phase,
+     * and only their names are under test here. */
+    if (expect_int("nameless campaign reads",
+                   campaign_catalog_read("levels/nameless_campaign.toml", &catalog), 0) != 0 ||
+        expect_int("three entries", (int)catalog.count, 3) != 0 ||
+        expect_string("missing name", catalog.levels[0].display_name, "missing_name") != 0 ||
+        expect_string("empty name", catalog.levels[1].display_name, "empty_name") != 0 ||
+        expect_string("blank name", catalog.levels[2].display_name, "blank_name") != 0)
+        goto done;
+    result = 0;
+
+done:
+    campaign_catalog_cleanup(&catalog);
+    if (test_change_folder(cwd) != 0) result = 1;
+    return result;
+}

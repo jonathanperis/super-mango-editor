@@ -68,6 +68,16 @@ int game_experiment_decode(const char *text, size_t size, const char *label,
                            uint64_t level_hash, GameExperiment *tape);
 int game_experiment_save(GameState *gs, const char *path);
 
+/*
+ * game_experiment_physics_max — The largest value a capture may hold in
+ * physics column `column` (0 .. INSPECTOR_PHYSICS_COUNT - 1, the order of
+ * game_inspector.c): MAX_PLAYER_SPEED for the two top speeds,
+ * MAX_PLAYER_ACCEL for the rest. Tuning the player live should stop at
+ * the same value, or a recording could not be replayed. 0 for a column
+ * that does not exist.
+ */
+float game_experiment_physics_max(int column);
+
 /* What an F9 export did, so the debug log can say what actually went wrong. */
 typedef enum {
     EXPERIMENT_EXPORT_OK = 0,
@@ -83,7 +93,19 @@ typedef enum {
  * named after stamp, seconds since 1970. path receives the name used. */
 ExperimentExportResult game_experiment_export_at(GameState *gs, const char *folder,
                                                  long long stamp, char *path, size_t size);
-/* F9: export into the working folder, stamped with the current date/time. */
+/*
+ * The folder F9 exports into, with its trailing separator, malloc'd (the
+ * caller frees it); NULL when there is none. Natively it is the per-user
+ * folder that also holds profile.toml (preference_path with
+ * GAME_DATA_ORGANIZATION / GAME_DATA_APPLICATION), never the install
+ * folder the game runs in. In the browser it is "": the file is written
+ * to memory, downloaded and deleted.
+ */
+#define GAME_DATA_ORGANIZATION "SuperMango"
+#define GAME_DATA_APPLICATION  "SuperMango"
+char *game_experiment_export_folder(void);
+/* F9: export into game_experiment_export_folder(), stamped with the current
+ * date/time. The full path goes to the log (TraceLog). */
 void game_experiment_export(GameState *gs);
 /* Step length for the next update: dt normally; 0 once a replay has ended. */
 float game_experiment_dt(const GameState *gs, float dt);

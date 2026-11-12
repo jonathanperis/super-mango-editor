@@ -165,15 +165,53 @@ ExperimentExportResult game_experiment_export_at(GameState *gs, const char *fold
     return EXPERIMENT_EXPORT_NAME_TAKEN;
 }
 
+/*
+ * F9 used to write into the working folder. main.c moves into the install
+ * folder at startup so the game finds its assets, so an export landed
+ * next to the program: often a folder the player cannot write (Program
+ * Files, /Applications), and otherwise one an update replaces. The native
+ * game writes into the same per-user folder as profile.toml instead.
+ *
+ * The browser build has no such folder: it writes the file into its
+ * in-memory file system, hands it to the browser as a download and
+ * deletes it, so "" (the in-memory working folder) is right there.
+ */
+char *game_experiment_export_folder(void)
+{
+#ifdef __EMSCRIPTEN__
+    char *folder = malloc(1);
+    if (folder) folder[0] = '\0';
+    return folder;
+#else
+    return preference_path(GAME_DATA_ORGANIZATION, GAME_DATA_APPLICATION);
+#endif
+}
+
 void game_experiment_export(GameState *gs)
 {
-    char path[160];
-    switch (game_experiment_export_at(gs, "", (long long)time(NULL), path, sizeof(path))) {
+    char path[SERIALIZER_IO_PATH_MAX];
+    char *folder = game_experiment_export_folder();
+    ExperimentExportResult result;
+
+    if (!folder) {
+        debug_log(&gs->screen.debug, "Export failed: no folder for player data");
+        TraceLog(LOG_WARNING, "Experiment export: cannot find or create the player data folder");
+        return;
+    }
+    result = game_experiment_export_at(gs, folder, (long long)time(NULL), path, sizeof(path));
+    /* On success path is folder + file name; the log shows the name. */
+    size_t folder_length = strlen(folder);
+    free(folder);
+    switch (result) {
     case EXPERIMENT_EXPORT_OK:
 #ifdef __EMSCRIPTEN__
         experiment_download(path);
+        debug_log(&gs->screen.debug, "Exported %s (downloaded)", path + folder_length);
+#else
+        /* "Exported to player data: mango-experiment-<10 digits>-10.toml"
+         * is 60 characters, inside a log line (DEBUG_LOG_MSG_LEN). */
+        debug_log(&gs->screen.debug, "Exported to player data: %s", path + folder_length);
 #endif
-        debug_log(&gs->screen.debug, "Exported %s", path);
         TraceLog(LOG_INFO, "Experiment exported: %s", path);
         break;
     case EXPERIMENT_EXPORT_NOTHING:

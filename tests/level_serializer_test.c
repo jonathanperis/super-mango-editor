@@ -16,6 +16,7 @@
 #include "shared/serializer.h"
 #include "shared/serializer_load_header.h"
 #include "shared/serializer_parse.h"   /* serializer_load_schema */
+#include "shared/serializer_emit.h"    /* serializer_message_text */
 #include "levels/level.h"
 #include "test_paths.h"         /* TEST_OUT scratch directory */
 
@@ -1442,9 +1443,15 @@ static int legacy_warnings_name_every_skipped_shape(void)
     const char *text =
         "physics = 3\n"                      /* a table was expected  */
         "coins = 5\n"                        /* an array was expected */
-        "floor_gaps = [16, \"wide\"]\n"      /* one element is unusable */
+        "platforms = [1, {x = 10}]\n"        /* one item is no table  */
+        /* These two fail the load instead (validate_legacy), so saying
+         * "it is ignored" about them would be untrue: no warning. */
+        "floor_gaps = [16, \"wide\"]\n"
+        "checkpoints = [3]\n"
         "[last_star]\n"
-        "x = \"left\"\n";                    /* a key of a single table */
+        "x = \"left\"\n"                       /* a key of a single table */
+        "[[bouncepads_medium]]\n"
+        "pad_type = \"WOD\"\n";                /* not a pad type        */
     toml_result_t parsed = toml_parse(text, (int)strlen(text));
     WarningLog log = {0};
     int count;
@@ -1455,11 +1462,13 @@ static int legacy_warnings_name_every_skipped_shape(void)
     }
     count = serializer_legacy_warnings(parsed.toptab, log_warning, &log);
     toml_free(parsed);
-    if (count != 4 || log.count != 4 ||
+    if (count != 5 || log.count != 5 ||
         !strstr(log.all, "root.physics has type integer, expected table; it is ignored") ||
         !strstr(log.all, "root.coins has type integer, expected array; it is ignored") ||
-        !strstr(log.all, "root.floor_gaps[1] has type string and is ignored") ||
-        !strstr(log.all, "root.last_star.x has type string and is ignored")) {
+        !strstr(log.all, "root.platforms[0] has type integer, expected table; it is ignored") ||
+        !strstr(log.all, "root.last_star.x has type string and is ignored") ||
+        !strstr(log.all, "root.bouncepads_medium[0].pad_type has unknown value 'WOD'; "
+                         "WOOD is used instead")) {
         fprintf(stderr, "level_serializer_test: legacy shape warnings were:\n%s", log.all);
         return fail("each skipped shape should be reported");
     }
@@ -1768,8 +1777,10 @@ static int header_and_checkpoint_rejects(void)
             return 1;
         if (expect_float_value("missing physics key", def.physics.run_max_speed, -1.0f) != 0)
             return 1;
-        if (strcmp(def.name, "Untitled") != 0)
-            return fail("a missing name should read as Untitled");
+        /* A missing name reads as empty, so a campaign can show the file
+         * name instead (campaign_catalog.c); saving writes "Untitled". */
+        if (def.name[0] != '\0')
+            return fail("a missing name should read as empty");
         if (expect_int_value("missing screen_count", def.screen_count, 4) != 0) return 1;
     }
     if (load_schema_text("name = \"\"\nscreen_count = 2\nmusic_volume = 7\n"
@@ -2113,6 +2124,390 @@ static int rejects_unsafe_toml_paths(void)
     return 0;
 }
 
+/* ------------------------------------------------------------------ */
+/* Audit round 4: files without format_version, guards, physics caps   */
+/* ------------------------------------------------------------------ */
+
+/* Load text as a level with every message of the load joined in log. */
+static int load_text_logged(const char *text, LevelDef *def, LoadMessageLog *log)
+{
+    memset(log, 0, sizeof(*log));
+    return level_load_toml_text(text, strlen(text), "audit4", def, log_every_message, log);
+}
+
+/* 1 when log holds no byte a terminal would act on (ESC, BEL, ...). */
+static int log_has_control_bytes(const LoadMessageLog *log)
+{
+    for (const char *p = log->all; *p; p++) {
+        unsigned char byte = (unsigned char)*p;
+        if ((byte < 0x20 && byte != '\n') || byte == 0x7f) return 1;
+    }
+    return 0;
+}
+
+/*
+ * coins = [1, {x = 100, y = 100}, "x"] in a file without format_version:
+ * the warnings said the two non-table items "are ignored", but they were
+ * counted and loaded as coins at 0,0. They are skipped now, and the one
+ * real coin is the first.
+ */
+static int legacy_non_table_items_are_really_ignored(void)
+{
+    static LevelDef def;
+    LoadMessageLog log;
+    int status = 0;
+
+    if (load_text_logged("screen_count = 1\n"
+                         "coins = [1, {x = 100, y = 120}, \"x\"]\n", &def, &log) != 0) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("a legacy array with non-table items should load");
+    }
+    if (expect_int_value("tables counted", def.coin_count, 1) != 0 ||
+        expect_float_value("first coin is the table", def.coins[0].x, 100.0f) != 0 ||
+        expect_float_value("first coin y", def.coins[0].y, 120.0f) != 0)
+        return 1;
+    if (log.count != 2 ||
+        !strstr(log.all, "warning: root.coins[0] has type integer, expected table; it is ignored") ||
+        !strstr(log.all, "warning: root.coins[2] has type string, expected table; it is ignored")) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("each skipped item should be reported");
+    }
+    /* serializer_load_schema on its own skips them too. */
+    if (load_schema_text("coins = [7, {x = 5, y = 6}]\n", &def, &status) != 0) return 1;
+    if (status != 0 || expect_int_value("schema loader count", def.coin_count, 1) != 0 ||
+        expect_float_value("schema loader coin", def.coins[0].x, 5.0f) != 0)
+        return fail("serializer_load_schema should skip non-table items");
+    return 0;
+}
+
+/*
+ * pad_type = "WOD" in a [[bouncepads_medium]] of a file without
+ * format_version became BOUNCEPAD_GREEN, the first value of the enum, with
+ * no word. It is the row's own default now (WOOD for a medium pad), and a
+ * warning names the value.
+ */
+static int legacy_unknown_enum_uses_the_default(void)
+{
+    static LevelDef def;
+    LoadMessageLog log;
+
+    if (load_text_logged("screen_count = 1\n"
+                         "[[bouncepads_medium]]\n"            /* line 2 */
+                         "x = 100\n"
+                         "launch_vy = -400\n"
+                         "pad_type = \"WOD\"\n"               /* line 5 */
+                         "[[axe_traps]]\n"
+                         "pillar_x = 200\n"
+                         "y = 100\n"
+                         "mode = \"SPN\"\n", &def, &log) != 0) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("a legacy level with a misspelt enum should load");
+    }
+    if (expect_int_value("medium pad keeps its default type",
+                         (int)def.bouncepads_medium[0].pad_type, (int)BOUNCEPAD_WOOD) != 0 ||
+        expect_int_value("axe keeps its default mode",
+                         (int)def.axe_traps[0].mode, (int)AXE_MODE_PENDULUM) != 0)
+        return 1;
+    if (log.count != 2 ||
+        !strstr(log.all, "5: warning: root.bouncepads_medium[0].pad_type has unknown value "
+                         "'WOD'; WOOD is used instead") ||
+        !strstr(log.all, "root.axe_traps[0].mode has unknown value 'SPN'; PENDULUM is used")) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("an unknown enum value should be reported");
+    }
+    return 0;
+}
+
+/*
+ * The legacy warnings were only given when the level loaded. A file that
+ * fails, at the schema check or at the runtime rules, now lists them too,
+ * after the error: a misspelt key is often the reason a load fails.
+ */
+static int legacy_warnings_come_with_a_failed_load(void)
+{
+    static LevelDef def;
+    LoadMessageLog log;
+    const char *first_newline;
+
+    /* Fails the runtime rules: music_volume is at most 128. */
+    if (load_text_logged("screen_count = 1\n"
+                         "music_volume = 500\n"
+                         "colour = \"red\"\n", &def, &log) == 0)
+        return fail("a level with music_volume 500 should not load");
+    first_newline = strchr(log.all, '\n');
+    if (log.count != 2 || !strstr(log.all, "music_volume") ||
+        !strstr(log.all, "warning: root has unknown key 'colour'; it is ignored") ||
+        !first_newline || strstr(log.all, "warning") < first_newline) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("a failed load should list the error, then the legacy warnings");
+    }
+
+    /* Fails the schema check: a floor gap that is not a number. */
+    if (load_text_logged("screen_count = 1\n"
+                         "floor_gaps = [\"wide\"]\n"
+                         "colour = \"red\"\n", &def, &log) == 0)
+        return fail("a non-number floor gap should not load");
+    if (log.count != 2 ||
+        !strstr(log.all, "2: root.floor_gaps[0] has type string, expected integer") ||
+        !strstr(log.all, "warning: root has unknown key 'colour'")) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("a schema failure should list the legacy warnings too");
+    }
+    return 0;
+}
+
+/*
+ * A load that cannot get memory for its staging copy says so and leaves
+ * the caller's LevelDef exactly as it was.
+ */
+static int load_without_memory_leaves_the_level_alone(void)
+{
+    static LevelDef def;
+    LoadMessageLog log;
+
+    level_def_init_defaults(&def);
+    snprintf(def.name, sizeof(def.name), "%s", "kept");
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_LOAD_MEMORY);
+    int loaded = load_text_logged("name = \"replaced\"\nscreen_count = 1\n", &def, &log);
+    serializer_test_set_failure(SERIALIZER_TEST_FAILURE_NONE);
+    if (loaded == 0) return fail("a load without memory should fail");
+    if (log.count != 1 || !strstr(log.all, "out of memory") || strcmp(def.name, "kept") != 0) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("a load without memory should report it and keep the caller's level");
+    }
+    return 0;
+}
+
+/*
+ * What a file without format_version cannot skip fails its load. Those
+ * failures reached the editor as "cannot read the level's settings and
+ * tables" on line 0, or named the bare key ("tile_height is outside C int
+ * range"). Each now names the full TOML path and its line.
+ */
+static int expect_legacy_error(const char *text, const char *message, int line)
+{
+    static LevelDef def;
+    LoadMessageLog log;
+    char expected[256];
+
+    if (load_text_logged(text, &def, &log) == 0) {
+        fprintf(stderr, "level_serializer_test: loaded, expected '%s'\n", message);
+        return 1;
+    }
+    snprintf(expected, sizeof(expected), "%d: %s", line, message);
+    if (strncmp(log.all, expected, strlen(expected)) != 0) {
+        fprintf(stderr, "level_serializer_test: expected '%s' first; messages were:\n%s",
+                expected, log.all);
+        return 1;
+    }
+    return 0;
+}
+
+static int legacy_errors_name_path_and_line(void)
+{
+    char too_many[1024];
+    int used = snprintf(too_many, sizeof(too_many), "screen_count = 4\nfloor_gaps = [");
+
+    for (int i = 0; i <= MAX_FLOOR_GAPS && used > 0 && (size_t)used < sizeof(too_many); i++)
+        used += snprintf(too_many + used, sizeof(too_many) - (size_t)used, "%s%d",
+                         i ? ", " : "", 64 + i * 64);
+    if (used <= 0 || (size_t)used + 3 >= sizeof(too_many)) return fail("fixture too long");
+    snprintf(too_many + used, sizeof(too_many) - (size_t)used, "]\n");
+
+    if (expect_legacy_error(too_many, "root.floor_gaps has 17 items (max 16)", 2)) return 1;
+    if (expect_legacy_error("screen_count = 1\n"
+                            "floor_gaps = [16, \"wide\"]\n",
+                            "root.floor_gaps[1] has type string, expected integer", 2))
+        return 1;
+    if (expect_legacy_error("screen_count = 1\n"
+                            "[[checkpoints]]\n"
+                            "y = 100\n",
+                            "root.checkpoints[0] missing required key 'x'", 2))
+        return 1;
+    if (expect_legacy_error("screen_count = 1\n"
+                            "[[checkpoints]]\n"
+                            "x = 100\n"
+                            "y = 100\n"
+                            "[[checkpoints]]\n"
+                            "x = \"left\"\n"
+                            "y = 100\n",
+                            "root.checkpoints[1].x has type string, expected finite number", 6))
+        return 1;
+    if (expect_legacy_error("screen_count = 1\n"
+                            "checkpoints = [3]\n",
+                            "root.checkpoints[0] has type integer, expected table", 2))
+        return 1;
+    if (expect_legacy_error("screen_count = 1\n"
+                            "[[platforms]]\n"
+                            "x = 100\n"
+                            "[[platforms]]\n"
+                            "x = 200\n"
+                            "tile_height = 1e20\n",
+                            "root.platforms[1].tile_height is outside C int range", 6))
+        return 1;
+    if (expect_legacy_error("music_volume = 1e20\n",
+                            "root.music_volume is outside C int range", 1))
+        return 1;
+    return 0;
+}
+
+/*
+ * A key or a value quoted in a message is untrusted: an ESC in it would
+ * reach the terminal that shows the log, or the editor's status bar, as a
+ * control sequence. Every such byte is written as \xHH instead.
+ */
+static int messages_escape_control_bytes(void)
+{
+    static LevelDef def;
+    LoadMessageLog log;
+
+    /* A versioned file: unknown keys are errors, at the root and in a table. */
+    if (load_text_logged("format_version = 1\n"
+                         "\"\\u001b[31mred\" = 1\n", &def, &log) == 0)
+        return fail("an unknown root key should not load");
+    if (!strstr(log.all, "root has unknown key '\\x1b[31mred'") || log_has_control_bytes(&log)) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("an unknown root key should be escaped");
+    }
+    if (load_text_logged("format_version = 1\n"
+                         "[[coins]]\n"
+                         "x = 1\n"
+                         "y = 1\n"
+                         "\"\\u001b]0;title\\u0007\" = 2\n", &def, &log) == 0)
+        return fail("an unknown table key should not load");
+    if (!strstr(log.all, "root.coins[0] has unknown key '\\x1b]0;title\\x07'") ||
+        log_has_control_bytes(&log)) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("an unknown table key should be escaped");
+    }
+
+    /* A file without format_version: the same keys are warnings, and an
+     * unknown enum value is quoted as well. */
+    if (load_text_logged("screen_count = 1\n"
+                         "\"\\u001b[2J\" = 1\n"
+                         "[[coins]]\n"
+                         "x = 10\n"
+                         "y = 10\n"
+                         "\"back\\\\slash\\u009b\" = 2\n"
+                         "[[axe_traps]]\n"
+                         "pillar_x = 200\n"
+                         "y = 100\n"
+                         "mode = \"\\u001b[5m\"\n", &def, &log) != 0) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("a legacy level with odd keys should load");
+    }
+    if (!strstr(log.all, "root has unknown key '\\x1b[2J'") ||
+        !strstr(log.all, "root.coins[0] has unknown key 'back\\\\slash\\xc2\\x9b'") ||
+        !strstr(log.all, "mode has unknown value '\\x1b[5m'") ||
+        log_has_control_bytes(&log)) {
+        fprintf(stderr, "level_serializer_test: messages were:\n%s", log.all);
+        return fail("legacy warnings should escape keys and values");
+    }
+
+    /* The helper itself: a cut never leaves half an escape behind. */
+    {
+        char small[6];
+        serializer_message_text(small, sizeof(small), "ab\x1b", 3);
+        if (strcmp(small, "ab") != 0) return fail("a cut escape should be left out whole");
+        serializer_message_text(small, sizeof(small), NULL, 4);
+        if (small[0] != '\0') return fail("no text should give an empty string");
+    }
+    return 0;
+}
+
+/*
+ * Every row of the schema table but format_version (written by hand, first)
+ * is written by a save exactly once, and the save writes nothing that is
+ * not a row. A row added to the table and to neither order list would load
+ * and then vanish on the next save.
+ */
+static int save_order_covers_every_schema_row(void)
+{
+    size_t rows = serializer_schema_row_count();
+    size_t entries = serializer_save_order_count();
+
+    if (rows < 40 || entries + 1 != rows) {
+        fprintf(stderr, "level_serializer_test: %zu schema rows, %zu saved entries\n",
+                rows, entries);
+        return fail("the save order should have one entry per schema row but format_version");
+    }
+    for (size_t r = 0; r < rows; r++) {
+        const char *name = serializer_schema_row_name(r);
+        int seen = 0;
+
+        if (!name) return fail("a schema row has no name");
+        for (size_t e = 0; e < entries; e++)
+            if (strcmp(serializer_save_order_name(e), name) == 0) seen++;
+        if (seen != (strcmp(name, "format_version") == 0 ? 0 : 1)) {
+            fprintf(stderr, "level_serializer_test: '%s' is saved %d times\n", name, seen);
+            return fail("every schema row should be saved exactly once");
+        }
+    }
+    for (size_t e = 0; e < entries; e++) {
+        const char *name = serializer_save_order_name(e);
+        int found = 0;
+        for (size_t r = 0; r < rows && !found; r++)
+            found = strcmp(serializer_schema_row_name(r), name) == 0;
+        if (!found) {
+            fprintf(stderr, "level_serializer_test: '%s' is saved but is no row\n", name);
+            return fail("the save order should only name schema rows");
+        }
+    }
+    if (serializer_schema_row_name(rows) != NULL || serializer_save_order_name(entries) != NULL)
+        return fail("an index past the end should give NULL");
+    return 0;
+}
+
+/*
+ * A [physics] override is exactly -1 (the engine's value) or a number from
+ * 0 to its cap: MAX_PLAYER_SPEED (960 px/s, 16 px a step) for the two top
+ * speeds and MAX_PLAYER_ACCEL for the rest. Any negative value used to
+ * pass (and then meant "engine default"), and a top speed of 10000 px/s
+ * moved the player 166 px a step, through any wall.
+ */
+static int expect_physics(const char *key, const char *value, int loads)
+{
+    static LevelDef def;
+    LoadMessageLog log;
+    char text[256];
+    int loaded;
+
+    snprintf(text, sizeof(text), "format_version = 1\nscreen_count = 1\n[physics]\n%s = %s\n",
+             key, value);
+    loaded = load_text_logged(text, &def, &log) == 0;
+    if (loaded != loads) {
+        fprintf(stderr, "level_serializer_test: physics.%s = %s %s; messages were:\n%s",
+                key, value, loaded ? "loaded" : "did not load", log.all);
+        return 1;
+    }
+    if (!loads && !strstr(log.all, "must be -1 for the engine default, or 0 to")) {
+        fprintf(stderr, "level_serializer_test: physics message was:\n%s", log.all);
+        return 1;
+    }
+    return 0;
+}
+
+static int physics_overrides_are_default_or_capped(void)
+{
+    if (expect_physics("walk_max_speed", "-1.0", 1) ||
+        expect_physics("walk_max_speed", "0.0", 1) ||
+        expect_physics("walk_max_speed", "960.0", 1) ||
+        expect_physics("run_max_speed", "960.5", 0) ||
+        expect_physics("run_max_speed", "10000.0", 0) ||
+        expect_physics("walk_max_speed", "-5.0", 0) ||
+        expect_physics("walk_max_speed", "-0.5", 0) ||
+        expect_physics("air_friction", "10000.0", 1) ||
+        expect_physics("air_friction", "10001.0", 0) ||
+        expect_physics("ground_counter_accel", "-2.0", 0) ||
+        expect_physics("cam_lookahead_vx_factor", "-0.2", 0) ||
+        expect_physics("cam_lookahead_max", "50.0", 1))
+        return fail("physics overrides should be -1 or within 0..cap");
+    if (expect_float_value("speed cap", (float)MAX_PLAYER_SPEED,
+                           (float)(FLOOR_PIECE_W * TARGET_FPS)) != 0)
+        return 1;
+    return 0;
+}
+
 int parser_boundary_test(void);
 
 static int metadata_roundtrip_and_limits(void)
@@ -2176,6 +2571,14 @@ int main(void)
     if (rejects_bad_runtime_links() != 0) return 1;
     if (rejects_unsafe_toml_paths() != 0) return 1;
     if (legacy_wav_music_loads_as_qoa() != 0) return 1;
+    if (legacy_non_table_items_are_really_ignored() != 0) return 1;
+    if (legacy_unknown_enum_uses_the_default() != 0) return 1;
+    if (legacy_warnings_come_with_a_failed_load() != 0) return 1;
+    if (load_without_memory_leaves_the_level_alone() != 0) return 1;
+    if (legacy_errors_name_path_and_line() != 0) return 1;
+    if (messages_escape_control_bytes() != 0) return 1;
+    if (save_order_covers_every_schema_row() != 0) return 1;
+    if (physics_overrides_are_default_or_capped() != 0) return 1;
 
     puts("level_serializer_test: ok");
     return 0;

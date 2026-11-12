@@ -340,6 +340,22 @@ void properties_apply_to_selection(EditorState *es, EntityType type, const char 
     editor_set_status(es, "%s set on %d %s", key, changed + 1, editor_entity_type_name(type));
 }
 
+int properties_shared_field_active(const EditorState *es)
+{
+    return es && es->shared_field_id != 0 &&
+           es->ui.active_id == es->shared_field_id &&
+           editor_selection_count(es) > 1 &&
+           (int)es->selection.type == es->shared_field_type;
+}
+
+void properties_apply_shared_field(EditorState *es)
+{
+    if (!es) return;
+    properties_apply_to_selection(es, (EntityType)es->shared_field_type,
+                                  es->shared_field_key ? es->shared_field_key : "value",
+                                  es->shared_field_offset, es->shared_field_size);
+}
+
 /* ------------------------------------------------------------------ */
 /* properties_render                                                   */
 /* ------------------------------------------------------------------ */

@@ -111,7 +111,7 @@ static void draw_collision_boxes(const GameState *gs, int cam)
                                   BRIDGE_TILE_W, BRIDGE_TILE_H}, cam, (Color){180,120,60,255});
     }
     for (int i=0;i<gs->world.coin_count;i++) if (gs->world.coins[i].active)
-        outline((IntRect){(int)gs->world.coins[i].x,(int)gs->world.coins[i].y,COIN_DISPLAY_W,COIN_DISPLAY_H},cam,(Color){255,255,0,255});
+        outline(coin_get_hitbox(&gs->world.coins[i]),cam,(Color){255,255,0,255});
     for (int i=0;i<gs->world.star_yellow_count;i++) if (gs->world.star_yellows[i].active)
         outline(health_star_get_hitbox(&gs->world.star_yellows[i]),cam,(Color){255,0,255,255});
     for (int i=0;i<gs->world.star_green_count;i++) if (gs->world.star_greens[i].active)
@@ -177,12 +177,12 @@ static void draw_collision_boxes(const GameState *gs, int cam)
     const Bouncepad *pads[] = {gs->world.bouncepads_medium, gs->world.bouncepads_small, gs->world.bouncepads_high};
     int counts[] = {gs->world.bouncepad_medium_count, gs->world.bouncepad_small_count, gs->world.bouncepad_high_count};
     Color colors[] = {{0,255,255,255}, {0,200,0,255}, {255,50,50,255}};
+    /* A pad is not a box: it launches a player whose feet reach the floor
+     * over its art columns (player_surfaces.c). The outline is that strip
+     * of floor, from the same function the launch test uses. */
     for (int kind = 0; kind < 3; kind++)
-        for (int i = 0; i < counts[kind]; i++) {
-            const Bouncepad *p = &pads[kind][i];
-            outline((IntRect){(int)p->x + BOUNCEPAD_ART_X, (int)p->y, BOUNCEPAD_ART_W, p->h},
-                    cam, colors[kind]);
-        }
+        for (int i = 0; i < counts[kind]; i++)
+            outline(bouncepad_trigger_rect(&pads[kind][i]), cam, colors[kind]);
     for (int i = 0; i < gs->world.vine_count; i++)
         outline(player_vine_grab_rect(&gs->world.vines[i]), cam, (Color){0,180,0,255});
     for (int i=0;i<gs->world.rail_count;i++) for (int j=0;j<gs->world.rails[i].count;j++)

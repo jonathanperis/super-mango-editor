@@ -458,11 +458,15 @@ keyboard layout and rendering.
 1. Run `./out/super-mango --debug --no-save --seed 7 --level levels/labs/06_camera.toml`.
 2. Press F8 to restart and start recording. Move, jump and change a tuning
    value with F6 and minus/equal.
-3. Press F9 to export. The native game writes a uniquely named TOML file in the
-   working directory; the browser starts a download.
-4. Replay it:
-   `./out/super-mango --level levels/labs/06_camera.toml --experiment mango-experiment-N.toml`
-   (use your file's name in place of `mango-experiment-N.toml`).
+3. Press F9 to export. The native game writes a uniquely named TOML file in
+   the player data folder, the one that holds `profile.toml`
+   (`~/Library/Application Support/SuperMango/SuperMango/` on macOS,
+   `~/.local/share/SuperMango/SuperMango/` on Linux,
+   `%APPDATA%\SuperMango\SuperMango\` on Windows), and the debug log names
+   it; the browser starts a download.
+4. Replay it (macOS shown; use your system's folder and your file's name in
+   place of `mango-experiment-N.toml`):
+   `./out/super-mango --level levels/labs/06_camera.toml --experiment "$HOME/Library/Application Support/SuperMango/SuperMango/mango-experiment-N.toml"`
 
 **What you will see:** the run plays itself back exactly and freezes after the
 last recorded step, even if you press keys during the replay.
@@ -496,11 +500,16 @@ matches). Every step is exactly 1/60 s. The random generator
 the recorded `level_hash`, or the replay is refused. With the same engine
 build, the same steps run in the same order on the same data.
 
-Across platforms, the same C source can still round floating-point results
-differently: another compiler may fuse a multiply and add into one
-instruction, or a maths library function such as `sinf` may return a value
-that differs in the last bit. Those tiny differences can grow over thousands of
-steps, so a replay is only guaranteed to match on the same build.
+Across platforms, the same C source could still round floating-point results
+differently: a compiler may fuse a multiply and an add into one instruction,
+and a maths library function such as `sinf` may return a value that differs in
+the last bit from one C library to the next. Those tiny differences can grow
+over thousands of steps. The project closes both gaps: the Makefile passes
+`-ffp-contract=off` to the native and the WebAssembly builds, so nothing is
+fused, and the fixed step uses `game_sinf()` and `game_cosf()` from
+`src/core/game_trig.h`, which use only `+ - * /` and `floor()`, operations
+IEEE 754 defines exactly. So a capture replays the same on every platform built
+from the same source.
 
 </details>
 
