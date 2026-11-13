@@ -370,7 +370,11 @@ node check_live_site.mjs --expect-version "$(git rev-parse HEAD)" --out ../../ou
 
 Without `--expect-version` it accepts whatever version the page serves;
 `--url` checks another copy of the page, and `--timeout-seconds` shortens the
-wait. Exit status 0 is a pass, 1 a failed check, 2 bad arguments.
+wait. Exit status 0 is a pass, 1 a failed check, 2 bad arguments, and 3 means
+the page kept serving another commit until the deadline. A later `main` run
+can deploy while this one waits, so the job counts 3 as a pass only when the
+GitHub compare API says the served commit is newer than this run's (that run
+checks its own deploy); an older or unrelated version still fails.
 
 The pages around the game can also be smoked with plain HTTP:
 
