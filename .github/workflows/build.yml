@@ -1139,13 +1139,34 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
+      # Exit 3: the page kept serving another commit. A later main run can
+      # deploy while this one waits; that is a pass when the served commit is
+      # newer (the compare API says it is "ahead" of this one), because that
+      # run checks its own deploy. Any other version is a failure.
       - name: Check the published game
         working-directory: tools/live-check
         env:
           PAGE_URL: ${{ needs.pages-deploy.outputs.page_url }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          status=0
           node check_live_site.mjs --url "${PAGE_URL%/}/super-mango.html" \
-            --expect-version "$GITHUB_SHA" --timeout-seconds 300 --out "$RUNNER_TEMP/live-check"
+            --expect-version "$GITHUB_SHA" --timeout-seconds 300 \
+            --out "$RUNNER_TEMP/live-check" | tee "$RUNNER_TEMP/live-check.log" || status=${PIPESTATUS[0]}
+          if [ "$status" -eq 3 ]; then
+            served=$(sed -n 's/^check_live_site: served //p' "$RUNNER_TEMP/live-check.log" | tail -n 1)
+            case "$served" in
+              *,*|'') echo "::error::the page serves several or no versions: '$served'"; exit 1 ;;
+            esac
+            relation=$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...$served" --jq .status) || relation=unknown
+            if [ "$relation" = ahead ]; then
+              echo "::notice::a newer commit ($served) was deployed while this check waited; its own run checks it"
+              exit 0
+            fi
+            echo "::error::the page serves $served, which is $relation of $GITHUB_SHA (not a newer deploy)"
+            exit 1
+          fi
+          exit "$status"
 
       - name: Upload screenshots
         if: always()

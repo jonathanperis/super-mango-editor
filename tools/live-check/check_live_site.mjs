@@ -19,7 +19,11 @@
  * Throughout, any console error, uncaught page error or failed request
  * fails the check, except the messages in KNOWN_NOISE.
  *
- * Exit status: 0 pass, 1 check failed, 2 bad arguments.
+ * Exit status: 0 pass, 1 check failed, 2 bad arguments, 3 the page kept
+ * serving another version until the deadline (its versions are the last
+ * line, "check_live_site: served <v>[,<v>]"). A later deploy can replace this
+ * one while the check waits; the workflow treats 3 as a pass only when the
+ * served commit is newer than the expected one (its own run checks it).
  */
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -99,9 +103,19 @@ function freshUrl(url) {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+/* Thrown when the page serves other versions until the deadline. */
+class OtherVersionError extends Error {
+    constructor(expected, served) {
+        super(`the page never served version ${expected}: serves ${served.join(', ')}`);
+        this.served = served;
+    }
+}
+
 async function waitForVersion(options, deadline) {
     let last;  // why the latest attempt did not match; set by every attempt
+    let other;  // the versions served by that attempt, when it got any
     for (;;) {
+        other = null;
         try {
             const response = await fetch(freshUrl(options.url), { cache: 'no-store' });
             if (!response.ok) {
@@ -111,13 +125,15 @@ async function waitForVersion(options, deadline) {
                 if (!versions.length) last = 'no versioned asset links in the page';
                 else if (!options.expectVersion) return versions;
                 else if (versions.every(version => sameVersion(version, options.expectVersion))) return versions;
-                else last = `serves ${versions.join(', ')}`;
+                else { last = `serves ${versions.join(', ')}`; other = versions; }
             }
         } catch (error) {
             last = error.message;
         }
-        if (Date.now() >= deadline)
+        if (Date.now() >= deadline) {
+            if (other) throw new OtherVersionError(options.expectVersion, other);
             throw new Error(`the page never served version ${options.expectVersion || '(any)'}: ${last}`);
+        }
         await sleep(10000);
     }
 }
@@ -207,5 +223,9 @@ async function main() {
 
 main().catch(error => {
     console.error(`check_live_site: FAILED: ${error.message}`);
+    if (error instanceof OtherVersionError) {
+        console.log(`check_live_site: served ${error.served.join(',')}`);
+        process.exit(3);
+    }
     process.exit(1);
 });
