@@ -171,8 +171,12 @@ static int inspection_and_replay(void)
 #ifndef _WIN32
         CHECK(mkdir(TEST_OUT "bad\tfolder", 0700) == 0 || errno == EEXIST);
 #endif
+        /* The refused folder still leaves path as a string: F9's warning
+         * prints it, so stale bytes must not reach that log line. */
+        memset(exported, 'X', sizeof(exported));
         CHECK(game_experiment_export_at(&gs, TEST_OUT "bad\tfolder/", 1002, exported,
                                         sizeof(exported)) == EXPERIMENT_EXPORT_WRITE_FAILED);
+        CHECK(exported[0] == '\0');
 #ifndef _WIN32
         CHECK(rmdir(TEST_OUT "bad\tfolder") == 0);
 #endif

@@ -149,6 +149,8 @@ ExperimentExportResult game_experiment_export_at(GameState *gs, const char *fold
 {
     const GameExperiment *tape = gs->screen.experiment;
     char checked[SERIALIZER_IO_PATH_MAX];
+    /* Every return leaves path a string: F9's failure warning prints it. */
+    if (size) path[0] = '\0';
     if (!tape || !tape->count) return EXPERIMENT_EXPORT_NOTHING;
     /* The folder comes from HOME or XDG_DATA_HOME: write only below one
      * that is a usable path. The web build's folder is "", which is fine. */
@@ -229,7 +231,11 @@ void game_experiment_export(GameState *gs)
         break;
     default:
         debug_log(&gs->screen.debug, "Export failed: could not write the file");
-        TraceLog(LOG_WARNING, "Experiment export: could not write %s", path);
+        /* An empty path means the player data folder itself was refused. */
+        if (path[0] == '\0')
+            TraceLog(LOG_WARNING, "Experiment export: the player data folder is not a usable path");
+        else
+            TraceLog(LOG_WARNING, "Experiment export: could not write %s", path);
         break;
     }
 }
