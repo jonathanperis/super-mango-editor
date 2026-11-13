@@ -174,7 +174,9 @@ required check either.
   scripted replay smoke on Linux. An always-on `Docs drift` job runs
   `make docs-drift`. A pull request that only changes documentation (the
   manual, `.specs/`, top-level Markdown) skips the C build, test and
-  sanitizer work; the required checks still report. On `main` it publishes the website; on a `v*` tag
+  sanitizer work; the required checks still report. On `main` it publishes the website
+  and then loads the published game in headless Chromium (`Live site check`,
+  `tools/live-check/`); on a `v*` tag
   or a manual release run it adds checksums and build provenance and publishes
   the release archives.
 - **`docs.yml`** lints, audits, builds and link-checks the website. It does

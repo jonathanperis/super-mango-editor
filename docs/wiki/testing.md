@@ -349,7 +349,30 @@ interactive browser testing.
 
 `make web` produces `out/super-mango.html`, `out/super-mango.js`, `out/super-mango.wasm`, and `out/super-mango.data`, plus the debug variants. Local Emscripten preflights are useful; GitHub Actions remain the authoritative WebAssembly gate. Use real Node.js for artifact syntax/module checks, including `NODE=/path/to/node` when another runtime shadows `node` on PATH.
 
-After a Pages deploy, smoke the live site with at least:
+After every Pages deploy, Build & Release's `Live site check` job loads the
+published game in headless Chromium with `tools/live-check/check_live_site.mjs`.
+It waits up to five minutes for the page to link this commit's assets
+(`super-mango.js?v=<commit>`), then fails when the canvas never reaches its
+running label, the loading line stays visible, the console logs an error, the
+page throws, a request fails, or the game stops while ArrowRight is held.
+Three messages every healthy load prints are allowed by their exact text: audio
+waiting for a user gesture, the `ScriptProcessorNode` deprecation (see
+[Build System](../build-system/), "Web audio") and SwiftShader's ReadPixels
+stall. Screenshots and `report.json` are uploaded as the `live-site-check`
+artifact. The job is not a required check: the site is already live when it
+runs, so a failure means fix forward. Run it locally with real Node.js:
+
+```sh
+cd tools/live-check
+npm ci && npx playwright install chromium
+node check_live_site.mjs --expect-version "$(git rev-parse HEAD)" --out ../../out/live-check
+```
+
+Without `--expect-version` it accepts whatever version the page serves;
+`--url` checks another copy of the page, and `--timeout-seconds` shortens the
+wait. Exit status 0 is a pass, 1 a failed check, 2 bad arguments.
+
+The pages around the game can also be smoked with plain HTTP:
 
 ```sh
 python3 - <<'PY'

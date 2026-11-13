@@ -1094,7 +1094,64 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # LIVE SITE CHECK
+  # After a deploy, load the published game in headless Chromium
+  # (tools/live-check/check_live_site.mjs): wait until the page links this
+  # commit's assets, then fail on a canvas that never reaches "running", a
+  # visible loading line, a console error, page error or failed request, or
+  # a game that stops when ArrowRight is held. Known noise (audio waiting for
+  # a gesture, ScriptProcessorNode, SwiftShader ReadPixels) is listed in the
+  # script. Not a required check: the site is already live when it runs, so
+  # a failure is a signal to fix forward, with screenshots in the artifact.
+  # ────────────────────────────────────────────────────────────────────────────
+  live-site-check:
+    name: Live site check
+    needs: pages-deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out the live-check script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .node-version
+            tools/live-check
+
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+
+      - name: Install Playwright Chromium
+        working-directory: tools/live-check
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Check the published game
+        working-directory: tools/live-check
+        env:
+          PAGE_URL: ${{ needs.pages-deploy.outputs.page_url }}
+        run: |
+          node check_live_site.mjs --url "${PAGE_URL%/}/super-mango.html" \
+            --expect-version "$GITHUB_SHA" --timeout-seconds 300 --out "$RUNNER_TEMP/live-check"
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: live-site-check
+          path: ${{ runner.temp }}/live-check
+          if-no-files-found: warn
+          retention-days: 14

@@ -69,12 +69,18 @@ static int xy_same(float ax, float ay, float bx, float by)
  * Returns 1 when the active member for `type` matches, including float
  * bits. A null pair matches; one null side does not. ENT_COUNT and any
  * other type this switch does not name do not match.
+ *
+ * Each case lists the fields a level file stores for that type, which are
+ * the ones the editor can change (Properties rows in properties_entities.c,
+ * dragging, nudging). A field added to a PlacementData member must be added
+ * to its case too, or an edit to it would not make an undo step.
  */
 int placement_same(EntityType type, const PlacementData *a, const PlacementData *b)
 {
     if (!a || !b) return a == b;
 
     switch (type) {
+    /* Level structure: gaps, checkpoints, rails and solid platforms. */
     case ENT_FLOOR_GAP:
         return a->floor_gap == b->floor_gap;
     case ENT_CHECKPOINT:
@@ -89,6 +95,7 @@ int placement_same(EntityType type, const PlacementData *a, const PlacementData 
                a->platform.tile_width == b->platform.tile_width &&
                text_same(a->platform.tile_path, b->platform.tile_path,
                          sizeof(a->platform.tile_path));
+    /* Collectibles and markers: a position and nothing else. */
     case ENT_COIN:
         return xy_same(a->coin.x, a->coin.y, b->coin.x, b->coin.y);
     case ENT_STAR_YELLOW:
@@ -102,6 +109,8 @@ int placement_same(EntityType type, const PlacementData *a, const PlacementData 
         /* Player spawn reuses the {x, y} last_star member; see
          * editor_snapshot_entity. */
         return xy_same(a->last_star.x, a->last_star.y, b->last_star.x, b->last_star.y);
+    /* Enemies: start position, speed, patrol span and, for the ones
+     * that animate from a placed frame, that starting frame. */
     case ENT_SPIDER:
         return f32_same(a->spider.x, b->spider.x) && f32_same(a->spider.vx, b->spider.vx) &&
                f32_same(a->spider.patrol_x0, b->spider.patrol_x0) &&
@@ -124,6 +133,8 @@ int placement_same(EntityType type, const PlacementData *a, const PlacementData 
         return f32_same(a->fish.x, b->fish.x) && f32_same(a->fish.vx, b->fish.vx) &&
                f32_same(a->fish.patrol_x0, b->fish.patrol_x0) &&
                f32_same(a->fish.patrol_x1, b->fish.patrol_x1);
+    /* Hazards: position plus the setting that shapes each one (swing
+     * mode, saw direction, spike count, rail and speed). */
     case ENT_AXE_TRAP:
         return f32_same(a->axe_trap.pillar_x, b->axe_trap.pillar_x) &&
                f32_same(a->axe_trap.y, b->axe_trap.y) &&
@@ -149,6 +160,8 @@ int placement_same(EntityType type, const PlacementData *a, const PlacementData 
         return f32_same(a->blue_flame.x, b->blue_flame.x);
     case ENT_FIRE_FLAME:
         return f32_same(a->fire_flame.x, b->fire_flame.x);
+    /* Surfaces the player stands on, bounces off or climbs: position,
+     * size in tiles and the variant (pad strength, vine type, rail). */
     case ENT_FLOAT_PLATFORM:
         return a->float_platform.mode == b->float_platform.mode &&
                f32_same(a->float_platform.x, b->float_platform.x) &&
@@ -177,6 +190,7 @@ int placement_same(EntityType type, const PlacementData *a, const PlacementData 
         return f32_same(a->rope.x, b->rope.x) && f32_same(a->rope.y, b->rope.y) &&
                a->rope.tile_count == b->rope.tile_count;
     case ENT_COUNT:
+        /* Not a real type: the count of types, never a placed entity. */
         break;
     }
     return 0;

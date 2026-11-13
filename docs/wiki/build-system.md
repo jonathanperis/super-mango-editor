@@ -332,6 +332,29 @@ beside it is `aria-hidden` and stops turning under
 against a fake page, and `tools/check_web_boot_contract.py` fails the build if
 a host page grows boot logic of its own.
 
+**Web audio: why it is not an AudioWorklet.** In the browser, raylib's
+miniaudio plays sound through a `ScriptProcessorNode`, and Chromium logs that
+this node is deprecated. miniaudio can use an `AudioWorkletNode` instead
+(`MA_ENABLE_AUDIO_WORKLETS` with `-sAUDIO_WORKLET=1 -sWASM_WORKERS=1
+-sASYNCIFY`), but Wasm Workers share memory through `SharedArrayBuffer`, and
+browsers only allow that on a cross-origin isolated page, one served with
+`Cross-Origin-Opener-Policy: same-origin` and
+`Cross-Origin-Embedder-Policy: require-corp`. GitHub Pages cannot send custom
+headers, so the published page cannot be isolated and that build would not
+start there. The options, none taken yet:
+
+- **Keep `ScriptProcessorNode`** (current). It works in every browser today;
+  the deprecation has no removal date. `web/audio-unlock.js` still resumes the
+  audio on the first key or pointer press.
+- **A service worker that adds the two headers** (the `coi-serviceworker`
+  approach). The first visit loads twice, the worker must be allowed by the
+  page's Content-Security-Policy, and `-sASYNCIFY` makes the `.wasm` larger.
+- **A host that sends headers** (Cloudflare Pages, Netlify and others accept a
+  `_headers` file). That moves the site off GitHub Pages and its deploy job.
+
+The live site check in Build & Release lists the deprecation as known noise,
+so it does not fail on it; changing the audio path means changing that list.
+
 The target also produces `out/super-mango-debug.html` for direct debug HTML launches. It is not linked separately: `tools/web_debug_page.py` copies the built `super-mango.html`, inlines `web/debug-boot.js` (which sets `Module.__superMangoDebug`, so `web/boot.js` passes `--debug`) just before the `super-mango.js` tag, and re-pins the CSP. Both pages therefore load the same `super-mango.js`, `.wasm` and `.data`; the debug page used to link byte-identical copies of them. The docs-site browser debug button uses the normal `super-mango.js` payload and passes `--debug` at boot.
 
 For release confidence, the **GitHub Actions WebAssembly build is authoritative**. Report local SDK/cache failures separately from application failures, and require the CI `make web`, artifact checks and Pages assembly checks. JavaScript syntax/WASM validation requires real Node.js; if a local `node` wrapper launches Bun, set `NODE` to the Node executable explicitly.
@@ -693,7 +716,7 @@ Five workflow files handle automated builds, docs checks, analysis and fuzzing; 
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis; superseded PR runs are cancelled. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
 | Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 300 seconds per harness) on the level loader, the editor's save → load round trip, the profile and ghost decoders, and the campaign manifest loader and experiment capture decoder. After a successful search `make fuzz-merge` minimises each corpus (`-merge=1`); the result is kept in the Actions cache for the next run and uploaded as the `fuzz-corpus` artifact (90 days), and a run that finds no cache entry downloads the newest such artifact with `gh run download` instead of starting from the seeds. Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
 | Static analysis | `static-analysis.yml` | Pull requests (not documentation-only ones), manual | `clang-tidy (informational)`: builds the pinned raylib for its headers, writes `compile_commands.json` and runs `tools/run_clang_tidy.py` with the checks in `.clang-tidy` (Clang static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/` only. Findings go to the job summary; the job never fails on them and is not a required check |
-| Pages | `build.yml` jobs `pages-build` → `pages-deploy` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed) |
+| Pages | `build.yml` jobs `pages-build` → `pages-deploy` → `live-site-check` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed). `Live site check` then loads the published game in headless Chromium (`tools/live-check/check_live_site.mjs`, see [Testing](../testing/)) and reports without blocking anything |
 
 Every job sets `timeout-minutes`. The build legs and the sanitizers take 1 to
 6 minutes when raylib comes from the cache, but a pull request that changes the
