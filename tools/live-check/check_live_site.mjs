@@ -100,7 +100,7 @@ function freshUrl(url) {
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function waitForVersion(options, deadline) {
-    let last = 'no response yet';
+    let last;  // why the latest attempt did not match; set by every attempt
     for (;;) {
         try {
             const response = await fetch(freshUrl(options.url), { cache: 'no-store' });
