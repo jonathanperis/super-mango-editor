@@ -153,7 +153,8 @@ def main():
             imports["game.exe"] = imports["editor.exe"] = ["KERNEL32.dll"]
             assert package_release.collect_windows_dlls(binaries, dll_dir) == []
     # Pages publishing lives in build.yml: the WASM artifact must come from
-    # the same run (no run-id), only pages-deploy may hold Pages/OIDC rights,
+    # the same run (no run-id), only pages-deploy may hold Pages/OIDC rights
+    # (live-site-check after it reads the site with the read-only token),
     # and no workflow may consume another run's artifact via workflow_run.
     workflows = ROOT / ".github/workflows"
     assert not (workflows / "deploy.yml").exists()
@@ -163,7 +164,13 @@ def main():
         assert "github.event.workflow_run" not in text, path.name  # its payload
     build = (workflows / "build.yml").read_text(encoding="utf-8")
     pages_build = build.split("  pages-build:", 1)[1].split("  pages-deploy:", 1)[0]
-    pages_deploy = build.split("  pages-deploy:", 1)[1]
+    pages_deploy = build.split("  pages-deploy:", 1)[1].split("  live-site-check:", 1)[0]
+    # The live check after the deploy only reads the published site: it runs
+    # with the workflow's read-only token and never holds Pages/OIDC rights.
+    live_check = build.split("  live-site-check:", 1)[1]
+    assert "needs: pages-deploy" in live_check
+    assert "permissions:" not in live_check
+    assert "pages: write" not in live_check and "id-token: write" not in live_check
     assert "name: super-mango-wasm" in pages_build and "run-id" not in pages_build
     assert "pages: write" not in pages_build and "id-token: write" not in pages_build
     assert "pages: write" in pages_deploy and "id-token: write" in pages_deploy

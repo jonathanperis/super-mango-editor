@@ -1,0 +1,12 @@
+{
+  "name": "super-mango-live-check",
+  "private": true,
+  "description": "Headless browser check of the published game (check_live_site.mjs); Build & Release runs it after Pages deploy",
+  "type": "module",
+  "scripts": {
+    "check": "node check_live_site.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.64.1"
+  }
+}

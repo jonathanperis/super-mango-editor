@@ -86,16 +86,17 @@ Before creating a release, confirm checks for the intended source commit are gre
 - Build & Release, including the non-gating `Windows x86_64 extras (clang -Werror, Mesa desktop backend)` and `Coverage (Linux x86_64)` jobs
 - CodeQL (`Analyze (c-cpp)`, `Analyze (actions)`, `Analyze (python)`, `Analyze (javascript-typescript)`)
 - Docs (runs on pull requests that touch docs-related paths, weekly and on demand, never on `main` pushes; Build & Release's `Docs drift` job always runs, and on `main` its `Pages build` job lints, builds and checks the site)
-- Pages build and Pages deploy (main pushes and manual runs on main)
+- Pages build, Pages deploy and Live site check (main pushes and manual runs on main; the live check loads the published game in headless Chromium and fails on console errors, see [Testing](../testing/))
 
 > **Required checks:** as of 2026-10-07 the `main` branch ruleset requires
 > `Build (Linux x86_64)`, `Build (macOS arm64)`, `Build (Windows x86_64)`,
 > `Build (WebAssembly)`, `Sanitizers (Linux x86_64)`, `Docs drift`,
 > `Analyze (c-cpp)`, `Analyze (actions)`, `Analyze (python)`,
 > `Analyze (javascript-typescript)` and `CodeQL`, and blocks merges on
-> high-or-higher CodeQL security alerts. The Windows clang and `Desktop
-> backend` jobs and `Docs lint and build` (which only runs for docs-related
-> pull requests) are not required; check that they are green before a release.
+> high-or-higher CodeQL security alerts. `Windows x86_64 extras (clang
+> -Werror, Mesa desktop backend)`, `Coverage (Linux x86_64)`, `Live site
+> check` and `Docs lint and build` (which only runs for docs-related pull
+> requests) are not required; check that they are green before a release.
 
 Publishing rules:
 
@@ -215,3 +216,49 @@ xattr -dr com.apple.quarantine super-mango-macos-arm64
 
 Fixing this properly requires a Developer ID certificate plus notarization in
 the release job; until then, document the workaround in release notes.
+
+<a id="hands-on-checks"></a>
+
+## 7. Hands-on Checks CI Cannot Do
+
+CI builds and tests Windows and macOS, but its runners cannot show what a
+player sees: hosted macOS runners have no OpenGL, and Windows runners have no
+audio device and a small virtual screen. Before a release, someone with the
+machine runs the downloaded archive (not a local build) and ticks these off.
+Until they do, Windows-only behaviour and a real macOS window are unverified.
+
+**Windows (x86_64 archive)**
+
+- [ ] Extract the zip and start `super-mango.exe`. SmartScreen shows "Windows
+      protected your PC" for an unsigned download; **More info › Run anyway**
+      starts it, and no other warning or missing-DLL error appears.
+- [ ] Music and sound effects play, and still play after unplugging and
+      reconnecting headphones.
+- [ ] Resize and maximise the window, then turn on fullscreen in Settings
+      (borderless windowed): the game scales without stretching, and the
+      frame rate holds.
+- [ ] A gamepad (Xbox or compatible) moves, jumps and opens the pause menu;
+      unplugging it mid-level does not crash.
+- [ ] Start `super-mango-editor.exe`, open a level with the file dialog (a
+      PowerShell `OpenFileDialog`; it takes a moment to appear), change
+      an entity, save it under a new name with the save dialog (including a
+      folder with spaces and non-ASCII letters), and play-test it.
+- [ ] Quit from the menu and with the window's close button; both exit
+      without an error dialog.
+
+**macOS (arm64 archive, a real window)**
+
+- [ ] First launch is blocked by Gatekeeper as described in
+      [Verifying a Download](#verifying-a-download); after **Open Anyway** (or
+      removing the quarantine attribute) it starts.
+- [ ] On a Retina display the pixel art is sharp (no blur from 2x scaling) and
+      the HUD sits inside the window.
+- [ ] Drag the window to a second display with a different refresh rate (for
+      example 60 Hz and 120 Hz): the frame cap follows the new display and the
+      game speed does not change.
+- [ ] Music and sound effects play, and continue after switching the output
+      device in Control Centre.
+- [ ] The editor's open and save dialogs work, and Cmd+Q quits both programs.
+
+Record the date, OS version and archive version in the release notes, with
+anything that failed.
