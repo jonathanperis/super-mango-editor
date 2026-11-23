@@ -5,8 +5,8 @@
     "": {
       "name": "super-mango-editor-docs",
       "dependencies": {
-        "@astrojs/markdown-satteri": "^0.4.7",
-        "@astrojs/sitemap": "^3.7.4",
+        "@astrojs/markdown-satteri": "^0.4.10",
+        "@astrojs/sitemap": "^3.7.6",
         "@fontsource/atkinson-hyperlegible": "^5.3.0",
         "@fontsource/dm-mono": "^5.3.0",
         "@fontsource/pixelify-sans": "^5.3.0",
@@ -14,8 +14,8 @@
       },
       "devDependencies": {
         "@astrojs/check": "^0.9.12",
-        "@tailwindcss/vite": "^4.3.4",
-        "tailwindcss": "^4.3.4",
+        "@tailwindcss/vite": "^4.3.5",
+        "tailwindcss": "^4.3.5",
         "typescript": "^6.0.3",
       },
     },
@@ -59,7 +59,7 @@
 
     "@astrojs/runtime": ["@astrojs/runtime@0.1.1", "", { "dependencies": { "@oslojs/encoding": "^1.1.0", "clsx": "^2.1.1" } }, "sha512-2Tr9IJ4aQBPDFzlSLq139eWS9OZnuhL0yU2al8cCpnTE/RszygSyGIP8piBmEio1zDUaItb/+YxxsrmldUCBmg=="],
 
-    "@astrojs/sitemap": ["@astrojs/sitemap@3.7.5", "", { "dependencies": { "sitemap": "^10.0.0", "zod": "^4.6.7" } }, "sha512-rxSbFcxdcOoVRR02q0aFxyZ6chwXZpUOHMg8e+3iWPo7xYV4hlYBU4ztFd1Xl/pWtr6pe+TVCFKJfyPe0sp8iA=="],
+    "@astrojs/sitemap": ["@astrojs/sitemap@3.7.6", "", { "dependencies": { "sitemap": "^10.0.0", "zod": "^4.6.7" } }, "sha512-QEKD3ubC0iJxpNzC4KvcKdxSP97U5SjuQ16+VkmUwx1TT+Hq7TIV8QGm/d2pvkN6+3GqGXLRzm7j6lZxHETm3A=="],
 
     "@astrojs/telemetry": ["@astrojs/telemetry@3.4.2", "", { "dependencies": { "ci-info": "^4.4.0", "dset": "^3.1.4", "is-docker": "^4.0.0", "package-manager-detector": "^1.9.0" } }, "sha512-2JOMRUxJrBSfiVDfeKLv1wBmvSIx1Y6u2YEO8awZ9qSq3u/rNAiUyFdOYi8dHv91kHrmYEQX7pRDw0J4xyj3UA=="],
 
