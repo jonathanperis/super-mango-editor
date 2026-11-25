@@ -55,7 +55,6 @@
 #include "../surfaces/vine.h"
 #include "../surfaces/ladder.h"
 #include "../surfaces/rope.h"
-#include "../effects/water.h"   /* WATER_ART_H — used for fish water_y computation */
 
 #define ARRAY_LEN(arr) ((int)(sizeof(arr) / sizeof((arr)[0])))
 
@@ -348,10 +347,8 @@ static void load_faster_birds(GameWorld *world, const LevelDef *def)
  * Fish and faster fish also share a struct and a placement type; only the
  * range of their random first jump differs.
  *
- * water_y — the y-position of a fish while swimming. Fish rest with their
- * sprite half-submerged in the water. WATER_ART_H = 31 px visible water
- * strip; FISH_RENDER_H = 48 (the faster fish sprite is the same size).
- * water_y = water_surface − (render_h / 2) = (GAME_H − WATER_ART_H) − 24
+ * water_y — the y-position of a fish while swimming: level_fish_swim_y()
+ * in level.h, which the editor uses to draw the fish in the same place.
  *
  * Each fish draws one random number, in array order: keep that order, or
  * seeded replays would give different fish different jump times.
@@ -359,7 +356,7 @@ static void load_faster_birds(GameWorld *world, const LevelDef *def)
 static void load_fish_array(Fish *fish, const FishPlacement *placed, int count,
                             float jump_min, float jump_max)
 {
-    float water_y = (float)(GAME_H - WATER_ART_H) - FISH_RENDER_H / 2.0f;
+    float water_y = level_fish_swim_y();
 
     for (int i = 0; i < count; i++) {
         fish[i].x             = placed[i].x;

@@ -29,8 +29,9 @@ static EditorRect rect(float x, float y, float w, float h)
 int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
                          EditorRect *out)
 {
-    /* Fish swim in the water strip at the bottom of the screen. */
-    const float fish_y = (float)(GAME_H - WATER_ART_H) - FISH_FRAME_H / 2.0f;
+    /* Fish swim in the water strip at the bottom of the screen, exactly
+     * where the game puts them. */
+    const float fish_y = level_fish_swim_y();
 
     if (!level || !out || index < 0 || index >= editor_entity_count(level, type))
         return 0;
@@ -56,17 +57,17 @@ int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
                     BIRD_FRAME_W, BIRD_ART_H);
         return 1;
     case ENT_FISH:
-        *out = rect(level->fish[index].x, fish_y, FISH_FRAME_W, FISH_FRAME_H);
+        *out = rect(level->fish[index].x, fish_y, FISH_RENDER_W, FISH_RENDER_H);
         return 1;
     case ENT_FASTER_FISH:
         *out = rect(level->faster_fish[index].x, fish_y,
-                    FISH_FRAME_W, FISH_FRAME_H);
+                    FISH_RENDER_W, FISH_RENDER_H);
         return 1;
 
     /* ---- Hazards ---------------------------------------------------- */
     case ENT_AXE_TRAP: {
         const AxeTrapPlacement *at = &level->axe_traps[index];
-        *out = rect(at->pillar_x, level_axe_trap_y(at), AXE_FRAME_W, AXE_FRAME_H);
+        *out = rect(at->pillar_x, level_axe_trap_y(at), AXE_DISPLAY_W, AXE_DISPLAY_H);
         return 1;
     }
     case ENT_CIRCULAR_SAW: {
@@ -99,13 +100,13 @@ int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
     }
     case ENT_BLUE_FLAME:  /* x is the gap; the flame is centred inside it */
         *out = rect(level->blue_flames[index].x +
-                        (float)(FLOOR_GAP_W - BLUE_FLAME_W) / 2.0f,
-                    (float)(FLOOR_Y - BLUE_FLAME_H), BLUE_FLAME_W, BLUE_FLAME_H);
+                        (float)(FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f,
+                    (float)(FLOOR_Y - BLUE_FLAME_DISPLAY_H), BLUE_FLAME_DISPLAY_W, BLUE_FLAME_DISPLAY_H);
         return 1;
     case ENT_FIRE_FLAME:
         *out = rect(level->fire_flames[index].x +
-                        (float)(FLOOR_GAP_W - FIRE_FLAME_W) / 2.0f,
-                    (float)(FLOOR_Y - FIRE_FLAME_H), FIRE_FLAME_W, FIRE_FLAME_H);
+                        (float)(FLOOR_GAP_W - BLUE_FLAME_DISPLAY_W) / 2.0f,
+                    (float)(FLOOR_Y - BLUE_FLAME_DISPLAY_H), BLUE_FLAME_DISPLAY_W, BLUE_FLAME_DISPLAY_H);
         return 1;
 
     /* ---- Collectibles ----------------------------------------------- */
@@ -115,41 +116,41 @@ int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
         return 1;
     case ENT_STAR_YELLOW:
         *out = rect(level->star_yellows[index].x, level->star_yellows[index].y,
-                    YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
+                    HEALTH_STAR_DISPLAY_W, HEALTH_STAR_DISPLAY_H);
         return 1;
     case ENT_STAR_GREEN:
         *out = rect(level->star_greens[index].x, level->star_greens[index].y,
-                    YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
+                    HEALTH_STAR_DISPLAY_W, HEALTH_STAR_DISPLAY_H);
         return 1;
     case ENT_STAR_RED:
         *out = rect(level->star_reds[index].x, level->star_reds[index].y,
-                    YSTAR_DISPLAY_W, YSTAR_DISPLAY_H);
+                    HEALTH_STAR_DISPLAY_W, HEALTH_STAR_DISPLAY_H);
         return 1;
     case ENT_LAST_STAR:
         *out = rect(level->last_star.x, level->last_star.y,
-                    LSTAR_DISPLAY_W, LSTAR_DISPLAY_H);
+                    LAST_STAR_DISPLAY_W, LAST_STAR_DISPLAY_H);
         return 1;
     case ENT_PLAYER_SPAWN:
         *out = rect(level->player_start_x, level->player_start_y,
-                    PLAYER_SPAWN_W, PLAYER_SPAWN_H);
+                    PLAYER_FRAME_W, PLAYER_FRAME_H);
         return 1;
 
     /* ---- Surfaces --------------------------------------------------- */
     case ENT_BOUNCEPAD_SMALL:
-        *out = rect(level->bouncepads_small[index].x, (float)(FLOOR_Y - BP_SRC_H),
-                    BP_FRAME_W, BP_SRC_H);
+        *out = rect(level->bouncepads_small[index].x, (float)(FLOOR_Y - BOUNCEPAD_SRC_H),
+                    BOUNCEPAD_W, BOUNCEPAD_SRC_H);
         return 1;
     case ENT_BOUNCEPAD_MEDIUM:
-        *out = rect(level->bouncepads_medium[index].x, (float)(FLOOR_Y - BP_SRC_H),
-                    BP_FRAME_W, BP_SRC_H);
+        *out = rect(level->bouncepads_medium[index].x, (float)(FLOOR_Y - BOUNCEPAD_SRC_H),
+                    BOUNCEPAD_W, BOUNCEPAD_SRC_H);
         return 1;
     case ENT_BOUNCEPAD_HIGH:
-        *out = rect(level->bouncepads_high[index].x, (float)(FLOOR_Y - BP_SRC_H),
-                    BP_FRAME_W, BP_SRC_H);
+        *out = rect(level->bouncepads_high[index].x, (float)(FLOOR_Y - BOUNCEPAD_SRC_H),
+                    BOUNCEPAD_W, BOUNCEPAD_SRC_H);
         return 1;
     case ENT_FLOAT_PLATFORM: {
         const FloatPlatformPlacement *fp = &level->float_platforms[index];
-        float w = (float)fp->tile_count * FPLAT_PIECE_W;
+        float w = (float)fp->tile_count * FLOAT_PLATFORM_PIECE_W;
         float x = fp->x;
         float y = fp->y;
         /* RAIL mode ignores x/y: the platform is centred on its rail point,
@@ -159,9 +160,9 @@ int editor_entity_bounds(const LevelDef *level, EntityType type, int index,
             editor_rail_placement_position_at(&level->rails[fp->rail_index],
                                               fp->t_offset, &x, &y);
             x -= w * 0.5f;
-            y -= FPLAT_PIECE_H * 0.5f;
+            y -= FLOAT_PLATFORM_H * 0.5f;
         }
-        *out = rect(x, y, w, FPLAT_PIECE_H);
+        *out = rect(x, y, w, FLOAT_PLATFORM_H);
         return 1;
     }
     case ENT_BRIDGE: {
