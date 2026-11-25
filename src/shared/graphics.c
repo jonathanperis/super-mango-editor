@@ -1,7 +1,9 @@
 /* Window creation and final presentation. Individual render modules draw in
  * logical coordinates; this file maps their completed canvas to the window. */
 #include "graphics.h"
+#include "platform.h"  /* clock_seconds */
 #include "../input/input_backend.h"
+#include <rlgl.h>      /* rlDrawRenderBatchActive; after raylib.h */
 
 #if !defined(__EMSCRIPTEN__) && !defined(MANGO_RAYLIB_MEMORY)
 /* The monitor the native frame cap was taken from, or -1 while the window
@@ -189,7 +191,7 @@ IntRect display_keep_on_monitor(IntRect window, IntRect monitor)
     return window;
 }
 
-void display_present(RenderTexture2D target)
+double display_present(RenderTexture2D target)
 {
     /* Return from the logical render target to the real window framebuffer. */
     EndTextureMode();
@@ -200,6 +202,13 @@ void display_present(RenderTexture2D target)
     /* Render textures have the opposite Y orientation to ordinary textures.
      * A negative source height flips this completed image for presentation. */
     Rectangle source = {0, 0, (float)target.texture.width, -(float)target.texture.height};
+    texture_note_use(target.texture.id);
     DrawTexturePro(target.texture, source, dest, (Vector2){0}, 0, WHITE);
+    /* Hand the queued quads to the renderer now (EndDrawing would do it
+     * first thing anyway) and read the clock: everything up to here is
+     * drawing work, while EndDrawing mostly waits for the display. */
+    rlDrawRenderBatchActive();
+    double drawn = clock_seconds();
     EndDrawing(); /* Exactly one event poll and frame-pacing owner. */
+    return drawn;
 }

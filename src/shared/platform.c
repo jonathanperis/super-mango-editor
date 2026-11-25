@@ -35,6 +35,20 @@ uint64_t clock_millis(void)
 #endif
 }
 
+double clock_seconds(void)
+{
+#ifdef _WIN32
+    LARGE_INTEGER frequency, now;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&now);
+    return (double)now.QuadPart / (double)frequency.QuadPart;
+#else
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (double)now.tv_sec + (double)now.tv_nsec * 1e-9;
+#endif
+}
+
 void clock_wait(unsigned int milliseconds)
 {
 #ifdef _WIN32

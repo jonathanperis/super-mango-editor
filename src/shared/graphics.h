@@ -50,7 +50,12 @@ void display_follow_monitor(void);
  */
 int display_monitor_changed(int paced_monitor, int current_monitor);
 
-void display_present(RenderTexture2D target);
+/* Finish the frame: end texture mode, draw the canvas into the window
+ * (display_viewport) and call EndDrawing. Returns clock_seconds() taken when
+ * every draw had been handed to the renderer but before EndDrawing, which
+ * waits for the display; the game subtracts its start time from it to show
+ * how long drawing took. Callers that do not time frames ignore it. */
+double display_present(RenderTexture2D target);
 /* Where display_present draws a canvas_w x canvas_h canvas inside a
  * window_w x window_h window, in window units. At 1x or more it is the
  * largest whole-number scale that fits, centred on whole-pixel offsets;
@@ -92,6 +97,22 @@ Texture2D *texture_own(Texture2D value);
 /* Release the GPU image and the handle. NULL is ignored. */
 void texture_unload(Texture2D *texture);
 
+/*
+ * Texture switches — a cheap stand-in for "draw calls".
+ *
+ * raylib collects quads into one batch and starts a new draw call each time
+ * the texture changes (rlgl.h, rlSetTexture). So the number of times one
+ * draw uses a different texture from the draw before it is roughly the
+ * number of draw calls a frame costs. sprite_draw and font_draw report the
+ * texture they use; the game takes the count once per frame for the debug
+ * overlay and `make bench`. Shapes (DrawRectangle and friends) are not
+ * counted, so the real number of batches is a little higher.
+ * Defined in texture.c.
+ */
+void texture_note_use(unsigned int texture_id);
+/* Switches counted since the previous call; starts the next count at 0. */
+int texture_take_switches(void);
+
 #ifdef MANGO_TESTING
 /* Test builds only. texture_test_loads: image files texture_load has decoded
  * so far. texture_test_live: handles that exist right now, so a test can
@@ -125,6 +146,7 @@ static inline void sprite_draw_pivot(const Texture2D *texture, const IntRect *so
                                      Vector2 pivot, Color tint)
 {
     if (!texture || !dest || dest->w <= 0 || dest->h <= 0) return;
+    texture_note_use(texture->id);
     Rectangle src = source ? rect_to_raylib(*source) :
         (Rectangle){0, 0, (float)texture->width, (float)texture->height};
     /* Negative source dimensions mirror the sampled image. WHITE leaves

@@ -725,6 +725,6 @@ int game_render_frame(GameState *gs, int cam_x, float dt)
      */
     settings_menu_render(gs->screen.settings_menu, gs->screen.profile, gs->screen.hud.font,
                          gs->screen.controller);
-    display_present(gs->screen.frame_target);
+    gs->screen.debug.draw_submitted = display_present(gs->screen.frame_target);
     return 1;
 }
