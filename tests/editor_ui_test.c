@@ -65,9 +65,7 @@
 
 #include <rlgl.h>  /* rlGetActiveFramebuffer: which target draws land in */
 
-#define CHECK(test) do { if (!(test)) { \
-    fprintf(stderr, "editor_ui_test:%d: %s\n", __LINE__, #test); \
-    failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 
 /* A spot in the status bar: drawn every frame, but nothing there to click. */
 #define NEUTRAL_X (CANVAS_W / 2)
@@ -322,7 +320,17 @@ static int settle_probe(EditorState *es, int x, int y, uint64_t before,
 
 /* ------------------------------------------------------------------ */
 
-int main(void)
+/* The palette's open categories and the Level Config foldouts live in
+ * EditorState, so each case's fresh editor starts with them closed.  The
+ * input layer is still process-wide: clear it between cases, so no case
+ * depends on a key or button the case before it left held (`--shuffle`
+ * found order dependence here once). */
+static void editor_ui_after_each(void)
+{
+    input_clear();
+}
+
+int main(int argc, char **argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
 #ifndef _WIN32
@@ -332,8 +340,8 @@ int main(void)
         return 1;
     }
 #endif
-    const struct { const char *name; int (*run)(void); } cases[] = {
-#define CASE(fn) {#fn, fn}
+    static const TestCase cases[] = {
+#define CASE TEST_CASE
         CASE(ui_scroll_keeps_fractions_and_stays_in_range),
         CASE(scrolled_out_field_wants_no_ibeam),
         CASE(ui_scrollbar_pages_drags_and_uses_its_clicks),
@@ -417,12 +425,7 @@ int main(void)
         CASE(unfocused_editor_slows_its_frames),
 #undef CASE
     };
-    int failures = 0;
-    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        int result = cases[i].run();
-        printf("editor_ui: %s %s\n", cases[i].name, result ? "FAIL" : "PASS");
-        failures += result != 0;
-    }
-    printf("editor_ui_test: %d failing cases\n", failures);
-    return failures ? 1 : 0;
+    TestHooks hooks = {.after_each = editor_ui_after_each};
+    return test_run_cases("editor_ui", cases, sizeof(cases) / sizeof(cases[0]),
+                          hooks, argc, argv);
 }
