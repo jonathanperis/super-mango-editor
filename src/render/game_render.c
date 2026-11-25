@@ -614,6 +614,7 @@ typedef struct {
     RenderFn    render;  /* the function that draws it                   */
 } RenderLayer;
 
+/* See docs/wiki/architecture.md, "Render Order"; make docs-drift compares the two. */
 static const RenderLayer s_render_layers[] = {
     /* layer, name,               render                    */
     /* ---- Background and ground ---------------------------------- */
