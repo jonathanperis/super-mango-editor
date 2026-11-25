@@ -2,7 +2,7 @@
 
 ## Overview
 
-A 2D pixel art platformer written in C11 + raylib 6.2, designed as a learning resource for game development. Every line of code is documented for someone who knows basic programming but is new to C and raylib.
+A 2D pixel art platformer written in C11 + raylib 6.2, designed as a learning resource for game development. The code is commented for someone who knows basic programming but is new to C and raylib: each source file opens with a summary, and units, ownership and the reasons behind library calls are written down where they matter.
 
 ## Goals
 

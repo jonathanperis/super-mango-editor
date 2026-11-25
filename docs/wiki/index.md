@@ -84,7 +84,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | Compiler | `clang` recommended for CI/local parity; `gcc` compatible |
 | Window size | 800 × 600 px OS window by default (native settings scale the canvas 1×–4×) |
 | Logical canvas | 400 × 300 px (2× pixel scale) |
-| Target FPS | 60 |
+| Simulation rate | 60 fixed steps per second (`TARGET_FPS`); drawing follows the display's refresh rate |
 | Audio | raylib/miniaudio-negotiated device format; decoded effects and streamed music, both QOA |
 | Libraries | raylib 6.2 (bundled GLFW on desktop), tomlc17 (TOML parser) |
 | Level format | TOML (`.toml` files in `levels/`) |
@@ -93,18 +93,20 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 
 ## Quick Start
 
-```sh
-# macOS — install dependencies
-brew install cmake python
+Install the prerequisites first: a C compiler, `make`, CMake, Python 3 and
+Node.js, listed per platform in [Build System](build-system/#prerequisites)
+(the [README](https://github.com/jonathanperis/super-mango-editor#prerequisites)
+has the same list). `make doctor` says what is missing. Then:
 
+```sh
 # Build and run the game
-make run CC=clang
+make run
 
 # Build and run the level editor
-make run-editor CC=clang
+make run-editor
 
 # Run a specific level file
-make run-level CC=clang LEVEL=levels/labs/01_collision.toml
+make run-level LEVEL=levels/labs/01_collision.toml
 
 # Optional local WebAssembly preflight (CI is authoritative for WASM releases)
 make web
@@ -114,4 +116,7 @@ The editor is a native program. The browser page plays the game and does not
 include the editor. `make run-editor` opens an empty level; Open (`Ctrl+O`)
 loads a file from `levels/` or `levels/labs/`. See [Level Editor](level-editor/).
 
-See [Build System](build-system/) for Linux and Windows instructions.
+The Makefile builds with clang by default; add `CC=gcc` to use GCC. See
+[Build System](build-system/) for every target and flag, and
+[Troubleshooting](troubleshooting/) when a build or test fails for a reason
+outside the code.

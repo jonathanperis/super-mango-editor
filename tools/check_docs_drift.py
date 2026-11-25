@@ -420,9 +420,12 @@ def check_public_readme_docs() -> None:
     readme = read(ROOT / "README.md")
     if f"{expected_count} native regression tests" not in readme:
         fail(f"README.md: stale make test count; expected {expected_count}")
-    for token in ["Enter/Space/Start", "Esc/Back", "scripted replay smoke on Linux"]:
-        if token not in readme:
-            fail(f"README.md: missing current project context token `{token}`")
+    # The README keeps a short summary and links to the manual, which holds
+    # the full feature list (overlay controls: check_overlay_controls_doc) and
+    # the one CI summary (build-system.md, checked here).
+    if "scripted replay smoke on Linux" not in read(DOCS / "build-system.md"):
+        fail("docs/wiki/build-system.md: the CI/CD table must say Build & Release runs "
+             "`scripted replay smoke on Linux`")
     if "3 coins restore a heart" in readme:
         fail("README.md: stale coin pickup docs; coins award score/bonus-life threshold, stars restore hearts")
     if "GitHub CI is the authoritative WASM release verification" not in readme:
