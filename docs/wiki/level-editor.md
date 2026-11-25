@@ -349,8 +349,13 @@ level-wide fields are:
 - `next_phase` path (saved under `[last_star]` in TOML; it must follow the [level-reference rule](../level-design/#level-references))
 - `music_path` (dropdown: none, water, lava, winds) and `music_volume` (0–128)
 - `floor_tile_path` (dropdown)
-- `initial_hearts` (0–3), `initial_lives` (0 in either means the game's default of 3)
-- `score_per_life`, `coin_score` (0 = the defaults, 1000 and 100)
+- `initial_hearts` (0–3), `initial_lives` (0–999; 0 in either means the game's default of 3)
+- `score_per_life`, `coin_score` (0–999999; 0 = the defaults, 1000 and 100)
+
+Each of these number fields clamps a typed value to the same range the level
+validator accepts (`MAX_LEVEL_SCREENS`, `MAX_HEARTS`, `MAX_LIVES`,
+`LEVEL_SCORE_PER_LIFE_MAX`, `LEVEL_COIN_SCORE_MAX`), so the panel cannot
+hold a value that saving would then reject.
 - A collapsible Movement Physics group for the optional `[physics]` overrides
 - Collapsible Background Layers, Foreground Layers and Fog Layers lists (up
   to 8, 8 and 4 rows). Each row has the layer's image, its scroll speed and

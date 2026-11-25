@@ -53,11 +53,11 @@ typedef struct {
 #define PROFILE_FORMAT_VERSION 2
 
 /*
- * The most lives a Continue point stores. Bonus lives have no fixed limit
- * in play, so a point saved with more is held to this; a profile that
- * claims more was not written by the game and its point is refused.
+ * A Continue point stores at most MAX_LIVES lives (game_constants.h). Bonus
+ * lives have no fixed limit in play, so a point saved with more is held to
+ * that; a profile that claims more was not written by the game and its
+ * point is refused.
  */
-#define GAME_RESUME_LIVES_MAX 999
 
 /*
  * GameResume — where Continue picks a level up again (one slot per profile).

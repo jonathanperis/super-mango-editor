@@ -269,7 +269,7 @@ static int resume_codec_and_migration(void)
         {4, "score = -1\n"},
         {5, "level_score_start = 121\n"},            /* more than the score */
         {7, "lives = -1\n"},
-        {7, "lives = 1000\n"},                      /* GAME_RESUME_LIVES_MAX is 999 */
+        {7, "lives = 1000\n"},                      /* MAX_LIVES is 999 */
         {8, "respawn_x = nan\n"},
         {10, "elapsed = -1.0\n"},
         {10, "elapsed = 41.25\nextra = 1\n"},        /* unknown key */

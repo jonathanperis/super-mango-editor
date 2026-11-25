@@ -12,9 +12,8 @@
 
 #include "../shared/asset_cache.h"  /* AssetCache — hud_init asks it for the font and icon */
 #include "../shared/text.h"
+#include "../game_constants.h"      /* MAX_HEARTS: one icon per heart */
 
-#define MAX_HEARTS      3     /* maximum hearts the player can have        */
-#define DEFAULT_LIVES   3     /* lives the player starts with              */
 #define HUD_MARGIN      4     /* pixel margin from screen edges            */
 #define HUD_HEART_SIZE 16     /* display size of each heart icon (px)      */
 #define HUD_HEART_GAP   2     /* horizontal gap between heart icons (px)   */

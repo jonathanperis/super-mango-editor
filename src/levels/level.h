@@ -446,6 +446,14 @@ typedef struct {
 #define LEVEL_UNTITLED_NAME "Untitled"
 #define LEVEL_DESCRIPTION_CAPACITY 4096
 #define LEVEL_AUTHOR_CAPACITY 128
+/*
+ * The largest score rules a level may set (score_per_life, coin_score).
+ * The level validator and the editor's Level Config fields both use these;
+ * 0 means the game's default (SCORE_PER_LIFE, COIN_SCORE in coin.h).  Six
+ * digits keeps a whole level's score far from int overflow.
+ */
+#define LEVEL_SCORE_PER_LIFE_MAX 999999
+#define LEVEL_COIN_SCORE_MAX     999999
 /* Loudest authored music_volume (the audio module's full volume, 128 units);
  * the validator and the editor's volume field share this limit. */
 #define LEVEL_MUSIC_VOLUME_MAX 128

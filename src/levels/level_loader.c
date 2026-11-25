@@ -787,7 +787,7 @@ void level_apply(GameState *gs, const LevelDef *def)
 
     /*
      * Game rules — use level-defined values if set (>0), otherwise fall
-     * back to engine defaults defined in hud.h and coin.h.
+     * back to engine defaults defined in game_constants.h and coin.h.
      */
     world->hearts          = def->initial_hearts  > 0 ? def->initial_hearts  : MAX_HEARTS;
     world->lives           = def->initial_lives   > 0 ? def->initial_lives   : DEFAULT_LIVES;

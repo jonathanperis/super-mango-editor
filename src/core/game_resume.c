@@ -30,9 +30,9 @@ void game_resume_capture(const GameState *gs, GameResume *resume)
     resume->score = gs->world.score;
     resume->level_score_start = gs->world.level_score_start;
     resume->score_life_next = gs->world.score_life_next;
-    /* Held to the range a stored point accepts (GAME_RESUME_LIVES_MAX). */
+    /* Held to the range a stored point accepts (MAX_LIVES). */
     resume->lives = gs->world.lives < 0 ? 0 :
-                    gs->world.lives > GAME_RESUME_LIVES_MAX ? GAME_RESUME_LIVES_MAX :
+                    gs->world.lives > MAX_LIVES ? MAX_LIVES :
                     gs->world.lives;
     /* The profile stores the timer in seconds (format unchanged); the
      * game counts steps. game_level_steps_from_seconds turns it back. */

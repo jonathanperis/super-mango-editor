@@ -1143,10 +1143,10 @@ static int automatic_continue_point_must_be_one_the_game_saves(void)
         CHECK(game_resume_apply(&gs, &bad) == 0);
     }
 
-    /* A stored point never claims more lives than GAME_RESUME_LIVES_MAX. */
+    /* A stored point never claims more lives than MAX_LIVES. */
     gs.world.lives = 5000;
     game_resume_capture(&gs, &bad);
-    CHECK(bad.lives == GAME_RESUME_LIVES_MAX);
+    CHECK(bad.lives == MAX_LIVES);
 done:
     game_cleanup(&gs);
     return failed;

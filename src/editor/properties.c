@@ -27,7 +27,6 @@
 
 #include "properties.h"
 #include "asset_choices.h" /* the files each asset dropdown offers */
-#include "../screens/hud.h"  /* MAX_HEARTS */
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "snapshot_equal.h"   /* placement_same: did a shared edit change an entity? */
