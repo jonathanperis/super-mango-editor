@@ -16,14 +16,8 @@
 
 #include "../shared/asset_cache.h"  /* AssetCache — the strips are held from it */
 #include "../shared/graphics.h"
+#include "effect_defs.h"              /* WATER_FRAMES, WATER_ART_*, WATER_PERIOD */
 
-#define WATER_FRAMES        8    /* frames in the sheet                    */
-#define WATER_FRAME_W      48    /* full slot width in the sheet (px)      */
-#define WATER_ART_DX       16    /* left offset to art within each slot    */
-#define WATER_ART_W        16    /* width of actual art pixels per frame   */
-#define WATER_ART_Y        17    /* first visible row                      */
-#define WATER_ART_H        31    /* height of visible art                  */
-#define WATER_PERIOD      (WATER_FRAMES * WATER_ART_W)  /* 128 px repeat  */
 #define WATER_SCROLL_SPEED 40.0f /* rightward px/s                         */
 
 /*

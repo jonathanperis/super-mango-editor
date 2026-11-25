@@ -17,41 +17,20 @@
 
 #include <stdint.h>
 #include <string.h>                    /* memset */
-#include "../surfaces/bouncepad.h"     /* BouncepadType */
-#include "../surfaces/bouncepad_small.h"  /* MAX_BOUNCEPADS_SMALL */
-#include "../surfaces/bouncepad_medium.h" /* MAX_BOUNCEPADS_MEDIUM */
-#include "../surfaces/bouncepad_high.h"   /* MAX_BOUNCEPADS_HIGH */
-#include "../hazards/axe_trap.h"       /* AxeTrapMode, MAX_AXE_TRAPS */
-#include "../hazards/blue_flame.h"     /* MAX_BLUE_FLAMES, MAX_FIRE_FLAMES */
-#include "../surfaces/float_platform.h"/* FloatPlatformMode, MAX_FLOAT_PLATFORMS */
-#include "../surfaces/rail.h"          /* MAX_RAILS */
 /*
- * The rest of the array limits and sizes LevelDef uses. These are the
- * headers that define them, not game.h: a LevelDef does not contain a
- * GameState, so the serializer, the editor and the level checker (which
- * include this file but never touch GameState) are not recompiled when
- * GameState changes.
+ * The array limits and sizes LevelDef uses come from the small *_defs.h
+ * headers, not from the runtime headers (spider.h, rail.h...) or game.h.
+ * Those headers hold only #defines and enums and include nothing, so the
+ * serializer, the editor and the level checker can include this file
+ * without pulling in raylib, and are not recompiled when GameState or a
+ * runtime struct changes.
  */
-#include "../game_constants.h"         /* FLOOR_Y, TILE_SIZE, MAX_FLOOR_GAPS, MAX_CHECKPOINTS */
-#include "../surfaces/platform.h"      /* MAX_PLATFORMS */
-#include "../surfaces/bridge.h"        /* MAX_BRIDGES */
-#include "../surfaces/vine.h"          /* MAX_VINES */
-#include "../surfaces/ladder.h"        /* MAX_LADDERS */
-#include "../surfaces/rope.h"          /* MAX_ROPES */
-#include "../collectibles/coin.h"      /* MAX_COINS */
-#include "../collectibles/health_star.h" /* MAX_STAR_YELLOWS / GREENS / REDS */
-#include "../entities/spider.h"        /* MAX_SPIDERS */
-#include "../entities/jumping_spider.h"/* MAX_JUMPING_SPIDERS */
-#include "../entities/bird.h"          /* MAX_BIRDS */
-#include "../entities/faster_bird.h"   /* MAX_FASTER_BIRDS */
-#include "../entities/fish.h"          /* MAX_FISH */
-#include "../entities/faster_fish.h"   /* MAX_FASTER_FISH */
-#include "../hazards/circular_saw.h"   /* MAX_CIRCULAR_SAWS, SAW_DISPLAY_H */
-#include "../hazards/spike.h"          /* MAX_SPIKE_ROWS */
-#include "../hazards/spike_platform.h" /* MAX_SPIKE_PLATFORMS */
-#include "../hazards/spike_block.h"    /* MAX_SPIKE_BLOCKS */
-#include "../effects/parallax.h"       /* MAX_BACKGROUND_LAYERS */
-#include "../effects/fog.h"            /* MAX_FOG_TEXTURES */
+#include "../game_constants.h"           /* FLOOR_Y, TILE_SIZE, MAX_FLOOR_GAPS, MAX_CHECKPOINTS */
+#include "../collectibles/collectible_defs.h" /* MAX_COINS, MAX_STAR_* */
+#include "../entities/enemy_defs.h"      /* MAX_SPIDERS, MAX_BIRDS, MAX_FISH... */
+#include "../hazards/hazard_defs.h"      /* AxeTrapMode, MAX_AXE_TRAPS, SAW_DISPLAY_H... */
+#include "../surfaces/surface_defs.h"    /* BouncepadType, FloatPlatformMode, MAX_RAILS... */
+#include "../effects/effect_defs.h"      /* MAX_BACKGROUND_LAYERS, MAX_FOG_TEXTURES */
 
 /* Current TOML level document schema version. Missing TOML version means v1. */
 #define LEVEL_FORMAT_VERSION 1
@@ -697,19 +676,3 @@ static inline void level_def_init_defaults(LevelDef *def)
     def->last_star.x = LEVEL_DEFAULT_LAST_STAR_X;
     def->last_star.y = LEVEL_DEFAULT_LAST_STAR_Y;
 }
-
-/* ------------------------------------------------------------------ */
-/* Rail builder — declared here so RailPlacement is fully visible      */
-/* ------------------------------------------------------------------ */
-
-/*
- * rail_init_from_placements — Build rail paths from a RailPlacement array.
- *
- * Implemented in rail.c.  Declared here (instead of rail.h) because the
- * parameter type RailPlacement is only defined in this header.
- */
-void rail_init_from_placements(Rail *rails, int *count,
-                               const RailPlacement *placements, int n);
-
-/* Build one bounded path. Invalid draft geometry leaves an empty rail. */
-int rail_build(Rail *rail, const RailPlacement *placement);

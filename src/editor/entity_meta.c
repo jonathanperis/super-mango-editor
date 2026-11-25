@@ -29,6 +29,7 @@
 #include "editor_clipboard.h" /* keep a copied rail rider on its rail */
 #include "editor_session.h"   /* editor_set_status: a full selection */
 #include "../game_constants.h" /* GAME_H, FLOOR_Y, TILE_SIZE, FLOOR_GAP_W */
+#include "../surfaces/rail.h"   /* Rail, rail_build: where a rail rider sits */
 
 /*
  * EditorEntityMeta — one row of the table: everything about a type that is

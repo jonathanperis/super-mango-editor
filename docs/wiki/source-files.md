@@ -23,6 +23,7 @@ src/
 ├── game_constants.h              Window, world, floor and camera #defines (no other includes)
 ├── game_fwd.h                    `typedef struct GameState GameState;` for pointer-only headers
 ├── collectibles/
+│   ├── collectible_defs.h        Coin/star level limits and display sizes (no includes, no raylib)
 │   ├── coin.h / .c               Coin collectible: placement, AABB collection, render
 │   ├── health_star.h / .c        Yellow/green/red star health pickups (one module)
 │   └── last_star.h / .c          End-of-level star collectible
@@ -127,10 +128,12 @@ src/
 │   ├── serializer_save.c        TOML save: write_level_toml walks two order lists and calls the schema writer for each name
 │   └── serializer_types.h / .c  Enum/string conversion helpers
 ├── effects/
+│   ├── effect_defs.h             Layer limits and water-strip art sizes (no includes, no raylib)
 │   ├── fog.h / .c                Atmospheric fog overlay: init, slide, spawn, render
 │   ├── parallax.h / .c           Multi-layer scrolling background: init, tiled render, cleanup
 │   └── water.h / .c              Animated water strip: init, scroll, tile render
 ├── entities/
+│   ├── enemy_defs.h              Enemy level limits and sprite sizes (no includes, no raylib)
 │   ├── spider.h / .c             Spider enemy: ground patrol, animation, render
 │   ├── jumping_spider.h / .c     Jumping spider: patrol, jump arcs, floor-gap awareness
 │   ├── bird.h / .c               Bird enemy: sine-wave sky patrol, animation, render (shared by both birds)
@@ -138,6 +141,7 @@ src/
 │   ├── fish.h / .c               Fish enemy: patrol, random jump arcs, render (shared by both fish)
 │   └── faster_fish.h / .c        `FasterFish` (a `typedef` of `Fish`) and its FFISH_* tuning
 ├── hazards/
+│   ├── hazard_defs.h             Hazard level limits, sprite sizes and AxeTrapMode (no raylib)
 │   ├── spike.h / .c              Static ground spike hazard rows
 │   ├── spike_block.h / .c        Rail-riding rotating spike hazard
 │   ├── spike_platform.h / .c     Elevated spike surface hazard
@@ -181,13 +185,11 @@ src/
 │   ├── start_menu.h / .c         Start menu screen with logo
 │   └── hud.h / .c                HUD renderer: hearts, lives counter, score text
 └── surfaces/
+    ├── surface_defs.h            Surface level limits, sprite sizes and mode enums (no raylib)
     ├── platform.h / .c           One-way platform pillar init and 9-slice rendering
     ├── float_platform.h / .c     Hovering platform: static, crumble, and rail behaviours
     ├── bridge.h / .c             Tiled crumble walkway: per-brick fall timers, render
     ├── bouncepad.h / .c          Shared bouncepad mechanics (squash/release animation)
-    ├── bouncepad_small.h         Green bouncepad placement helper
-    ├── bouncepad_medium.h        Wood bouncepad placement helper
-    ├── bouncepad_high.h          Red bouncepad placement helper
     ├── rail.h / .c               Rail path builder, bitmask tile render, position interpolation
     ├── vine.h / .c               Climbable vine decoration
     ├── ladder.h / .c             Climbable ladder decoration
@@ -309,10 +311,7 @@ explains the trade-off.
 #include "entities/fish.h"              // Fish struct + MAX_FISH
 #include "collectibles/coin.h"          // Coin struct + MAX_COINS
 #include "surfaces/vine.h"              // VineDecor struct + MAX_VINES
-#include "surfaces/bouncepad.h"         // Bouncepad struct (shared mechanics)
-#include "surfaces/bouncepad_small.h"   // Small bouncepad
-#include "surfaces/bouncepad_medium.h"  // Medium bouncepad
-#include "surfaces/bouncepad_high.h"    // High bouncepad
+#include "surfaces/bouncepad.h"         // Bouncepad struct + MAX_BOUNCEPADS_SMALL/MEDIUM/HIGH
 #include "screens/hud.h"                // Hud struct
 #include "effects/parallax.h"           // ParallaxSystem
 #include "surfaces/rail.h"              // Rail, RailTile
@@ -465,6 +464,10 @@ Owns one heap-allocated application session and its active menu or game screen. 
 
 ## Enemy Modules (`entities/`)
 
+### `entities/enemy_defs.h`
+
+Every enemy's level limit (`MAX_SPIDERS`, `MAX_FISH`...) and sprite-sheet size (`SPIDER_FRAME_W`, `BIRD_ART_H`, `FISH_RENDER_H`...). It holds only `#define`s and includes nothing, so `levels/level.h`, the serializer and the editor can use the same numbers as the game without pulling in raylib. Each folder of entity modules has one such header: `collectibles/collectible_defs.h`, `hazards/hazard_defs.h`, `surfaces/surface_defs.h` and `effects/effect_defs.h` follow the same rule. Speeds and animation timing stay in each module's own header.
+
 ### `entities/spider.h` / `entities/spider.c`
 
 Ground-patrol spider enemy with 3-frame walk animation. Reverses at patrol boundaries and respects sea gaps. Asset: `spider.png`.
@@ -492,6 +495,10 @@ Fast fish variant with higher jumps and faster patrol speed. It is a `Fish` with
 ---
 
 ## Hazard Modules (`hazards/`)
+
+### `hazards/hazard_defs.h`
+
+Hazard level limits, sprite sizes and `AxeTrapMode`, raylib-free (see `entities/enemy_defs.h`).
 
 ### `hazards/blue_flame.h` / `hazards/blue_flame.c`
 
@@ -521,6 +528,10 @@ Swinging pendulum or spinning axe hazard. Two behaviour modes: swing (60 degree 
 
 ## Collectible Modules (`collectibles/`)
 
+### `collectibles/collectible_defs.h`
+
+Coin and star level limits and display sizes, raylib-free (see `entities/enemy_defs.h`).
+
 ### `collectibles/coin.h` / `collectibles/coin.c`
 
 Gold coin collectible. AABB pickup awards the level's `coin_score` (100 by default); crossing `score_per_life` grants a bonus life. Asset: `coin.png`. `coin_streak_pitch` raises the pickup chime a semitone per quick pickup (`CoinStreak`, kept in `GameScreen` and fed only the world's `sim_steps`).
@@ -540,6 +551,10 @@ End-of-level star collectible. Asset: `last_star.png`.
 
 ## Surface Modules (`surfaces/`)
 
+### `surfaces/surface_defs.h`
+
+Surface level limits, sprite sizes, `BouncepadType`, `FloatPlatformMode` and `VineType`, raylib-free (see `entities/enemy_defs.h`).
+
 ### `surfaces/platform.h` / `surfaces/platform.c`
 
 One-way pillar platforms built from 9-slice platform tiles. Player can jump through from below and land on top. Default asset: `grass_platform.png`.
@@ -554,19 +569,7 @@ Tiled crumble walkway. Each brick the player stands on falls `BRIDGE_FALL_DELAY`
 
 ### `surfaces/bouncepad.h` / `surfaces/bouncepad.c`
 
-Shared bouncepad mechanics: squash/release 3-frame animation.
-
-### `surfaces/bouncepad_small.h`
-
-Green bouncepad -- small jump height. Asset: `bouncepad_small.png`.
-
-### `surfaces/bouncepad_medium.h`
-
-Wood bouncepad -- medium jump height. Asset: `bouncepad_medium.png`.
-
-### `surfaces/bouncepad_high.h`
-
-Red bouncepad -- high jump height. Asset: `bouncepad_high.png`.
+Shared bouncepad mechanics: squash/release 3-frame animation. A level keeps its pads in three arrays, one per sprite: `bouncepads_small` (green, `bouncepad_small.png`), `bouncepads_medium` (wood, `bouncepad_medium.png`) and `bouncepads_high` (red, `bouncepad_high.png`), each up to `MAX_BOUNCEPADS_SMALL`/`_MEDIUM`/`_HIGH` (in `surfaces/surface_defs.h`).
 
 ### `surfaces/rail.h` / `surfaces/rail.c`
 
@@ -587,6 +590,10 @@ Climbable rope decoration. Same climbing mechanics as vines. Asset: `rope.png`.
 ---
 
 ## Environment Modules (`effects/`)
+
+### `effects/effect_defs.h`
+
+`MAX_BACKGROUND_LAYERS`, `MAX_FOG_TEXTURES` and the water strip's art sizes (`WATER_ART_H`...), raylib-free (see `entities/enemy_defs.h`).
 
 ### `effects/water.h` / `effects/water.c`
 

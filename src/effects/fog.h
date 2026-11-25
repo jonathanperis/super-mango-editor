@@ -10,12 +10,7 @@
 
 #include "../shared/asset_cache.h"  /* AssetCache — fog images are held from it */
 #include "../shared/graphics.h"
-
-/*
- * MAX_FOG_TEXTURES — maximum number of fog texture assets the system can hold.
- * Actual count is determined per-level via the fog_layers[] in LevelDef.
- */
-#define MAX_FOG_TEXTURES  4
+#include "effect_defs.h"              /* MAX_FOG_TEXTURES */
 
 /*
  * Maximum concurrent fog instances. Two would suffice for the overlap,

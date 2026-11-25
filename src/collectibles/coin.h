@@ -10,10 +10,8 @@
 
 #include "../shared/graphics.h"
 #include <stdint.h>  /* uint32_t */
+#include "collectible_defs.h"  /* MAX_COINS, COIN_DISPLAY_W/H */
 
-#define MAX_COINS       64     /* coin slots across the full world         */
-#define COIN_DISPLAY_W  16     /* render width  in logical pixels          */
-#define COIN_DISPLAY_H  16     /* render height in logical pixels          */
 #define COIN_SCORE     100     /* score awarded per coin collected         */
 #define SCORE_PER_LIFE 1000    /* score multiple that grants a bonus life  */
 

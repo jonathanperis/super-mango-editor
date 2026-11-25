@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>   /* free */
 #include <string.h>
 
 #ifdef _WIN32

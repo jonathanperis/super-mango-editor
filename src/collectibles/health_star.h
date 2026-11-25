@@ -14,14 +14,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
-
-/* ---- Constants ---------------------------------------------------------- */
-
-#define MAX_STAR_YELLOWS       16    /* maximum yellow stars per level         */
-#define MAX_STAR_GREENS        16    /* maximum green stars per level          */
-#define MAX_STAR_REDS          16    /* maximum red stars per level            */
-#define HEALTH_STAR_DISPLAY_W  16    /* render width  in logical pixels        */
-#define HEALTH_STAR_DISPLAY_H  16    /* render height in logical pixels        */
+#include "collectible_defs.h"  /* MAX_STAR_*, HEALTH_STAR_DISPLAY_W/H */
 
 /* ---- Types -------------------------------------------------------------- */
 

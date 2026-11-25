@@ -16,7 +16,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "text.h"
-#include "../levels/level.h"
 #include "../../vendor/raygui/raygui_icons.h" /* UIIcon */
 
 typedef void (*UIBeforeChangeFn)(void *context, int widget_id);
@@ -32,7 +31,13 @@ typedef enum {
     UI_KEY_PICK                           /* open dropdown lists only    */
 } UIEditKey;
 
-#define UI_EDIT_BUFFER_SIZE LEVEL_DESCRIPTION_CAPACITY
+/*
+ * The longest text one field can edit, NUL included.  It must hold the
+ * longest level description (LEVEL_DESCRIPTION_CAPACITY in levels/level.h);
+ * properties_config.c checks that at compile time, so this widget library
+ * does not have to include the level format.
+ */
+#define UI_EDIT_BUFFER_SIZE 4096
 #define UI_PENDING_TEXT_SIZE 4096
 /* Most editable fields one frame can draw; Tab moves through them in order. */
 #define UI_MAX_FIELDS 128

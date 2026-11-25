@@ -12,5 +12,9 @@
  */
 #pragma once
 
+/* raylib.h first: raymath declares its own Vector2/Matrix types when it is
+ * included before raylib, and those clash with raylib's when a later
+ * header includes raylib. */
+#include <raylib.h>
 #define RAYMATH_STATIC_INLINE
 #include <raymath.h>

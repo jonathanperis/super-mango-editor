@@ -11,13 +11,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
-
-#define MAX_LADDERS   16
-#define LADDER_W      16              /* sprite width  (px)                    */
-#define LADDER_H      22              /* content height after cropping padding */
-#define LADDER_SRC_Y  13              /* first pixel row with content          */
-#define LADDER_SRC_H  22              /* height of content area (rows 13–34)   */
-#define LADDER_STEP    8              /* tight overlap so tiles merge visually */
+#include "surface_defs.h"  /* MAX_LADDERS, LADDER_* */
 
 /*
  * LadderDecor — world-space position and length of one ladder.

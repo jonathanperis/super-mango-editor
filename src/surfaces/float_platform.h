@@ -22,19 +22,7 @@
 
 #include "../shared/graphics.h"
 #include "rail.h"   /* Rail — needed for the RAIL mode pointer */
-
-/* ---- Sprite constants ---------------------------------------------------- */
-
-/*
- * FLOAT_PLATFORM_PIECE_W / _H — size of each 3-slice piece in logical pixels.
- * Platform.png is 48×16, so each of the three pieces is 16×16.
- */
-#define FLOAT_PLATFORM_PIECE_W  16
-#define FLOAT_PLATFORM_H        16
-
-/* ---- Capacity ------------------------------------------------------------ */
-
-#define MAX_FLOAT_PLATFORMS 16   /* max FloatPlatform instances in one level */
+#include "surface_defs.h"  /* FLOAT_PLATFORM_PIECE_W/H, MAX_FLOAT_PLATFORMS, FloatPlatformMode */
 
 /* ---- Crumble parameters -------------------------------------------------- */
 
@@ -56,18 +44,6 @@
  * starts, so the platform eases into motion instead of snapping from zero.
  */
 #define CRUMBLE_FALL_INITIAL_VY  20.0f
-
-/* ---- Mode enum ----------------------------------------------------------- */
-
-/*
- * FloatPlatformMode — which of the three behaviours this platform uses.
- * Set once at init; never changes during a play session.
- */
-typedef enum {
-    FLOAT_PLATFORM_STATIC,   /* hovers at a fixed world position forever     */
-    FLOAT_PLATFORM_CRUMBLE,  /* falls after the player stands on it          */
-    FLOAT_PLATFORM_RAIL,     /* follows a Rail path (closed loop or bouncing)*/
-} FloatPlatformMode;
 
 /* ---- Struct -------------------------------------------------------------- */
 

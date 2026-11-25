@@ -63,10 +63,7 @@
 #include "entities/fish.h"          /* Fish struct + MAX_FISH constant */
 #include "collectibles/coin.h"      /* Coin struct + MAX_COINS constant */
 #include "surfaces/vine.h"          /* VineDecor struct + MAX_VINES constant */
-#include "surfaces/bouncepad.h"       /* Bouncepad struct — shared mechanics */
-#include "surfaces/bouncepad_small.h" /* Green bouncepad (small jump) placement */
-#include "surfaces/bouncepad_medium.h"/* Wood bouncepad (medium jump) placement */
-#include "surfaces/bouncepad_high.h"  /* Red bouncepad (high jump) placement */
+#include "surfaces/bouncepad.h"     /* Bouncepad struct + MAX_BOUNCEPADS_SMALL/MEDIUM/HIGH */
 #include "screens/hud.h"            /* Hud struct — HUD display resources */
 #include "effects/parallax.h"       /* ParallaxSystem — multi-layer scrolling background */
 #include "surfaces/rail.h"          /* Rail, RailTile — rail path system */

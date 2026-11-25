@@ -10,7 +10,6 @@
 
 #include "fish.h"   /* Fish, FishSpec, FISH_* sprite and hitbox sizes */
 
-#define MAX_FASTER_FISH        16
 /* FFISH_SPEED — the usual patrol speed, 120 px/s (fish: 70); the level's
  * vx is the speed actually used (shipped levels author this value). */
 #define FFISH_SPEED           120.0f

@@ -30,6 +30,11 @@
 #include "../game_constants.h" /* MAX_PATROL_SPEED (enemy vx limit)          */
 #include "properties_internal.h"
 
+/* The description field edits the whole description in the widget's own
+ * buffer, so that buffer must be at least as large. */
+_Static_assert(LEVEL_DESCRIPTION_CAPACITY <= UI_EDIT_BUFFER_SIZE,
+               "a text field must be able to hold a whole level description");
+
 /* The part of the screen the scrolled config content shows this frame
  * (set by level_config_render); rows outside it cannot be clicked. */
 static int cfg_clip_top = 0;

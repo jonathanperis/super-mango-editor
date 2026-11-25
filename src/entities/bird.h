@@ -15,16 +15,10 @@
 
 #include "../shared/graphics.h"
 #include "../shared/audio.h"
+#include "enemy_defs.h"   /* MAX_BIRDS, BIRD_FRAME_W, BIRD_ART_* */
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_BIRDS       16
-#define BIRD_FRAMES      3       /* animation frames in the sheet            */
-#define BIRD_FRAME_W     48      /* width  of one frame slot (px)            */
-#define BIRD_ART_X       17      /* first visible col within each frame      */
-#define BIRD_ART_W       15      /* width  of visible art (cols 17..31)      */
-#define BIRD_ART_Y       17      /* first visible row within each frame      */
-#define BIRD_ART_H       14      /* height of visible art (rows 17..30)      */
 /* BIRD_SPEED — the usual flight speed, px/s; the level's vx is the speed
  * actually used (shipped levels author this value). */
 #define BIRD_SPEED       45.0f

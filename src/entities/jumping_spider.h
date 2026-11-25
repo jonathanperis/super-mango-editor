@@ -17,16 +17,10 @@
 
 #include "../shared/graphics.h"
 #include "../shared/audio.h"
+#include "enemy_defs.h"   /* MAX_JUMPING_SPIDERS, JSPIDER_FRAME_W, JSPIDER_ART_* */
 
 /* ---- Constants ---------------------------------------------------------- */
 
-#define MAX_JUMPING_SPIDERS 16
-#define JSPIDER_FRAMES       3       /* animation frames in Spider_2.png      */
-#define JSPIDER_FRAME_W      64      /* width  of one frame slot (px)         */
-#define JSPIDER_ART_X        20      /* first visible col within each frame   */
-#define JSPIDER_ART_W        25      /* width  of visible art (cols 20..44)   */
-#define JSPIDER_ART_Y        22      /* first visible row within each frame   */
-#define JSPIDER_ART_H        10      /* height of visible art (rows 22..31)   */
 /* JSPIDER_SPEED — the usual walk speed, px/s; the level's vx is the speed
  * actually used (shipped levels author this value). */
 #define JSPIDER_SPEED        55.0f

@@ -16,6 +16,7 @@
 #include "level_ref.h"
 #include "level_validate.h"
 #include "../player/player.h"  /* JUMP_VY: the jump-height check */
+#include "../entities/jumping_spider.h" /* JSPIDER_JUMP_VY, JSPIDER_GRAVITY: its jump arc */
 #include "../screens/hud.h"    /* MAX_HEARTS: the initial_hearts limit */
 #include "../shared/geometry.h" /* float_same_value: the flame-on-gap rule */
 

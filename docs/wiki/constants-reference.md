@@ -9,7 +9,15 @@ On this page: [`game_constants.h`](#game_constantsh-constants) · [Player](#play
 [Derived values](#derived-values-quick-reference)
 
 Per header: [`axe_trap.h`](#axe_traph-constants) · [`bird.h`](#birdh-constants) · [`blue_flame.h`](#blue_flameh-constants) · [`bouncepad.h`](#bouncepadh-constants) · [`bridge.h`](#bridgeh-constants) · [`circular_saw.h`](#circular_sawh-constants) · [`coin.h`](#coinh-constants) · [`debug.h`](#debugh-constants) · [`faster_bird.h`](#faster_birdh-constants) · [`faster_fish.h`](#faster_fishh-constants) · [`fish.h`](#fishh-constants) · [`float_platform.h`](#float_platformh-constants) · [`fog.h`](#fogh-constants) · [`health_star.h`](#health_starh-constants) · [`hud.h`](#hudh-constants) · [`jumping_spider.h`](#jumping_spiderh-constants) · [`ladder.h`](#ladderh-constants) · [`last_star.h`](#last_starh-constants) · [`parallax.h`](#parallaxh-constants) · [`platform.h`](#platformh-constants) · [`rail.h`](#railh-constants) · [`rope.h`](#ropeh-constants) · [`spider.h`](#spiderh-constants) · [`spike.h`](#spikeh-constants) · [`spike_block.h`](#spike_blockh-constants) · [`spike_platform.h`](#spike_platformh-constants) · [`vine.h`](#vineh-constants) · [`water.h`](#waterh-constants) ·
-[bouncepad variants](#bouncepad_smallh--bouncepad_mediumh--bouncepad_highh-constants)
+[bouncepad variants](#bouncepad-array-limits)
+
+The tables are grouped by the module each constant belongs to. A module's
+level limit (`MAX_*`), sprite sizes and level-file enums are written in its
+folder's raylib-free `*_defs.h` header (`entities/enemy_defs.h`,
+`hazards/hazard_defs.h`, `surfaces/surface_defs.h`,
+`collectibles/collectible_defs.h`, `effects/effect_defs.h`), which the
+module's own header includes; its speeds and timings are in the module's
+header itself.
 
 `make docs-drift` checks every value in the tables below against the
 `#define` in `src/`, so a changed constant fails the check until this page
@@ -636,7 +644,9 @@ update code in `fish.c`; only this tuning differs (passed as a `FishSpec`).
 
 ---
 
-## `bouncepad_small.h` / `bouncepad_medium.h` / `bouncepad_high.h` Constants
+<a id="bouncepad-array-limits"></a>
+
+## Bouncepad Array Limits (`surface_defs.h`)
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|

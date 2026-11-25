@@ -9,15 +9,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
-
-#define MAX_ROPES    16
-#define ROPE_W       16              /* display width (full sprite width)       */
-#define ROPE_H       36              /* display height with padding cropped       */
-#define ROPE_SRC_X   0               /* source crop x (no crop, use full width)   */
-#define ROPE_SRC_Y   6               /* source crop y (6 px top padding)          */
-#define ROPE_SRC_W  16               /* source crop width (full sprite width)    */
-#define ROPE_SRC_H  36               /* source crop height                       */
-#define ROPE_STEP   23               /* vertical spacing for 13px overlap (36-23)*/
+#include "surface_defs.h"  /* MAX_ROPES, ROPE_* */
 
 /*
  * RopeDecor — world-space position and length of one rope.

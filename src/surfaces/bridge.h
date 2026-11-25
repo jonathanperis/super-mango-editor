@@ -12,13 +12,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
-
-/* ---- Constants ---------------------------------------------------------- */
-
-#define MAX_BRIDGES         16
-#define MAX_BRIDGE_BRICKS   16     /* max bricks in a single bridge          */
-#define BRIDGE_TILE_W       16     /* width  of one Bridge.png tile (px)     */
-#define BRIDGE_TILE_H       16     /* height of one Bridge.png tile (px)     */
+#include "surface_defs.h"  /* MAX_BRIDGES, MAX_BRIDGE_BRICKS, BRIDGE_TILE_W/H */
 
 /*
  * BRIDGE_FALL_DELAY — seconds between the player first touching a brick
