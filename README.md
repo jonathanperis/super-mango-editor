@@ -21,7 +21,7 @@ Windows; Emscripten builds the browser version.
 **Start learning:** [Sandbox School](https://super-mango-editor.jonathanperis.tech/docs/learning-path/) · [Debugging C](https://super-mango-editor.jonathanperis.tech/docs/debugging-c/) · [C in This Codebase](https://super-mango-editor.jonathanperis.tech/docs/c-concepts/) · [Mechanics Museum](https://super-mango-editor.jonathanperis.tech/docs/mechanics-museum/) · [Entity Walkthrough](https://super-mango-editor.jonathanperis.tech/docs/entity-walkthrough/)
 
 The source is part of the lesson. Explicit update/draw steps, simple loops and
-comments about units, ownership and library calls are intentional. We favour
+comments about units, ownership and library calls are intentional. I favour
 code a learner can trace over a shorter version that hides a step.
 
 ## Tech Stack
@@ -36,16 +36,12 @@ code a learner can trace over a shorter version that hides a step.
 
 ## What is in it
 
-- A side-scrolling platformer with multi-screen TOML worlds, 33 render layers and fixed 1/60 s physics steps (`make timing-lab` shows why)
-- Six enemy types, seven hazard types, coins (score and bonus lives), health stars and an end-of-level star
-- Vines, ladders, ropes, three bouncepad sizes, crumbling bridges and float platforms
-- Authored `[[checkpoints]]`, or automatic screen-boundary respawns for levels without them
-- Pause, game-over and completion overlays: Up/Down or D-pad selects, Enter/Space/Start confirms (A also confirms), Esc/Back exits (B also exits)
-- Keyboard, hot-plug gamepad and browser touch controls; F1 settings with remapping, audio, dead zone, window scale, high contrast and reduced motion
-- A debug inspector to freeze, step, slow down and tune the simulation, and to record and replay experiments
-- A standalone level editor with undo/redo, copy/paste, validation that blocks bad saves, autosave and one-key playtesting
-
-The [manual](https://super-mango-editor.jonathanperis.tech/docs/) covers each of these in detail.
+A side-scrolling platformer with multi-screen TOML worlds, enemies, hazards,
+climbable surfaces and authored checkpoints; menus and settings that work with
+a keyboard, a gamepad or touch; a debug inspector that freezes, steps and
+replays the simulation; and a standalone level editor that saves the same
+files the game loads. The [manual's overview](https://super-mango-editor.jonathanperis.tech/docs/)
+has the full feature list, and each feature has its own page there.
 
 ## Getting Started
 
@@ -91,17 +87,18 @@ tests on raylib's in-memory backend.
 ### Quick Start
 
 ```sh
-make run CC=clang                     # build and play
-make run-editor CC=clang              # build and open the level editor
-make run-level-debug CC=clang LEVEL=levels/labs/01_collision.toml  # a lab, with the inspector
-make debug CC=clang                   # -g -O0 game and editor in out/debug/ for lldb/gdb
-make test CC=clang                    # 18 native regression tests (binaries) plus Python/JavaScript host checks
-make sanitize CC=clang                # the tests again under AddressSanitizer/UBSan
+make run                              # build and play
+make run-editor                       # build and open the level editor
+make run-level-debug LEVEL=levels/labs/01_collision.toml  # a lab, with the inspector
+make debug                            # -g -O0 game and editor in out/debug/ for lldb/gdb
+make test                             # 18 native regression tests (binaries) plus Python/JavaScript host checks
+make sanitize                         # the tests again under AddressSanitizer/UBSan
 make docs-drift                       # check the manual against the code
 make help                             # list every target with a one-line description
 ```
 
-The [Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/) page lists every target and flag, and
+The Makefile builds with clang by default; add `CC=gcc` to any of these to use
+GCC instead. The [Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/) page lists every target and flag, and
 [Testing](https://super-mango-editor.jonathanperis.tech/docs/testing/) says which checks to run for which change. The debug
 inspector keys are in [Controls](https://super-mango-editor.jonathanperis.tech/docs/controls/#debug-inspector-keys); debug and
 playtest runs never touch your saved profile.
@@ -150,11 +147,12 @@ super-mango-editor/
 | `DESIGN.md` | How the website looks: built from the game's own sprites, palette and fonts. |
 | `docs/wiki/` | The manual, published on the [docs site](https://super-mango-editor.jonathanperis.tech/docs/). |
 | `docs/README.md` | Website setup, content ownership, generated facts and deployment. |
-| `docs/archive/`, `.specs/archive/` | Historical, dated documents: two audit reports and the SDL2-era working specification. Not current status; each folder's README says what they are. |
+| `docs/archive/`, `.specs/archive/` | Historical, dated documents: two audit reports, the old arcade-cabinet website plan and the SDL2-era working specification. Not current status; each folder's README says what they are. |
 | `SECURITY.md` | Vulnerability reporting, scope and the web build's shared-origin model. |
 | `THIRD_PARTY_NOTICES.md` | Third-party code and media notices. |
 | `CODEOWNERS` | Review ownership hints for GitHub. |
 | `CONTRIBUTING.md` | Branch shape, which checks are required, and the headless test command. |
+| `CHANGELOG.md` | The longer history of each larger piece of work; `.specs/project/STATE.md` keeps one line per item. |
 
 If any of these disagree with the code, the code wins: update the docs and the
 checks that guard them together.
@@ -162,39 +160,12 @@ checks that guard them together.
 ## CI/CD
 
 `build.yml` and `codeql.yml` run on every pull request and every push to
-`main`; `docs.yml` runs only on pull requests that touch the website's inputs,
-plus a weekly and a manual run. `fuzz.yml` runs weekly and on demand, and is
-not a required check. `static-analysis.yml` runs on pull requests (except
-documentation-only ones) and on demand; it only reports, so it is not a
-required check either.
-
-- **`build.yml`** builds and tests the game and editor on Linux, macOS and
-  Windows with warnings as errors, renders every level briefly, and builds the
-  WebAssembly version. It also runs the sanitizers (with the fuzz seeds) and
-  scripted replay smoke on Linux. An always-on `Docs drift` job runs
-  `make docs-drift`. A pull request that only changes documentation (the
-  manual, `.specs/`, top-level Markdown) skips the C build, test and
-  sanitizer work; the required checks still report. On `main` it publishes the website
-  and then loads the published game in headless Chromium (`Live site check`,
-  `tools/live-check/`); on a `v*` tag
-  or a manual release run it adds checksums and build provenance and publishes
-  the release archives.
-- **`docs.yml`** lints, audits, builds and link-checks the website. It does
-  not repeat `make docs-drift` (the always-on `Docs drift` job in `build.yml`
-  checks the manual against the code), and on `main` the website is built by
-  `build.yml` before it is published.
-- **`codeql.yml`** runs CodeQL security and quality analysis on the C code, the
-  workflows, the Python tools and the JavaScript/TypeScript.
-- **`fuzz.yml`** runs coverage-guided libFuzzer against the level loader, the
-  editor's save and reload, the profile and ghost decoders, and the campaign
-  manifest and experiment capture loaders (`make fuzz`, four harnesses). It
-  minimises what it found (`make fuzz-merge`) and keeps that corpus in the
-  Actions cache and in a `fuzz-corpus` artifact. Sanitizer runs still replay
-  the seed corpus on every pull request.
-- **`static-analysis.yml`** runs clang-tidy over `src/` and `tools/`
-  (`make tidy`) and lists the findings in the job summary.
-
-The [Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/#cicd-pipelines) page has the job-by-job detail.
+`main`; `docs.yml`, `fuzz.yml` and `static-analysis.yml` run on narrower
+triggers. `build.yml` builds and tests the game and editor on Linux, macOS,
+Windows and WebAssembly, and on `main` publishes the website. The
+[Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/#cicd-pipelines)
+page is the one place that lists every workflow, its triggers and its jobs,
+and [CONTRIBUTING.md](CONTRIBUTING.md) lists the checks a pull request needs.
 
 ## License
 
