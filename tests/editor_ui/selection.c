@@ -46,10 +46,10 @@ static int mouse_cursor_follows_fields_and_drags(void)
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, sx, sy);
     push_event(INPUT_MOUSE_MOVE, 0, 0, sx + 30, sy + 10);
     ui_frame(&es, sx + 30, sy + 10);
-    CHECK(es.dragging && es.ui.cursor_shown == MOUSE_CURSOR_RESIZE_ALL);
+    CHECK(es.drag.active && es.ui.cursor_shown == MOUSE_CURSOR_RESIZE_ALL);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, sx + 30, sy + 10);
     ui_frame(&es, sx + 30, sy + 10);
-    CHECK(!es.dragging && es.ui.cursor_shown == MOUSE_CURSOR_DEFAULT);
+    CHECK(!es.drag.active && es.ui.cursor_shown == MOUSE_CURSOR_DEFAULT);
 
     /* A dragged scrollbar thumb shows the up-down arrows. */
     UIState ui;

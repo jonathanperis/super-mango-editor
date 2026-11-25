@@ -197,7 +197,7 @@ int editor_handles_shown(const EditorState *es)
     if (editor_selection_count(es) != 1) return 0;
     /* While the selected entity is being moved its handles would only be
      * in the way; while one of them is being dragged they stay. */
-    if (es->dragging && !es->resizing) return 0;
+    if (es->drag.active && !es->resizing) return 0;
     return 1;
 }
 
@@ -560,9 +560,9 @@ int editor_resize_begin(EditorState *es, float world_x, float world_y)
     if (kind == EDITOR_HANDLE_NONE) return 0;
 
     es->resizing = 1;
-    es->dragging = 1;       /* the gesture owns the document (see editor.h) */
-    es->drag_moved = 0;
-    es->drag_count = 0;     /* no entity is being moved */
+    es->drag.active = 1;       /* the gesture owns the document (see editor.h) */
+    es->drag.moved = 0;
+    es->drag.count = 0;     /* no entity is being moved */
     es->box_selecting = 0;
     es->last_click_valid = 0;
     es->resize_handle = (int)kind;
@@ -655,7 +655,7 @@ void editor_resize_finish(EditorState *es)
 
     if (!es || !es->resizing) return;
     es->resizing = 0;
-    es->dragging = 0;
+    es->drag.active = 0;
     if (!resize_target_exists(es)) return;
 
     after = editor_snapshot_entity(&es->level, es->resize_type, es->resize_index);
@@ -691,7 +691,7 @@ void editor_resize_cancel(EditorState *es)
 {
     if (!es || !es->resizing) return;
     es->resizing = 0;
-    es->dragging = 0;
+    es->drag.active = 0;
     restore_resize(es);
     editor_set_status(es, "Resize cancelled");
 }

@@ -274,7 +274,7 @@ static int drag_round_trips_and_follows_grab_point(void)
     event.mods = 0;
     editor_handle_event(&es, &event);
     if (expect_float_value("esc restores", es.level.coins[0].x, 100.0f) != 0 ||
-        expect_int("esc ends drag", es.dragging, 0) != 0 ||
+        expect_int("esc ends drag", es.drag.active, 0) != 0 ||
         expect_int("esc records nothing", es.undo->top, 0) != 0) goto fail;
 
     /* A level broken while the button is held puts the entity back. */

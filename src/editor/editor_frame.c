@@ -23,7 +23,7 @@
 void editor_update_cursor(EditorState *es)
 {
     /* Moving entities: the four-way arrows, whatever is under them. */
-    if (es->dragging && !es->playing) ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
+    if (es->drag.active && !es->playing) ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
     /* A resize handle, grabbed or under the pointer: arrows along the way
      * it moves (a rail's corner moves both ways). */
     if (!es->playing) {

@@ -150,7 +150,7 @@ static int patrol_handles_move_the_range_ends(void)
     CHECK(handle_screen_point(&es, ENT_SPIDER, 0, EDITOR_HANDLE_PATROL_END, &sx, &sy));
     const int undo_top = es.undo->top;
     press_and_move(&es, sx, sy, 60, 0);
-    CHECK(es.resizing && es.dragging);
+    CHECK(es.resizing && es.drag.active);
     CHECK(spider->patrol_x1 == 430.0f && spider->patrol_x0 == 150.0f && spider->x == 200.0f);
     CHECK(strstr(es.status_message, "patrol: 150 to 430") != NULL);
     CHECK(es.ui.cursor_shown == MOUSE_CURSOR_RESIZE_EW);
@@ -163,7 +163,7 @@ static int patrol_handles_move_the_range_ends(void)
     key_frame(&es, KEY_F1, 0);
     CHECK(!es.shortcut_sheet_open);
     release_at(&es, sx + 60, sy);
-    CHECK(!es.resizing && !es.dragging && !es.mouse.down);
+    CHECK(!es.resizing && !es.drag.active && !es.mouse.down);
     CHECK(es.undo->top == undo_top + 1 && es.modified && level_is_valid(&es));
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(spider->patrol_x1 == 400.0f && es.undo->top == undo_top);
@@ -177,7 +177,7 @@ static int patrol_handles_move_the_range_ends(void)
     press_and_move(&es, sx, sy, -40, 0);
     CHECK(spider->patrol_x0 == 130.0f);
     key_frame(&es, KEY_ESCAPE, 0);
-    CHECK(!es.resizing && !es.dragging && spider->patrol_x0 == 150.0f);
+    CHECK(!es.resizing && !es.drag.active && spider->patrol_x0 == 150.0f);
     CHECK(strstr(es.status_message, "Resize cancelled") != NULL);
     release_at(&es, sx - 40, sy);
     CHECK(spider->patrol_x0 == 150.0f && es.undo->top == undo_top);
