@@ -239,8 +239,9 @@ not saved for later.
 
 Besides hitboxes, patrol lines and the velocity arrow, the overlay keeps its
 text in a few small panels: a status line at the top left (`LIVE`, `FROZEN` or
-`SLOW`, plus `REC n` or `REPLAY n/m`), one performance line at the top right
-(FPS, frame time, memory), one player line at the bottom right (state,
+`SLOW`, plus `REC n` or `REPLAY n/m`), two performance lines at the top right
+(FPS, the frame interval and memory; then the CPU time of the update and of
+the drawing, and the texture switches per frame), one player line at the bottom right (state,
 ground/air, facing, velocity, and the checkpoint, riding platform and hurt time
 when set) and recent events at the bottom left. The tuned movement value
 appears under the status line for three seconds after F6/F7/`-`/`=`, and stays
