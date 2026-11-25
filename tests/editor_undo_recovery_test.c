@@ -1194,6 +1194,168 @@ done:
     return failed;
 }
 
+/* Write text to a file in the recovery folder (any platform). */
+static int put_recovery_file(const char *root, const char *name, const char *text)
+{
+    char path[EDITOR_PATH_MAX + 64];
+    FILE *fp;
+    snprintf(path, sizeof(path), "%s/%s", root, name);
+    if (!(fp = fopen(path, "wb"))) return -1;
+    if (text[0] && fputs(text, fp) == EOF) { fclose(fp); return -1; }
+    return fclose(fp);
+}
+
+static void drop_recovery_file(const char *root, const char *name)
+{
+    char path[EDITOR_PATH_MAX + 64];
+    snprintf(path, sizeof(path), "%s/%s", root, name);
+    remove(path);
+}
+
+/*
+ * The .meta files sit in a folder anyone can write to, and a crash or a
+ * full disk can cut one short, so discovery reads each one as untrusted
+ * input. Every damaged form below has a snapshot beside it, so the only
+ * reason not to offer it is the .meta itself; the well-formed ones of each
+ * version (and upper-case hex, which an older writer could produce) are
+ * offered. Nothing is deleted: the files are young, so the start-up sweep
+ * would leave them alone too.
+ */
+static int damaged_recovery_metadata_is_never_offered(void)
+{
+    int failed = 0;
+    static EditorState es;
+    char root[EDITOR_PATH_MAX] = {0};
+    static char long_line[EDITOR_PATH_MAX * 2 + 256];
+    static const struct { unsigned id; const char *meta; int offered; } cases[] = {
+        {0x8001, "", 0},                                          /* empty file */
+        {0x8002, "1\t0000000000008002\t1700000000\t-", 0},          /* cut before the newline */
+        {0x8003, "1\t0000000000008003\t1700000000\t-\nmore\n", 0},  /* a second line */
+        {0x8004, "4\t0000000000008004\t1700000000\t0\t0\t-\n", 0},  /* unknown version */
+        {0x8005, "2\t0000000000008005\t1700000000\t-\n", 0},        /* version 2 without a pid */
+        {0x8006, "3\t0000000000008006\t1700000000\t0\t-\n", 0},     /* version 3 without a start */
+        {0x8007, "1\t0000000000008007\t1700000000\t-\textra\n", 0}, /* one field too many */
+        {0x8008, "1\t0\t1700000000\t-\n", 0},                       /* id 0 */
+        {0x8009, "1\t80zz\t1700000000\t-\n", 0},                    /* id not hex */
+        {0x800a, "1\t1ffffffffffffffff\t1700000000\t-\n", 0},       /* id past 64 bits */
+        {0x800b, "1\t000000000000800b\t0\t-\n", 0},                 /* timestamp 0 */
+        {0x800c, "1\t000000000000800c\t17x\t-\n", 0},               /* timestamp not a number */
+        {0x800d, "2\t000000000000800d\t1700000000\tpid\t-\n", 0},   /* pid not a number */
+        {0x800e, "3\t000000000000800e\t1700000000\t0\tnow\t-\n", 0},/* start not a number */
+        {0x800f, "1\t000000000000800f\t1700000000\tabc\n", 0},      /* odd-length source */
+        {0x8010, "1\t0000000000008010\t1700000000\t6c00\n", 0},     /* a NUL in the source */
+        {0x8011, "1\t0000000000008011\t1700000000\t6g\n", 0},       /* source not hex */
+        {0x8012, "1\t0000000000008012\t1700000000\t-\n", 1},        /* version 1, no source */
+        {0x8013, "2\t0000000000008013\t1700000000\t0\t6C2E746F6D6C\n", 1}, /* "l.toml", upper case */
+        {0x8014, "3\t0000000000008014\t1700000000\t0\t0\t6c2e746f6d6c\r\n", 1}, /* CRLF */
+    };
+    const size_t count = sizeof(cases) / sizeof(cases[0]);
+    char name[64];
+
+    CHECK(make_preference_root(root, sizeof(root)) == 0);
+    CHECK(open_editor_in(&es, root, "Reader", "") == 0);
+    for (size_t i = 0; i < count; i++) {
+        snprintf(name, sizeof(name), "editor_recovery_%016x.toml", cases[i].id);
+        CHECK(put_recovery_file(root, name, "name = \"copy\"\n") == 0);
+        snprintf(name, sizeof(name), "editor_recovery_%016x.meta", cases[i].id);
+        CHECK(put_recovery_file(root, name, cases[i].meta) == 0);
+    }
+    /* A line longer than any the editor writes is cut short by the reader,
+     * so it is refused as damaged, not read in pieces. */
+    memset(long_line, 'a', sizeof(long_line) - 2);
+    memcpy(long_line, "1\t0000000000008015\t1700000000\t", 30);
+    long_line[sizeof(long_line) - 2] = '\n';
+    long_line[sizeof(long_line) - 1] = '\0';
+    CHECK(put_recovery_file(root, "editor_recovery_0000000000008015.toml", "name = \"copy\"\n") == 0);
+    CHECK(put_recovery_file(root, "editor_recovery_0000000000008015.meta", long_line) == 0);
+    /* Names that only look like a .meta are not read at all. */
+    CHECK(put_recovery_file(root, "editor_recovery_0000000000000000.meta",
+                            "1\t0000000000000000\t1700000000\t-\n") == 0);
+    CHECK(put_recovery_file(root, "editor_recovery_000000000000801g.meta",
+                            "1\t000000000000801a\t1700000000\t-\n") == 0);
+    /* A well-formed .meta whose snapshot is missing is not offered either. */
+    CHECK(put_recovery_file(root, "editor_recovery_0000000000008016.meta",
+                            "1\t0000000000008016\t1700000000\t-\n") == 0);
+
+    CHECK(editor_discover_recoveries(&es) == 0);
+    CHECK(es.recovery_entry_count == 3);
+    for (int i = 0; i < es.recovery_entry_count; i++) {
+        const EditorRecoveryEntry *entry = &es.recovery_entries[i];
+        int known = 0;
+        for (size_t c = 0; c < count; c++)
+            if (entry->id == cases[c].id) known = cases[c].offered;
+        CHECK(known);
+        if (entry->id == 0x8012) CHECK(entry->source_path[0] == '\0');
+        else CHECK(strcmp(entry->source_path, "l.toml") == 0);
+    }
+    CHECK(editor_recovery_offer_count(&es) == 3);
+done:
+    for (size_t i = 0; i < count; i++) {
+        snprintf(name, sizeof(name), "editor_recovery_%016x.toml", cases[i].id);
+        drop_recovery_file(root, name);
+        snprintf(name, sizeof(name), "editor_recovery_%016x.meta", cases[i].id);
+        drop_recovery_file(root, name);
+    }
+    drop_recovery_file(root, "editor_recovery_0000000000008015.toml");
+    drop_recovery_file(root, "editor_recovery_0000000000008015.meta");
+    drop_recovery_file(root, "editor_recovery_0000000000000000.meta");
+    drop_recovery_file(root, "editor_recovery_000000000000801g.meta");
+    drop_recovery_file(root, "editor_recovery_0000000000008016.meta");
+    remove_preference_root(root, (EditorState *[]){&es}, 1);
+    close_document(&es);
+    return failed;
+}
+
+/*
+ * A snapshot that no longer loads (cut short by a crash mid-write, or
+ * edited by hand) is refused with "Recovery failed", and the open document
+ * stays exactly as it was: recovering must never replace good work with a
+ * broken level. The copy stays on disk, so nothing more is lost.
+ */
+static int a_snapshot_that_will_not_load_leaves_the_document_alone(void)
+{
+    int failed = 0;
+    static EditorState es;
+    char root[EDITOR_PATH_MAX] = {0};
+
+    CHECK(make_preference_root(root, sizeof(root)) == 0);
+    CHECK(open_editor_in(&es, root, "Keep me", "") == 0);
+    CHECK(put_recovery_file(root, "editor_recovery_0000000000008101.toml",
+                            "name = \"half wr") == 0);
+    CHECK(put_recovery_file(root, "editor_recovery_0000000000008101.meta",
+                            "1\t0000000000008101\t1700000000\t-\n") == 0);
+    CHECK(editor_discover_recoveries(&es) == 0);
+    CHECK(es.recovery_entry_count == 1);
+    CHECK(editor_recover_entry_by_id(&es, 0x8101u) == -1);
+    CHECK(strcmp(es.status_message, "Recovery failed") == 0);
+    CHECK(strcmp(es.level.name, "Keep me") == 0 && es.modified);
+    CHECK(editor_recover_entry_by_id(&es, 0) == -1);
+
+    /* The document's own snapshot, cut short the same way and without a
+     * .meta (as an editor from before the index left it): refused too. */
+    autosave_now(&es);
+    CHECK(editor_file_exists(es.autosave_path));
+    {
+        char meta[EDITOR_PATH_MAX + 8];
+        FILE *fp = fopen(es.autosave_path, "wb");
+        CHECK(fp != NULL);
+        fputs("name = [", fp);
+        fclose(fp);
+        snprintf(meta, sizeof(meta), "%.*s.meta",
+                 (int)(strlen(es.autosave_path) - strlen(".toml")), es.autosave_path);
+        CHECK(remove(meta) == 0);
+    }
+    CHECK(editor_recover_autosave(&es) == -1);
+    CHECK(strcmp(es.status_message, "Recovery failed") == 0);
+    CHECK(strcmp(es.level.name, "Keep me") == 0);
+done:
+    drop_recovery_file(root, "editor_recovery_0000000000008101.toml");
+    drop_recovery_file(root, "editor_recovery_0000000000008101.meta");
+    remove_preference_root(root, (EditorState *[]){&es}, 1);
+    close_document(&es);
+    return failed;
+}
+
 /* ------------------------------------------------------------------ */
 
 int main(int argc, char **argv)
@@ -1219,6 +1381,8 @@ int main(int argc, char **argv)
         CASE(recovery_picker_walks_the_copies),
         CASE(the_open_documents_own_snapshot_is_not_offered),
         CASE(autosave_reads_the_recovery_folder_once),
+        CASE(damaged_recovery_metadata_is_never_offered),
+        CASE(a_snapshot_that_will_not_load_leaves_the_document_alone),
 #ifndef _WIN32
         CASE(another_running_editors_copy_is_not_offered),
         CASE(recovery_folder_leftovers_are_tidied),

@@ -2036,6 +2036,14 @@ static int experiment_rows_keep_the_physics_caps(void)
     return 0;
 }
 
+/* tests/platform_paths_test.c: platform.c and asset_root.c at their edges. */
+int platform_text_copies_never_overrun(void);
+int platform_writable_paths_refuse_control_bytes(void);
+int platform_preference_folders_are_created_or_refused(void);
+int platform_executable_folder_reads_any_separator(void);
+int asset_root_rejects_paths_it_cannot_hold(void);
+int asset_root_is_found_from_the_test_program(void);
+
 /* Each case gets a fresh window and audio device and leaves none behind. */
 static void session_after_each(void)
 {
@@ -2076,6 +2084,12 @@ int main(int argc, char **argv)
         CASE(start_point_respawns_follow_the_ground),
         CASE(asset_root_moves_a_foreign_working_folder),
         CASE(executable_folder_follows_links), CASE(long_replay_dir_fits_the_session),
+        CASE(platform_text_copies_never_overrun),
+        CASE(platform_writable_paths_refuse_control_bytes),
+        CASE(platform_preference_folders_are_created_or_refused),
+        CASE(platform_executable_folder_reads_any_separator),
+        CASE(asset_root_rejects_paths_it_cannot_hold),
+        CASE(asset_root_is_found_from_the_test_program),
         CASE(direct_game_boot_repairs_input_and_keeps_controller_runtime),
         CASE(immediate_play_preserves_window_and_input_latch),
         CASE(repeated_menu_game_ownership), CASE(checkpoint_transitions_use_production_paths),

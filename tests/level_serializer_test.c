@@ -2531,6 +2531,8 @@ static int metadata_roundtrip_and_limits(void)
     return failed;
 }
 
+int serializer_io_edge_cases(void);  /* tests/serializer_io_test.c */
+
 int main(void)
 {
     if (ensure_out_dir() != 0) return 1;
@@ -2580,6 +2582,7 @@ int main(void)
     if (messages_escape_control_bytes() != 0) return 1;
     if (save_order_covers_every_schema_row() != 0) return 1;
     if (physics_overrides_are_default_or_capped() != 0) return 1;
+    if (serializer_io_edge_cases() != 0) return 1;
 
     puts("level_serializer_test: ok");
     return 0;
