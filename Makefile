@@ -609,18 +609,28 @@ endif
 COVERAGE_BINS = $(patsubst $(OUTDIR)/%,$(COVERAGE_OUTDIR)/%,$(TEST_TARGETS)) \
                 $(COVERAGE_OUTDIR)/parser-allocation-probe
 COVERAGE_IGNORE = '(^|/)(vendor|tests|out)/'
-# Optional floor for the TOTAL line coverage, in percent (CI sets one). Empty
-# means "report only". The summary is also kept in summary.txt for CI.
+# Optional floors for the TOTAL line and branch coverage, in percent (CI sets
+# both). Empty means "report only". The summary is also kept in summary.txt
+# for CI.
 COVERAGE_MIN ?=
-# Each file's line coverage is also compared with its number in
+COVERAGE_BRANCH_MIN ?=
+# Each file's line and branch coverage is also compared with its numbers in
 # COVERAGE_BASELINE (tools/check_coverage_baseline.py). COVERAGE_TOLERANCE=N
-# fails the run when a file is more than N points below it (CI sets 2);
-# empty means "report only". `make coverage-baseline` rewrites the file.
+# fails the run when a file is more than N points below either (CI sets 2);
+# empty means "report only". A file the baseline does not list yet (new, or
+# split out of another) must reach COVERAGE_NEW_FILE_MIN_LINES and
+# COVERAGE_NEW_FILE_MIN_BRANCHES instead (CI sets both).
+# `make coverage-ratchet` raises the baseline where coverage improved;
+# `make coverage-baseline` rewrites it outright.
 COVERAGE_BASELINE = tools/coverage_baseline.txt
 COVERAGE_TOLERANCE ?=
+COVERAGE_NEW_FILE_MIN_LINES ?=
+COVERAGE_NEW_FILE_MIN_BRANCHES ?=
+COVERAGE_CHECK = python3 tools/check_coverage_baseline.py "$(COVERAGE_OUTDIR)/summary.txt" \
+                 --baseline $(COVERAGE_BASELINE)
 
-.PHONY: coverage coverage-baseline
-coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (clang)
+.PHONY: coverage coverage-baseline coverage-ratchet
+coverage: $(RAYLIB_LIB) ## Test: Per-file line and branch coverage of the native tests (clang)
 	rm -rf "$(COVERAGE_OUTDIR)/profiles"
 	mkdir -p "$(COVERAGE_OUTDIR)/profiles" "$(COVERAGE_OUTDIR)/obj/tests"
 	LLVM_PROFILE_FILE="$(abspath $(COVERAGE_OUTDIR))/profiles/%p-%m.profraw" \
@@ -635,25 +645,23 @@ coverage: $(RAYLIB_LIB) ## Test: Per-file line coverage of the native tests (cla
 		-ignore-filename-regex=$(COVERAGE_IGNORE) > "$(COVERAGE_OUTDIR)/summary.txt"
 	@cat "$(COVERAGE_OUTDIR)/summary.txt"
 	@echo "coverage: per-line view: $(LLVM_COV) show $(firstword $(COVERAGE_BINS)) -instr-profile=$(COVERAGE_OUTDIR)/tests.profdata <file.c>"
-# The TOTAL row lists region, function and line coverage (then branches, on
-# newer llvm-cov) as percentages, so the third NN.NN% field is the line total.
-	@if [ -n "$(COVERAGE_MIN)" ]; then \
-		awk -v min="$(COVERAGE_MIN)" ' \
-			$$1 == "TOTAL" { for (i = 2; i <= NF; i++) if ($$i ~ /%$$/ && ++n == 3) lines = $$i } \
-			END { if (lines == "") { print "coverage: no TOTAL line coverage in summary.txt"; exit 1 } \
-			      sub(/%$$/, "", lines); \
-			      if (lines + 0 < min + 0) { printf "coverage: line coverage %s%% is below the %s%% floor\n", lines, min; exit 1 } \
-			      printf "coverage: line coverage %s%% meets the %s%% floor\n", lines, min }' \
-			"$(COVERAGE_OUTDIR)/summary.txt"; \
-	fi
-	python3 tools/check_coverage_baseline.py "$(COVERAGE_OUTDIR)/summary.txt" --baseline $(COVERAGE_BASELINE) \
-		$(if $(COVERAGE_TOLERANCE),--tolerance $(COVERAGE_TOLERANCE),)
+	$(COVERAGE_CHECK) $(if $(COVERAGE_TOLERANCE),--tolerance $(COVERAGE_TOLERANCE),) \
+		$(if $(COVERAGE_MIN),--min-lines $(COVERAGE_MIN),) \
+		$(if $(COVERAGE_BRANCH_MIN),--min-branches $(COVERAGE_BRANCH_MIN),) \
+		$(if $(COVERAGE_NEW_FILE_MIN_LINES),--new-file-min-lines $(COVERAGE_NEW_FILE_MIN_LINES),) \
+		$(if $(COVERAGE_NEW_FILE_MIN_BRANCHES),--new-file-min-branches $(COVERAGE_NEW_FILE_MIN_BRANCHES),)
 
-# Run coverage, then record every file's line coverage as the new baseline.
-# Use the CI configuration (Linux, clang, Memory backend), which the baseline
-# describes: make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
-coverage-baseline: coverage ## Generate: Refresh tools/coverage_baseline.txt from a coverage run
-	python3 tools/check_coverage_baseline.py "$(COVERAGE_OUTDIR)/summary.txt" --baseline $(COVERAGE_BASELINE) --write
+# Run coverage, then record every file's line and branch coverage as the new
+# baseline. Use the CI configuration (Linux, clang, Memory backend), which
+# the baseline describes: make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+coverage-baseline: coverage ## Generate: Rewrite tools/coverage_baseline.txt from a coverage run
+	$(COVERAGE_CHECK) --write
+
+# Run coverage, then raise each baseline number that improved (and add new
+# files, drop deleted ones). It never lowers a number, so it is the one to run
+# after adding tests; same configuration as coverage-baseline.
+coverage-ratchet: coverage ## Generate: Raise tools/coverage_baseline.txt where coverage improved
+	$(COVERAGE_CHECK) --ratchet
 
 # ── Fuzzing (POSIX) ──────────────────────────────────────────────────
 # Each harness defines LLVMFuzzerTestOneInput.  fuzz-corpus links it with
