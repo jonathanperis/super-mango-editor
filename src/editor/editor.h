@@ -477,6 +477,20 @@ typedef struct {
 } EditorBoxSelect;
 
 /*
+ * EditorEntityList — the Entities list (Ctrl+F, editor_entity_list.c).
+ *
+ * It takes the place of Level Config and the palette in the right column
+ * while it is open.  Its rows are worked out from the level on every frame,
+ * so nothing here names an entity: only the search text, and how far the
+ * rows are scrolled (pixels).
+ */
+typedef struct {
+    int      open;
+    char     filter[48];
+    UIScroll scroll;
+} EditorEntityList;
+
+/*
  * EditorMouse — the pointer as the editor last saw it, updated from every
  * input event (editor_events.c), and the view panning it drives.
  *
@@ -797,15 +811,7 @@ typedef struct {
     EditorResize   resize;
 
     /* ---- Entity list (editor_entity_list.c) ---------------------------- */
-    /*
-     * The Entities list (Ctrl+F) takes the place of Level Config and the
-     * palette in the right column while it is open.  Its rows are worked
-     * out from the level on every frame, so nothing here names an entity:
-     * only the search text, and how far the rows are scrolled (pixels).
-     */
-    int            entity_list_open;
-    char           entity_list_filter[48];
-    UIScroll       entity_list_scroll;
+    EditorEntityList entity_list;
 
     /* ---- Box (rubber-band) selection ---------------------------------- */
     EditorBoxSelect box;

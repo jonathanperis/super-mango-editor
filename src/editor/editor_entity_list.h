@@ -83,7 +83,7 @@ const char *editor_entity_list_filter(const EditorState *es);
  * the current search text: 0 for the first row, counting the type
  * headings.  -1 when the entity is not listed.  The row's top edge is at
  *   panel top + ENTITY_LIST_ROWS_TOP + row * ENTITY_LIST_ROW_H - scroll
- * where scroll is es->entity_list_scroll.offset.
+ * where scroll is es->entity_list.scroll.offset.
  */
 int editor_entity_list_row_of(const EditorState *es, EntityType type, int index);
 

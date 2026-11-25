@@ -28,7 +28,7 @@ void editor_side_panel_layout(const EditorState *es, EditorSideLayout *out)
     /* The Entities list covers Level Config and the palette.  (With the
      * Place tool it is on its way out: editor_render_side_panels closes
      * it, because placing needs the palette.) */
-    if (es->entity_list_open && es->tool != TOOL_PLACE) {
+    if (es->entity_list.open && es->tool != TOOL_PLACE) {
         out->list_open = 1;
         out->props_h = selected ? (es->panel_open ? PROPS_SHORT_H : SECTION_HDR) : 0;
         out->list_h = right_bottom - TOOLBAR_H - out->props_h;
@@ -76,7 +76,7 @@ void editor_render_side_panels(EditorState *es)
 
     editor_selection_reconcile(es);
     /* Placing needs the palette, which the Entities list would cover. */
-    if (es->entity_list_open && es->tool == TOOL_PLACE) editor_entity_list_close(es);
+    if (es->entity_list.open && es->tool == TOOL_PLACE) editor_entity_list_close(es);
     editor_side_panel_layout(es, &layout);
     if (layout.list_open) {
         editor_entity_list_render(es, layout.list_y, layout.list_h);
@@ -109,7 +109,7 @@ int editor_handle_side_panel_scroll(EditorState *es, int mx, int my, float wheel
     EditorSideLayout layout;
     editor_side_panel_layout(es, &layout);
     if (layout.list_open && (layout.props_h == 0 || my < layout.props_y)) {
-        (void)ui_scroll_wheel(&es->entity_list_scroll, wheel_y, (float)ENTITY_LIST_ROW_H);
+        (void)ui_scroll_wheel(&es->entity_list.scroll, wheel_y, (float)ENTITY_LIST_ROW_H);
         return 1;
     }
     if (layout.list_open) {

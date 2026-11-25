@@ -34,7 +34,7 @@
 void editor_entity_list_open(EditorState *es)
 {
     if (!es) return;
-    es->entity_list_open = 1;
+    es->entity_list.open = 1;
     /* The Place tool needs the palette, which the list covers. */
     if (es->tool == TOOL_PLACE) es->tool = TOOL_SELECT;
     /* The search field takes the caret when it is next drawn. */
@@ -44,7 +44,7 @@ void editor_entity_list_open(EditorState *es)
 void editor_entity_list_close(EditorState *es)
 {
     if (!es) return;
-    es->entity_list_open = 0;
+    es->entity_list.open = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -195,7 +195,7 @@ const char *editor_entity_list_filter(const EditorState *es)
      * widget's edit buffer (ui.h): reading it there filters as you type,
      * without waiting for Enter. */
     if (es->ui.active_id == WIDGET_ENTITY_LIST_SEARCH) return es->ui.edit_buf;
-    return es->entity_list_filter;
+    return es->entity_list.filter;
 }
 
 /* ------------------------------------------------------------------ */
@@ -302,8 +302,8 @@ void editor_entity_list_render(EditorState *es, int start_y, int available_h)
     ui_label_tip(&es->ui, x + 8, start_y + 34, "Find:",
                  "A type name, or a coordinate such as 96; Esc closes the list");
     (void)ui_text_field_hint(&es->ui, WIDGET_ENTITY_LIST_SEARCH, x + 48, start_y + 32,
-                             PROP_W - 48 - 12, es->entity_list_filter,
-                             (int)sizeof(es->entity_list_filter),
+                             PROP_W - 48 - 12, es->entity_list.filter,
+                             (int)sizeof(es->entity_list.filter),
                              "type or coordinate", 0);
     /* Level Config scrolls to a field of its own that takes the caret
      * (focus_landed_id, WIDGET_LEVEL_FIRST and up); this one is not in that panel. */
@@ -314,10 +314,10 @@ void editor_entity_list_render(EditorState *es, int start_y, int available_h)
     total_rows = editor_entity_list_row_count(es);
 
     /* The scrollbar takes its clicks before the rows can see them. */
-    (void)ui_scrollbar_input(&es->ui, &es->entity_list_scroll, x + PROP_W - SCROLLBAR_W,
+    (void)ui_scrollbar_input(&es->ui, &es->entity_list.scroll, x + PROP_W - SCROLLBAR_W,
                              rows_top, SCROLLBAR_W, rows_h, rows_h,
                              total_rows * ENTITY_LIST_ROW_H);
-    y = ui_scroll_begin(&es->ui, &es->entity_list_scroll, x, rows_top, PROP_W, rows_h,
+    y = ui_scroll_begin(&es->ui, &es->entity_list.scroll, x, rows_top, PROP_W, rows_h,
                         total_rows * ENTITY_LIST_ROW_H);
 
     for (int t = 0; t < ENT_COUNT; t++) {
@@ -372,7 +372,7 @@ void editor_entity_list_render(EditorState *es, int start_y, int available_h)
         }
     }
     ui_scroll_end(&es->ui);
-    ui_scrollbar_draw(&es->ui, &es->entity_list_scroll, x + PROP_W - SCROLLBAR_W, rows_top,
+    ui_scrollbar_draw(&es->ui, &es->entity_list.scroll, x + PROP_W - SCROLLBAR_W, rows_top,
                       SCROLLBAR_W, rows_h, rows_h, total_rows * ENTITY_LIST_ROW_H);
 
     /* How many entities are listed, at the right end of the title bar. */
