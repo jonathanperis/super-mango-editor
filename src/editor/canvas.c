@@ -1268,7 +1268,7 @@ static void render_handles(EditorState *es)
     count = editor_entity_handles(&es->level, es->selection.type,
                                   es->selection.index, handles);
     canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &cursor_x, &cursor_y);
-    if (es->resizing) hot = (EditorHandleKind)es->resize_handle;
+    if (es->resize.active) hot = (EditorHandleKind)es->resize.handle;
     else if (canvas_contains(es->mouse.x, es->mouse.y))
         hot = editor_handle_at(es, cursor_x, cursor_y);
 

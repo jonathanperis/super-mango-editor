@@ -30,7 +30,7 @@ void editor_update_cursor(EditorState *es)
         float world_x, world_y;
         EditorHandleKind handle = EDITOR_HANDLE_NONE;
         canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &world_x, &world_y);
-        if (es->resizing) handle = (EditorHandleKind)es->resize_handle;
+        if (es->resize.active) handle = (EditorHandleKind)es->resize.handle;
         else if (canvas_contains(es->mouse.x, es->mouse.y))
             handle = editor_handle_at(es, world_x, world_y);
         if (handle == EDITOR_HANDLE_CORNER)

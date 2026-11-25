@@ -345,7 +345,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         finish_box(es);
         return;
     }
-    if (es->resizing) {
+    if (es->resize.active) {
         editor_resize_finish(es);
         return;
     }
@@ -433,7 +433,7 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
         es->box_y1 = world_y;
         return;
     }
-    if (es->resizing) {
+    if (es->resize.active) {
         editor_resize_drag(es, world_x, world_y);
         return;
     }
@@ -487,7 +487,7 @@ void tools_cancel_drag(EditorState *es)
         es->box_selecting = 0;
         return;
     }
-    if (es->resizing) {
+    if (es->resize.active) {
         editor_resize_cancel(es);
         return;
     }
