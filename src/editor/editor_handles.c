@@ -192,7 +192,7 @@ int editor_entity_handles(const LevelDef *level, EntityType type, int index,
 
 int editor_handles_shown(const EditorState *es)
 {
-    if (!es || es->campaign || es->playing) return 0;
+    if (!es || es->campaign || es->playtest.running) return 0;
     if (es->tool != TOOL_SELECT) return 0;
     if (editor_selection_count(es) != 1) return 0;
     /* While the selected entity is being moved its handles would only be

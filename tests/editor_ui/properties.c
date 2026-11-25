@@ -277,7 +277,7 @@ static int a_shared_field_reaches_every_entity_however_it_is_left(void)
     start_typing_into_shared_row(&es, 1, "68");
     key_frame(&es, KEY_F5, 0);
     CHECK(three_coins_at(&es, 68.0f, steps));
-    CHECK(!es.playing);
+    CHECK(!es.playtest.running);
 #endif
 
     /* Undo straight from the field: the edit lands for all three first,

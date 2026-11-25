@@ -503,6 +503,26 @@ typedef struct {
 } EditorNudge;
 
 /*
+ * EditorPlaytest — the game running as a child process (editor_playtest.c).
+ *
+ * running — 1 while the game is running.  While it is, the editor hides
+ * its window and shows only a minimal "Stop" overlay; the game runs in its
+ * own window.  When the user clicks Stop or the game exits, running
+ * returns to 0 and the editor window is restored.
+ *
+ * pid (POSIX) is the game's process id, for kill/waitpid; process (Windows)
+ * its process handle.
+ */
+typedef struct {
+    int            running;
+#ifndef _WIN32
+    int            pid;            /* pid_t stored as int for portability */
+#else
+    intptr_t       process;        /* process handle while playtest runs */
+#endif
+} EditorPlaytest;
+
+/*
  * EditorMouse — the pointer as the editor last saw it, updated from every
  * input event (editor_events.c), and the view panning it drives.
  *
@@ -831,22 +851,8 @@ typedef struct {
     /* ---- Arrow-key nudges (tools_nudge.c) ------------------------------ */
     EditorNudge    nudge;
 
-    /* ---- Play-test state ---------------------------------------------- */
-    /*
-     * playing — 1 while the game is running as a child process.
-     * play_pid — PID of the game process (POSIX) for kill/waitpid.
-     *
-     * When playing == 1 the editor hides its window and shows only a
-     * minimal "Stop" overlay.  The game runs in its own window.  When
-     * the user clicks Stop or the game exits, playing returns to 0 and
-     * the editor window is restored.
-     */
-    int            playing;
-#ifndef _WIN32
-    int            play_pid;       /* pid_t stored as int for portability */
-#else
-    intptr_t       play_process;   /* process handle while playtest runs */
-#endif
+    /* ---- Play-test state (editor_playtest.c) --------------------------- */
+    EditorPlaytest playtest;
 
     /* ---- Immediate-mode UI state ------------------------------------- */
     /*

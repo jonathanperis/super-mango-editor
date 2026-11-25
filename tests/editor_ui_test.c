@@ -195,7 +195,7 @@ static void ui_frame(EditorState *es, int mx, int my)
     es->mouse.x = es->ui.mouse_x = mx;
     es->mouse.y = es->ui.mouse_y = my;
     es->ui.mouse_down = es->mouse.down;
-    if (es->playing) editor_check_play_status(es);
+    if (es->playtest.running) editor_check_play_status(es);
     /* Like editor_run_frame, revalidate (which also checks asset files on
      * disk) only when the document changed. */
     uint64_t hash = editor_document_hash(&es->level);
@@ -208,7 +208,7 @@ static void ui_frame(EditorState *es, int mx, int my)
     BeginDrawing();
     BeginTextureMode(tiny_target);
     es->drawing_target = &tiny_target;
-    if (es->playing) {
+    if (es->playtest.running) {
         editor_render_play_overlay(es);
     } else {
         canvas_render(es);

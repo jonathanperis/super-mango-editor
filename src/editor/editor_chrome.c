@@ -129,7 +129,7 @@ void editor_render_toolbar(EditorState *es)
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_ENTITY_LIST));
 
     int rx = EDITOR_W - 4 - 52;
-    if (es->playing) {
+    if (es->playtest.running) {
         if (ui_button_icon(&es->ui, rx, by, 52, bh, UI_ICON_STOP, "Stop")) {
             editor_stop_play(es);
         }

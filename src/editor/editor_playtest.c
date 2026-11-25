@@ -116,7 +116,7 @@ void editor_play_test_here(EditorState *es)
     LevelStart start;
 
     if (!es || !editor_finish_field_edit(es)) return;
-    if (es->playing) return;
+    if (es->playtest.running) return;
     if (editor_playtest_start_here(es, &start) != 0) return;
     editor_play_test_from(es, &start);
 }
@@ -132,7 +132,7 @@ void editor_play_test_from(EditorState *es, const LevelStart *start)
     const char *args[8];
 
     if (!es || !editor_finish_field_edit(es)) return;
-    if (es->playing) return;   /* already running */
+    if (es->playtest.running) return;   /* already running */
     if (!editor_can_persist(es, "Playtest")) return;
 
     char save_path[EDITOR_PATH_MAX];
@@ -175,8 +175,8 @@ void editor_play_test_from(EditorState *es, const LevelStart *start)
         execv(binary_path, (char *const *)args);
         _exit(1);
     } else if (pid > 0) {
-        es->play_pid = (int)pid;
-        es->playing = 1;
+        es->playtest.pid = (int)pid;
+        es->playtest.running = 1;
         if (start && start->kind == LEVEL_START_AT_X)
             editor_set_status(es, "Play launched from x %s", start_number);
         else if (start && start->kind == LEVEL_START_AT_CHECKPOINT)
@@ -229,9 +229,9 @@ void editor_play_test_from(EditorState *es, const LevelStart *start)
         free(wide_level);
         free(wide_binary);
         CloseHandle(process.hThread);
-        es->play_process = (intptr_t)process.hProcess;
+        es->playtest.process = (intptr_t)process.hProcess;
     }
-    es->playing = 1;
+    es->playtest.running = 1;
     if (start && start->kind == LEVEL_START_AT_X)
         editor_set_status(es, "Play launched from x %s", start_number);
     else if (start && start->kind == LEVEL_START_AT_CHECKPOINT)
@@ -288,16 +288,16 @@ void editor_stop_play(EditorState *es)
 {
     int stopped = 1;
 
-    if (!es->playing) return;
+    if (!es->playtest.running) return;
 
 #ifndef _WIN32
-    if (es->play_pid > 0) {
-        if (stop_child((pid_t)es->play_pid)) es->play_pid = 0;
+    if (es->playtest.pid > 0) {
+        if (stop_child((pid_t)es->playtest.pid)) es->playtest.pid = 0;
         else stopped = 0;
     }
 #else
-    if (es->play_process) {
-        HANDLE process = (HANDLE)es->play_process;
+    if (es->playtest.process) {
+        HANDLE process = (HANDLE)es->playtest.process;
         DWORD wait_result = WaitForSingleObject(process, 0);
 
         if (wait_result == WAIT_TIMEOUT) {
@@ -312,7 +312,7 @@ void editor_stop_play(EditorState *es)
         }
         if (stopped) {
             CloseHandle(process);
-            es->play_process = 0;
+            es->playtest.process = 0;
         }
     }
 #endif
@@ -327,7 +327,7 @@ void editor_stop_play(EditorState *es)
         return;
     }
 
-    es->playing = 0;
+    es->playtest.running = 0;
     editor_set_status(es, "Play stopped");
     editor_update_window_title(es);
 }
@@ -335,12 +335,12 @@ void editor_stop_play(EditorState *es)
 void editor_check_play_status(EditorState *es)
 {
 #ifndef _WIN32
-    if (es->play_pid > 0) {
+    if (es->playtest.pid > 0) {
         int status;
-        pid_t result = waitpid((pid_t)es->play_pid, &status, WNOHANG);
+        pid_t result = waitpid((pid_t)es->playtest.pid, &status, WNOHANG);
         if (result > 0) {
-            es->play_pid = 0;
-            es->playing = 0;
+            es->playtest.pid = 0;
+            es->playtest.running = 0;
             editor_retire_playtest_level(es);
             if (WIFEXITED(status)) {
                 editor_set_status(es, "Play exited: code %d", WEXITSTATUS(status));
@@ -352,8 +352,8 @@ void editor_check_play_status(EditorState *es)
             editor_update_window_title(es);
         } else if (result < 0) {
             if (errno == ECHILD) {
-                es->play_pid = 0;
-                es->playing = 0;
+                es->playtest.pid = 0;
+                es->playtest.running = 0;
                 editor_retire_playtest_level(es);
                 editor_set_status(es, "Play ended: process already reaped");
                 editor_update_window_title(es);
@@ -363,16 +363,16 @@ void editor_check_play_status(EditorState *es)
         }
     }
 #else
-    if (es->play_process) {
-        HANDLE process = (HANDLE)es->play_process;
+    if (es->playtest.process) {
+        HANDLE process = (HANDLE)es->playtest.process;
         DWORD wait_result = WaitForSingleObject(process, 0);
 
         if (wait_result == WAIT_OBJECT_0) {
             DWORD exit_code = 0;
             (void)GetExitCodeProcess(process, &exit_code);
             CloseHandle(process);
-            es->play_process = 0;
-            es->playing = 0;
+            es->playtest.process = 0;
+            es->playtest.running = 0;
             editor_retire_playtest_level(es);
             editor_set_status(es, "Play exited: code %lu",
                               (unsigned long)exit_code);

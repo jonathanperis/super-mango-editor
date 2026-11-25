@@ -44,14 +44,14 @@ static int playtest_status_follows_the_game_process(void)
         _exit(3);
     }
     (void)close(gate[0]);
-    es.playing = 1;
-    es.play_pid = (int)child;
+    es.playtest.running = 1;
+    es.playtest.pid = (int)child;
     key_frame(&es, KEY_TWO, 0);
     /* The game exits with code 3: the status line says so. */
     (void)close(gate[1]);
     CHECK(wait_until_exited(child) == 0);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(!es.playing && es.play_pid == 0);
+    CHECK(!es.playtest.running && es.playtest.pid == 0);
     CHECK(strstr(es.status_message, "code 3") != NULL);
     CHECK(es.tool == TOOL_SELECT);
 
@@ -59,31 +59,31 @@ static int playtest_status_follows_the_game_process(void)
     child = fork();
     CHECK(child >= 0);
     if (child == 0) { raise(SIGKILL); _exit(0); }
-    es.playing = 1;
-    es.play_pid = (int)child;
+    es.playtest.running = 1;
+    es.playtest.pid = (int)child;
     CHECK(wait_until_exited(child) == 0);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(!es.playing && strstr(es.status_message, "signal") != NULL);
+    CHECK(!es.playtest.running && strstr(es.status_message, "signal") != NULL);
 
     /* A child that something else already reaped ends the playtest too. */
     child = fork();
     CHECK(child >= 0);
     if (child == 0) _exit(0);
     CHECK(waitpid(child, NULL, 0) == child);
-    es.playing = 1;
-    es.play_pid = (int)child;
+    es.playtest.running = 1;
+    es.playtest.pid = (int)child;
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(!es.playing && strstr(es.status_message, "already reaped") != NULL);
+    CHECK(!es.playtest.running && strstr(es.status_message, "already reaped") != NULL);
 
     /* The overlay's Stop button ends a running game. */
     child = fork();
     CHECK(child >= 0);
     if (child == 0) { for (;;) pause(); }
-    es.playing = 1;
-    es.play_pid = (int)child;
-    for (int y = EDITOR_H / 2; y < EDITOR_H / 2 + 80 && es.playing; y += 4)
+    es.playtest.running = 1;
+    es.playtest.pid = (int)child;
+    for (int y = EDITOR_H / 2; y < EDITOR_H / 2 + 80 && es.playtest.running; y += 4)
         click_frame(&es, EDITOR_W / 2, y);
-    CHECK(!es.playing && es.play_pid == 0);
+    CHECK(!es.playtest.running && es.playtest.pid == 0);
     CHECK(strstr(es.status_message, "stopped") != NULL);
     /* The child is gone: there is nothing left to reap. */
     CHECK(waitpid(child, NULL, WNOHANG) == -1 && errno == ECHILD);
@@ -91,7 +91,7 @@ static int playtest_status_follows_the_game_process(void)
     /* Starting a playtest of an invalid level is refused up front. */
     es.level.screen_count = -1;
     key_frame(&es, KEY_F5, 0);
-    CHECK(!es.playing && strstr(es.status_message, "Playtest blocked") != NULL);
+    CHECK(!es.playtest.running && strstr(es.status_message, "Playtest blocked") != NULL);
 done:
     clear_dialog_seams();
     close_editor(&es);
@@ -162,7 +162,7 @@ static int launched_with(const char *flag, const char *value)
 static void finish_launched_game(EditorState *es)
 {
     release_launched_game();
-    if (es->play_pid > 0) (void)wait_until_exited((pid_t)es->play_pid);
+    if (es->playtest.pid > 0) (void)wait_until_exited((pid_t)es->playtest.pid);
     ui_frame(es, NEUTRAL_X, NEUTRAL_Y);
 }
 
@@ -196,18 +196,18 @@ static int playtest_from_here_passes_the_start_point(void)
     ui_frame(&es, 200, canvas_y);
     push_key(KEY_F5, INPUT_SHIFT);
     ui_frame(&es, 200, canvas_y);
-    CHECK(launch_count == 1 && es.playing);
+    CHECK(launch_count == 1 && es.playtest.running);
     CHECK(launched_with("--start-x", "200"));
     CHECK(launched_with("--level", es.playtest_path));
     CHECK(strstr(es.status_message, "from x 200") != NULL);
     finish_launched_game(&es);
-    CHECK(!es.playing);
+    CHECK(!es.playtest.running);
 
     /* Over the gap there is nothing to stand on: nothing is launched. */
     ui_frame(&es, 416, canvas_y);
     push_key(KEY_F5, INPUT_SHIFT);
     ui_frame(&es, 416, canvas_y);
-    CHECK(launch_count == 1 && !es.playing);
+    CHECK(launch_count == 1 && !es.playtest.running);
     CHECK(strstr(es.status_message, "nothing to stand on") != NULL);
 
     /* A selected checkpoint wins over the mouse. */
@@ -225,7 +225,7 @@ static int playtest_from_here_passes_the_start_point(void)
 
     /* Plain F5 starts where the level starts. */
     key_frame(&es, KEY_F5, 0);
-    CHECK(launch_count == 3 && es.playing);
+    CHECK(launch_count == 3 && es.playtest.running);
     for (int i = 0; i < launched_argc; i++)
         CHECK(strncmp(launched_args[i], "--start", 7) != 0);
     finish_launched_game(&es);
