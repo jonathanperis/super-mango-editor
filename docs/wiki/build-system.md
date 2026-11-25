@@ -513,6 +513,18 @@ Regenerates `docs/wiki/overlay-snapshots.md` from the canonical overlay strings 
 make overlay-snapshots
 ```
 
+### `make module-graph`
+
+Rewrites the module dependency tables in
+[Architecture](../architecture/#module-dependencies) with
+`tools/gen_module_graph.py`, from the `#include` lines under `src/` and the
+Makefile's `EDITOR_SRCS`. Run it after an include that crosses directories;
+`make docs-drift` fails while the tables are stale.
+
+```sh
+make module-graph
+```
+
 ### `make raygui-icons`
 
 Regenerates `vendor/raygui/raygui_icons.h`, the editor's toolbar icons, from the
@@ -552,7 +564,7 @@ make dist-wasm   # runs make web first when its outputs are stale
 
 ### `make docs-drift`
 
-Runs generated content-inventory/asset-budget, `tools/gen_sounds.py --check`, level-catalog and overlay-snapshot freshness checks, `tools/check_docs_drift.py`, `tools/check_roadmap_quality.py`, and then `tests/docs_drift_unit_test.py`, the unit tests of those checkers (each plants a stale claim and expects the check to name it). They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, constant values, inspector keys, the render order, `make` targets and `src/` paths named in the manual, level prose, workflow references and scripted-smoke wiring. Run the separate built-site check below for emitted links and metadata.
+Runs generated content-inventory/asset-budget, `tools/gen_sounds.py --check`, level-catalog, overlay-snapshot and module-graph freshness checks, `tools/check_docs_drift.py`, `tools/check_roadmap_quality.py`, and then `tests/docs_drift_unit_test.py`, the unit tests of those checkers (each plants a stale claim and expects the check to name it). They compare documented test targets, README/guide summaries, source-map entries, campaign coverage, TOML example schemas, player API declarations, runtime flags, constant values, inspector keys, the render order, `make` targets and `src/` paths named in the manual, level prose, workflow references, scripted-smoke wiring, a module summary comment at the top of every `src/` file, and the `In progress (branch …)` rows of `.specs/project/STATE.md`. Run the separate built-site check below for emitted links and metadata.
 
 ```sh
 make docs-drift

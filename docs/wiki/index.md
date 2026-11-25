@@ -36,7 +36,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | [Entities & Hazards](entities-and-hazards/) | All 6 enemy types and 7 hazard types: behaviour, constants, TOML placement |
 | [Collectibles & Surfaces](collectibles-and-surfaces/) | Coins, stars, bouncepads, rails, float platforms, climbable surfaces |
 | [Assets](assets/) | All sprite sheets, tilesets, and generated sounds in `assets/`; text uses raylib's built-in font |
-| [Sounds](sounds/) | The 12 generated WAVs in `assets/sounds/` and how the game plays them |
+| [Sounds](sounds/) | The 12 generated QOA files in `assets/sounds/` and how the game plays them |
 | [Asset Inventory](asset-inventory/) | Generated raw asset sizes and budget |
 | [Asset Provenance](asset-provenance/) | Code, artwork, audio and font license records |
 | [Level Catalog](level-catalog/) | Generated inventory of every stage selected by the v1 campaign manifest, its progression link, and content count |
