@@ -64,9 +64,29 @@ typedef struct {
     int    fps_frame_count;   /* frames rendered since the last sample    */
     int    fps_display;       /* the FPS number currently shown on screen */
 
-    /* Frame interval, not CPU time or OS process utilization. */
+    /* Frame interval: from one frame to the next. With VSync most of it is
+     * spent waiting for the display, so it says little about the work. */
     float  frame_ms;          /* last frame duration in milliseconds      */
     float  frame_ms_display;  /* smoothed frame time shown on screen      */
+
+    /* CPU work per frame, measured with clock_seconds() around the fixed
+     * steps (update) and around the drawing up to the hand-over to the
+     * renderer (draw); see debug_note_frame_work. Summed between samples
+     * and shown as averages, so one slow frame does not hide the trend. */
+    double cpu_update_ms_sum, cpu_draw_ms_sum; /* since the last sample   */
+    int    texture_switch_sum, cpu_frames;      /* since the last sample   */
+    float  update_ms_display;  /* average fixed-step time shown on screen */
+    float  draw_ms_display;    /* average drawing time shown on screen    */
+    int    texture_switches_display; /* average per frame (graphics.h)    */
+
+    /* The same work summed over the whole run, for `make bench`, which
+     * reads it from the SMOKE_TIMING line a smoke run prints at its end. */
+    double run_update_ms, run_draw_ms, run_frame_ms;
+    long   run_texture_switches;
+    int    run_frames;
+    /* clock_seconds() when this frame's drawing was handed to the renderer
+     * (the value display_present returns), set by game_render_frame. */
+    double draw_submitted;
 
     /* Memory usage (updated every sample period) */
     float  mem_mb;            /* resident memory in megabytes             */
@@ -92,6 +112,15 @@ void debug_cleanup(DebugOverlay *dbg);
  * dt is in seconds (same value used by game physics).
  */
 void debug_update(DebugOverlay *dbg, float dt);
+
+/*
+ * Record one frame's CPU work, in milliseconds: the fixed steps, the
+ * drawing up to the hand-over to the renderer, and the whole frame
+ * (including EndDrawing). texture_switches comes from texture_take_switches.
+ * Called every frame, debug mode or not, so `make bench` can report it.
+ */
+void debug_note_frame_work(DebugOverlay *dbg, double update_ms, double draw_ms,
+                           double frame_ms, int texture_switches);
 
 /*
  * Push a formatted message into the scrolling debug log.

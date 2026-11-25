@@ -119,6 +119,16 @@ void game_timing_tick_smoke(GameState *gs)
                        gs->world.player.vx, gs->world.player.vy, gs->world.score, gs->world.lives,
                        gs->world.hearts, (double)game_level_seconds(gs), gs->screen.paused,
                        gs->screen.completion.complete);
+                /* Average CPU work per frame over the whole run, for
+                 * `make bench` (tools/bench.py). It depends on the machine,
+                 * so it is a line of its own: the determinism checks in
+                 * tools/run_scripted_smoke.py read only SMOKE_STATE. */
+                const DebugOverlay *dbg = &gs->screen.debug;
+                int frames = dbg->run_frames > 0 ? dbg->run_frames : 1;
+                printf("SMOKE_TIMING {\"frames\":%d,\"update_ms\":%.4f,\"draw_ms\":%.4f,"
+                       "\"frame_ms\":%.4f,\"texture_switches\":%.2f}\n",
+                       dbg->run_frames, dbg->run_update_ms / frames, dbg->run_draw_ms / frames,
+                       dbg->run_frame_ms / frames, (double)dbg->run_texture_switches / frames);
             }
         }
     }

@@ -62,6 +62,7 @@ int font_measure(TextFont *font, const char *text, int *width, int *height)
 void font_draw(TextFont *font, const char *text, int x, int y, Color color)
 {
     if (!font || !text) return;
+    texture_note_use(font->font.texture.id);  /* graphics.h: texture switches */
     DrawTextEx(font->font, text, (Vector2){(float)x, (float)y}, (float)font->size,
                (float)font->spacing, color);
 }

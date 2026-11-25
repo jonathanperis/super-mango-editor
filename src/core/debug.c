@@ -249,11 +249,26 @@ void debug_cleanup(DebugOverlay *dbg)
     (void)dbg;
 }
 
+void debug_note_frame_work(DebugOverlay *dbg, double update_ms, double draw_ms,
+                           double frame_ms, int texture_switches)
+{
+    dbg->cpu_update_ms_sum += update_ms;
+    dbg->cpu_draw_ms_sum += draw_ms;
+    dbg->texture_switch_sum += texture_switches;
+    dbg->cpu_frames++;
+    dbg->run_update_ms += update_ms;
+    dbg->run_draw_ms += draw_ms;
+    dbg->run_frame_ms += frame_ms;
+    dbg->run_texture_switches += texture_switches;
+    dbg->run_frames++;
+}
+
 void debug_update(DebugOverlay *dbg, float dt)
 {
     /* dt arrives in seconds. Refresh readable counters over a short interval
-     * instead of changing every label on every frame. This is an inspection
-     * aid, not a CPU profiler: frame_ms is the interval between frames. */
+     * instead of changing every label on every frame. frame_ms is the
+     * interval between frames; the CPU times beside it are the work done
+     * inside the frame (debug_note_frame_work). */
     dbg->frame_ms = dt * 1000;
     dbg->fps_frame_count++;
     uint64_t now = clock_millis(), elapsed = now - dbg->fps_prev_ticks;
@@ -265,6 +280,14 @@ void debug_update(DebugOverlay *dbg, float dt)
         dbg->fps_prev_ticks = now;
         dbg->frame_ms_display = dbg->frame_ms;
         dbg->mem_mb = get_resident_mb();
+        if (dbg->cpu_frames > 0) {
+            dbg->update_ms_display = (float)(dbg->cpu_update_ms_sum / dbg->cpu_frames);
+            dbg->draw_ms_display = (float)(dbg->cpu_draw_ms_sum / dbg->cpu_frames);
+            dbg->texture_switches_display =
+                (dbg->texture_switch_sum + dbg->cpu_frames / 2) / dbg->cpu_frames;
+        }
+        dbg->cpu_update_ms_sum = dbg->cpu_draw_ms_sum = 0.0;
+        dbg->texture_switch_sum = dbg->cpu_frames = 0;
     }
     for (int i = 0; i < dbg->log_count; i++)
         dbg->log[i].age += dt;
@@ -290,17 +313,26 @@ void debug_render(const DebugOverlay *dbg, TextFont *font, const void *state, in
     draw_collision_boxes(gs,cam);
     Color green={0,255,0,255},yellow={255,255,0,255},red={255,80,80,255};
 
-    /* ---- Top right: performance, one line ------------------------- */
-    char perf[64];
+    /* ---- Top right: performance ------------------------------------
+     * Line 1: frames per second and the frame interval ("frame"), which
+     * with VSync is mostly waiting for the display. Line 2: the CPU time
+     * the frame actually worked, split into the fixed steps ("update") and
+     * the drawing ("draw"), and the texture switches ("tex", about one
+     * draw call each; graphics.h). */
+    char perf[64], work[64];
     if (dbg->mem_mb > 0)
-        snprintf(perf, sizeof(perf), "%d FPS  %.1fms  %.0fMB", dbg->fps_display,
+        snprintf(perf, sizeof(perf), "%d FPS  frame %.1fms  %.0fMB", dbg->fps_display,
                  (double)dbg->frame_ms_display, (double)dbg->mem_mb);
     else
-        snprintf(perf, sizeof(perf), "%d FPS  %.1fms", dbg->fps_display,
+        snprintf(perf, sizeof(perf), "%d FPS  frame %.1fms", dbg->fps_display,
                  (double)dbg->frame_ms_display);
-    const char *perf_lines[] = {perf};
-    Color perf_color = dbg->fps_display >= 55 ? green : dbg->fps_display >= 30 ? yellow : red;
-    debug_draw_panel(font, GAME_W - HUD_MARGIN, DEBUG_PANEL_TOP, 1, perf_lines, &perf_color, 1);
+    snprintf(work, sizeof(work), "CPU update %.2fms  draw %.2fms  %d tex",
+             (double)dbg->update_ms_display, (double)dbg->draw_ms_display,
+             dbg->texture_switches_display);
+    const char *perf_lines[] = {perf, work};
+    Color fps_color = dbg->fps_display >= 55 ? green : dbg->fps_display >= 30 ? yellow : red;
+    Color perf_colors[] = {fps_color, WHITE};
+    debug_draw_panel(font, GAME_W - HUD_MARGIN, DEBUG_PANEL_TOP, 1, perf_lines, perf_colors, 2);
 
     /* ---- Bottom right: the player, one line ------------------------
      * State, ground/air, facing and velocity always; checkpoint, riding

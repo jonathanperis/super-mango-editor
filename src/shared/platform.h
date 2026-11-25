@@ -6,6 +6,11 @@
 
 /* Monotonic milliseconds for elapsed-time subtraction, not a calendar date. */
 uint64_t clock_millis(void);
+/* Monotonic seconds with sub-microsecond resolution, for timing work done
+ * inside one frame (the debug overlay's CPU times, `make bench`). raylib's
+ * GetTime() is not used for this: on its Memory backend it has no macOS
+ * clock and always returns 0. */
+double clock_seconds(void);
 void clock_wait(unsigned int milliseconds);
 /* Capacity includes the NUL byte. str_copy returns the source length so a
  * caller can detect truncation; utf8_copy returns bytes actually copied and

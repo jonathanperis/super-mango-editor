@@ -53,3 +53,24 @@ void texture_unload(Texture2D *texture)
     s_test_live--;
 #endif
 }
+
+/* The texture of the most recent sprite or text draw, and how many times
+ * a draw has used another one since texture_take_switches last ran. */
+static unsigned int s_last_texture_id;
+static int s_texture_switches;
+
+void texture_note_use(unsigned int texture_id)
+{
+    if (texture_id == s_last_texture_id) return;
+    s_last_texture_id = texture_id;
+    s_texture_switches++;
+}
+
+int texture_take_switches(void)
+{
+    int switches = s_texture_switches;
+    s_texture_switches = 0;
+    /* The next frame's first draw counts as a switch too: it starts a batch. */
+    s_last_texture_id = 0;
+    return switches;
+}
