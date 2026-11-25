@@ -1,0 +1,28 @@
+# The committed replay of the cross-platform determinism check
+# (committed_replay_reaches_the_recorded_state in tests/game_replay_test.c).
+# Columns: frame, action, key. Fifteen seconds in the sandbox fixture:
+# walk, run, jump over the gaps and enemies, stop, turn back, carry on.
+0 down right
+30 tap space
+70 down shift
+90 tap space
+130 tap space
+180 up shift
+200 tap space
+240 up right
+260 down left
+300 tap space
+330 up left
+340 down right
+350 down shift
+380 tap space
+420 tap space
+460 tap space
+520 tap space
+600 up shift
+640 tap space
+700 tap space
+760 up right
+800 down right
+820 tap space
+880 up right

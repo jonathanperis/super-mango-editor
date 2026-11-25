@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -290,5 +291,166 @@ int replay_scripts_reject_malformed_files(void)
 done:
     game_replay_cleanup(&gs);
     remove_script("move-right");
+    return failed;
+}
+/* ------------------------------------------------------------------ */
+/* Cross-platform determinism                                          */
+/* ------------------------------------------------------------------ */
+
+#define DETERMINISM_DIR      "tests/fixtures/determinism"
+#define DETERMINISM_LEVEL    DETERMINISM_DIR "/sandbox.toml"
+#define DETERMINISM_EXPECTED DETERMINISM_DIR "/expected_state.txt"
+#define DETERMINISM_FRAMES   900
+
+/* FNV-1a, 64 bit, fed one value at a time. Floats go in as their exact bit
+ * pattern: "close enough" is not determinism. */
+static void mix_bytes(uint64_t *hash, const void *data, size_t size)
+{
+    const unsigned char *bytes = data;
+    for (size_t i = 0; i < size; i++) {
+        *hash ^= bytes[i];
+        *hash *= UINT64_C(1099511628211);
+    }
+}
+
+static void mix_int(uint64_t *hash, int value)
+{
+    int32_t fixed = (int32_t)value;   /* the same width on every system */
+    mix_bytes(hash, &fixed, sizeof(fixed));
+}
+
+static void mix_float(uint64_t *hash, float value)
+{
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    mix_bytes(hash, &bits, sizeof(bits));
+}
+
+/*
+ * The state a replay must reproduce exactly: the player, the run's score
+ * and lives, the camera, the step count, and where every moving thing is.
+ * Only plain numbers go in, field by field: no padding bytes, pointers or
+ * texture ids, which differ between backends and runs.
+ */
+static uint64_t world_state_hash(const GameState *gs)
+{
+    const GameWorld *w = &gs->world;
+    const Player *p = &w->player;
+    uint64_t h = UINT64_C(1469598103934665603);
+
+    mix_float(&h, p->x); mix_float(&h, p->y); mix_float(&h, p->vx); mix_float(&h, p->vy);
+    mix_int(&h, p->on_ground); mix_int(&h, (int)p->anim_state); mix_int(&h, p->facing_left);
+    mix_int(&h, p->on_vine); mix_float(&h, p->hurt_timer);
+    mix_int(&h, w->hearts); mix_int(&h, w->lives); mix_int(&h, w->score);
+    mix_int(&h, w->checkpoint_index); mix_float(&h, w->respawn_x); mix_float(&h, w->respawn_y);
+    mix_float(&h, w->camera.x); mix_int(&h, (int)w->sim_steps);
+    mix_int(&h, gs->screen.game_over); mix_int(&h, gs->screen.completion.complete);
+    for (int i = 0; i < w->spider_count; i++) {
+        mix_float(&h, w->spiders[i].x); mix_float(&h, w->spiders[i].vx);
+        mix_int(&h, w->spiders[i].frame_index);
+    }
+    for (int i = 0; i < w->jumping_spider_count; i++) {
+        const JumpingSpider *s = &w->jumping_spiders[i];
+        mix_float(&h, s->x); mix_float(&h, s->y); mix_float(&h, s->vx); mix_float(&h, s->vy);
+    }
+    for (int i = 0; i < w->bird_count; i++) {
+        mix_float(&h, w->birds[i].x); mix_float(&h, w->birds[i].vx);
+    }
+    for (int i = 0; i < w->faster_bird_count; i++) mix_float(&h, w->faster_birds[i].x);
+    for (int i = 0; i < w->fish_count; i++) {
+        const Fish *f = &w->fish[i];
+        mix_float(&h, f->x); mix_float(&h, f->y); mix_float(&h, f->vy); mix_float(&h, f->jump_timer);
+    }
+    for (int i = 0; i < w->faster_fish_count; i++) {
+        mix_float(&h, w->faster_fish[i].x); mix_float(&h, w->faster_fish[i].y);
+    }
+    for (int i = 0; i < w->axe_trap_count; i++) mix_float(&h, w->axe_traps[i].angle);
+    for (int i = 0; i < w->spike_block_count; i++) {
+        const SpikeBlock *b = &w->spike_blocks[i];
+        mix_float(&h, b->x); mix_float(&h, b->y); mix_float(&h, b->t); mix_int(&h, b->active);
+    }
+    for (int i = 0; i < w->circular_saw_count; i++) mix_float(&h, w->circular_saws[i].x);
+    for (int i = 0; i < w->blue_flame_count; i++) {
+        mix_float(&h, w->blue_flames[i].y); mix_int(&h, (int)w->blue_flames[i].state);
+    }
+    for (int i = 0; i < w->float_platform_count; i++) {
+        mix_float(&h, w->float_platforms[i].x); mix_float(&h, w->float_platforms[i].y);
+    }
+    for (int i = 0; i < w->coin_count; i++) mix_int(&h, w->coins[i].active);
+    for (int i = 0; i < w->star_yellow_count; i++) mix_int(&h, w->star_yellows[i].active);
+    return h;
+}
+
+/* A readable line next to the hash, so a mismatch says what moved. */
+static void describe_state(const GameState *gs, char *out, size_t size)
+{
+    const GameWorld *w = &gs->world;
+    snprintf(out, size, "player %.3f,%.3f hearts %d lives %d score %d camera %.1f steps %u",
+             (double)w->player.x, (double)w->player.y, w->hearts, w->lives, w->score,
+             (double)w->camera.x, (unsigned)w->sim_steps);
+}
+
+/*
+ * The committed replay (tests/fixtures/determinism/jump-right.replay) on its
+ * frozen level, seed 7, for 900 frames, must end in exactly the state that
+ * tests/fixtures/determinism/expected_state.txt records, on every CI leg:
+ * Linux (GCC and Clang), macOS (arm64), Windows (GCC and Clang). The other
+ * replay checks compare two runs in one process, which cannot notice a
+ * compiler or C library computing a float differently. This one can.
+ *
+ * An intended change to the simulation moves the state: run
+ * `make replay-state-update` and commit the new expected_state.txt.
+ */
+int committed_replay_reaches_the_recorded_state(void)
+{
+    int failed = 0;
+    GameState gs;
+    char line[256], recorded_text[256] = "", now_text[256];
+    unsigned long long recorded = 0;
+    const char *update = getenv("MANGO_REPLAY_STATE_UPDATE");
+
+    CHECK(mechanics_open_level(&gs, DETERMINISM_LEVEL, 0) == 0);
+    snprintf(gs.screen.replay_script_path, sizeof(gs.screen.replay_script_path), "jump-right");
+    snprintf(gs.screen.replay_dir, sizeof(gs.screen.replay_dir), "%s", DETERMINISM_DIR);
+    CHECK(game_replay_load(&gs) == 0);
+    for (int frame = 0; frame < DETERMINISM_FRAMES; frame++) replay_frame_unrendered(&gs);
+    CHECK(gs.screen.replay_cursor == gs.screen.replay_event_count);   /* every event played */
+
+    const uint64_t hash = world_state_hash(&gs);
+    describe_state(&gs, now_text, sizeof(now_text));
+
+    if (update && strcmp(update, "1") == 0) {
+        FILE *out = fopen(DETERMINISM_EXPECTED, "w");
+        CHECK(out != NULL);
+        fprintf(out, "# State after %d frames of jump-right.replay on sandbox.toml, seed 7.\n"
+                     "# Written by `make replay-state-update`; read by\n"
+                     "# committed_replay_reaches_the_recorded_state (tests/game_replay_test.c).\n"
+                     "hash %016llx\nstate %s\n",
+                DETERMINISM_FRAMES, (unsigned long long)hash, now_text);
+        CHECK(fclose(out) == 0);
+        printf("replay state: recorded %016llx (%s)\n", (unsigned long long)hash, now_text);
+        goto done;
+    }
+
+    FILE *in = fopen(DETERMINISM_EXPECTED, "r");
+    CHECK(in != NULL);
+    while (fgets(line, sizeof(line), in)) {
+        if (strncmp(line, "hash ", 5) == 0) recorded = strtoull(line + 5, NULL, 16);
+        if (strncmp(line, "state ", 6) == 0) {
+            snprintf(recorded_text, sizeof(recorded_text), "%s", line + 6);
+            recorded_text[strcspn(recorded_text, "\r\n")] = '\0';
+        }
+    }
+    fclose(in);
+    if (recorded != (unsigned long long)hash) {
+        fprintf(stderr, "replay state: hash %016llx, recorded %016llx\n"
+                        "replay state: now      %s\nreplay state: recorded %s\n"
+                        "replay state: if the simulation changed on purpose, run "
+                        "`make replay-state-update` and commit " DETERMINISM_EXPECTED "\n",
+                (unsigned long long)hash, recorded, now_text, recorded_text);
+    }
+    CHECK(recorded == (unsigned long long)hash);
+done:
+    game_cleanup(&gs);
     return failed;
 }
