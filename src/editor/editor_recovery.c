@@ -1377,8 +1377,9 @@ static int editor_ask_recovery_action(const EditorState *es, int index)
 {
     /* index counts the offered copies; entry is where that one is stored. */
     const int offered = editor_recovery_offer_count(es);
-    const EditorRecoveryEntry *entry =
-        &es->recovery_entries[editor_recovery_offered_entry(es, index)];
+    const int stored = editor_recovery_offered_entry(es, index);
+    if (stored < 0) return -1;   /* no such copy: as if the dialog failed */
+    const EditorRecoveryEntry *entry = &es->recovery_entries[stored];
     /* Room for the longest question below: its fixed text and two numbers
      * (under 100 bytes), a full source path and the 63-byte timestamp. GCC
      * adds these up and, with -Wformat-truncation, refuses a smaller one. */
@@ -1460,6 +1461,7 @@ int editor_choose_recovery(EditorState *es)
         }
         if (action == EDITOR_RECOVERY_RECOVER) {
             int stored = editor_recovery_offered_entry(es, index);
+            if (stored < 0) return -1;
             es->pending_recovery_id = es->recovery_entries[stored].id;
             return stored;
         }

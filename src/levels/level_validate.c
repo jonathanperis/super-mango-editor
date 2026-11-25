@@ -24,6 +24,14 @@
 _Static_assert(FLOOR_GAP_W % FLOOR_PIECE_W == 0,
                "FLOOR_GAP_W must be a whole number of floor pieces");
 
+/* MAX_PLAYER_SPEED (through FLOOR_PIECE_W = TILE_SIZE / 3) and
+ * MAX_PATROL_SPEED (FLOOR_GAP_W * TARGET_FPS / 2) are integer divisions
+ * that the limits below use as floats.  Both divide exactly, so nothing is
+ * lost; these checks keep that true if a constant changes. */
+_Static_assert(TILE_SIZE % 3 == 0, "FLOOR_PIECE_W must divide TILE_SIZE exactly");
+_Static_assert((FLOOR_GAP_W * TARGET_FPS) % 2 == 0,
+               "MAX_PATROL_SPEED must be a whole number of px/s");
+
 static int fail_count(char *err, size_t err_size,
                       const char *field, int count, int max_count)
 {
@@ -999,12 +1007,10 @@ static int validate_platforms(const LevelDef *def, char *err,
     for (int i = 0; i < def->platform_count; i++) {
         const PlatformPlacement *p = &def->platforms[i];
         int tw = p->tile_width > 0 ? p->tile_width : 1;
-        if (p->tile_height < 1 || p->tile_height > (FLOOR_Y + 16) / TILE_SIZE) {
-            snprintf(field, sizeof(field), "platforms[%d].tile_height", i);
-            fail_range(err, err_size, field, p->tile_height, 1,
-                       (FLOOR_Y + 16) / TILE_SIZE);
-            if (stop_here(sink, err)) return -1;
-        } else if (level_platform_top_y(p->tile_height) < 0.0f) {
+        /* A pillar must be at least one tile tall and its top must stay on
+         * screen (y >= 0); the second test guards the first one's maths. */
+        if (p->tile_height < 1 || p->tile_height > (FLOOR_Y + 16) / TILE_SIZE ||
+            level_platform_top_y(p->tile_height) < 0.0f) {
             snprintf(field, sizeof(field), "platforms[%d].tile_height", i);
             fail_range(err, err_size, field, p->tile_height, 1,
                        (FLOOR_Y + 16) / TILE_SIZE);
@@ -1226,14 +1232,14 @@ static int validate_spike_blocks(const LevelDef *def, char *err,
     char field[64];
 
     for (int i = 0; i < def->spike_block_count; i++) {
+        const int rail = def->spike_blocks[i].rail_index;
         snprintf(field, sizeof(field), "spike_blocks[%d].rail_index", i);
-        if (validate_rail_index(err, err_size, field,
-                                def->spike_blocks[i].rail_index,
-                                def->rail_count) != 0) {
+        if (validate_rail_index(err, err_size, field, rail, def->rail_count) != 0) {
             if (stop_here(sink, err)) return -1;
-        } else if (!rail_offset_is_on_track(&def->rails[def->spike_blocks[i].rail_index],
-                                            def->spike_blocks[i].t_offset)) {
-            /* rails[rail_index] is only read once the index is known good. */
+        } else if (rail >= 0 && rail < def->rail_count &&
+                   !rail_offset_is_on_track(&def->rails[rail], def->spike_blocks[i].t_offset)) {
+            /* rails[rail] is only read once the index is known good (the
+             * range test repeats validate_rail_index's, where it can be seen). */
             snprintf(field, sizeof(field), "spike_blocks[%d].t_offset", i);
             fail_value(err, err_size, field, "must lie on the referenced rail");
             if (stop_here(sink, err)) return -1;

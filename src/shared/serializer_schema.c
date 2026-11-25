@@ -105,7 +105,9 @@ toml_datum_t serializer_table_get(toml_datum_t table,
  * first element, a char *, so the check never depends on how a compiler
  * treats an array inside _Generic.
  */
-#define MEMBER_IS(T, member, type) (0 * sizeof(_Generic(((T *)0)->member, type: 1)))
+/* `type` names a type in a _Generic association, where parentheses are not
+ * allowed, so it is left bare. */
+#define MEMBER_IS(T, member, type) (0 * sizeof(_Generic(((T *)0)->member, type: 1))) /* NOLINT(bugprone-macro-parentheses) */
 #define TEXT_MEMBER(T, member) (0 * sizeof(_Generic(&(((T *)0)->member)[0], char *: 1)))
 
 #define FLOAT_AT(key, T, member) \

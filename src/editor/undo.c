@@ -58,15 +58,23 @@ static int step_capacity(const UndoStep *step)
     return step->many ? step->capacity : 1;
 }
 
-/* Free what entries [from, step->count) own and forget them. */
+/* Free the snapshots one entry owns. */
+static void release_entry(UndoEntry *entry)
+{
+    free(entry->config);
+    free(entry->text);
+    entry->config = NULL;
+    entry->text = NULL;
+}
+
+/* Free what entries [from, step->count) own and forget them.  A step
+ * without `many` holds at most its `one` entry, so only index 0 exists. */
 static void release_entries_from(UndoStep *step, int from)
 {
-    UndoEntry *entries = step_entries(step);
-    for (int i = from; i < step->count; i++) {
-        free(entries[i].config);
-        free(entries[i].text);
-        entries[i].config = NULL;
-        entries[i].text = NULL;
+    if (step->many) {
+        for (int i = from; i < step->count; i++) release_entry(&step->many[i]);
+    } else if (from == 0 && step->count > 0) {
+        release_entry(&step->one);
     }
     step->count = from;
     if (step->applied > from) step->applied = from;

@@ -154,39 +154,41 @@ static float float_at(const void *item, size_t offset)
  */
 static int draw_row(EditorState *es, EntityType type, void *item, const PropertyRow *row, int y)
 {
-    char *member = (char *)item + row->offset;
+    /* The member's address: `offset` bytes into the struct at item. */
+    void *member = (char *)item + row->offset;
     int id = FIELD_ID(type, row->id);
 
     field_label(es, y, row->key, id);
     switch (row->kind) {
     case ROW_FLOAT:
-        return ui_float_field(&es->ui, id, FIELD_X, y, FIELD_W, (float *)(void *)member);
+        return ui_float_field(&es->ui, id, FIELD_X, y, FIELD_W, member);
     case ROW_FLOAT_NONZERO:
         return ui_float_field_nonzero(&es->ui, id, FIELD_X, y, FIELD_W,
-                                      (float *)(void *)member, row->hi);
+                                      member, row->hi);
     case ROW_FLOAT_LIMITED:
         return ui_float_field_limited(&es->ui, id, FIELD_X, y, FIELD_W,
-                                      (float *)(void *)member, row->lo, row->hi);
+                                      member, row->lo, row->hi);
     case ROW_FLOAT_BELOW:
-        return ui_float_field_limited(&es->ui, id, FIELD_X, y, FIELD_W, (float *)(void *)member,
+        return ui_float_field_limited(&es->ui, id, FIELD_X, y, FIELD_W, member,
                                       -FLT_MAX, float_at(item, row->other_offset) - row->gap);
     case ROW_FLOAT_ABOVE:
-        return ui_float_field_limited(&es->ui, id, FIELD_X, y, FIELD_W, (float *)(void *)member,
+        return ui_float_field_limited(&es->ui, id, FIELD_X, y, FIELD_W, member,
                                       float_at(item, row->other_offset) + row->gap, FLT_MAX);
     case ROW_INT:
-        return ui_int_field(&es->ui, id, FIELD_X, y, FIELD_W, (int *)(void *)member);
+        return ui_int_field(&es->ui, id, FIELD_X, y, FIELD_W, member);
     case ROW_CHOICE:
         return ui_dropdown(&es->ui, id, FIELD_X, y, FIELD_W, row->options, row->option_count,
-                           (int *)(void *)member);
+                           member);
     }
     return 0;
 }
 
 /*
- * The pointer casts above ((float *)(void *)member) say "this address holds
- * a float". They are sound because `item` points at a real placement
- * struct and `offset` came from offsetof on a float (or int) member of
- * that struct, so the address is that member's own and is aligned for it.
+ * draw_row hands `member`, a void *, to widgets that take a float * or an
+ * int *.  C converts a void * to any object pointer without a cast; that
+ * is sound because `item` points at a real placement struct and `offset`
+ * came from offsetof on a float (or int) member of that struct, so the
+ * address is that member's own and is aligned for it.
  */
 
 /* How many bytes a row's value takes in the placement struct. */
