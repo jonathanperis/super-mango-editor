@@ -33,31 +33,43 @@ EM_JS(void, input_web_scope_close, (void), {
  * full queue drops new events (input_push returns 0). Each event is about
  * 56 bytes, so this is about 230 KB. */
 #define INPUT_CAPACITY 4096
-static InputEvent events[INPUT_CAPACITY];
-static unsigned int first, count;
-static int ready, width, height, focused = 1, gamepad;
-static unsigned char suppressed[512];
+/* The queue is a ring: s_count events start at s_events[s_first]. */
+static InputEvent s_events[INPUT_CAPACITY];
+static unsigned int s_first, s_count;
+
+/* Key codes run below 512 (GLFW_KEY_LAST is 348); one flag per key code. */
+#define INPUT_KEY_COUNT 512
+
+/* s_ready: input_init ran and input_shutdown has not.  s_width/s_height:
+ * the logical canvas size the pointer is mapped into.  s_focused: whether
+ * the window had focus at the last poll.  s_gamepad: the gamepad in use,
+ * 1 + its raylib index (0 = none).  s_suppressed[key]: 1 while a key that
+ * was held when the window lost focus or input_clear_keys ran is ignored
+ * until it is released, so a key held across a screen change does not act
+ * again on the new screen. */
+static int s_ready, s_width, s_height, s_focused = 1, s_gamepad;
+static unsigned char s_suppressed[INPUT_KEY_COUNT];
 
 #ifndef MANGO_RAYLIB_MEMORY
 /* raylib exposes key and character queues separately. Chaining its backend's
  * public callbacks preserves text-before-Ctrl+S and per-event modifiers, as
  * well as mouse clicks pressed and released within one frame. The original
  * callbacks still maintain raylib's sampled key/mouse state. */
-static GLFWwindow *input_window;
-static GLFWkeyfun prior_key;
-static GLFWcharfun prior_char;
-static GLFWmousebuttonfun prior_button;
-static GLFWcursorposfun prior_cursor;
-static GLFWscrollfun prior_scroll;
+static GLFWwindow *s_input_window;
+static GLFWkeyfun s_prior_key;
+static GLFWcharfun s_prior_char;
+static GLFWmousebuttonfun s_prior_button;
+static GLFWcursorposfun s_prior_cursor;
+static GLFWscrollfun s_prior_scroll;
 
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
     /* Let raylib update its held-key state first. Our additional command keeps
      * the event's modifiers/repeat bit instead of sampling them later. */
-    if (prior_key) prior_key(window, key, scancode, action, mods);
-    if (key <= 0 || key >= 512) return;
-    if (action == GLFW_RELEASE) suppressed[key] = 0;
-    else if (suppressed[key]) return;
+    if (s_prior_key) s_prior_key(window, key, scancode, action, mods);
+    if (key <= 0 || key >= INPUT_KEY_COUNT) return;
+    if (action == GLFW_RELEASE) s_suppressed[key] = 0;
+    else if (s_suppressed[key]) return;
     input_push(&(InputEvent){.type=action == GLFW_RELEASE ? INPUT_KEY_UP : INPUT_KEY_DOWN,
         .key=key, .binding=input_binding_from_key(key), .mods=mods,
         .repeat=action == GLFW_REPEAT});
@@ -65,7 +77,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 
 static void char_callback(GLFWwindow *window, unsigned int codepoint)
 {
-    if (prior_char) prior_char(window, codepoint);
+    if (s_prior_char) s_prior_char(window, codepoint);
     /* Key identity and typed text differ on non-US layouts. GLFW delivers a
      * Unicode codepoint; encode it as UTF-8 bytes for the editor's text queue.
      * Aggregate initialization supplies the trailing NUL in the empty bytes. */
@@ -88,7 +100,7 @@ static InputEvent pointer_event(GLFWwindow *window, InputKind type)
 
 static void button_callback(GLFWwindow *window, int button, int action, int mods)
 {
-    if (prior_button) prior_button(window, button, action, mods);
+    if (s_prior_button) s_prior_button(window, button, action, mods);
     InputEvent event = pointer_event(window, action == GLFW_PRESS ? INPUT_MOUSE_DOWN : INPUT_MOUSE_UP);
     event.button = button;
     event.mods = mods;
@@ -97,14 +109,14 @@ static void button_callback(GLFWwindow *window, int button, int action, int mods
 
 static void cursor_callback(GLFWwindow *window, double x, double y)
 {
-    if (prior_cursor) prior_cursor(window, x, y);
+    if (s_prior_cursor) s_prior_cursor(window, x, y);
     Vector2 point = input_pointer_to_logical((Vector2){(float)x,(float)y});
     input_push(&(InputEvent){.type=INPUT_MOUSE_MOVE,.x=(int)point.x,.y=(int)point.y,.mods=input_modifiers()});
 }
 
 static void scroll_callback(GLFWwindow *window, double x, double y)
 {
-    if (prior_scroll) prior_scroll(window, x, y);
+    if (s_prior_scroll) s_prior_scroll(window, x, y);
     InputEvent event = pointer_event(window, INPUT_WHEEL);
     event.wheel = (float)y;
     /* macOS turns Shift+wheel into horizontal scrolling, so keep x too. */
@@ -114,25 +126,25 @@ static void scroll_callback(GLFWwindow *window, double x, double y)
 
 static void callbacks_close(void)
 {
-    if (!input_window) return;
-    glfwSetKeyCallback(input_window, prior_key);
-    glfwSetCharCallback(input_window, prior_char);
-    glfwSetMouseButtonCallback(input_window, prior_button);
-    glfwSetCursorPosCallback(input_window, prior_cursor);
-    glfwSetScrollCallback(input_window, prior_scroll);
-    input_window = NULL;
+    if (!s_input_window) return;
+    glfwSetKeyCallback(s_input_window, s_prior_key);
+    glfwSetCharCallback(s_input_window, s_prior_char);
+    glfwSetMouseButtonCallback(s_input_window, s_prior_button);
+    glfwSetCursorPosCallback(s_input_window, s_prior_cursor);
+    glfwSetScrollCallback(s_input_window, s_prior_scroll);
+    s_input_window = NULL;
 }
 
 static void callbacks_open(void)
 {
     callbacks_close();
     if (!IsWindowReady()) return;
-    input_window = glfwGetCurrentContext();
-    prior_key = glfwSetKeyCallback(input_window, key_callback);
-    prior_char = glfwSetCharCallback(input_window, char_callback);
-    prior_button = glfwSetMouseButtonCallback(input_window, button_callback);
-    prior_cursor = glfwSetCursorPosCallback(input_window, cursor_callback);
-    prior_scroll = glfwSetScrollCallback(input_window, scroll_callback);
+    s_input_window = glfwGetCurrentContext();
+    s_prior_key = glfwSetKeyCallback(s_input_window, key_callback);
+    s_prior_char = glfwSetCharCallback(s_input_window, char_callback);
+    s_prior_button = glfwSetMouseButtonCallback(s_input_window, button_callback);
+    s_prior_cursor = glfwSetCursorPosCallback(s_input_window, cursor_callback);
+    s_prior_scroll = glfwSetScrollCallback(s_input_window, scroll_callback);
 }
 #endif
 
@@ -238,22 +250,22 @@ const char *input_pad_name(int b)
 
 int input_ready(void)
 {
-    return ready;
+    return s_ready;
 }
 
 void input_clear(void)
 {
-    first = count = 0;
+    s_first = s_count = 0;
 }
 
 void input_open(int w, int h)
 {
-    width = w;
-    height = h;
-    ready = 1;
-    focused = 1;
-    gamepad = 0;
-    memset(suppressed, 0, sizeof(suppressed));
+    s_width = w;
+    s_height = h;
+    s_ready = 1;
+    s_focused = 1;
+    s_gamepad = 0;
+    memset(s_suppressed, 0, sizeof(s_suppressed));
     input_clear();
 #ifndef MANGO_RAYLIB_MEMORY
     callbacks_open();
@@ -271,23 +283,23 @@ void input_close(void)
     input_web_scope_close();
 #endif
     input_clear();
-    ready = 0;
-    gamepad = 0;
+    s_ready = 0;
+    s_gamepad = 0;
 }
 int input_push(const InputEvent *event)
 {
     /* Copy the event by value: callers can safely pass a stack-local event.
      * Modulo wraps around the fixed ring; no allocation occurs per command. */
-    if (!ready || !event || count == INPUT_CAPACITY) return 0;
-    events[(first+count++) % INPUT_CAPACITY] = *event;
+    if (!s_ready || !event || s_count == INPUT_CAPACITY) return 0;
+    s_events[(s_first+s_count++) % INPUT_CAPACITY] = *event;
     return 1;
 }
 int input_poll(InputEvent *event)
 {
-    if (!count) return 0;
-    *event = events[first];
-    first = (first+1) % INPUT_CAPACITY;
-    count--;
+    if (!s_count) return 0;
+    *event = s_events[s_first];
+    s_first = (s_first+1) % INPUT_CAPACITY;
+    s_count--;
     return 1;
 }
 
@@ -295,7 +307,7 @@ void input_clear_keys(void)
 {
     input_clear();
     if (!IsWindowReady()) return;
-    for (int key = 1; key < 512; key++) suppressed[key] = IsKeyDown(key);
+    for (int key = 1; key < INPUT_KEY_COUNT; key++) s_suppressed[key] = IsKeyDown(key);
     while (GetKeyPressed()) {}
     while (GetCharPressed()) {}
 }
@@ -304,8 +316,8 @@ int input_key_down(int binding)
 {
     int key = input_key_from_binding(binding);
     if (!key || !IsWindowReady()) return 0;
-    if (suppressed[key]) {
-        if (!IsKeyDown(key)) suppressed[key] = 0;
+    if (s_suppressed[key]) {
+        if (!IsKeyDown(key)) s_suppressed[key] = 0;
         return 0;
     }
     return IsKeyDown(key);
@@ -322,9 +334,9 @@ Vector2 input_pointer_to_logical(Vector2 mouse)
     /* Invert display_present with the same viewport: remove the letterbox
      * margin, then divide by the scale. Do this once before widgets/world
      * hit testing. */
-    Rectangle view = display_viewport(GetScreenWidth(), GetScreenHeight(), width, height);
+    Rectangle view = display_viewport(GetScreenWidth(), GetScreenHeight(), s_width, s_height);
     if (view.width <= 0 || view.height <= 0) return (Vector2){-1, -1};
-    float scale = view.width / width;
+    float scale = view.width / s_width;
     return (Vector2){(mouse.x-view.x)/scale, (mouse.y-view.y)/scale};
 }
 
@@ -358,7 +370,7 @@ int input_first_gamepad(void)
     /* Keep the selected controller while it exists. A lower-index device
      * appearing later must not steal the current player's controls. */
     if (!IsWindowReady()) return 0;
-    if (gamepad && gamepad_usable(gamepad-1)) return gamepad;
+    if (s_gamepad && gamepad_usable(s_gamepad-1)) return s_gamepad;
     for (int i = 0; i < 4; i++) if (gamepad_usable(i)) return i+1;
     return 0;
 }
@@ -374,15 +386,15 @@ const char *input_gamepad_name(int controller)
 
 void input_collect(void)
 {
-    if (!ready || !IsWindowReady()) return;
+    if (!s_ready || !IsWindowReady()) return;
     /* Bounded hidden-window smoke runs have no desktop focus to acquire. */
     int current_focus = IsWindowHidden() ? 1 : IsWindowFocused();
-    if (current_focus != focused) {
-        focused = current_focus;
-        if (!focused)
-            for (int key = 1; key < 512; key++)
-                suppressed[key] = IsKeyDown(key);
-        input_push(&(InputEvent){.type=INPUT_FOCUS, .focused=focused});
+    if (current_focus != s_focused) {
+        s_focused = current_focus;
+        if (!s_focused)
+            for (int key = 1; key < INPUT_KEY_COUNT; key++)
+                s_suppressed[key] = IsKeyDown(key);
+        input_push(&(InputEvent){.type=INPUT_FOCUS, .focused=s_focused});
     }
 #ifndef __EMSCRIPTEN__
     /* Only desktop windows have an OS close request. raylib's Web version
@@ -400,15 +412,15 @@ void input_collect(void)
     if (WindowShouldClose()) input_push(&(InputEvent){.type=INPUT_QUIT});
 #endif
     int device = input_first_gamepad();
-    if (device != gamepad) {
-        if (gamepad) input_push(&(InputEvent){.type=INPUT_PAD_REMOVED,.device=gamepad});
-        gamepad = device;
+    if (device != s_gamepad) {
+        if (s_gamepad) input_push(&(InputEvent){.type=INPUT_PAD_REMOVED,.device=s_gamepad});
+        s_gamepad = device;
         if (device) input_push(&(InputEvent){.type=INPUT_PAD_ADDED,.device=device});
     }
     /* Commands were captured in callback order during EndDrawing's poll. */
     while (GetKeyPressed()) {}
     while (GetCharPressed()) {}
-    for (int key = 1; key < 512; key++) if (!IsKeyDown(key)) suppressed[key] = 0;
+    for (int key = 1; key < INPUT_KEY_COUNT; key++) if (!IsKeyDown(key)) s_suppressed[key] = 0;
     if (device) for (int b = 0; b < PAD_COUNT; b++) {
         int button = input_pad_button(b);
         if (!button) continue;
