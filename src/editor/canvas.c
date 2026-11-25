@@ -42,6 +42,7 @@
 #include "../levels/level_loader.h"
 #include "../levels/level_validate.h" /* level_validate_preview */
 #include "../shared/geometry.h" /* float_same_value */
+#include "../surfaces/rail.h"    /* Rail, rail_init_from_placements: rail riders */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE,
                                    FLOOR_GAP_W, GRAVITY; MAX_* via level.h */
 

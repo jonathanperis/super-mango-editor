@@ -12,25 +12,9 @@
 #pragma once
 
 #include "../shared/graphics.h"
+#include "hazard_defs.h"  /* SAW_FRAME_*, SAW_DISPLAY_*, MAX_CIRCULAR_SAWS */
 
 /* ------------------------------------------------------------------ */
-
-/*
- * SAW_FRAME_W / SAW_FRAME_H — source dimensions of Circular_Saw.png.
- *
- * The sprite is a single 32×32 px image (no sprite sheet grid).
- */
-#define SAW_FRAME_W  32
-#define SAW_FRAME_H  32
-
-/*
- * SAW_DISPLAY_W / SAW_DISPLAY_H — on-screen size in logical pixels.
- *
- * Rendered at native sprite size so each pixel maps 1:1 in the 400×300
- * logical canvas (then 2× scaled to the 800×600 OS window).
- */
-#define SAW_DISPLAY_W  32
-#define SAW_DISPLAY_H  32
 
 /*
  * SAW_SPIN_DEG_PER_SEC — rotation speed in degrees per second.
@@ -59,8 +43,6 @@
 #define SAW_PUSH_VY    (-150.0f)
 
 /* ------------------------------------------------------------------ */
-
-#define MAX_CIRCULAR_SAWS 16  /* max CircularSaw instances in one level */
 
 /*
  * CircularSaw — a fast rotating hazard that patrols a horizontal line.

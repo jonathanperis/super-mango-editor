@@ -16,25 +16,9 @@
 #pragma once
 
 #include "../shared/graphics.h"
+#include "hazard_defs.h"  /* BLUE_FLAME_FRAME_*, BLUE_FLAME_DISPLAY_*, MAX_BLUE_FLAMES, MAX_FIRE_FLAMES */
 
 /* ------------------------------------------------------------------ */
-
-/*
- * BLUE_FLAME_FRAME_W / BLUE_FLAME_FRAME_H — size of one animation frame in the sheet.
- *
- * blue_flame.png is 96×48: two 48×48 frames laid out horizontally.
- */
-#define BLUE_FLAME_FRAME_W  48
-#define BLUE_FLAME_FRAME_H  48
-
-/*
- * BLUE_FLAME_DISPLAY_W / BLUE_FLAME_DISPLAY_H — on-screen size in logical pixels.
- *
- * Rendered at 48×48 so the blue flame fits within the sea gap
- * and doesn't look oversized relative to other hazards.
- */
-#define BLUE_FLAME_DISPLAY_W  48
-#define BLUE_FLAME_DISPLAY_H  48
 
 /*
  * BLUE_FLAME_FRAME_COUNT — number of animation frames in the sheet.
@@ -87,9 +71,6 @@
 #define BLUE_FLAME_WAIT_DURATION  1.5f
 
 /* ------------------------------------------------------------------ */
-
-#define MAX_BLUE_FLAMES 16  /* max blue flame instances in one level */
-#define MAX_FIRE_FLAMES 16  /* max fire flame instances in one level */
 
 /*
  * BlueFlameState — the four phases of the blue flame's eruption cycle.

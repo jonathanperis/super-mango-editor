@@ -11,11 +11,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
-
-/* ------------------------------------------------------------------ */
-
-#define LAST_STAR_DISPLAY_W  24   /* on-screen width  in logical pixels  */
-#define LAST_STAR_DISPLAY_H  24   /* on-screen height in logical pixels  */
+#include "collectible_defs.h"  /* LAST_STAR_DISPLAY_W/H */
 
 /*
  * LastStar — the end-of-level collectible.

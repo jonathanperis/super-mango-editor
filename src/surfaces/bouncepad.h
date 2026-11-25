@@ -15,14 +15,11 @@
 #pragma once
 
 #include "../shared/graphics.h"
+#include "surface_defs.h"  /* BOUNCEPAD_W/H, BOUNCEPAD_SRC_*, BOUNCEPAD_ART_*, MAX_BOUNCEPADS_*, BouncepadType */
 
 /* ------------------------------------------------------------------ */
 /* Constants                                                           */
 /* ------------------------------------------------------------------ */
-
-/* Display size of one bouncepad frame in logical pixels. */
-#define BOUNCEPAD_W      48
-#define BOUNCEPAD_H      48
 
 /*
  * Bounce impulse presets — three strength tiers.
@@ -41,46 +38,10 @@
 #define BOUNCEPAD_VY  BOUNCEPAD_VY_MEDIUM
 
 /*
- * BouncepadType — the pad colour named in the level file (pad_type).
- *
- * It is validated and saved back to the TOML, but the game never reads it:
- * the texture comes from which array the pad is in (bouncepads_small,
- * _medium or _high, drawn in game_render.c) and the launch from launch_vy.
- */
-typedef enum {
-    BOUNCEPAD_GREEN,   /* usual for small pads  (bouncepad_small.png)  */
-    BOUNCEPAD_WOOD,    /* usual for medium pads (bouncepad_medium.png) */
-    BOUNCEPAD_RED      /* usual for high pads   (bouncepad_high.png)   */
-} BouncepadType;
-
-/*
  * BOUNCEPAD_FRAME_MS — how many milliseconds each animation frame is shown
  * during the release sequence (frame 1, then frame 0).
  */
 #define BOUNCEPAD_FRAME_MS  80
-
-/*
- * BOUNCEPAD_SRC_Y / BOUNCEPAD_SRC_H — vertical crop of the sprite sheet.
- *
- * Pixel analysis of Bouncepad_Wood.png shows the actual art occupies
- * rows 14–31 (18 px) within each 48-px frame; the remaining rows are
- * fully transparent padding.  Cropping to this region lets us position
- * the pad so its art bottom lands exactly on FLOOR_Y without rendering
- * invisible transparent space below it.
- */
-#define BOUNCEPAD_SRC_Y  14   /* first non-transparent row in the frame  */
-#define BOUNCEPAD_SRC_H  18   /* height of the art region (rows 14–31)   */
-
-/*
- * BOUNCEPAD_ART_X / BOUNCEPAD_ART_W — horizontal crop of each frame.
- *
- * The art occupies cols 16–31 (16 px) within each 48-px frame slot;
- * the left 16 px and right 16 px are fully transparent padding.
- * These constants define the collision box width so it matches the
- * visible art, not the full frame slot.
- */
-#define BOUNCEPAD_ART_X  16   /* first non-transparent col in the frame  */
-#define BOUNCEPAD_ART_W  16   /* width  of the art region (cols 16–31)   */
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */

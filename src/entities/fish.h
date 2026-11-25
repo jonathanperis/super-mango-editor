@@ -7,13 +7,8 @@
 #pragma once
 
 #include "../shared/graphics.h"
+#include "enemy_defs.h"         /* MAX_FISH, FISH_FRAME_*, FISH_RENDER_* */
 
-#define MAX_FISH           16       /* maximum simultaneous fish instances     */
-#define FISH_FRAMES         2       /* horizontal frames in Fish_2.png (96×48) */
-#define FISH_FRAME_W       48       /* width of one frame slot in the sheet    */
-#define FISH_FRAME_H       48       /* height of one frame slot in the sheet   */
-#define FISH_RENDER_W      48       /* on-screen render width  (matches player) */
-#define FISH_RENDER_H      48       /* on-screen render height (matches player) */
 /* FISH_SPEED — the usual patrol speed, px/s; the level's vx is the speed
  * actually used (shipped levels author this value). */
 #define FISH_SPEED         70.0f

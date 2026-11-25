@@ -12,18 +12,9 @@
 
 #include "../shared/graphics.h"
 #include "../surfaces/rail.h"  /* Rail — the block needs a pointer to its rail */
+#include "hazard_defs.h"     /* SPIKE_DISPLAY_W/H, MAX_SPIKE_BLOCKS */
 
 /* ------------------------------------------------------------------ */
-
-/*
- * SPIKE_DISPLAY_W / SPIKE_DISPLAY_H — on-screen size in logical pixels.
- *
- * Spike_Block.png is a single 16×16 frame.  We display it at 24×24 to make
- * it more visible against rail tiles (which are also 16×16).  Nearest-
- * neighbour scaling (set in game_init) keeps the pixel art sharp.
- */
-#define SPIKE_DISPLAY_W  24
-#define SPIKE_DISPLAY_H  24
 
 /*
  * SPIKE_SPIN_DEG_PER_SEC — rotation speed of the spinning animation.
@@ -62,8 +53,6 @@
 #define SPIKE_PUSH_VY    (-150.0f)
 
 /* ------------------------------------------------------------------ */
-
-#define MAX_SPIKE_BLOCKS 16   /* max SpikeBlock instances in one level */
 
 /*
  * SpikeBlock — a hazard that travels along a Rail, and can fall off open ends.

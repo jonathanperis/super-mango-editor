@@ -13,13 +13,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
-
-/* ---- Constants ---------------------------------------------------------- */
-
-#define MAX_SPIKE_PLATFORMS    16
-#define SPIKE_PLAT_PIECE_W     16   /* width  of one 3-slice piece (px)       */
-#define SPIKE_PLAT_SRC_Y        5   /* first content row in each piece        */
-#define SPIKE_PLAT_SRC_H       11   /* content height (rows 5–15)             */
+#include "hazard_defs.h"  /* MAX_SPIKE_PLATFORMS, SPIKE_PLAT_* */
 
 /* ---- Types -------------------------------------------------------------- */
 

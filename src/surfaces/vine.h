@@ -11,24 +11,7 @@
 #pragma once
 
 #include "../shared/graphics.h"
-
-#define MAX_VINES   24              /* upper bound on decoration instances   */
-#define VINE_W      16              /* sprite width  (natural size)          */
-#define VINE_H      32              /* content height after removing 8 px transparent padding top+bottom */
-#define VINE_SRC_Y   8              /* first pixel row with content in Vine.png */
-#define VINE_SRC_H  32              /* height of content area in Vine.png    */
-#define VINE_STEP   19              /* vertical spacing between stacked tiles */
-
-/*
- * VineType — visual variant for vine decorations.
- *
- * VINE_GREEN : lush green vine (forest/fertile themes)
- * VINE_BROWN : dried brown vine (arid/volcanic/cave themes)
- */
-typedef enum {
-    VINE_GREEN = 0,
-    VINE_BROWN
-} VineType;
+#include "surface_defs.h"  /* MAX_VINES, VINE_*, VineType */
 
 /*
  * VineDecor — world-space position and length of one hanging vine.

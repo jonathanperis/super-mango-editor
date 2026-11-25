@@ -20,14 +20,8 @@
 #pragma once
 
 #include "../shared/graphics.h"
+#include "enemy_defs.h"         /* MAX_SPIDERS, SPIDER_FRAME_W, SPIDER_ART_* */
 
-#define MAX_SPIDERS     16     /* maximum simultaneous spiders on screen    */
-#define SPIDER_FRAMES    3     /* animation frames in Spider_1.png          */
-#define SPIDER_FRAME_W   64    /* width of one frame slot in the sheet (px) */
-#define SPIDER_ART_X     20    /* first visible col within each frame slot  */
-#define SPIDER_ART_W     25    /* width of visible art  (cols 20..44)       */
-#define SPIDER_ART_Y     22    /* first visible row within each frame slot  */
-#define SPIDER_ART_H     10    /* height of visible art (rows 22..31)       */
 /* SPIDER_SPEED — the usual walk speed, px/s. Shipped levels and new editor
  * placements author it as vx; the level's vx is the speed actually used. */
 #define SPIDER_SPEED     50.0f

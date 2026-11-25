@@ -14,26 +14,9 @@
 
 #include "../shared/graphics.h"
 #include "../shared/audio.h"
+#include "hazard_defs.h"  /* AXE_FRAME_*, AXE_DISPLAY_*, MAX_AXE_TRAPS, AxeTrapMode */
 
 /* ------------------------------------------------------------------ */
-
-/*
- * AXE_FRAME_W / AXE_FRAME_H — source dimensions of Axe_Trap.png.
- *
- * The sprite is a single 48×64 px image (no sprite sheet grid).
- * The handle is at the top; the blade fans out at the bottom.
- */
-#define AXE_FRAME_W  48
-#define AXE_FRAME_H  64
-
-/*
- * AXE_DISPLAY_W / AXE_DISPLAY_H — on-screen size in logical pixels.
- *
- * Rendered at native sprite size so each pixel maps 1:1 in the 400×300
- * logical canvas (then 2× scaled to the 800×600 OS window).
- */
-#define AXE_DISPLAY_W  48
-#define AXE_DISPLAY_H  64
 
 /*
  * AXE_SWING_AMPLITUDE — maximum pendulum angle in degrees from vertical.
@@ -54,25 +37,6 @@
  * 180°/s = one full rotation every 2 seconds.
  */
 #define AXE_SPIN_SPEED  180.0f
-
-/*
- * MAX_AXE_TRAPS — upper bound on how many axe traps the level can hold.
- * Stored as a fixed-size array inside GameState.
- */
-#define MAX_AXE_TRAPS 16
-
-/* ------------------------------------------------------------------ */
-
-/*
- * AxeTrapMode — selects the swing behaviour for each trap instance.
- *
- * AXE_MODE_PENDULUM : grandfather-clock sinusoidal swing (−60° to +60°).
- * AXE_MODE_SPIN     : continuous 360° clockwise rotation.
- */
-typedef enum {
-    AXE_MODE_PENDULUM,
-    AXE_MODE_SPIN
-} AxeTrapMode;
 
 /*
  * AxeTrap — all the data for one swinging/spinning axe hazard.

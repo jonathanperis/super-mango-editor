@@ -22,12 +22,7 @@
 
 #include "../shared/asset_cache.h"  /* AssetCache — layers are held from it */
 #include "../shared/graphics.h"
-
-/*
- * MAX_BACKGROUND_LAYERS — maximum number of background layers the system can hold.
- * Stored as a fixed-size array; no heap allocation needed.
- */
-#define MAX_BACKGROUND_LAYERS  8
+#include "effect_defs.h"              /* MAX_BACKGROUND_LAYERS */
 
 /* ------------------------------------------------------------------ */
 
