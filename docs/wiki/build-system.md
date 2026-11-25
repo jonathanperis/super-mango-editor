@@ -186,8 +186,8 @@ and forth recompiles each time, so give long-lived flag combinations their own
 `OUTDIR`.
 
 `make content-inventory` regenerates public counts and the raw asset inventory;
-`make asset-budget` checks freshness and the 4 MiB raw playable-asset budget
-(1 MiB of it for generated sounds). `make sounds` regenerates the QOA files
+`make asset-budget` checks freshness and the 320 KiB raw playable-asset budget
+(240 KiB of it for generated sounds). `make sounds` regenerates the QOA files
 from `tools/gen_sounds.py`; `make docs-drift` runs its `--check` mode.
 `make timing-lab` prints a small integration experiment for 30/60/144 Hz that
 shows why the game simulates fixed 1/60 s steps instead of a variable frame dt.
