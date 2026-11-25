@@ -20,7 +20,8 @@
  *         for different blocks prevent all blocks from being synchronised.
  * speed : rail traversal speed in tiles per second (spike_block.h lists typical values).
  */
-void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed) {
+void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed)
+{
     sb->rail      = rail;
     sb->t         = t0;
     sb->speed     = speed;
@@ -74,7 +75,8 @@ void spike_block_init(SpikeBlock *sb, const Rail *rail, float t0, float speed) {
  *      direction (speed tiles/s × RAIL_TILE_W px/tile).  fall_vy starts at 0
  *      and gravity accumulates from the next frame onward.
  */
-void spike_block_update(SpikeBlock *sb, float dt, int reveal_x) {
+void spike_block_update(SpikeBlock *sb, float dt, int reveal_x)
+{
     if (!sb->active) return;
 
     /*
@@ -186,7 +188,8 @@ void spike_block_update(SpikeBlock *sb, float dt, int reveal_x) {
     sb->y = cy - sb->h * 0.5f;
 }
 
-void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int reveal_x) {
+void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int reveal_x)
+{
     for (int i = 0; i < count; i++)
         spike_block_update(&blocks[i], dt, reveal_x);
 }
@@ -201,7 +204,8 @@ void spike_blocks_update(SpikeBlock *blocks, int count, float dt, int reveal_x) 
  * texture", which is correct for a single-frame sprite.
  */
 void spike_block_render(const SpikeBlock *sb,
-                        Texture2D *tex, int cam_x) {
+                        Texture2D *tex, int cam_x)
+{
     if (!sb->active) return;
 
     /*
@@ -233,7 +237,8 @@ void spike_block_render(const SpikeBlock *sb,
 }
 
 void spike_blocks_render(const SpikeBlock *blocks, int count,
-                         Texture2D *tex, int cam_x) {
+                         Texture2D *tex, int cam_x)
+{
     for (int i = 0; i < count; i++)
         spike_block_render(&blocks[i], tex, cam_x);
 }
@@ -246,7 +251,8 @@ void spike_blocks_render(const SpikeBlock *blocks, int count,
  * The hitbox matches the display rect (top-left x,y; size w×h).
  * No inset is applied because the spike art fills the entire frame.
  */
-IntRect spike_block_get_hitbox(const SpikeBlock *sb) {
+IntRect spike_block_get_hitbox(const SpikeBlock *sb)
+{
     IntRect r = {
         .x = (int)sb->x,
         .y = (int)sb->y,

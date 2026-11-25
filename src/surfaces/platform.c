@@ -35,7 +35,8 @@
  * corners instead of a stack of identical repeated tiles.
  */
 void platforms_render(const Platform *platforms, int count,
-                       Texture2D *default_tex, int cam_x) {
+                       Texture2D *default_tex, int cam_x)
+{
     const int P = TILE_SIZE / 3;   /* 9-slice piece size: 16 px */
 
     for (int i = 0; i < count; i++) {

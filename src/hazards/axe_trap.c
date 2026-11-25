@@ -54,7 +54,8 @@
  *   Sound fires once per full 360° rotation.
  */
 void axe_traps_update(AxeTrap *traps, int count, float dt,
-                      SoundEffect *snd_axe, float player_x, int cam_x) {
+                      SoundEffect *snd_axe, float player_x, int cam_x)
+{
     for (int i = 0; i < count; i++) {
         AxeTrap *t = &traps[i];
         if (!t->active) continue;
@@ -154,7 +155,8 @@ void axe_traps_update(AxeTrap *traps, int count, float dt,
  * so the axe swings around that point exactly like a real pendulum.
  */
 void axe_traps_render(const AxeTrap *traps, int count,
-                      Texture2D *tex, int cam_x) {
+                      Texture2D *tex, int cam_x)
+{
     if (!tex) return;
 
     /*
@@ -228,7 +230,8 @@ void axe_traps_render(const AxeTrap *traps, int count,
  *
  * (sin for x, cos for y because angle 0 = straight down in our convention)
  */
-IntRect axe_trap_get_hitbox(const AxeTrap *trap) {
+IntRect axe_trap_get_hitbox(const AxeTrap *trap)
+{
     /* Distance from pivot to blade centre (approximately 3/4 of sprite height) */
     float arm = (float)(AXE_DISPLAY_H - 4) * 0.70f;
 

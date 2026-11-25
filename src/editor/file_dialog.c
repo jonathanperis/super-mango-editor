@@ -77,7 +77,8 @@ void file_dialog_test_set_save_result(int result, const char *path)
  * Returns FILE_DIALOG_SELECTED, FILE_DIALOG_CANCELLED, FILE_DIALOG_ERROR,
  * or FILE_DIALOG_INVALID_PATH (see file_dialog_read_path).
  */
-int file_dialog_open(char *buf, int buf_size) {
+int file_dialog_open(char *buf, int buf_size)
+{
     if (!buf || buf_size < 2) return FILE_DIALOG_ERROR;
     if (file_dialog_test_open_result != -1) {  /* -1 = no injected result */
         int result = file_dialog_test_open_result;

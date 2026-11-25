@@ -727,7 +727,8 @@ static int config_fog_layers(EditorState *es, int x, int y)
  * fully shown (editor_layout.c); content past available_h scrolls.
  */
 void level_config_render(EditorState *es, int start_y, int available_h,
-                         int total_content_h) {
+                         int total_content_h)
+{
     editor_begin_change_tracking(es, EDITOR_CHANGE_CONFIG);
     es->ui.before_change = editor_before_change;
     es->ui.before_change_context = es;

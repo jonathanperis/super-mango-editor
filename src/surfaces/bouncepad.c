@@ -64,7 +64,8 @@ void bouncepad_place(Bouncepad *pad, float x, float launch_vy, BouncepadType pad
  * fraction of a 16.67 ms step instead of truncating it to 16 ms, the same
  * way animate_frame_ms (entity_utils.c) handles the other animations.
  */
-void bouncepads_update(Bouncepad *pads, int count, float dt) {
+void bouncepads_update(Bouncepad *pads, int count, float dt)
+{
     for (int i = 0; i < count; i++) {
         Bouncepad *p = &pads[i];
         if (p->state != BOUNCE_ACTIVE) continue;
@@ -99,7 +100,8 @@ void bouncepads_update(Bouncepad *pads, int count, float dt) {
  * World → screen conversion: dst.x = (int)pad->x - cam_x.
  */
 void bouncepads_render(const Bouncepad *pads, int count,
-                       Texture2D *tex, int cam_x) {
+                       Texture2D *tex, int cam_x)
+{
     if (!tex) return;   /* texture failed to load; skip silently */
 
     for (int i = 0; i < count; i++) {
