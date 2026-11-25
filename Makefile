@@ -419,7 +419,8 @@ PYTHON_TESTS = tests/validate_levels_test.py tests/gen_sounds_test.py \
                tests/fuzz_dict_test.py tests/coverage_baseline_test.py \
                tests/clang_tidy_report_test.py tests/doctor_test.py \
                tests/build_raylib_test.py tests/gen_compile_commands_test.py \
-               tests/roadmap_quality_test.py tests/import_raygui_icons_test.py
+               tests/roadmap_quality_test.py tests/import_raygui_icons_test.py \
+               tests/bench_test.py
 
 test: $(OUTDIR) $(TEST_TARGETS) web-host-contract parser-allocation-probe parser-encoding-probe ## Test: Native test binaries plus the Python and Node host checks
 	$(foreach script,$(PYTHON_TESTS),python3 $(script)$(newline))
@@ -595,6 +596,21 @@ asset-budget: ## Check: Shipped assets stay within the size budget
 .PHONY: timing-lab
 timing-lab: ## Run: Print the fixed-step vs variable-step physics study
 	python3 tools/timing_lab.py
+
+# Time update and drawing per campaign level (tools/bench.py). It builds its
+# own optimized tree on the Memory backend, so every machine draws the same
+# pixels on the CPU and no window or GPU is needed. BENCH_CHECK=1 also
+# compares the result with tools/bench_budget.json; CI runs that, for
+# information only (.github/workflows/bench.yml).
+BENCH_OUTDIR ?= out/bench
+BENCH_FRAMES ?= 600
+BENCH_REPEAT ?= 3
+BENCH_CHECK ?=
+.PHONY: bench
+bench: ## Test: Time update and drawing per campaign level, headless (BENCH_CHECK=1 checks budgets)
+	$(MAKE) all OUTDIR="$(BENCH_OUTDIR)" RAYLIB_PLATFORM=memory BUILD_MODE=release
+	python3 tools/bench.py --binary "$(BENCH_OUTDIR)/super-mango" --frames $(BENCH_FRAMES) \
+		--repeat $(BENCH_REPEAT) $(if $(BENCH_CHECK),--check,)
 
 smoke: all editor ## Test: Boot every level and the editor for SMOKE_FRAMES frames
 	@for level in $(SMOKE_LEVELS); do \

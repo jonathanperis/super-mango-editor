@@ -1,0 +1,66 @@
+name: Bench
+
+# `make bench BENCH_CHECK=1` on every pull request and main push: the
+# per-level CPU time of update and drawing on the headless Memory backend,
+# checked against tools/bench_budget.json. Hosted runners are shared
+# machines whose speed varies from run to run, so this job is information,
+# not a gate: it is not a required check, and the budget file's tolerance
+# only catches large regressions (a render change that doubles the draw
+# time, say). The numbers are in the job summary.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bench:
+    name: Bench (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      MAKEFLAGS: -j4
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-linux-deps
+
+      # Source archive only: the bench tree is a release build of its own
+      # (out/bench/raylib), which no other job builds.
+      - name: Cache raylib source
+        uses: ./.github/actions/raylib-cache
+
+      - name: Bench against the budget
+        run: |
+          set -o pipefail
+          make bench BENCH_CHECK=1 2>&1 | tee bench.txt
+
+      - name: Publish the numbers
+        if: ${{ always() }}
+        run: |
+          if [ -f bench.txt ]; then
+            { echo '### make bench (ms per frame, headless Memory backend)'; echo '```';
+              grep -E '^(bench|level|levels/)' bench.txt || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
