@@ -303,6 +303,7 @@ typedef struct {
     UpdateFn    update;  /* the function that does it            */
 } UpdateStep;
 
+/* See docs/wiki/architecture.md, "Update Order"; make docs-drift compares the two. */
 static const UpdateStep s_update_steps[] = {
     /* name                  update                       */
     /* ---- Enemies ----------------------------------------------- */

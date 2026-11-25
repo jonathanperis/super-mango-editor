@@ -72,6 +72,7 @@ typedef struct {
     const char *campaign_path;
 } AppSessionConfig;
 
+/* See docs/wiki/architecture.md, "App Session and Game Frame". */
 typedef struct AppSession {
     StartMenu *menu;
     GameState *game;

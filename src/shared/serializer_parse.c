@@ -593,6 +593,7 @@ static const SerializerFieldSpec PHYSICS_FIELDS[] = {
 _Static_assert(sizeof(((LevelDef *)0)->floor_gaps[0]) == sizeof(int),
                "ROOT_INTEGERS stores each element through an int");
 
+/* See docs/wiki/level-design.md for these keys as a level author meets them. */
 static const SerializerRootSpec ROOT_FIELDS[] = {
     ROOT_VALUE("format_version", SERIALIZER_VALUE_INTEGER),
     ROOT_TEXT("name", name, SERIALIZER_WRITE_UNTITLED_IF_EMPTY, ""),
