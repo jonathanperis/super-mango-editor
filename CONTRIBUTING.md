@@ -1,11 +1,12 @@
 # Contributing
 
-Short-lived branches off `main`. Name the branch with a topic prefix and a
-short description (`docs/…`, `fix/…`, `refactor/…`, `test/…`, `tidy/…`,
-`ci/…`, `perf/…`). Open a pull request whose title is one imperative
-sentence in sentence case, with no `feat:` or `fix:` prefix. Merge with a
-rebase merge, and only after the required checks below are green. Never
-force-push `main`.
+Every piece of work goes on a short-lived `feat/` branch cut from the latest
+`main` (`feat/docs-audit`, `feat/editor-handles`), whatever kind of change it
+is. `main` is the only long-lived branch, here and on GitHub: delete the
+`feat/` branch once its pull request merges. Open a pull request whose title
+is one imperative sentence in sentence case, with no `feat:` or `fix:`
+prefix. Merge with a rebase merge, and only after the required checks below
+are green, so history stays linear. Never force-push `main`.
 
 The manual lives in [`docs/wiki/`](docs/wiki/). Start with the
 [developer guide](docs/wiki/developer-guide.md), the
