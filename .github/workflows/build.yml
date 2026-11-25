@@ -554,7 +554,7 @@ jobs:
   # the job summary and a coverage-summary artifact. COVERAGE_MIN and
   # COVERAGE_BRANCH_MIN fail the job when the TOTAL line or branch coverage
   # drops below a floor set a little under the measured total (lines 91.2%
-  # when that floor was set; branches 77.5% when theirs was). Raise the
+  # when that floor was set; branches 76.9% when theirs was). Raise the
   # floors as tests are added; they exist to catch a large accidental drop,
   # not to chase a number. A total can hide one file losing its tests, so
   # COVERAGE_TOLERANCE=2 also fails the job when any file's line or branch
