@@ -939,7 +939,7 @@ static int canvas_navigates_like_a_level_editor(void)
     push_event(INPUT_MOUSE_MOVE, 0, 0, 300, 300);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_MIDDLE, 0, 300, 300);
     ui_frame(&es, 300, 300);
-    CHECK(es.camera.x == 250.0f && !es.panning);
+    CHECK(es.camera.x == 250.0f && !es.mouse.panning);
 
     int coins = es.level.coin_count;
     es.tool = TOOL_PLACE;
@@ -950,7 +950,7 @@ static int canvas_navigates_like_a_level_editor(void)
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 400, 300);
     push_event(INPUT_KEY_UP, KEY_SPACE, 0, 0, 0);
     ui_frame(&es, 400, 300);
-    CHECK(es.camera.x == 200.0f && es.level.coin_count == coins && !es.space_held);
+    CHECK(es.camera.x == 200.0f && es.level.coin_count == coins && !es.mouse.space_held);
 
     /* A left release does not end a middle-button pan. */
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
@@ -959,21 +959,21 @@ static int canvas_navigates_like_a_level_editor(void)
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 400, 300);
     push_event(INPUT_KEY_UP, KEY_SPACE, 0, 0, 0);
     ui_frame(&es, 400, 300);
-    CHECK(es.panning && es.pan_button == MOUSE_BUTTON_MIDDLE);
+    CHECK(es.mouse.panning && es.mouse.pan_button == MOUSE_BUTTON_MIDDLE);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
     ui_frame(&es, 400, 300);
-    CHECK(!es.panning);
+    CHECK(!es.mouse.panning);
 
     /* With the F1 list open, the releases still end Space and a pan. */
     push_event(INPUT_KEY_DOWN, KEY_SPACE, 0, 0, 0);
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
     ui_frame(&es, 400, 300);
-    CHECK(es.space_held && es.panning);
+    CHECK(es.mouse.space_held && es.mouse.panning);
     es.shortcut_sheet_open = 1;
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_MIDDLE, 0, 400, 300);
     push_event(INPUT_KEY_UP, KEY_SPACE, 0, 0, 0);
     ui_frame(&es, 400, 300);
-    CHECK(!es.space_held && !es.panning);
+    CHECK(!es.mouse.space_held && !es.mouse.panning);
     es.shortcut_sheet_open = 0;
 
     /* Eight screens (3200 px) fit at a quarter. */

@@ -388,6 +388,29 @@ typedef struct {
  * function modify the original struct in place.  If we passed by value,
  * the function would receive a copy and changes would be lost.
  */
+/*
+ * EditorMouse — the pointer as the editor last saw it, updated from every
+ * input event (editor_events.c), and the view panning it drives.
+ *
+ * x, y        : cursor position in window pixels.
+ * down        : 1 while the left button is held; right_down the same for
+ *               the right button.
+ * panning     : a middle-drag, or a left drag with Space held, is sliding
+ *               the view; pan_x/pan_y is where the pointer was at the last
+ *               move, and pan_button the button whose release ends it.
+ * space_held  : Space is down (and no field is typing).
+ */
+typedef struct {
+    int x;
+    int y;
+    int down;
+    int right_down;
+    int panning;
+    int pan_x, pan_y;
+    int pan_button;
+    int space_held;
+} EditorMouse;
+
 /* The Campaign view's state (editor_campaign.c); NULL while it is closed. */
 typedef struct EditorCampaign EditorCampaign;
 
@@ -667,16 +690,7 @@ typedef struct {
     int            debug_play;   /* 1 = launch game with --debug when playing      */
 
     /* ---- Mouse state (updated every frame from input commands) -------- */
-    int            mouse_x;       /* current cursor x in window pixels         */
-    int            mouse_y;       /* current cursor y in window pixels         */
-    int            mouse_down;    /* 1 while left mouse button is held         */
-    int            mouse_right_down; /* 1 while right mouse button is held     */
-    /* Panning: middle-drag, or a left drag with Space held, slides the
-     * view; pan_x/pan_y is where the pointer was at the last move. */
-    int            panning;
-    int            pan_x, pan_y;
-    int            pan_button;    /* the button whose release ends the pan  */
-    int            space_held;    /* Space is down (and no field is typing) */
+    EditorMouse    mouse;
 
     /* ---- Drag state (moving one entity with the Select tool) ---------- */
     /*

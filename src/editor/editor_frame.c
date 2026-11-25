@@ -29,9 +29,9 @@ void editor_update_cursor(EditorState *es)
     if (!es->playing) {
         float world_x, world_y;
         EditorHandleKind handle = EDITOR_HANDLE_NONE;
-        canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &world_x, &world_y);
+        canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &world_x, &world_y);
         if (es->resizing) handle = (EditorHandleKind)es->resize_handle;
-        else if (canvas_contains(es->mouse_x, es->mouse_y))
+        else if (canvas_contains(es->mouse.x, es->mouse.y))
             handle = editor_handle_at(es, world_x, world_y);
         if (handle == EDITOR_HANDLE_CORNER)
             ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_NWSE);
@@ -41,7 +41,7 @@ void editor_update_cursor(EditorState *es)
             ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_EW);
     }
     /* Sliding the view, or ready to (Space over the canvas): the same. */
-    if ((es->panning || (es->space_held && canvas_contains(es->mouse_x, es->mouse_y))) &&
+    if ((es->mouse.panning || (es->mouse.space_held && canvas_contains(es->mouse.x, es->mouse.y))) &&
         !es->playing)
         ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
     ui_apply_cursor(&es->ui);
@@ -69,10 +69,10 @@ void editor_run_frame(EditorState *es)
     /* Hover uses the latest sampled pointer. Commands above carry their own
      * event-time coordinates, so a quick click is not moved by later motion. */
     Vector2 mouse = input_mouse();
-    es->mouse_x = es->ui.mouse_x = (int)mouse.x;
-    es->mouse_y = es->ui.mouse_y = (int)mouse.y;
+    es->mouse.x = es->ui.mouse_x = (int)mouse.x;
+    es->mouse.y = es->ui.mouse_y = (int)mouse.y;
     /* Held after this frame's events: a text field drags out a selection. */
-    es->ui.mouse_down = es->mouse_down;
+    es->ui.mouse_down = es->mouse.down;
     if (es->playing
 #ifndef _WIN32
         || es->play_pid > 0

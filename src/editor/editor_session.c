@@ -556,7 +556,7 @@ void editor_pace_frames(EditorState *es)
      * the rate is back to full. A held button is never idle: a drag may
      * rest without the pointer moving. */
     if (!IsWindowReady()) return;
-    int idle = !es->mouse_down &&
+    int idle = !es->mouse.down &&
                (uint32_t)clock_millis() - es->last_input_ms >= EDITOR_IDLE_MS;
     int rate = editor_frame_rate_for(IsWindowHidden(), IsWindowFocused(), idle);
     if (rate && rate != es->frame_rate) {

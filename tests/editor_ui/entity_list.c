@@ -320,8 +320,8 @@ static void config_only_frame(EditorState *es, int click, int mx, int my)
     arm_dialog_seams();
     ui_begin_frame(&es->ui);
     if (click) (void)ui_press(&es->ui);
-    es->mouse_x = es->ui.mouse_x = mx;
-    es->mouse_y = es->ui.mouse_y = my;
+    es->mouse.x = es->ui.mouse_x = mx;
+    es->mouse.y = es->ui.mouse_y = my;
     BeginDrawing();
     BeginTextureMode(tiny_target);
     level_config_render(es, TOOLBAR_H, EDITOR_H - TOOLBAR_H, EDITOR_H - TOOLBAR_H);
