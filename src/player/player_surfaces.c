@@ -31,7 +31,8 @@ void player_resolve_floor_collision(Player *player,
                                     const BouncepadList *bouncepad_lists, int bouncepad_list_count,
                                     const int *floor_gaps, int floor_gap_count,
                                     float prev_center_x, float prev_bottom,
-                                    int *out_bounce_list, int *out_bounce_index) {
+                                    int *out_bounce_list, int *out_bounce_index)
+{
     *out_bounce_list = -1;
     *out_bounce_index = -1;
 
@@ -135,7 +136,8 @@ void player_resolve_platform_collisions(Player *player,
                                         int float_platform_count,
                                         float prev_bottom,
                                         int *out_fp_landed_idx,
-                                        int prev_fp_landed_idx) {
+                                        int prev_fp_landed_idx)
+{
     *out_fp_landed_idx = -1;
 
     /*
@@ -261,7 +263,8 @@ void player_resolve_platform_collisions(Player *player,
 void player_resolve_bridge_collision(Player *player,
                                      const Bridge *bridges, int bridge_count,
                                      float prev_bottom,
-                                     int *out_bridge_landed_idx) {
+                                     int *out_bridge_landed_idx)
+{
     /*
      * Bridge collision — same one-way crossing test as static platforms.
      * Only land if the brick under the player's centre is still solid
@@ -301,7 +304,8 @@ void player_resolve_bridge_collision(Player *player,
 void player_resolve_spike_platform_top_collision(Player *player,
                                                  const SpikePlatform *spike_platforms,
                                                  int spike_platform_count,
-                                                 float prev_bottom) {
+                                                 float prev_bottom)
+{
     /*
      * Spike platform collision — same one-way crossing test as bridges.
      * The player can land on top (solid surface) but will take damage
@@ -332,7 +336,8 @@ void player_resolve_spike_platform_top_collision(Player *player,
 void player_resolve_spike_platform_ceiling_collision(Player *player,
                                                      const SpikePlatform *spike_platforms,
                                                      int spike_platform_count,
-                                                     float prev_top) {
+                                                     float prev_top)
+{
     /*
      * Spike platform smooth-underside barrier — blocks upward movement.
      *
@@ -380,7 +385,8 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
     }
 }
 
-void player_clamp_world_x(Player *player, int world_w) {
+void player_clamp_world_x(Player *player, int world_w)
+{
     /*
      * Keep the PHYSICS body inside the world horizontally. We clamp the
      * inset edge (x + PLAYER_PHYS_PAD_X), not the sprite left edge, so the
@@ -393,7 +399,8 @@ void player_clamp_world_x(Player *player, int world_w) {
         player->x = (float)(world_w - player->w + PLAYER_PHYS_PAD_X);
 }
 
-void player_resolve_world_bounds(Player *player, int world_w) {
+void player_resolve_world_bounds(Player *player, int world_w)
+{
     player_clamp_world_x(player, world_w);
 
     /*

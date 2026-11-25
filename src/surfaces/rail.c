@@ -34,7 +34,8 @@
  *   (1,1) = col 0, row 0  →  SOUTH only    (vertical   top   end cap)
  *   (1,3) = col 2, row 0  →  NORTH only    (vertical   bot   end cap)
  */
-static IntRect connection_to_src(int conn) {
+static IntRect connection_to_src(int conn)
+{
     int col, row;
     switch (conn & (RAIL_N | RAIL_E | RAIL_S | RAIL_W)) {
         /* ---- Two-direction: loop corners and straights ---- */
@@ -76,7 +77,8 @@ static IntRect connection_to_src(int conn) {
  *
  * Inner edge tiles receive the straight-line bitmask for their axis.
  */
-static void build_rect_rail(Rail *r, int x0, int y0, int w_tiles, int h_tiles) {
+static void build_rect_rail(Rail *r, int x0, int y0, int w_tiles, int h_tiles)
+{
     int idx = 0;
     const int S = RAIL_TILE_W;   /* grid step: one tile side = 16 px */
 
@@ -144,7 +146,8 @@ static void build_rect_rail(Rail *r, int x0, int y0, int w_tiles, int h_tiles) {
  *
  * Physical width: w_tiles × RAIL_TILE_W logical pixels.
  */
-static void build_horiz_rail(Rail *r, int x0, int y0, int w_tiles, int end_cap) {
+static void build_horiz_rail(Rail *r, int x0, int y0, int w_tiles, int end_cap)
+{
     /* First tile: left end-cap, opens rightward only */
     r->tiles[0].x           = x0;
     r->tiles[0].y           = y0;
@@ -223,7 +226,8 @@ int rail_build(Rail *rail, const RailPlacement *p)
  * adjusted by the camera offset (world → screen: dst.x = tile.x − cam_x).
  */
 void rails_render(const Rail *rails, int count,
-                  Texture2D *tex, int cam_x) {
+                  Texture2D *tex, int cam_x)
+{
     for (int r = 0; r < count; r++) {
         const Rail *rail = &rails[r];
         for (int i = 0; i < rail->count; i++) {
@@ -259,7 +263,8 @@ void rails_render(const Rail *rails, int count,
  *
  * Centre of tile k: (tiles[k].x + RAIL_TILE_W/2, tiles[k].y + RAIL_TILE_H/2)
  */
-void rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y) {
+void rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y)
+{
     *out_x = *out_y = 0.0f;
     if (!r || r->count < 1 || r->count > MAX_RAIL_TILES || !isfinite(t)) return;
     if (r->closed) {
@@ -296,7 +301,8 @@ void rail_get_world_pos(const Rail *r, float t, float *out_x, float *out_y) {
  * For a 28-tile loop at 2 tiles/s the block completes one circuit in 14 s.
  * Returns the new t value, wrapped to [0, count) for closed rails.
  */
-float rail_advance(const Rail *r, float t, float speed, float dt) {
+float rail_advance(const Rail *r, float t, float speed, float dt)
+{
     if (!r || r->count < 1 || !isfinite(t) || !isfinite(speed) || !isfinite(dt)) return 0.0f;
     double advanced = (double)t + (double)speed * (double)dt;
     if (r->closed) {

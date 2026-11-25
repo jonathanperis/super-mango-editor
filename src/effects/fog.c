@@ -64,7 +64,8 @@
  * If all slots are occupied, the spawn is silently skipped — this should
  * not happen with FOG_MAX = 4 and the durations used here.
  */
-static void fog_spawn(FogSystem *fog) {
+static void fog_spawn(FogSystem *fog)
+{
     /* Find the first inactive slot in the pool */
     for (int i = 0; i < FOG_MAX; i++) {
         if (fog->instances[i].active) continue;
@@ -184,7 +185,8 @@ void fog_init(FogSystem *fog, AssetCache *cache,
  * Deactivation:
  *   When elapsed >= duration the pan is complete; free the slot.
  */
-void fog_update(FogSystem *fog, float dt) {
+void fog_update(FogSystem *fog, float dt)
+{
     for (int i = 0; i < FOG_MAX; i++) {
         FogInstance *inst = &fog->instances[i];
         if (!inst->active) continue;
@@ -231,7 +233,8 @@ void fog_update(FogSystem *fog, float dt) {
  *   FOG_FADE_TIME .. (d-fade)  → alpha stays at FOG_ALPHA_MAX   (full)
  *   (d-fade) .. d              → alpha ramps FOG_ALPHA_MAX → 0  (fade out)
  */
-void fog_render(FogSystem *fog) {
+void fog_render(FogSystem *fog)
+{
     for (int i = 0; i < FOG_MAX; i++) {
         FogInstance *inst = &fog->instances[i];
         if (!inst->active) continue;
@@ -285,7 +288,8 @@ void fog_render(FogSystem *fog) {
  * to NULL after releasing makes a second cleanup safe, because releasing
  * NULL does nothing.
  */
-void fog_cleanup(FogSystem *fog, AssetCache *cache) {
+void fog_cleanup(FogSystem *fog, AssetCache *cache)
+{
     for (int i = 0; i < fog->tex_count; i++) {
         asset_cache_texture_release(cache, fog->textures[i]);
         fog->textures[i] = NULL;

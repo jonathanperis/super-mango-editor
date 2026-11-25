@@ -13,7 +13,8 @@
  * a statement about the file, and the answer to a wrong one is to refuse
  * the file, not to fall back to a default.
  */
-int serializer_load_header(toml_datum_t top, LevelDef *def) {
+int serializer_load_header(toml_datum_t top, LevelDef *def)
+{
     toml_datum_t version;
 
     if (!def) return -1;

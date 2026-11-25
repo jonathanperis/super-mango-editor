@@ -39,7 +39,8 @@
 void player_update(Player *player, float dt, SoundEffect *snd_jump,
                    const PlayerSurfaces *surfaces,
                    int prev_fp_landed_idx,
-                   PlayerLanding *landed) {
+                   PlayerLanding *landed)
+{
 
     /*
      * Unpack the view into locals, once. The steps below then read as they

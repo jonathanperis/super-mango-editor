@@ -61,7 +61,8 @@
  * the visible portion of the dynamic-width world maps onto the CANVAS_W-pixel
  * viewport.  The result can be negative (entity is off-screen left).
  */
-static inline int w2s_x(const EditorState *es, float wx) {
+static inline int w2s_x(const EditorState *es, float wx)
+{
     return (int)((wx - es->camera.x) * es->camera.zoom);
 }
 
@@ -72,7 +73,8 @@ static inline int w2s_x(const EditorState *es, float wx) {
  * below the toolbar strip.  At 1x/2x the 300-px world fits and camera.y is
  * 0; at 3x/5x camera.y lets the designer scroll down to the floor.
  */
-static inline int w2s_y(const EditorState *es, float wy) {
+static inline int w2s_y(const EditorState *es, float wy)
+{
     return (int)((wy - es->camera.y) * es->camera.zoom) + TOOLBAR_H;
 }
 
@@ -82,12 +84,14 @@ static inline int w2s_y(const EditorState *es, float wy) {
  * Ensures that a 1-pixel minimum is returned so thin entities remain visible
  * at extreme zoom-out levels.
  */
-static inline int w2s_w(const EditorState *es, int w) {
+static inline int w2s_w(const EditorState *es, int w)
+{
     int sw = (int)(w * es->camera.zoom);
     return sw < 1 ? 1 : sw;
 }
 
-static inline int w2s_h(const EditorState *es, int h) {
+static inline int w2s_h(const EditorState *es, int h)
+{
     int sh = (int)(h * es->camera.zoom);
     return sh < 1 ? 1 : sh;
 }
@@ -131,7 +135,8 @@ static void render_screens(EditorState *es);
  * keep integer placement at every editor zoom level (DrawRectangleLines
  * would draw GL lines with a half-pixel offset instead).
  */
-static void draw_outline(int x, int y, int w, int h, int thickness, Color color) {
+static void draw_outline(int x, int y, int w, int h, int thickness, Color color)
+{
     DrawRectangleLinesEx((Rectangle){(float)x, (float)y, (float)w, (float)h},
                          (float)thickness, color);
 }
@@ -147,7 +152,8 @@ static void draw_outline(int x, int y, int w, int h, int thickness, Color color)
  * coordinates; dw/dh are world-space dimensions that get scaled to screen.
  */
 static void draw_tex(EditorState *es, Texture2D *tex, const IntRect *src,
-                     float wx, float wy, int dw, int dh) {
+                     float wx, float wy, int dw, int dh)
+{
     if (!tex) return;
     IntRect dst = {
         w2s_x(es, wx),
@@ -210,7 +216,8 @@ int canvas_banner_contains(EditorState *es, int sx, int sy)
     return es->canvas_check.runtime_failed;
 }
 
-void canvas_render(EditorState *es) {
+void canvas_render(EditorState *es)
+{
     const char *error = es->canvas_check.error;
     /* The Campaign view takes the canvas's place while it is open. */
     if (es->campaign) {
@@ -319,7 +326,8 @@ void canvas_render(EditorState *es) {
  * the status-bar readout and the placement ghost all call it.
  */
 void canvas_screen_to_world(const EditorState *es, int sx, int sy,
-                            float *wx, float *wy) {
+                            float *wx, float *wy)
+{
     /* A zeroed EditorState (tests, early startup) has zoom 0; treat it as
      * 1x instead of dividing by zero. */
     float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
@@ -340,7 +348,8 @@ static float clamp_camera_axis(float value, float world_size, float view_size)
     return value;
 }
 
-void canvas_clamp_camera(EditorState *es) {
+void canvas_clamp_camera(EditorState *es)
+{
     float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
     /* editor_world_width caps a hand-edited screen_count, so this is safe
      * to run every frame even while the level is invalid. */
@@ -349,7 +358,8 @@ void canvas_clamp_camera(EditorState *es) {
     es->camera.y = clamp_camera_axis(es->camera.y, (float)GAME_H, CANVAS_H / zoom);
 }
 
-void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy) {
+void canvas_set_zoom(EditorState *es, float zoom, int anchor_sx, int anchor_sy)
+{
     float wx, wy;
 
     if (zoom <= 0.0f) return;
@@ -405,18 +415,21 @@ void canvas_zoom_to_fit(EditorState *es)
     canvas_clamp_camera(es);
 }
 
-int canvas_contains(int sx, int sy) {
+int canvas_contains(int sx, int sy)
+{
     return sx >= 0 && sx < CANVAS_W &&
            sy >= TOOLBAR_H && sy < TOOLBAR_H + CANVAS_H;
 }
 
-int canvas_shows(const EditorState *es, const EditorRect *r) {
+int canvas_shows(const EditorState *es, const EditorRect *r)
+{
     float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
     return r->x + r->w > es->camera.x && r->x < es->camera.x + CANVAS_W / zoom &&
            r->y + r->h > es->camera.y && r->y < es->camera.y + CANVAS_H / zoom;
 }
 
-void canvas_center_on(EditorState *es, const EditorRect *r) {
+void canvas_center_on(EditorState *es, const EditorRect *r)
+{
     float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
     es->camera.x = r->x + r->w / 2.0f - (float)CANVAS_W / (2.0f * zoom);
     es->camera.y = r->y + r->h / 2.0f - (float)CANVAS_H / (2.0f * zoom);
@@ -436,7 +449,8 @@ void canvas_center_on(EditorState *es, const EditorRect *r) {
  * editor's camera stands in for the game's, so scrolling the canvas moves
  * each layer at its own rate, as playing does.
  */
-static void draw_parallax_layer(EditorState *es, Texture2D *tex, float speed) {
+static void draw_parallax_layer(EditorState *es, Texture2D *tex, float speed)
+{
     if (!tex || tex->width <= 0 || tex->height <= 0) return;
     int tex_w = tex->width;
     int offset = (((int)(es->camera.x * speed)) % tex_w + tex_w) % tex_w;
@@ -456,7 +470,8 @@ static void draw_parallax_layer(EditorState *es, Texture2D *tex, float speed) {
  * draw_parallax_layer.  Layer 0 is textures.sky; the others are
  * preview_layers[i].
  */
-static void render_sky(EditorState *es) {
+static void render_sky(EditorState *es)
+{
     int layers = es->level.background_layer_count;
     if (layers > MAX_BACKGROUND_LAYERS) layers = MAX_BACKGROUND_LAYERS;
     /* Flat blue under everything: a level without layers, or a layer
@@ -475,7 +490,8 @@ static void render_sky(EditorState *es) {
  */
 #define PREVIEW_FOG_W     (GAME_W * 2)
 #define PREVIEW_FOG_ALPHA 120
-static void render_fog(EditorState *es) {
+static void render_fog(EditorState *es)
+{
     int fogs = es->level.fog_layer_count;
     if (fogs > MAX_FOG_TEXTURES) fogs = MAX_FOG_TEXTURES;
     for (int i = 0; i < fogs; i++) {
@@ -497,7 +513,8 @@ static void render_fog(EditorState *es) {
  * right of its last screen and below its height, so the level's edges
  * read at a glance at any zoom.
  */
-static void render_outside_world(EditorState *es) {
+static void render_outside_world(EditorState *es)
+{
     const Color shade = {0, 0, 0, 110};
     int left = w2s_x(es, 0.0f);
     int right = w2s_x(es, editor_world_width(&es->level));
@@ -523,7 +540,8 @@ static void render_outside_world(EditorState *es) {
  *
  * If the platform texture is unavailable, fall back to a solid brown rect.
  */
-static void render_platforms(EditorState *es) {
+static void render_platforms(EditorState *es)
+{
     const int P = TILE_SIZE / 3;  /* 9-slice piece size: 16 px */
 
     for (int i = 0; i < es->level.platform_count; i++) {
@@ -597,7 +615,8 @@ static void render_platforms(EditorState *es) {
  *   - Pieces inside sea gaps are skipped.
  *   - Pieces at gap boundaries use edge-cap columns for clean edges.
  */
-static void render_floor(EditorState *es) {
+static void render_floor(EditorState *es)
+{
     const int P = TILE_SIZE / 3;  /* 9-slice piece size: 16 px */
     const int world_w = EDITOR_WORLD_W(es);
 
@@ -684,7 +703,8 @@ static void render_floor(EditorState *es) {
  * canvas does not need animated water frames — just a clear visual indicator
  * that water exists in this gap.
  */
-static void render_water(EditorState *es) {
+static void render_water(EditorState *es)
+{
 
     for (int g = 0; g < es->level.floor_gap_count; g++) {
         float gx = (float)es->level.floor_gaps[g];
@@ -710,7 +730,8 @@ static void render_water(EditorState *es) {
  *   rail.w * 16 pixels.
  * Both use green (#00AA00) with 2-pixel width for visibility.
  */
-static void render_rails(EditorState *es) {
+static void render_rails(EditorState *es)
+{
 
     for (int i = 0; i < es->level.rail_count; i++) {
         const RailPlacement *rp = &es->level.rails[i];
@@ -794,7 +815,8 @@ static void render_rails(EditorState *es) {
  * placement coordinates (which are set to the rail origin in the level
  * definition for v1 of the editor).
  */
-static void render_float_platforms(EditorState *es) {
+static void render_float_platforms(EditorState *es)
+{
     /*
      * Build rail paths from placements so RAIL-mode float platforms
      * can be positioned at their actual rail coordinates instead of (0,0).
@@ -858,7 +880,8 @@ static void render_float_platforms(EditorState *es) {
  * Each spike row sits at y = FLOOR_Y - SPIKE_TILE_H = 236, and is
  * count x SPIKE_TILE_W (16) pixels wide.  Each tile is 16x16.
  */
-static void render_spike_rows(EditorState *es) {
+static void render_spike_rows(EditorState *es)
+{
     float spike_y = (float)(FLOOR_Y - SPIKE_TILE_H);
 
     for (int i = 0; i < es->level.spike_row_count; i++) {
@@ -881,7 +904,8 @@ static void render_spike_rows(EditorState *es) {
  * Source rect crops to rows SPIKE_PLAT_SRC_Y..+SPIKE_PLAT_SRC_H
  * for the visible art content.
  */
-static void render_spike_platforms(EditorState *es) {
+static void render_spike_platforms(EditorState *es)
+{
     for (int i = 0; i < es->level.spike_platform_count; i++) {
         const SpikePlatformPlacement *sp = &es->level.spike_platforms[i];
 
@@ -911,7 +935,8 @@ static void render_spike_platforms(EditorState *es) {
  *
  * Each bridge is brick_count x BRIDGE_TILE_W pixels wide, each tile 16x16.
  */
-static void render_bridges(EditorState *es) {
+static void render_bridges(EditorState *es)
+{
     for (int i = 0; i < es->level.bridge_count; i++) {
         const BridgePlacement *br = &es->level.bridges[i];
 
@@ -934,7 +959,8 @@ static void render_bridges(EditorState *es) {
  * Frame 2 (x = 96) is the idle/compressed state shown in the editor.
  * y = FLOOR_Y - BOUNCEPAD_SRC_H = 252 - 18 = 234.
  */
-static void render_bouncepads(EditorState *es) {
+static void render_bouncepads(EditorState *es)
+{
     float bp_y = (float)(FLOOR_Y - BOUNCEPAD_SRC_H);
 
     /* Source rect for frame 2 (idle): x = 2 * BOUNCEPAD_W = 96 */
@@ -971,7 +997,8 @@ static void render_bouncepads(EditorState *es) {
  * VINE_W x VINE_H and stacked with VINE_STEP vertical spacing.
  * Source rect crops to (0, VINE_SRC_Y, VINE_W, VINE_SRC_H).
  */
-static void render_vines(EditorState *es) {
+static void render_vines(EditorState *es)
+{
     IntRect src = { 0, VINE_SRC_Y, VINE_W, VINE_SRC_H };
 
     for (int i = 0; i < es->level.vine_count; i++) {
@@ -999,7 +1026,8 @@ static void render_vines(EditorState *es) {
  * LADDER_W x LADDER_H and stacked with LADDER_STEP vertical spacing.
  * Source rect crops to (0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H).
  */
-static void render_ladders(EditorState *es) {
+static void render_ladders(EditorState *es)
+{
     IntRect src = { 0, LADDER_SRC_Y, LADDER_W, LADDER_SRC_H };
 
     for (int i = 0; i < es->level.ladder_count; i++) {
@@ -1022,7 +1050,8 @@ static void render_ladders(EditorState *es) {
  * ROPE_W x ROPE_H and stacked with ROPE_STEP vertical spacing.
  * Source rect crops to (ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H).
  */
-static void render_ropes(EditorState *es) {
+static void render_ropes(EditorState *es)
+{
     IntRect src = { ROPE_SRC_X, ROPE_SRC_Y, ROPE_SRC_W, ROPE_SRC_H };
 
     for (int i = 0; i < es->level.rope_count; i++) {
@@ -1048,7 +1077,8 @@ static void render_ropes(EditorState *es) {
  * the same row).  A spike block whose rail is missing has no bounds and
  * is skipped.
  */
-static void render_sprites(EditorState *es, const EntityType *types, int count) {
+static void render_sprites(EditorState *es, const EntityType *types, int count)
+{
     for (int t = 0; t < count; t++) {
         EntityType type = types[t];
         const EditorEntityPreview *preview = editor_entity_preview(type);
@@ -1120,7 +1150,8 @@ static void render_checkpoints(EditorState *es)
  * The rectangle comes from editor_entity_bounds, the same box a click
  * tests against, so the outline always shows the clickable area.
  */
-static void render_selection(EditorState *es) {
+static void render_selection(EditorState *es)
+{
     EditorRect r;
 
     static Selection items[EDITOR_MAX_SELECTION];
@@ -1260,7 +1291,8 @@ static void render_handles(EditorState *es)
  * of the selected palette entity at the current cursor position.  This gives
  * immediate visual feedback before committing the placement.
  */
-static void render_ghost(EditorState *es) {
+static void render_ghost(EditorState *es)
+{
     if (es->tool != TOOL_PLACE) return;
     if (!canvas_contains(es->mouse_x, es->mouse_y)) return;
 
@@ -1331,7 +1363,8 @@ static void render_ghost(EditorState *es) {
 /* The part of the canvas the level covers, in screen pixels: lines drawn
  * over the level stop at its edges instead of crossing the darkened space
  * around it. */
-static void level_screen_rect(const EditorState *es, int *x0, int *y0, int *x1, int *y1) {
+static void level_screen_rect(const EditorState *es, int *x0, int *y0, int *x1, int *y1)
+{
     *x0 = w2s_x(es, 0.0f);
     *x1 = w2s_x(es, (float)EDITOR_WORLD_W(es));
     *y0 = w2s_y(es, 0.0f);
@@ -1342,7 +1375,8 @@ static void level_screen_rect(const EditorState *es, int *x0, int *y0, int *x1, 
     if (*y1 > TOOLBAR_H + CANVAS_H) *y1 = TOOLBAR_H + CANVAS_H;
 }
 
-static void render_grid(EditorState *es) {
+static void render_grid(EditorState *es)
+{
     /* ---- TILE_SIZE grid, inside the level ---- */
     Color grid = {0x40,0x40,0x40,0x40};
     int x0, y0, x1, y1;
@@ -1378,7 +1412,8 @@ static void render_grid(EditorState *es) {
  * level's height and its number at the top, as the game counts them.
  * Drawn with the grid on or off, so the screen in view can always be read.
  */
-static void render_screens(EditorState *es) {
+static void render_screens(EditorState *es)
+{
     int x0, y0, x1, y1;
     level_screen_rect(es, &x0, &y0, &x1, &y1);
     if (y1 <= y0) return;

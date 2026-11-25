@@ -22,7 +22,8 @@
 void float_platform_init(FloatPlatform *fp, FloatPlatformMode mode,
                          float x, float y, int w_tiles,
                          float stand_limit,
-                         const Rail *rail, float t, float speed) {
+                         const Rail *rail, float t, float speed)
+{
     fp->mode   = mode;
     fp->w      = w_tiles * FLOAT_PLATFORM_PIECE_W;
     fp->h      = FLOAT_PLATFORM_H;
@@ -130,7 +131,8 @@ static void float_platform_update_rail(FloatPlatform *fp, float dt)
     fp->y = cy - fp->h * 0.5f;
 }
 
-void float_platform_update(FloatPlatform *fp, float dt, int player_on_top) {
+void float_platform_update(FloatPlatform *fp, float dt, int player_on_top)
+{
     if (!fp->active) return;
 
     /*
@@ -189,7 +191,8 @@ void float_platform_update(FloatPlatform *fp, float dt, int player_on_top) {
 /* ------------------------------------------------------------------ */
 
 void float_platforms_update(FloatPlatform *fps, int count,
-                            float dt, int landed_idx) {
+                            float dt, int landed_idx)
+{
     for (int i = 0; i < count; i++) {
         int on_top = (i == landed_idx) ? 1 : 0;
         float_platform_update(&fps[i], dt, on_top);
@@ -210,7 +213,8 @@ void float_platforms_update(FloatPlatform *fps, int count,
  * the leftmost, rightmost, and all interior tiles.
  */
 void float_platform_render(const FloatPlatform *fp,
-                           Texture2D *tex, int cam_x) {
+                           Texture2D *tex, int cam_x)
+{
     if (!fp->active || !tex) return;
 
     int n_pieces = fp->w / FLOAT_PLATFORM_PIECE_W;   /* total horizontal pieces */
@@ -241,7 +245,8 @@ void float_platform_render(const FloatPlatform *fp,
 /* ------------------------------------------------------------------ */
 
 void float_platforms_render(const FloatPlatform *fps, int count,
-                            Texture2D *tex, int cam_x) {
+                            Texture2D *tex, int cam_x)
+{
     for (int i = 0; i < count; i++)
         float_platform_render(&fps[i], tex, cam_x);
 }
@@ -252,7 +257,8 @@ void float_platforms_render(const FloatPlatform *fps, int count,
  * float_platform_get_rect — Return the world-space bounding rectangle.
  * Used by the debug overlay to draw collision boxes.
  */
-IntRect float_platform_get_rect(const FloatPlatform *fp) {
+IntRect float_platform_get_rect(const FloatPlatform *fp)
+{
     IntRect r = { (int)fp->x, (int)fp->y, fp->w, fp->h };
     return r;
 }

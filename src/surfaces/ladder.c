@@ -19,7 +19,8 @@
  * (LADDER_STEP = 46) for seamless stacking.
  */
 void ladders_render(const LadderDecor *ladders, int count,
-                    Texture2D *tex, int cam_x) {
+                    Texture2D *tex, int cam_x)
+{
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {

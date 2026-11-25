@@ -24,7 +24,8 @@
  * Spin advances every frame regardless of movement, wrapping within
  * [0, 360) to avoid float drift.
  */
-void circular_saws_update(CircularSaw *saws, int count, float dt) {
+void circular_saws_update(CircularSaw *saws, int count, float dt)
+{
     for (int i = 0; i < count; i++) {
         CircularSaw *s = &saws[i];
         if (!s->active) continue;
@@ -58,7 +59,8 @@ void circular_saws_update(CircularSaw *saws, int count, float dt) {
  * which is natural for a circular saw blade.
  */
 void circular_saws_render(const CircularSaw *saws, int count,
-                          Texture2D *tex, int cam_x) {
+                          Texture2D *tex, int cam_x)
+{
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -98,7 +100,8 @@ void circular_saws_render(const CircularSaw *saws, int count,
  * This makes collisions feel fair — the player must overlap the actual
  * blade, not just the bounding square.
  */
-IntRect circular_saw_get_hitbox(const CircularSaw *saw) {
+IntRect circular_saw_get_hitbox(const CircularSaw *saw)
+{
     IntRect r = {
         .x = (int)saw->x + 4,
         .y = (int)saw->y + 4,

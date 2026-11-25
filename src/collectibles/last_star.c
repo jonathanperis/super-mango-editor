@@ -19,7 +19,8 @@
  * Uses the full Stars_Ui.png texture (single 16×16 frame).
  */
 void last_star_render(const LastStar *star,
-                      Texture2D *tex, int cam_x) {
+                      Texture2D *tex, int cam_x)
+{
     if (!star->active || !tex) return;
 
     /* Off-screen culling */
@@ -38,7 +39,8 @@ void last_star_render(const LastStar *star,
 
 /* ------------------------------------------------------------------ */
 
-IntRect last_star_get_hitbox(const LastStar *star) {
+IntRect last_star_get_hitbox(const LastStar *star)
+{
     /*
      * Inset the hitbox by 2 px on each side so the player must visually
      * overlap the star's core, not just graze the edge.

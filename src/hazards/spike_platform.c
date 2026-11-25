@@ -24,7 +24,8 @@
  */
 void spike_platforms_render(const SpikePlatform *sps, int count,
                             Texture2D *tex,
-                            int cam_x) {
+                            int cam_x)
+{
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -62,7 +63,8 @@ void spike_platforms_render(const SpikePlatform *sps, int count,
  * extension, the strict rectangle overlap test would miss
  * the edge-aligned case and no damage would ever trigger.
  */
-IntRect spike_platform_get_rect(const SpikePlatform *sp) {
+IntRect spike_platform_get_rect(const SpikePlatform *sp)
+{
     /*
      * The hitbox matches the cropped content (11 px tall) plus a 2 px
      * upward extension so a player standing on top still registers overlap.

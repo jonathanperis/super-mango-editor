@@ -4,7 +4,8 @@
 
 #include "player_motion.h"
 
-void player_apply_horizontal_motion(Player *player, float dt, int was_on_ground) {
+void player_apply_horizontal_motion(Player *player, float dt, int was_on_ground)
+{
     /*
      * air_is_running — "snapshot" of is_running taken while on the ground.
      *

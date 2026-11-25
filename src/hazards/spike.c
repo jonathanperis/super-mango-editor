@@ -21,7 +21,8 @@
  * independently at sequential x positions, sharing the same texture.
  */
 void spike_rows_render(const SpikeRow *rows, int count,
-                       Texture2D *tex, int cam_x) {
+                       Texture2D *tex, int cam_x)
+{
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -56,7 +57,8 @@ void spike_rows_render(const SpikeRow *rows, int count,
 /*
  * spike_row_get_rect — Return the full bounding rect of the row.
  */
-IntRect spike_row_get_rect(const SpikeRow *row) {
+IntRect spike_row_get_rect(const SpikeRow *row)
+{
     IntRect r = {
         .x = (int)row->x,
         .y = (int)row->y,
@@ -73,7 +75,8 @@ IntRect spike_row_get_rect(const SpikeRow *row) {
  *
  * Uses a simple AABB overlap against the full row bounding rectangle.
  */
-int spike_row_hit_test(const SpikeRow *row, const IntRect *prect) {
+int spike_row_hit_test(const SpikeRow *row, const IntRect *prect)
+{
     if (!row->active) return 0;
     IntRect rr = spike_row_get_rect(row);
     return rect_intersects(prect, &rr);

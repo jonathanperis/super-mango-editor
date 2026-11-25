@@ -66,7 +66,8 @@
  * rand_range — return a pseudo-random float in [lo, hi].
  * Used to stagger fish jump timers so they don't all leap simultaneously.
  */
-static float rand_range(float lo, float hi) {
+static float rand_range(float lo, float hi)
+{
     return lo + game_random_unit() * (hi - lo);
 }
 

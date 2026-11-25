@@ -37,7 +37,8 @@ static const int ANIM_FIRST_FRAME[5] = { 0,   4,   8,   12,  16  };
  * should be playing, then advances the frame timer.  On state transitions the
  * frame index is reset to 0 so animations always start from the beginning.
  */
-void player_animate(Player *player, float dt_ms) {
+void player_animate(Player *player, float dt_ms)
+{
     /* Determine the target animation from current physics state */
     AnimState target;
     if (player->on_vine) {

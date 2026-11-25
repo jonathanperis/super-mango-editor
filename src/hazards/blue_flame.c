@@ -28,7 +28,8 @@
  *   FLIPPING → rotation complete  → FALLING  (angle locked at 180°)
  *   FALLING  → y reaches start_y  → WAITING  (reset angle, restart timer)
  */
-void blue_flames_update(BlueFlame *blue_flames, int count, float dt) {
+void blue_flames_update(BlueFlame *blue_flames, int count, float dt)
+{
     for (int i = 0; i < count; i++) {
         BlueFlame *f = &blue_flames[i];
         if (!f->active) continue;
@@ -119,7 +120,8 @@ void blue_flames_update(BlueFlame *blue_flames, int count, float dt) {
  * Rotation around the sprite's centre creates a smooth flip at the apex.
  */
 void blue_flames_render(const BlueFlame *blue_flames, int count,
-                        Texture2D *tex, int cam_x) {
+                        Texture2D *tex, int cam_x)
+{
     if (!tex) return;
 
     for (int i = 0; i < count; i++) {
@@ -169,7 +171,8 @@ void blue_flames_render(const BlueFlame *blue_flames, int count,
  * The hitbox is inset to match the visible blue flame
  * area (the outer pixels are mostly glow/transparent).
  */
-IntRect blue_flame_get_hitbox(const BlueFlame *blue_flame) {
+IntRect blue_flame_get_hitbox(const BlueFlame *blue_flame)
+{
     /*
      * Content occupies x=17..30, y=17..31 within the 48×48 frame
      * (14×15 px art).  Inset the hitbox to match the visible blue flame core.

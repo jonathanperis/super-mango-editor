@@ -17,7 +17,8 @@
  * The grab zone is wider than the 16 px visual sprite (padded by
  * PLAYER_CLIMB_GRAB_PAD on each side) and spans the full vine height.
  */
-IntRect player_vine_grab_rect(const VineDecor *v) {
+IntRect player_vine_grab_rect(const VineDecor *v)
+{
     int vine_total_h = (v->tile_count - 1) * VINE_STEP + VINE_H;
     return (IntRect){
         (int)v->x - PLAYER_CLIMB_GRAB_PAD,
@@ -34,7 +35,8 @@ IntRect player_vine_grab_rect(const VineDecor *v) {
  * horizontal forgiveness matches vines so grabbing either climbable feels the
  * same to the player.
  */
-IntRect player_ladder_grab_rect(const LadderDecor *ld) {
+IntRect player_ladder_grab_rect(const LadderDecor *ld)
+{
     int total_h = (ld->tile_count - 1) * LADDER_STEP + LADDER_H;
     return (IntRect){
         (int)ld->x - PLAYER_CLIMB_GRAB_PAD,
@@ -50,7 +52,8 @@ IntRect player_ladder_grab_rect(const LadderDecor *ld) {
  * Ropes share the same forgiving horizontal pad as vines and ladders while
  * using rope-specific tile spacing to cover the full climbable height.
  */
-IntRect player_rope_grab_rect(const RopeDecor *rp) {
+IntRect player_rope_grab_rect(const RopeDecor *rp)
+{
     int total_h = (rp->tile_count - 1) * ROPE_STEP + ROPE_H;
     return (IntRect){
         (int)rp->x - PLAYER_CLIMB_GRAB_PAD,
@@ -63,7 +66,8 @@ IntRect player_rope_grab_rect(const RopeDecor *rp) {
 int player_try_grab_climbable(Player *player,
                               const VineDecor *vines, int vine_count,
                               const LadderDecor *ladders, int ladder_count,
-                              const RopeDecor *ropes, int rope_count) {
+                              const RopeDecor *ropes, int rope_count)
+{
     IntRect phit = player_get_hitbox(player);
     int grabbed = 0;
 
@@ -121,7 +125,8 @@ void player_climb_get_bounds(const Player *player,
                              const LadderDecor *ladders,
                              const RopeDecor *ropes,
                              IntRect *out_grab, float *out_top,
-                             float *out_bottom) {
+                             float *out_bottom)
+{
     IntRect grab = {0, 0, 0, 0};
     float top = 0.0f, bot = 0.0f;
     int idx = player->vine_index;
@@ -152,7 +157,8 @@ int player_update_climbing(Player *player, float dt,
                            const VineDecor *vines,
                            const LadderDecor *ladders,
                            const RopeDecor *ropes,
-                           int world_w) {
+                           int world_w)
+{
     if (!player->on_vine) {
         return 0;
     }

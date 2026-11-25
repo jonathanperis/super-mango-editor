@@ -40,7 +40,8 @@
 void player_handle_input(Player *player, SoundEffect *snd_jump,
                          unsigned int replay_input_mask,
                          unsigned int physical_input_mask,
-                         const PlayerSurfaces *surfaces) {
+                         const PlayerSurfaces *surfaces)
+{
     const int replay_left = (replay_input_mask & PLAYER_INPUT_LEFT) != 0;
     const int replay_right = (replay_input_mask & PLAYER_INPUT_RIGHT) != 0;
     const int replay_up = (replay_input_mask & PLAYER_INPUT_UP) != 0;
