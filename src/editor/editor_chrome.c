@@ -190,7 +190,7 @@ void editor_render_status_bar(EditorState *es)
     ui_panel(&es->ui, 0, bar_y, EDITOR_W, STATUS_H);
 
     float wx, wy;
-    canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &wx, &wy);
+    canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &wx, &wy);
 
     char mouse_text[64];
     snprintf(mouse_text, sizeof(mouse_text), "Mouse: (%.0f, %.0f)", wx, wy);

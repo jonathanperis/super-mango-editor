@@ -163,7 +163,7 @@ static int patrol_handles_move_the_range_ends(void)
     key_frame(&es, KEY_F1, 0);
     CHECK(!es.shortcut_sheet_open);
     release_at(&es, sx + 60, sy);
-    CHECK(!es.resizing && !es.dragging && !es.mouse_down);
+    CHECK(!es.resizing && !es.dragging && !es.mouse.down);
     CHECK(es.undo->top == undo_top + 1 && es.modified && level_is_valid(&es));
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(spider->patrol_x1 == 400.0f && es.undo->top == undo_top);

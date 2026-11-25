@@ -1100,7 +1100,7 @@ static void render_checkpoints(EditorState *es)
 {
     /* Where the pointer is in the world: the same for every checkpoint. */
     float cursor_x, cursor_y;
-    canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &cursor_x, &cursor_y);
+    canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &cursor_x, &cursor_y);
 
     for (int i = 0; i < es->level.checkpoint_count; i++) {
         const CheckpointPlacement *cp = &es->level.checkpoints[i];
@@ -1267,9 +1267,9 @@ static void render_handles(EditorState *es)
     if (!editor_handles_shown(es)) return;
     count = editor_entity_handles(&es->level, es->selection.type,
                                   es->selection.index, handles);
-    canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &cursor_x, &cursor_y);
+    canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &cursor_x, &cursor_y);
     if (es->resizing) hot = (EditorHandleKind)es->resize_handle;
-    else if (canvas_contains(es->mouse_x, es->mouse_y))
+    else if (canvas_contains(es->mouse.x, es->mouse.y))
         hot = editor_handle_at(es, cursor_x, cursor_y);
 
     for (int i = 0; i < count; i++) {
@@ -1294,12 +1294,12 @@ static void render_handles(EditorState *es)
 static void render_ghost(EditorState *es)
 {
     if (es->tool != TOOL_PLACE) return;
-    if (!canvas_contains(es->mouse_x, es->mouse_y)) return;
+    if (!canvas_contains(es->mouse.x, es->mouse.y)) return;
 
     /* Convert cursor position to world coordinates, then onto the grid
      * when a click here would snap (WYSIWYG: the ghost shows the spot). */
     float wx, wy;
-    canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &wx, &wy);
+    canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &wx, &wy);
     editor_snap_point(es, &wx, &wy);
 
     /*

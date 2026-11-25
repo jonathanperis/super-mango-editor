@@ -94,9 +94,9 @@ int editor_playtest_start_here(EditorState *es, LevelStart *start)
     if (editor_selection_count(es) == 1 && es->selection.type == ENT_CHECKPOINT) {
         start->kind = LEVEL_START_AT_CHECKPOINT;
         start->checkpoint = es->selection.index;
-    } else if (canvas_contains(es->mouse_x, es->mouse_y)) {
+    } else if (canvas_contains(es->mouse.x, es->mouse.y)) {
         float world_x, world_y;
-        canvas_screen_to_world(es, es->mouse_x, es->mouse_y, &world_x, &world_y);
+        canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &world_x, &world_y);
         start->kind = LEVEL_START_AT_X;
         /* Whole pixels, as the game's flag takes them. */
         start->x = (float)(int)(world_x + 0.5f);

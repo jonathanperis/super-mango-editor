@@ -192,9 +192,9 @@ static void ui_frame(EditorState *es, int mx, int my)
     ui_begin_frame(&es->ui);
     while (input_poll(&event)) editor_handle_event(es, &event);
     editor_handle_dropped_files(es);
-    es->mouse_x = es->ui.mouse_x = mx;
-    es->mouse_y = es->ui.mouse_y = my;
-    es->ui.mouse_down = es->mouse_down;
+    es->mouse.x = es->ui.mouse_x = mx;
+    es->mouse.y = es->ui.mouse_y = my;
+    es->ui.mouse_down = es->mouse.down;
     if (es->playing) editor_check_play_status(es);
     /* Like editor_run_frame, revalidate (which also checks asset files on
      * disk) only when the document changed. */

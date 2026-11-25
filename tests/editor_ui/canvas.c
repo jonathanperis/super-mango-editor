@@ -179,7 +179,7 @@ static int f1_sheet_lists_the_shortcuts(void)
     es.palette_type = ENT_COIN;
     key_frame(&es, KEY_F1, 0);
     click_frame(&es, 300, 300);
-    CHECK(!es.shortcut_sheet_open && es.level.coin_count == 0 && !es.mouse_down);
+    CHECK(!es.shortcut_sheet_open && es.level.coin_count == 0 && !es.mouse.down);
     click_frame(&es, 300, 300);
     CHECK(es.level.coin_count == 1);
     /* Once closed, F1 and Esc are ordinary keys again: Esc leaves Place. */

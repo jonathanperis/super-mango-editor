@@ -567,7 +567,7 @@ static void editor_plain_key(EditorState *es, int key, int shift)
         break;
     case KEY_SPACE:
         /* Held, a left drag on the canvas slides the view (see below). */
-        es->space_held = 1;
+        es->mouse.space_held = 1;
         break;
     case KEY_S:
         if (editor_finish_field_edit(es)) {
@@ -726,17 +726,17 @@ static void editor_mouse_down(EditorState *es, const InputEvent *event, float wx
         }
         /* While a pan runs the pointer belongs to it: a left press
          * neither takes the pan over nor reaches the tools. */
-        if (es->panning) return;
+        if (es->mouse.panning) return;
         /* Space+drag slides the view instead of using the tool. */
-        if (es->space_held && !es->campaign && canvas_contains(event->x, event->y) &&
+        if (es->mouse.space_held && !es->campaign && canvas_contains(event->x, event->y) &&
             es->ui.active_id == 0) {
-            es->panning = 1;
-            es->pan_button = MOUSE_BUTTON_LEFT;
-            es->pan_x = event->x;
-            es->pan_y = event->y;
+            es->mouse.panning = 1;
+            es->mouse.pan_button = MOUSE_BUTTON_LEFT;
+            es->mouse.pan_x = event->x;
+            es->mouse.pan_y = event->y;
             return;
         }
-        es->mouse_down = 1;
+        es->mouse.down = 1;
         es->focus_area = canvas_contains(event->x, event->y) && !es->campaign
                        ? EDITOR_FOCUS_CANVAS : EDITOR_FOCUS_PANEL;
         /* Over the Campaign view the canvas tools are asleep; its
@@ -747,15 +747,15 @@ static void editor_mouse_down(EditorState *es, const InputEvent *event, float wx
     } else if (event->button == MOUSE_BUTTON_MIDDLE) {
         /* Middle-drag slides the view, in any tool (not in the middle
          * of a left-button drag, which owns the pointer). */
-        if (!es->campaign && !es->mouse_down && !es->panning &&
+        if (!es->campaign && !es->mouse.down && !es->mouse.panning &&
             canvas_contains(event->x, event->y)) {
-            es->panning = 1;
-            es->pan_button = MOUSE_BUTTON_MIDDLE;
-            es->pan_x = event->x;
-            es->pan_y = event->y;
+            es->mouse.panning = 1;
+            es->mouse.pan_button = MOUSE_BUTTON_MIDDLE;
+            es->mouse.pan_x = event->x;
+            es->mouse.pan_y = event->y;
         }
     } else if (event->button == MOUSE_BUTTON_RIGHT) {
-        es->mouse_right_down = 1;
+        es->mouse.right_down = 1;
         /* Right-click deletes. During a left-button drag that would shift
          * the array under drag_index, so the drag would then overwrite a
          * different entity. Finish (release) the drag first. A row being
@@ -776,31 +776,31 @@ static void editor_mouse_up(EditorState *es, const InputEvent *event, float wx, 
 {
     /* Only the button that started the pan ends it; another button's
      * release goes on to the tools as usual. */
-    if (es->panning && event->button == es->pan_button) {
-        es->panning = 0;
+    if (es->mouse.panning && event->button == es->mouse.pan_button) {
+        es->mouse.panning = 0;
         return;
     }
     if (event->button == MOUSE_BUTTON_LEFT) {
-        es->mouse_down = 0;
+        es->mouse.down = 0;
         tools_mouse_up(es, wx, wy);
     }
-    else if (event->button == MOUSE_BUTTON_RIGHT) es->mouse_right_down = 0;
+    else if (event->button == MOUSE_BUTTON_RIGHT) es->mouse.right_down = 0;
 }
 
 /* Pointer motion: slides the view during a pan, else drags with the tool. */
 static void editor_mouse_move(EditorState *es, const InputEvent *event, float wx, float wy)
 {
-    if (es->panning) {
+    if (es->mouse.panning) {
         /* The level follows the pointer: the view moves the other way. */
         float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
-        es->camera.x -= (float)(event->x - es->pan_x) / zoom;
-        es->camera.y -= (float)(event->y - es->pan_y) / zoom;
-        es->pan_x = event->x;
-        es->pan_y = event->y;
+        es->camera.x -= (float)(event->x - es->mouse.pan_x) / zoom;
+        es->camera.y -= (float)(event->y - es->mouse.pan_y) / zoom;
+        es->mouse.pan_x = event->x;
+        es->mouse.pan_y = event->y;
         canvas_clamp_camera(es);
         return;
     }
-    if (es->mouse_down) tools_mouse_drag(es,wx,wy);
+    if (es->mouse.down) tools_mouse_drag(es,wx,wy);
 }
 
 void editor_handle_event(EditorState *es, const InputEvent *event)
@@ -819,8 +819,8 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
     /* A release always ends a pan, even when an overlay below (a running
      * playtest, the F1 list) takes the event: otherwise Space or a pan
      * started before it would stay armed afterwards. */
-    if (event->type == INPUT_KEY_UP && event->key == KEY_SPACE) es->space_held = 0;
-    if (event->type == INPUT_MOUSE_UP && (es->playing || es->shortcut_sheet_open)) es->panning = 0;
+    if (event->type == INPUT_KEY_UP && event->key == KEY_SPACE) es->mouse.space_held = 0;
+    if (event->type == INPUT_MOUSE_UP && (es->playing || es->shortcut_sheet_open)) es->mouse.panning = 0;
 
     /*
      * While a playtest runs the editor shows only the "Playing" overlay and
@@ -832,8 +832,8 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         if (event->type == INPUT_MOUSE_DOWN && event->button == MOUSE_BUTTON_LEFT) {
             es->ui.mouse_clicked = 1;
         } else if (event->type == INPUT_MOUSE_UP) {
-            es->mouse_down = 0;  /* a press that started the playtest ends */
-            es->mouse_right_down = 0;
+            es->mouse.down = 0;  /* a press that started the playtest ends */
+            es->mouse.right_down = 0;
         } else if (event->type == INPUT_KEY_DOWN) {
             editor_set_status(es, "Playtest running: click Stop or close the game window to edit");
         }
@@ -860,7 +860,7 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         editor_key(es, event);
         break;
     case INPUT_KEY_UP:
-        if (event->key == KEY_SPACE) es->space_held = 0;
+        if (event->key == KEY_SPACE) es->mouse.space_held = 0;
         break;
     case INPUT_TEXT:
         ui_queue_text_input(&es->ui, event->text);
