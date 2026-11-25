@@ -23,10 +23,10 @@
 void editor_update_cursor(EditorState *es)
 {
     /* Moving entities: the four-way arrows, whatever is under them. */
-    if (es->drag.active && !es->playing) ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
+    if (es->drag.active && !es->playtest.running) ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
     /* A resize handle, grabbed or under the pointer: arrows along the way
      * it moves (a rail's corner moves both ways). */
-    if (!es->playing) {
+    if (!es->playtest.running) {
         float world_x, world_y;
         EditorHandleKind handle = EDITOR_HANDLE_NONE;
         canvas_screen_to_world(es, es->mouse.x, es->mouse.y, &world_x, &world_y);
@@ -42,7 +42,7 @@ void editor_update_cursor(EditorState *es)
     }
     /* Sliding the view, or ready to (Space over the canvas): the same. */
     if ((es->mouse.panning || (es->mouse.space_held && canvas_contains(es->mouse.x, es->mouse.y))) &&
-        !es->playing)
+        !es->playtest.running)
         ui_set_cursor(&es->ui, MOUSE_CURSOR_RESIZE_ALL);
     ui_apply_cursor(&es->ui);
 }
@@ -73,9 +73,9 @@ void editor_run_frame(EditorState *es)
     es->mouse.y = es->ui.mouse_y = (int)mouse.y;
     /* Held after this frame's events: a text field drags out a selection. */
     es->ui.mouse_down = es->mouse.down;
-    if (es->playing
+    if (es->playtest.running
 #ifndef _WIN32
-        || es->play_pid > 0
+        || es->playtest.pid > 0
 #endif
     )
         editor_check_play_status(es);
@@ -106,7 +106,7 @@ void editor_run_frame(EditorState *es)
     BeginTextureMode(es->frame_target);
     es->drawing_target = &es->frame_target;   /* a prompt may leave and return */
     ClearBackground((Color){0x1a, 0x1a, 0x1a, 255});
-    if (es->playing)
+    if (es->playtest.running)
         editor_render_play_overlay(es);
     else {
         canvas_render(es);

@@ -10,7 +10,7 @@ static int playtest_blocks_editing_and_stop_cleans_up(void)
     es.undo = undo_create();
     if (!es.undo) return 1;
     es.camera.zoom = 1.0f;
-    es.playing = 1;
+    es.playtest.running = 1;
 
     /* Canvas clicks and shortcuts do not edit while the game runs. */
     es.tool = TOOL_PLACE;
@@ -61,11 +61,11 @@ static int playtest_blocks_editing_and_stop_cleans_up(void)
         if (read(ready[0], &byte, 1) != 1) byte = 0;
         close(ready[0]);
 
-        es.play_pid = (int)pid;
+        es.playtest.pid = (int)pid;
         strncpy(es.playtest_path, level_path, sizeof(es.playtest_path) - 1);
         editor_stop_play(&es);
-        if (expect_int("stop clears playing", es.playing, 0) != 0 ||
-            expect_int("stop clears pid", es.play_pid, 0) != 0 ||
+        if (expect_int("stop clears playing", es.playtest.running, 0) != 0 ||
+            expect_int("stop clears pid", es.playtest.pid, 0) != 0 ||
             expect_int("child reaped", waitpid(pid, NULL, WNOHANG) == -1 &&
                        errno == ECHILD, 1) != 0 ||
             expect_int("playtest file removed", editor_file_exists(level_path), 0) != 0) {

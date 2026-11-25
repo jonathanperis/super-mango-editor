@@ -138,7 +138,7 @@ static int path_is_toml(const char *path)
  * exactly one .toml file. */
 static void open_dropped_level(EditorState *es, const char *path)
 {
-    if (es->playing) {
+    if (es->playtest.running) {
         editor_set_status(es, "Playtest running: click Stop or close the game window to edit");
         return;
     }
@@ -820,7 +820,7 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
      * playtest, the F1 list) takes the event: otherwise Space or a pan
      * started before it would stay armed afterwards. */
     if (event->type == INPUT_KEY_UP && event->key == KEY_SPACE) es->mouse.space_held = 0;
-    if (event->type == INPUT_MOUSE_UP && (es->playing || es->shortcut_sheet_open)) es->mouse.panning = 0;
+    if (event->type == INPUT_MOUSE_UP && (es->playtest.running || es->shortcut_sheet_open)) es->mouse.panning = 0;
 
     /*
      * While a playtest runs the editor shows only the "Playing" overlay and
@@ -828,7 +828,7 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
      * a document the designer cannot see, so input is limited to quitting
      * and the overlay's Stop button (which reads ui.mouse_clicked).
      */
-    if (es->playing && event->type != INPUT_QUIT) {
+    if (es->playtest.running && event->type != INPUT_QUIT) {
         if (event->type == INPUT_MOUSE_DOWN && event->button == MOUSE_BUTTON_LEFT) {
             es->ui.mouse_clicked = 1;
         } else if (event->type == INPUT_MOUSE_UP) {
@@ -851,7 +851,7 @@ void editor_handle_event(EditorState *es, const InputEvent *event)
         if (editor_campaign_close(es, 0) &&
             editor_confirm_discard_changes(es, "quit")) {
             editor_retire_current_recovery(es);
-            if (es->playing) editor_stop_play(es);
+            if (es->playtest.running) editor_stop_play(es);
             es->running = 0;
         }
         es->quitting = 0;

@@ -136,10 +136,10 @@ static int dropped_level_opens_like_a_recent_file(void)
     CHECK(es.campaign == NULL && document_is(&es, "levels/d.toml"));
 
     /* A playtest owns the editor until it ends. */
-    es.playing = 1;
+    es.playtest.running = 1;
     editor_test_drop_files(one, 1);
     editor_handle_dropped_files(&es);
-    es.playing = 0;
+    es.playtest.running = 0;
     CHECK(document_is(&es, "levels/d.toml"));
     CHECK(strstr(es.status_message, "Playtest running") != NULL);
 done:
