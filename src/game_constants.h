@@ -83,6 +83,25 @@
 #define FLOOR_PIECE_W       (TILE_SIZE / 3)
 #define MAX_CHECKPOINTS     99
 #define MAX_LEVEL_SCREENS   99
+
+/*
+ * Hearts and lives.
+ *
+ * MAX_HEARTS    — hit points a full player has; a level may start the
+ *                 player with 1..MAX_HEARTS (initial_hearts).
+ * DEFAULT_LIVES — lives a player starts with when the level leaves
+ *                 initial_lives at 0.
+ * MAX_LIVES     — the most lives a level may start the player with
+ *                 (initial_lives: the editor field, the level validator)
+ *                 and the most a saved Continue point stores
+ *                 (game_profile.c), so a Continue point can always hold a
+ *                 level's starting lives.  Bonus lives earned in play have
+ *                 no limit; a Continue point saved with more is held to
+ *                 this.  999 also keeps the HUD's "x999" to three digits.
+ */
+#define MAX_HEARTS          3
+#define DEFAULT_LIVES       3
+#define MAX_LIVES           999
 /* Upper magnitude for authored motion values; keeps integration and render
  * conversions bounded, well above the shipped speeds/accelerations. */
 #define MAX_LEVEL_MOTION    10000

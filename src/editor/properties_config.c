@@ -13,7 +13,6 @@
 
 #include "properties.h"
 #include "asset_choices.h" /* the files each asset dropdown offers */
-#include "../screens/hud.h"  /* MAX_HEARTS */
 #include "editor.h"     /* EditorState, EntityType, CANVAS_W, PANEL_W, etc. */
 #include "editor_undo_apply.h" /* committed property/config command tracking */
 #include "editor_files.h"  /* editor_path_for_display for recent entries   */
@@ -269,7 +268,7 @@ static int config_level_fields(EditorState *es, int x, int y)
     /* The limits live in the field, so a value applied by clicking away
      * (the Apply choice) is clamped exactly like one confirmed with Return. */
     if (ui_int_field_limited(&es->ui, 9011, x + 80, y, 50,
-                             &es->level.screen_count, 1, 99, 1))
+                             &es->level.screen_count, 1, MAX_LEVEL_SCREENS, 1))
         editor_commit_change(es);
     {
         char width_text[32];
@@ -341,21 +340,24 @@ static int config_lives_and_score(EditorState *es, int x, int y)
 {
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
-    /* 0 in each of these means the game's default; the tooltips say so. */
+    /* 0 in each of these means the game's default; the tooltips say so.
+     * The upper limits are the ones the level validator applies. */
     ui_label_tip(&es->ui, x + 8, y, "Hearts:", "Hearts the player starts with, 1-3; 0 = the default (3)");
     if (ui_int_field_limited(&es->ui, 9006, x + 70, y, 60,
                              &es->level.initial_hearts, 0, MAX_HEARTS, 1))
         editor_commit_change(es);
     ui_label_tip(&es->ui, x + 150, y, "Lives:", "Extra lives the player starts with; 0 = the default (3)");
     if (ui_int_field_limited(&es->ui, 9007, x + 205, y, 60,
-                             &es->level.initial_lives, 0, 99, 1))
+                             &es->level.initial_lives, 0, MAX_LIVES, 1))
         editor_commit_change(es);
     y += 22;
     ui_label_tip(&es->ui, x + 8, y, "Extra life:", "Score that earns an extra life; 0 = the default (1000)");
-    if (ui_int_field(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life))
+    if (ui_int_field_limited(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life,
+                             0, LEVEL_SCORE_PER_LIFE_MAX, 1))
         editor_commit_change(es);
     ui_label_tip(&es->ui, x + 180, y, "Per coin:", "Points a coin is worth; 0 = the default (100)");
-    if (ui_int_field(&es->ui, 9012, x + 240, y, 60, &es->level.coin_score))
+    if (ui_int_field_limited(&es->ui, 9012, x + 240, y, 60, &es->level.coin_score,
+                             0, LEVEL_COIN_SCORE_MAX, 1))
         editor_commit_change(es);
     return y + 24;
 }

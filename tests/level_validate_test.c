@@ -9,7 +9,6 @@
 #include "entities/jumping_spider.h"  /* JSPIDER_SPEED */
 #include "entities/bird.h"            /* BIRD_SPEED */
 #include "entities/fish.h"            /* FISH_SPEED */
-#include "screens/hud.h"    /* MAX_HEARTS */
 #include "levels/level_ref.h"
 #include "levels/level_validate.h"  /* level_jumping_spider_min_gap_speed */
 

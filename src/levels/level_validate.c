@@ -17,12 +17,7 @@
 #include "level_validate.h"
 #include "../player/player.h"  /* JUMP_VY: the jump-height check */
 #include "../entities/jumping_spider.h" /* JSPIDER_JUMP_VY, JSPIDER_GRAVITY: its jump arc */
-#include "../screens/hud.h"    /* MAX_HEARTS: the initial_hearts limit */
 #include "../shared/geometry.h" /* float_same_value: the flame-on-gap rule */
-
-#define MAX_INITIAL_LIVES 999
-#define MAX_SCORE_PER_LIFE 999999
-#define MAX_COIN_SCORE 999999
 
 /* A gap that starts on the floor grid must also end on it, so the renderer
  * removes exactly the pieces the player can fall through. */
@@ -773,19 +768,19 @@ static int validate_level_settings(const LevelDef *def,
         fail_range(err, err_size, "initial_hearts", def->initial_hearts, 0, MAX_HEARTS);
         if (stop_here(sink, err)) return -1;
     }
-    if (def->initial_lives < 0 || def->initial_lives > MAX_INITIAL_LIVES) {
+    if (def->initial_lives < 0 || def->initial_lives > MAX_LIVES) {
         fail_range(err, err_size, "initial_lives", def->initial_lives,
-                   0, MAX_INITIAL_LIVES);
+                   0, MAX_LIVES);
         if (stop_here(sink, err)) return -1;
     }
-    if (def->score_per_life < 0 || def->score_per_life > MAX_SCORE_PER_LIFE) {
+    if (def->score_per_life < 0 || def->score_per_life > LEVEL_SCORE_PER_LIFE_MAX) {
         fail_range(err, err_size, "score_per_life", def->score_per_life,
-                   0, MAX_SCORE_PER_LIFE);
+                   0, LEVEL_SCORE_PER_LIFE_MAX);
         if (stop_here(sink, err)) return -1;
     }
-    if (def->coin_score < 0 || def->coin_score > MAX_COIN_SCORE) {
+    if (def->coin_score < 0 || def->coin_score > LEVEL_COIN_SCORE_MAX) {
         fail_range(err, err_size, "coin_score", def->coin_score,
-                   0, MAX_COIN_SCORE);
+                   0, LEVEL_COIN_SCORE_MAX);
         if (stop_here(sink, err)) return -1;
     }
     return 0;

@@ -110,6 +110,11 @@ The floor is drawn by repeating the active 48x48 floor tile across the full leve
 |----------|-------|-------------|
 | `MAX_CHECKPOINTS` | `99` | Maximum authored `[[checkpoints]]` records per level |
 | `MAX_LEVEL_SCREENS` | `99` | Maximum `screen_count` |
+| `MAX_HEARTS` | `3` | Hearts a full player has; the most `initial_hearts` may be |
+| `DEFAULT_LIVES` | `3` | Lives the player starts with when `initial_lives` is `0` |
+| `MAX_LIVES` | `999` | Most `initial_lives` a level may set (editor field and validator) and most lives a Continue point stores |
+| `LEVEL_SCORE_PER_LIFE_MAX` | `999999` | Largest `score_per_life` (`src/levels/level.h`; validator and editor field) |
+| `LEVEL_COIN_SCORE_MAX` | `999999` | Largest `coin_score` (`src/levels/level.h`; validator and editor field) |
 | `LEVEL_DEFAULT_LAST_STAR_X` | `145.0f` | Last Star x when the level's TOML gives none |
 | `LEVEL_DEFAULT_LAST_STAR_Y` | `167.0f` | Last Star y when the level's TOML gives none |
 | `LEVEL_UNTITLED_NAME` | `"Untitled"` | What a level with an empty `name` is saved as; it still loads as empty |
@@ -350,8 +355,6 @@ mute overrides it. See [Sounds](../sounds/) for sample, alias and stream ownersh
 
 | Constant | Value | Type | Description |
 |----------|-------|------|-------------|
-| `MAX_HEARTS` | `3` | `int` | Maximum hearts the player can have |
-| `DEFAULT_LIVES` | `3` | `int` | Lives the player starts with |
 | `HUD_MARGIN` | `4` | `int` | Pixel margin from screen edges |
 | `HUD_HEART_SIZE` | `16` | `int` | Display size of each heart icon (px) |
 | `HUD_HEART_GAP` | `2` | `int` | Horizontal gap between heart icons (px) |
