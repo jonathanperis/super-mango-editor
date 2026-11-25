@@ -1,3 +1,10 @@
+/*
+ * game_terminal.c — The menu on the game-over and level-complete overlays.
+ *
+ * Builds the action list for the current overlay, moves the focused row and
+ * maps a confirmed action to a session route. See game_terminal.h.
+ */
+
 #include "game_terminal.h"
 
 #include <stddef.h>

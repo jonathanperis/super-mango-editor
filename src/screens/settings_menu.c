@@ -1,3 +1,10 @@
+/*
+ * settings_menu.c — The F1 settings panel shared by the start menu and game.
+ *
+ * Handles navigation, value changes and key/button capture for remapping,
+ * and draws both pages with the menus' own UI style. See settings_menu.h.
+ */
+
 #include "settings_menu.h"
 #include "../input/game_input.h"  /* game_input_event_confirms */
 #include "../shared/platform.h"

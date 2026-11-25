@@ -1,3 +1,10 @@
+/*
+ * app_session.h — The application runtime: one window, one screen at a time.
+ *
+ * AppSession owns the start menu or the running game, the assets and asset
+ * cache they borrow, the campaign catalog and the player profile, and turns
+ * each screen's route (Play, Next Level, Replay, Exit) into the next screen.
+ */
 #pragma once
 
 #include "../game_assets.h"     /* GameAssets, owned here */

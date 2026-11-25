@@ -1,3 +1,9 @@
+/*
+ * game_terminal.h — The menu on the game-over and level-complete overlays.
+ *
+ * One list of valid actions (Next Level, Replay, Level Select, Exit, Retry)
+ * that both the input code and the renderer read, so they cannot disagree.
+ */
 #pragma once
 
 #include "../game.h"

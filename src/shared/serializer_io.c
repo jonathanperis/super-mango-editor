@@ -1,11 +1,11 @@
+/*
+ * serializer_io.c — Internal file I/O helpers for TOML serialization.
+ */
+
 #ifndef _WIN32
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE 700  /* realpath is an XSI extension */
 #endif
-
-/*
- * serializer_io.c — Internal file I/O helpers for TOML serialization.
- */
 
 #include "serializer_io.h"
 

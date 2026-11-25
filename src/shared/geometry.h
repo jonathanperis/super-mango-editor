@@ -1,3 +1,7 @@
+/*
+ * geometry.h — Small shared geometry helpers: integer hitboxes with
+ * half-open edges, exact float comparison, and span lookup for floor gaps.
+ */
 #pragma once
 
 #include <stdint.h>

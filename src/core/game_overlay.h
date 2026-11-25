@@ -1,3 +1,9 @@
+/*
+ * game_overlay.h — Pause, game-over and level-complete overlay state.
+ *
+ * Which overlay is up, why the game is paused, whether a gameplay step may
+ * run this frame, and the one rule for when level music plays.
+ */
 #pragma once
 
 #include "../game_fwd.h"  /* GameState, used by pointer only */

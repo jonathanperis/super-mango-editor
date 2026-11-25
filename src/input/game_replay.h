@@ -1,3 +1,9 @@
+/*
+ * game_replay.h — Scripted input replay for smoke tests (--replay).
+ *
+ * A script lists (frame, key, action) events; they are parsed once at start-up
+ * and injected on their frame as if the player had pressed the keys.
+ */
 #pragma once
 
 #include "../game_fwd.h"  /* GameState, used by pointer only */

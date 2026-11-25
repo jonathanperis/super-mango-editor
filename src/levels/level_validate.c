@@ -1,3 +1,11 @@
+/*
+ * level_validate.c — Runtime validation of a loaded LevelDef.
+ *
+ * Counts against the MAX_* limits, safe asset paths, finite and in-range
+ * numbers, rails, patrols and bouncepads. The game and the editor run the
+ * same checks; level_validate_runtime_each reports every problem, not one.
+ */
+
 #include <ctype.h>
 #include <math.h>
 #include <stdint.h>

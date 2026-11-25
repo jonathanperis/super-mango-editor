@@ -1,3 +1,10 @@
+/*
+ * game_overlay.c — Pause, game-over and level-complete overlay state.
+ *
+ * See game_overlay.h. Pause reasons are bits (player, lost focus), and the
+ * paused flag follows them; music pauses and resumes from one predicate.
+ */
+
 #include "game_overlay.h"
 #include "../game.h"  /* GameState: this file reads its fields */
 
