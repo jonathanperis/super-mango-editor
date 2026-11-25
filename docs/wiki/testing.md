@@ -65,7 +65,8 @@ It also runs the Python tests of the build and docs tools:
 `tests/clang_tidy_report_test.py`, `tests/doctor_test.py`,
 `tests/build_raylib_test.py` (the raylib source unpacking),
 `tests/gen_compile_commands_test.py` (the compile database),
-`tests/roadmap_quality_test.py` and `tests/import_raygui_icons_test.py`, and the
+`tests/roadmap_quality_test.py`, `tests/import_raygui_icons_test.py`,
+`tests/bench_test.py` (the `make bench` budget check), and the
 parser encoding probe `tests/parser_validator_test.py`. (`make validate-levels`
 runs one more, `tests/schema_parity_test.py`, which compares the level schema in
 `tools/validate_levels.py` with the C table that `level-check --dump-schema` prints.) The

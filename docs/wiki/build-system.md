@@ -388,7 +388,7 @@ Current test binaries (18):
 - `out/gameplay-mechanics-test`
 - `out/editor-ui-test`
 
-`make test` also runs the Python tests in the Makefile's `PYTHON_TESTS` list: `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`, `tests/fuzz_dict_test.py`, `tests/coverage_baseline_test.py`, `tests/clang_tidy_report_test.py`, `tests/doctor_test.py`, `tests/build_raylib_test.py`, `tests/gen_compile_commands_test.py`, `tests/roadmap_quality_test.py` and `tests/import_raygui_icons_test.py`.
+`make test` also runs the Python tests in the Makefile's `PYTHON_TESTS` list: `tests/validate_levels_test.py`, `tests/gen_sounds_test.py`, `tests/fuzz_dict_test.py`, `tests/coverage_baseline_test.py`, `tests/clang_tidy_report_test.py`, `tests/doctor_test.py`, `tests/build_raylib_test.py`, `tests/gen_compile_commands_test.py`, `tests/roadmap_quality_test.py`, `tests/import_raygui_icons_test.py` and `tests/bench_test.py`.
 Its `web-host-contract` prerequisite runs `tools/check_web_boot_contract.py`, the
 six Node tests in `NODE_TESTS` (`tests/boot_test.cjs`, `tests/web_host_test.cjs`,
 `tests/profile_storage_test.cjs`, `tests/touch_controls_test.cjs`,
