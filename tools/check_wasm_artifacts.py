@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import os
 import re
 import shutil
@@ -12,7 +13,13 @@ import sys
 import zipfile
 from pathlib import Path
 from package_release import WASM_FILES
+from validate_levels import load_level, loaded_music_path
 from web_csp import problems as csp_problems
+
+try:  # Not in the standard library; used when installed, for information.
+    import brotli  # type: ignore[import-not-found]
+except ImportError:
+    brotli = None
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_OUT = WASM_FILES
@@ -40,6 +47,59 @@ def display(path: Path) -> str:
 def fail(message: str) -> int:
     print(f"wasm artifact check failed: {message}", file=sys.stderr)
     return 1
+
+
+# What a player downloads before the game starts, compressed as a web server
+# sends it. gzip (level 9) is measured because Python always has it; GitHub
+# Pages serves gzip. Each budget is the size when it was set plus about 10%,
+# so ordinary changes pass and a large jump (a new dependency, a debug
+# build, an asset that should not ship) fails. Raise one deliberately, with
+# the reason in the commit message. Brotli sizes are printed when the
+# brotli module is installed, but not checked.
+GZIP_BUDGETS = {
+    "super-mango.wasm": 185_000,  # 168.6 KB when set
+    "super-mango.js": 52_000,     # 47.0 KB
+    "super-mango.data": 225_000,  # 204.7 KB (unplayed music left out)
+}
+
+
+def compressed_sizes(path: Path) -> tuple[int, int, int | None]:
+    """(raw, gzip -9, brotli or None) sizes of one file, in bytes."""
+    data = path.read_bytes()
+    packed = len(gzip.compress(data, compresslevel=9, mtime=0))
+    return len(data), packed, len(brotli.compress(data)) if brotli else None
+
+
+def check_size_budgets(out_dir: Path) -> int:
+    for name, budget in GZIP_BUDGETS.items():
+        raw, packed, br = compressed_sizes(out_dir / name)
+        shown = f", brotli {br:,}" if br is not None else ""
+        print(f"wasm artifact size: {name}: {raw:,} bytes, gzip {packed:,} (budget {budget:,}){shown}")
+        if packed > budget:
+            return fail(f"{display(out_dir / name)} is {packed:,} bytes gzipped, over its "
+                        f"{budget:,}-byte budget (GZIP_BUDGETS in tools/check_wasm_artifacts.py)")
+    return 0
+
+
+def played_music(levels_dir: Path) -> set[str]:
+    """Every music file a level in levels/ (labs included) plays."""
+    tracks = set()
+    for level in sorted(levels_dir.glob("*.toml")) + sorted(levels_dir.glob("labs/*.toml")):
+        music = load_level(level).get("music_path", "")
+        if music:
+            tracks.add(loaded_music_path(music))
+    return tracks
+
+
+def check_packaged_music(js_path: Path, levels_dir: Path) -> int:
+    """The Makefile leaves unplayed music out of super-mango.data; make sure
+    it never leaves out a track a level plays. super-mango.js lists every
+    packaged file by its path from the root, "/assets/...". """
+    text = js_path.read_text(encoding="utf-8", errors="ignore")
+    for track in sorted(played_music(levels_dir)):
+        if f"/{track}" not in text:
+            return fail(f"{display(js_path)} does not package {track}, which a level plays")
+    return 0
 
 
 def require_nonempty(path: Path) -> int:
@@ -153,6 +213,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out-dir", default="out", help="directory containing make web output")
     parser.add_argument("--zip", help="wasm release zip to inspect; fails if the explicitly supplied zip is missing")
+    parser.add_argument("--levels", default="levels", help="levels the build packages (for the music check)")
     args = parser.parse_args()
 
     out_dir = ROOT / args.out_dir
@@ -175,6 +236,12 @@ def main() -> int:
         if rc != 0:
             return rc
     rc = check_js_asset_references(out_dir / "super-mango.js")
+    if rc != 0:
+        return rc
+    rc = check_packaged_music(out_dir / "super-mango.js", ROOT / args.levels)
+    if rc != 0:
+        return rc
+    rc = check_size_budgets(out_dir)
     if rc != 0:
         return rc
     rc = run_node_check(out_dir / "super-mango.js", out_dir / "super-mango.wasm")
