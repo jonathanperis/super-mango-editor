@@ -2,7 +2,7 @@
 """The fuzz dictionary names every key of the level schema.
 
 tests/fuzz/toml.dict gives libFuzzer the words the level loader reads. A key
-added to the schema table in src/shared/serializer_parse.c but not to the
+added to the schema table in src/shared/serializer_schema.c but not to the
 dictionary would be a field the fuzzer almost never reaches, so this test
 reads the key names out of the C table and fails for any that is missing.
 """
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA = ROOT / "src" / "shared" / "serializer_parse.c"
+SCHEMA = ROOT / "src" / "shared" / "serializer_schema.c"
 DICTIONARY = ROOT / "tests" / "fuzz" / "toml.dict"
 
 # A schema row is a macro call that starts with its key:

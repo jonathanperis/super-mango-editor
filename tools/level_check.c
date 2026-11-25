@@ -28,7 +28,7 @@
 #include <string.h>
 
 #include "shared/serializer.h"
-#include "shared/serializer_parse.h"   /* serializer_dump_schema */
+#include "shared/serializer_schema.h"  /* serializer_dump_schema */
 #include "levels/level.h"
 
 int main(int argc, char **argv)

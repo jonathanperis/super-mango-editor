@@ -202,7 +202,8 @@ SMOKE_SEEDS   ?= 1 7 23
 TEST_OBJDIR = $(OBJDIR)/tests
 TEST_SERIALIZER_OBJS = $(patsubst %,$(TEST_OBJDIR)/$(SHARED_DIR)/%.o,serializer serializer_emit \
                        serializer_io serializer_load serializer_load_header \
-                       serializer_parse serializer_save serializer_types)
+                       serializer_save serializer_schema serializer_types \
+                       serializer_validate)
 TEST_VALIDATE_OBJ   = $(TEST_OBJDIR)/$(SRCDIR)/levels/level_validate.o
 TEST_LEVEL_LOADER_OBJ = $(TEST_OBJDIR)/$(SRCDIR)/levels/level_loader.o
 TEST_TOMLC_OBJ      = $(TEST_OBJDIR)/$(VENDOR_DIR)/tomlc17.o
@@ -455,6 +456,7 @@ parser-encoding-probe:
 # campaign manifest chains. The checker reuses the game's objects in $(OBJDIR).
 LEVEL_CHECK = $(OUTDIR)/level-check
 LEVEL_CHECK_OBJS = $(filter $(OBJDIR)/$(SHARED_DIR)/serializer%.o,$(OBJS)) \
+                   $(OBJDIR)/$(SHARED_DIR)/platform.o \
                    $(OBJDIR)/$(SRCDIR)/levels/level_validate.o \
                    $(OBJDIR)/$(SRCDIR)/levels/level_ref.o $(OBJDIR)/$(VENDOR_DIR)/tomlc17.o
 
@@ -667,7 +669,7 @@ FUZZ_FLAGS = -std=c11 -g -O1 -Wall -Wextra -Wpedantic $(PROJECT_INCLUDES) \
              -fno-omit-frame-pointer -fsanitize=address,undefined \
              -fno-sanitize-recover=undefined $(EXTRA_CFLAGS)
 # The level loader and saver, without a harness: both level harnesses use it.
-FUZZ_SERIALIZER_SRCS = $(wildcard $(SHARED_DIR)/serializer*.c) \
+FUZZ_SERIALIZER_SRCS = $(wildcard $(SHARED_DIR)/serializer*.c) src/shared/platform.c \
                        src/levels/level_validate.c src/levels/level_ref.c $(VENDOR_DIR)/tomlc17.c
 FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(FUZZ_SERIALIZER_SRCS)
 # The editor's save -> load round trip (tests/fuzz_editor_roundtrip.c).
@@ -684,7 +686,7 @@ FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
 # so it needs the level loader too.
 FUZZ_CAMPAIGN_SRCS = tests/fuzz_campaign_experiment.c src/levels/campaign_catalog.c \
                      src/levels/level_path.c src/core/game_experiment_file.c \
-                     src/shared/platform.c $(FUZZ_SERIALIZER_SRCS)
+                     $(FUZZ_SERIALIZER_SRCS)
 FUZZ_HEADERS = $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h $(VENDOR_DIR)/*.h)
 # Seeds are read in place: shipped levels, schema fixtures, extra edge cases.
 FUZZ_LEVEL_SEEDS = levels levels/labs tests/fixtures/serializer_v1 \

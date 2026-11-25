@@ -16,7 +16,7 @@
 
 #include "shared/serializer.h"
 #include "shared/serializer_load_header.h"
-#include "shared/serializer_parse.h"   /* serializer_load_schema */
+#include "shared/serializer_schema.h"  /* serializer_load_schema */
 #include "shared/serializer_emit.h"    /* serializer_message_text */
 #include "levels/level.h"
 #include "test_paths.h"         /* TEST_OUT scratch directory */

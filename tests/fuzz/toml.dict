@@ -8,9 +8,9 @@
 #
 # One quoted token per line; `make fuzz` passes this file to every harness.
 # tests/fuzz_dict_test.py fails when a key of the level schema
-# (src/shared/serializer_parse.c) is missing from the first block.
+# (src/shared/serializer_schema.c) is missing from the first block.
 
-# Level keys and array names (serializer_parse.c).
+# Level keys and array names (serializer_schema.c).
 "air_accel_run"
 "air_accel_walk"
 "air_friction"

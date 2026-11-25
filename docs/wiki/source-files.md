@@ -122,10 +122,11 @@ src/
 │   ├── serializer.h / .c         TOML save/load public API anchor
 │   ├── serializer_emit.h / .c    TOML emission helpers; control bytes and DEL are written as \uXXXX escapes
 │   ├── serializer_io.h / .c      UTF-8 path I/O, size-limited whole-file reads, temp-file-then-rename saves, symlink checks
-│   ├── serializer_load.c         `level_load_toml` staged parse orchestration
+│   ├── serializer_load.c         `level_load_toml` staged parse, and serializer_load_schema: the one loader for every row of the schema table
 │   ├── serializer_load_header.h / .c        The format_version check
-│   ├── serializer_parse.h / .c  Schema table (keys, types, storage, defaults), v1 checks, and the one loader and writer for every key and table of a level
-│   ├── serializer_save.c        TOML save: write_level_toml walks two order lists and calls the schema writer for each name
+│   ├── serializer_save.c        TOML save: write_level_toml walks two order lists, and serializer_write_entry writes each row of the schema table
+│   ├── serializer_schema.h / .c Schema table (keys, types, storage, defaults), row lookup and --dump-schema; the header is the serializer's internal API
+│   ├── serializer_validate.c    Strict v1 schema check, legacy-file checks and warnings, the line a message is about
 │   └── serializer_types.h / .c  Enum/string conversion helpers
 ├── effects/
 │   ├── effect_defs.h             Layer limits and water-strip art sizes (no includes, no raylib)

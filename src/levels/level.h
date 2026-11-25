@@ -442,7 +442,7 @@ typedef struct {
 #define LEVEL_DEFAULT_LAST_STAR_X 145.0f
 #define LEVEL_DEFAULT_LAST_STAR_Y 167.0f
 #define LEVEL_NAME_CAPACITY 64
-/* What a level with an empty name is saved as (serializer_parse.c). */
+/* What a level with an empty name is saved as (serializer_schema.c). */
 #define LEVEL_UNTITLED_NAME "Untitled"
 #define LEVEL_DESCRIPTION_CAPACITY 4096
 #define LEVEL_AUTHOR_CAPACITY 128

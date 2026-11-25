@@ -261,7 +261,7 @@ static void update_bouncepads_high(GameState *gs, const StepInputs *in)
  *  3. The file format: a BatPlacement (or an existing placement struct)
  *     with `bats[MAX_BATS]` and `bat_count` in LevelDef (levels/level.h);
  *     a ROOT_TABLES("bats", ...) row in ROOT_FIELDS
- *     (shared/serializer_parse.c); "bats" in s_table_order
+ *     (shared/serializer_schema.c); "bats" in s_table_order
  *     (shared/serializer_save.c); CHECK_COUNT and the patrol checks in
  *     levels/level_validate.c; the same table in tools/validate_levels.py
  *     (`make validate-levels` compares the two) and the key in
