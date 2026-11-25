@@ -113,6 +113,18 @@ void texture_note_use(unsigned int texture_id);
 /* Switches counted since the previous call; starts the next count at 0. */
 int texture_take_switches(void);
 
+/*
+ * image_file_is_opaque — 1 when every pixel of the image file has alpha 255.
+ *
+ * An opaque image hides whatever is behind it, so it can be drawn without
+ * blending: blending a pixel of alpha 255 gives the source colour anyway,
+ * and reading the destination to find that out is wasted work. Decodes
+ * the file, so call it at load time, not per frame. 0 for a file that
+ * cannot be read: blending stays on, which draws exactly as before.
+ * Defined in texture.c.
+ */
+int image_file_is_opaque(const char *path);
+
 #ifdef MANGO_TESTING
 /* Test builds only. texture_test_loads: image files texture_load has decoded
  * so far. texture_test_live: handles that exist right now, so a test can

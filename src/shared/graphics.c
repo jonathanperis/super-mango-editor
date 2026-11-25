@@ -203,10 +203,16 @@ double display_present(RenderTexture2D target)
      * A negative source height flips this completed image for presentation. */
     Rectangle source = {0, 0, (float)target.texture.width, -(float)target.texture.height};
     texture_note_use(target.texture.id);
+    /* Blending stays on for this copy, though the canvas covers the window:
+     * raylib's alpha blending also blends the alpha channel, so a canvas
+     * pixel under something translucent (fog, the pause overlay) ends up
+     * with alpha below 1, and this blended copy over black darkens it.
+     * Copying without blending was measured and changes those pixels; see
+     * the optimization lessons page in the manual. */
     DrawTexturePro(target.texture, source, dest, (Vector2){0}, 0, WHITE);
-    /* Hand the queued quads to the renderer now (EndDrawing would do it
-     * first thing anyway) and read the clock: everything up to here is
-     * drawing work, while EndDrawing mostly waits for the display. */
+    /* Hand the copy to the renderer now (EndDrawing would do it first
+     * thing anyway) and read the clock: everything up to here is drawing
+     * work, while EndDrawing mostly waits for the display. */
     rlDrawRenderBatchActive();
     double drawn = clock_cpu_seconds();
     EndDrawing(); /* Exactly one event poll and frame-pacing owner. */

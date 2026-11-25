@@ -16,6 +16,7 @@
 
 #include "parallax.h"
 #include "game_constants.h" /* GAME_W, GAME_H                         */
+#include <rlgl.h>       /* rlDisableColorBlend; after raylib.h, which parallax.h includes */
 
 /* ------------------------------------------------------------------ */
 /* Layer configuration table                                          */
@@ -56,6 +57,20 @@ static const struct {
 /* ------------------------------------------------------------------ */
 
 /*
+ * measure_layer — Find out, once, whether the layer's PNG is opaque.
+ *
+ * This decodes the file a second time (the asset cache decoded it once to
+ * upload the texture), only while the level loads: well under a
+ * millisecond, against a saving on every frame drawn afterwards.
+ */
+static void measure_layer(ParallaxLayer *layer, const char *path)
+{
+    layer->opaque = image_file_is_opaque(path);
+}
+
+/* ------------------------------------------------------------------ */
+
+/*
  * parallax_init — Load every layer texture defined in LAYER_CONFIG.
  *
  * Each layer is loaded independently and non-fatally: if a PNG is missing
@@ -77,6 +92,7 @@ void parallax_init(ParallaxSystem *ps, AssetCache *cache)
         layer->tex_w   = 0;
         layer->tex_h   = 0;
         layer->texture = NULL;
+        layer->opaque  = 0;
 
         /*
          * Get the image from the asset cache: decoded and uploaded to GPU
@@ -96,6 +112,7 @@ void parallax_init(ParallaxSystem *ps, AssetCache *cache)
          */
         layer->tex_w = layer->texture->width;
         layer->tex_h = layer->texture->height;
+        measure_layer(layer, LAYER_CONFIG[i].path);
     }
 }
 
@@ -121,6 +138,7 @@ void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
         layer->tex_w   = 0;
         layer->tex_h   = 0;
         layer->texture = NULL;
+        layer->opaque  = 0;
 
         layer->texture = asset_cache_texture_acquire(cache, paths[i]);
         if (!layer->texture) {
@@ -130,6 +148,7 @@ void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
 
         layer->tex_w = layer->texture->width;
         layer->tex_h = layer->texture->height;
+        measure_layer(layer, paths[i]);
     }
 }
 
@@ -159,6 +178,16 @@ void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
  *
  * The destination rect stretches each tile to tex_w × GAME_H so the layer
  * fills the full canvas height.  (Natural height is 216 px; GAME_H is 300 px.)
+ *
+ * Overdraw: level 02 stacks seven layers, so every canvas pixel is read,
+ * blended and written seven times. An opaque layer (the sky) is drawn
+ * with blending off: blending a pixel of alpha 255 gives the source colour
+ * anyway, so reading the destination first is wasted work. Drawing only
+ * the rows of each layer that are not transparent would save far more (a
+ * third of the frame on the software renderer), but a shorter quad moves
+ * where each stretched texel row starts by a rounding error, and that
+ * changed about 0.5% of the pixels. The optimization lessons page in the
+ * manual has the numbers and why that was left out.
  */
 int parallax_layer_offset(const ParallaxLayer *layer, int cam_x)
 {
@@ -175,6 +204,12 @@ int parallax_layer_offset(const ParallaxLayer *layer, int cam_x)
     return ((parallax_x % layer->tex_w) + layer->tex_w) % layer->tex_w;
 }
 
+/* A layer that loaded, and whose image is opaque in every pixel. */
+static int layer_is_opaque(const ParallaxLayer *layer)
+{
+    return layer->texture && layer->tex_w > 0 && layer->opaque;
+}
+
 void parallax_render(const ParallaxSystem *ps, int cam_x)
 {
     for (int i = 0; i < ps->count; i++) {
@@ -185,6 +220,17 @@ void parallax_render(const ParallaxSystem *ps, int cam_x)
 
         /* Horizontal scroll offset for this layer, in [0, tex_w). */
         int offset = parallax_layer_offset(layer, cam_x);
+
+        /*
+         * Blending is a setting of the whole batch, not of one quad, so
+         * an opaque layer hands over what is queued, turns blending off
+         * for its own tiles, hands those over and turns it back on.
+         */
+        int opaque = layer_is_opaque(layer);
+        if (opaque) {
+            rlDrawRenderBatchActive();
+            rlDisableColorBlend();
+        }
 
         /*
          * Tile the texture horizontally to cover the full canvas width.
@@ -209,6 +255,11 @@ void parallax_render(const ParallaxSystem *ps, int cam_x)
              */
             sprite_draw(layer->texture, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
         }
+
+        if (opaque) {
+            rlDrawRenderBatchActive();
+            rlEnableColorBlend();
+        }
     }
 }
 
@@ -228,6 +279,7 @@ void parallax_cleanup(ParallaxSystem *ps, AssetCache *cache)
         ps->layers[i].tex_w = 0;
         ps->layers[i].tex_h = 0;
         ps->layers[i].speed = 0.0f;
+        ps->layers[i].opaque = 0;
     }
     ps->count = 0;
 }

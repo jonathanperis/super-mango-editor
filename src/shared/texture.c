@@ -54,6 +54,19 @@ void texture_unload(Texture2D *texture)
 #endif
 }
 
+int image_file_is_opaque(const char *path)
+{
+    Image image = LoadImage(path);
+    if (!IsImageValid(image)) return 0;
+    Color *pixels = LoadImageColors(image);  /* RGBA8, whatever the file held */
+    int opaque = pixels != NULL;
+    for (int i = 0; opaque && i < image.width * image.height; i++)
+        if (pixels[i].a < 255) opaque = 0;
+    UnloadImageColors(pixels);
+    UnloadImage(image);
+    return opaque;
+}
+
 /* The texture of the most recent sprite or text draw, and how many times
  * a draw has used another one since texture_take_switches last ran. */
 static unsigned int s_last_texture_id;
