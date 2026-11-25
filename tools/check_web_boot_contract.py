@@ -16,6 +16,13 @@ copy:
     own fails here, which is how the old drift would have been caught);
   * each page pastes the boot script in before its own, starts it exactly
     once, and tells it how to report status and failures.
+
+super-mango.js is shrunk by the Closure Compiler (`--closure 1` in the
+Makefile), which renames every property it does not know is shared with
+code it never compiles, such as web/boot.js. web/closure-externs.js lists
+the shared names, and the last check here keeps that list complete: each
+Module.<name> the game's JavaScript in src/ reads, and each SuperMango*
+object the web/ pre-js files put on the window.
 """
 
 from __future__ import annotations
@@ -29,6 +36,9 @@ BOOT = "web/boot.js"
 SHELL = "web/shell.html"
 DASHBOARD = "docs/src/components/home/Dashboard.astro"
 DEBUG_MARKER = "web/debug-boot.js"
+EXTERNS = "web/closure-externs.js"
+# Module properties Emscripten declares to Closure itself.
+EMSCRIPTEN_MODULE_NAMES = {"canvas"}
 
 # What web/boot.js must contain, and why.
 BOOT_REQUIREMENTS = (
@@ -154,13 +164,40 @@ def marker_problems(marker: str) -> list[str]:
     return problems
 
 
+def shared_names(root: Path = ROOT) -> set[str]:
+    """Names Closure must not rename: Module.<name> read by the game's own
+    JavaScript (EM_JS bodies in src/), and the SuperMango* objects the
+    pre-js files in web/ (everything but the uncompiled boot scripts) put on
+    the window."""
+    names = set()
+    for source in sorted((root / "src").rglob("*.c")):
+        names.update(re.findall(r"\bModule\.([A-Za-z_$][\w$]*)", source.read_text(encoding="utf-8")))
+    for script in sorted((root / "web").glob("*.js")):
+        if script.name in {Path(BOOT).name, Path(DEBUG_MARKER).name, Path(EXTERNS).name}:
+            continue
+        names.update(re.findall(r"\broot\.(SuperMango\w+)\s*=", script.read_text(encoding="utf-8")))
+    return names - EMSCRIPTEN_MODULE_NAMES
+
+
+def externs_problems(externs: str, names: set[str], makefile: str) -> list[str]:
+    problems = []
+    for name in sorted(names):
+        if not re.search(rf"(?<![\w$]){re.escape(name)}(?![\w$])", externs):
+            problems.append(f"{EXTERNS}: does not name `{name}`, which super-mango.js shares with "
+                            "code Closure does not compile; Closure would rename it")
+    if "--closure 1" in makefile and f"--externs={EXTERNS}" not in makefile:
+        problems.append(f"Makefile: links with --closure 1 but does not pass --externs={EXTERNS}")
+    return problems
+
+
 def all_problems(root: Path = ROOT) -> list[str]:
     def text(rel: str) -> str:
         return (root / rel).read_text(encoding="utf-8")
 
     boot = text(BOOT)
     return (boot_problems(boot) + common_problems(boot, BOOT) + shell_problems(text(SHELL))
-            + dashboard_problems(text(DASHBOARD)) + marker_problems(text(DEBUG_MARKER)))
+            + dashboard_problems(text(DASHBOARD)) + marker_problems(text(DEBUG_MARKER))
+            + externs_problems(text(EXTERNS), shared_names(root), text("Makefile")))
 
 
 def main() -> int:

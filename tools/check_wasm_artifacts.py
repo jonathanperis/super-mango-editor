@@ -58,7 +58,7 @@ def fail(message: str) -> int:
 # brotli module is installed, but not checked.
 GZIP_BUDGETS = {
     "super-mango.wasm": 185_000,  # 168.6 KB when set
-    "super-mango.js": 52_000,     # 47.0 KB
+    "super-mango.js": 35_000,     # 31.1 KB (47.0 KB before Closure, see the Makefile)
     "super-mango.data": 225_000,  # 204.7 KB (unplayed music left out)
 }
 
