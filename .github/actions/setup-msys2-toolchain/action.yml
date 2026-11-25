@@ -8,6 +8,13 @@ inputs:
     description: "'true' also installs UCRT64 Clang (the windows-extras job)."
     required: false
     default: 'false'
+  pin-gcc:
+    description: >-
+      'true' replaces the rolling GCC with the pinned build listed in the
+      "Pin GCC" step below (the gating Windows build leg, whose -Werror must
+      not change with MSYS2's packages). 'false' keeps whatever MSYS2 ships.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -53,6 +60,42 @@ runs:
           mingw-w64-ucrt-x86_64-cmake
           mingw-w64-ucrt-x86_64-make
           ${{ inputs.clang == 'true' && 'mingw-w64-ucrt-x86_64-clang' || '' }}
+
+    # Pin GCC for the jobs that ask. MSYS2 is rolling and the action above
+    # always installs today's GCC, so a new GCC release could fail the
+    # gating -Werror build with no change here. repo.msys2.org (the primary
+    # server, not every mirror) keeps the older builds, so the pinned
+    # compiler and the two runtime packages it requires at its exact version
+    # are downloaded from there, checked against the SHA-256 recorded below,
+    # and installed over the rolling ones with pacman -U (which also checks
+    # MSYS2's own signatures). The other packages keep rolling: gcc depends
+    # on them by name, not version. To move the pin, pick the version the
+    # rolling job prints ("Record ... toolchain versions") and update the
+    # three file names and hashes together (sha256sum of each file from
+    # https://repo.msys2.org/mingw/ucrt64/). If a newer package someday
+    # needs a newer libstdc++ than the pin, pacman refuses the downgrade and
+    # this step fails, saying so: then move the pin.
+    - name: Pin GCC
+      if: inputs.pin-gcc == 'true'
+      shell: msys2 {0}
+      env:
+        PINNED: |
+          mingw-w64-ucrt-x86_64-gcc-16.2.0-7-any.pkg.tar.zst c7c5ac5a7413e9a3b5afa367288568058dcecce8fdd690059c5bbfa07def01b9
+          mingw-w64-ucrt-x86_64-libgcc-16.2.0-7-any.pkg.tar.zst bc0ae31c582e0847964b4c8c4b55bb2404a9b7ddce7ebf0b176b6693b76e0c62
+          mingw-w64-ucrt-x86_64-libstdc++-16.2.0-7-any.pkg.tar.zst 4dd4b216b0e92ffa160127dd50620372609e98cb219ff1c5dcb9b3fbfe153253
+      run: |
+        dir="$RUNNER_TEMP/gcc-pin"
+        mkdir -p "$dir"
+        files=()
+        while read -r file sum; do
+          [ -n "$file" ] || continue
+          curl -fsSL --retry 3 -o "$dir/$file" "https://repo.msys2.org/mingw/ucrt64/$file"
+          echo "$sum  $dir/$file" | sha256sum -c - || { echo "::error::$file does not match its pinned SHA-256"; exit 1; }
+          files+=("$dir/$file")
+        done <<< "$PINNED"
+        pacman -U --noconfirm --needed "${files[@]}" || {
+          echo "::error::pacman would not install the pinned GCC over today's MSYS2 packages; move the pin (see this step's comment)"
+          exit 1; }
 
     # Record the exact compiler, so a new -Werror failure can be traced to a
     # toolchain update.
