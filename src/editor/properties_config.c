@@ -386,10 +386,10 @@ static int config_physics(EditorState *es, int x, int y)
     ui_separator(&es->ui, x + 4, y, PROP_W - 8);
     y += 6;
     config_subsection_header(es, x, y, " Physics (-1 = engine default)",
-                             &g_phys_open, config_row_hovered(es, x, y));
+                             &es->config_foldout.physics, config_row_hovered(es, x, y));
     y += 20;
 
-    if (g_phys_open) {
+    if (es->config_foldout.physics) {
         /* -- Walk / Run speeds -- */
         ui_label(&es->ui, COL1_L, y, "walk spd:");
         if (ui_float_field(&es->ui, 9020, COL1_F, y, PHYS_FW, &es->level.physics.walk_max_speed))
@@ -613,10 +613,10 @@ static int config_background_layers(EditorState *es, int x, int y)
     y += 6;
     snprintf(label, sizeof(label), " Background Layers (%d)",
              level->background_layer_count);
-    config_subsection_header(es, x, y, label, &g_plx_open,
+    config_subsection_header(es, x, y, label, &es->config_foldout.background_layers,
                              config_row_hovered(es, x, y));
     y += 18;
-    if (!g_plx_open) return y;
+    if (!es->config_foldout.background_layers) return y;
 
     LayerRowRequest request = { LAYER_ROW_NOTHING, 0 };
     int rows = level->background_layer_count < MAX_BACKGROUND_LAYERS
@@ -649,10 +649,10 @@ static int config_foreground_layers(EditorState *es, int x, int y)
     y += 6;
     snprintf(label, sizeof(label), " Foreground Layers (%d)",
              level->foreground_layer_count);
-    config_subsection_header(es, x, y, label, &g_fg_open,
+    config_subsection_header(es, x, y, label, &es->config_foldout.foreground_layers,
                              config_row_hovered(es, x, y));
     y += 18;
-    if (!g_fg_open) return y;
+    if (!es->config_foldout.foreground_layers) return y;
 
     LayerRowRequest request = { LAYER_ROW_NOTHING, 0 };
     int rows = level->foreground_layer_count < MAX_BACKGROUND_LAYERS
@@ -689,9 +689,9 @@ static int config_fog_layers(EditorState *es, int x, int y)
                    es->ui.mouse_y <= y + 18 &&
                    es->ui.mouse_y >= cfg_clip_top && es->ui.mouse_y < cfg_clip_bottom);
     snprintf(label, sizeof(label), " Fog Layers (%d)", level->fog_layer_count);
-    config_subsection_header(es, x, y, label, &g_fog_open, hovered);
+    config_subsection_header(es, x, y, label, &es->config_foldout.fog_layers, hovered);
     y += 18;
-    if (!g_fog_open) return y;
+    if (!es->config_foldout.fog_layers) return y;
 
     LayerRowRequest request = { LAYER_ROW_NOTHING, 0 };
     int rows = level->fog_layer_count < MAX_FOG_TEXTURES
@@ -795,45 +795,66 @@ void level_config_render(EditorState *es, int start_y, int available_h,
  * per layer, so its targets also name the key inside the row (field) and
  * give row 0's ID: row i's widget is widget + i, as config_layer_row
  * numbers them.  A target without a field matches any message about that
- * key and only unfolds its group (widget 0).  open is the foldout that
- * must be open for the widget to be drawn (NULL when it always is).
+ * key and only unfolds its group (widget 0).  foldout is the group that
+ * must be open for the widget to be drawn (FOLDOUT_NONE when it always is).
  */
+typedef enum {
+    FOLDOUT_NONE,
+    FOLDOUT_PHYSICS,
+    FOLDOUT_BACKGROUND,
+    FOLDOUT_FOREGROUND,
+    FOLDOUT_FOG
+} ConfigFoldout;
+
 typedef struct {
     const char *key;
     const char *field;
     int widget;
-    int *open;
+    ConfigFoldout foldout;
 } ConfigTarget;
 
+/* The open flag of a foldout in es->config_foldout (NULL for none). */
+static int *config_foldout_flag(EditorState *es, ConfigFoldout foldout)
+{
+    switch (foldout) {
+    case FOLDOUT_PHYSICS:    return &es->config_foldout.physics;
+    case FOLDOUT_BACKGROUND: return &es->config_foldout.background_layers;
+    case FOLDOUT_FOREGROUND: return &es->config_foldout.foreground_layers;
+    case FOLDOUT_FOG:        return &es->config_foldout.fog_layers;
+    case FOLDOUT_NONE:       break;
+    }
+    return NULL;
+}
+
 static const ConfigTarget s_config_targets[] = {
-    {"name", NULL, 9000, NULL},             {"description", NULL, 9001, NULL},
-    {"generated_by", NULL, 9002, NULL},     {"screen_count", NULL, 9011, NULL},
-    {"next_phase", NULL, 9031, NULL},       {"music_path", NULL, 9009, NULL},
-    {"music_volume", NULL, 9003, NULL},     {"floor_tile_path", NULL, 9010, NULL},
-    {"initial_hearts", NULL, 9006, NULL},   {"initial_lives", NULL, 9007, NULL},
-    {"score_per_life", NULL, 9008, NULL},   {"coin_score", NULL, 9012, NULL},
-    {"physics.walk_max_speed", NULL, 9020, &g_phys_open},
-    {"physics.run_max_speed", NULL, 9021, &g_phys_open},
-    {"physics.walk_ground_accel", NULL, 9022, &g_phys_open},
-    {"physics.run_ground_accel", NULL, 9023, &g_phys_open},
-    {"physics.ground_friction", NULL, 9024, &g_phys_open},
-    {"physics.ground_counter_accel", NULL, 9025, &g_phys_open},
-    {"physics.air_accel_walk", NULL, 9026, &g_phys_open},
-    {"physics.air_accel_run", NULL, 9027, &g_phys_open},
-    {"physics.air_friction", NULL, 9028, &g_phys_open},
-    {"physics.cam_lookahead_vx_factor", NULL, 9029, &g_phys_open},
-    {"physics.cam_lookahead_max", NULL, 9030, &g_phys_open},
+    {"name", NULL, 9000, FOLDOUT_NONE},             {"description", NULL, 9001, FOLDOUT_NONE},
+    {"generated_by", NULL, 9002, FOLDOUT_NONE},     {"screen_count", NULL, 9011, FOLDOUT_NONE},
+    {"next_phase", NULL, 9031, FOLDOUT_NONE},       {"music_path", NULL, 9009, FOLDOUT_NONE},
+    {"music_volume", NULL, 9003, FOLDOUT_NONE},     {"floor_tile_path", NULL, 9010, FOLDOUT_NONE},
+    {"initial_hearts", NULL, 9006, FOLDOUT_NONE},   {"initial_lives", NULL, 9007, FOLDOUT_NONE},
+    {"score_per_life", NULL, 9008, FOLDOUT_NONE},   {"coin_score", NULL, 9012, FOLDOUT_NONE},
+    {"physics.walk_max_speed", NULL, 9020, FOLDOUT_PHYSICS},
+    {"physics.run_max_speed", NULL, 9021, FOLDOUT_PHYSICS},
+    {"physics.walk_ground_accel", NULL, 9022, FOLDOUT_PHYSICS},
+    {"physics.run_ground_accel", NULL, 9023, FOLDOUT_PHYSICS},
+    {"physics.ground_friction", NULL, 9024, FOLDOUT_PHYSICS},
+    {"physics.ground_counter_accel", NULL, 9025, FOLDOUT_PHYSICS},
+    {"physics.air_accel_walk", NULL, 9026, FOLDOUT_PHYSICS},
+    {"physics.air_accel_run", NULL, 9027, FOLDOUT_PHYSICS},
+    {"physics.air_friction", NULL, 9028, FOLDOUT_PHYSICS},
+    {"physics.cam_lookahead_vx_factor", NULL, 9029, FOLDOUT_PHYSICS},
+    {"physics.cam_lookahead_max", NULL, 9030, FOLDOUT_PHYSICS},
     /* Layer rows: the asset dropdown and the speed field (the IDs in the
      * LayerChoices of config_background_layers and friends). */
-    {"background_layers", "path", 9200, &g_plx_open},
-    {"background_layers", "speed", 9100, &g_plx_open},
-    {"background_layers", NULL, 0, &g_plx_open},
-    {"foreground_layers", "path", 9300, &g_fg_open},
-    {"foreground_layers", "speed", 9400, &g_fg_open},
-    {"foreground_layers", NULL, 0, &g_fg_open},
-    {"fog_layers", "path", 9600, &g_fog_open},
-    {"fog_layers", "speed", 9700, &g_fog_open},
-    {"fog_layers", NULL, 0, &g_fog_open},
+    {"background_layers", "path", 9200, FOLDOUT_BACKGROUND},
+    {"background_layers", "speed", 9100, FOLDOUT_BACKGROUND},
+    {"background_layers", NULL, 0, FOLDOUT_BACKGROUND},
+    {"foreground_layers", "path", 9300, FOLDOUT_FOREGROUND},
+    {"foreground_layers", "speed", 9400, FOLDOUT_FOREGROUND},
+    {"foreground_layers", NULL, 0, FOLDOUT_FOREGROUND},
+    {"fog_layers", "path", 9600, FOLDOUT_FOG},
+    {"fog_layers", "speed", 9700, FOLDOUT_FOG},
+    {"fog_layers", NULL, 0, FOLDOUT_FOG},
 };
 
 int properties_focus_config(EditorState *es, const LevelIssueLocation *where)
@@ -857,7 +878,10 @@ int properties_focus_config(EditorState *es, const LevelIssueLocation *where)
             widget += where->index;
         }
         es->config_open = 1;
-        if (target->open) *target->open = 1;
+        {
+            int *open = config_foldout_flag(es, target->foldout);
+            if (open) *open = 1;
+        }
         if (widget) ui_focus_field(&es->ui, widget);
         return 1;
     }

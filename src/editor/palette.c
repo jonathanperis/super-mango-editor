@@ -69,16 +69,8 @@
 /* ------------------------------------------------------------------ */
 
 
-/*
- * category_open — tracks which categories are expanded (1) or collapsed (0).
- * All start collapsed.  Clicking a category header toggles it.
- */
-static int category_open[EDITOR_ENTITY_CATEGORY_COUNT] = { 0 };
-
-/* The type the palette last showed while placing (-1 = none), and whether
- * it was placing then: a change opens and reveals the type's row. */
-static int s_shown_type = -1;
-static int s_shown_place = 0;
+/* Which categories are open, and what was last shown while placing, live
+ * in es->palette_view (EditorPaletteView in editor.h). */
 
 
 /* ------------------------------------------------------------------ */
@@ -113,12 +105,12 @@ static int point_in_rect(int px, int py, int rx, int ry, int rw, int rh)
  * palette_row_offset — How far below the title the row for `type` is, with
  * the categories open as they are now; -1 if its category is closed.
  */
-static int palette_row_offset(EntityType type)
+static int palette_row_offset(const EditorPaletteView *view, EntityType type)
 {
     int y = 0;
     for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
         y += CATEGORY_H;
-        if (!category_open[cat]) continue;
+        if (!view->category_open[cat]) continue;
         int entry_count = editor_entity_palette_entry_count();
         for (int i = 0; i < entry_count; i++) {
             EntityType t = editor_entity_palette_entry_type(i);
@@ -135,13 +127,13 @@ static int palette_row_offset(EntityType type)
  * title: the title, every category header, and a row per entry of each
  * expanded category.  Collapsed categories contribute only their header.
  */
-static int palette_content_height(void)
+static int palette_content_height(const EditorPaletteView *view)
 {
     int total_content_h = TITLE_H;
     for (int cat = 0; cat < EDITOR_ENTITY_CATEGORY_COUNT; cat++) {
         EditorEntityCategory category = (EditorEntityCategory)cat;
         total_content_h += CATEGORY_H;
-        if (category_open[cat]) {
+        if (view->category_open[cat]) {
             int entry_count = editor_entity_palette_entry_count();
             for (int i = 0; i < entry_count; i++) {
                 EntityType type = editor_entity_palette_entry_type(i);
@@ -195,17 +187,18 @@ static void palette_title_bar(EditorState *es, int panel_x, int panel_y, int fol
  * palette_category_header — One category header at row_y ("> Enemies").
  * Clicking it opens or closes that category.
  */
-static void palette_category_header(UIState *ui, int cat, int panel_x, int row_y)
+static void palette_category_header(UIState *ui, EditorPaletteView *view, int cat,
+                                    int panel_x, int row_y)
 {
     int hdr_hovered = point_in_rect(ui->mouse_x, ui->mouse_y,
                                     panel_x, row_y,
                                     PANEL_W, CATEGORY_H);
     if (hdr_hovered && ui->mouse_clicked) {
-        category_open[cat] = !category_open[cat];
+        view->category_open[cat] = !view->category_open[cat];
     }
 
     /* Draw expand/collapse indicator and category name */
-    const char *cat_sym = category_open[cat] ? "v" : ">";
+    const char *cat_sym = view->category_open[cat] ? "v" : ">";
     int cat_sym_w = ui_text_width(ui, cat_sym);
     ui_label_color(ui, panel_x + PAD_X, row_y + 7,
                    cat_sym, ui_color(ui, UI_COLOR_ACCENT));
@@ -380,7 +373,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * placing then, so the next time the body is drawn while placing, the
      * type's row is revealed again. */
     if (!es->palette_open || folded) {
-        s_shown_place = 0;
+        es->palette_view.shown_place = 0;
         return;
     }
 
@@ -393,12 +386,13 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * the designer can still close that category afterwards. */
     {
         int placing = es->tool == TOOL_PLACE;
-        if (placing && (!s_shown_place || (int)es->palette_type != s_shown_type) &&
+        if (placing && (!es->palette_view.shown_place ||
+                        (int)es->palette_type != es->palette_view.shown_type) &&
             es->palette_type >= 0 && es->palette_type < ENT_COUNT) {
             int cat = (int)editor_entity_category(es->palette_type);
             if (cat >= 0 && cat < EDITOR_ENTITY_CATEGORY_COUNT) {
-                category_open[cat] = 1;
-                int row = palette_row_offset(es->palette_type);
+                es->palette_view.category_open[cat] = 1;
+                int row = palette_row_offset(&es->palette_view, es->palette_type);
                 if (row >= 0) {
                     int top = content_top - es->palette_scroll.offset + row;
                     ui_scroll_reveal(&es->palette_scroll, top, top + ROW_H,
@@ -406,8 +400,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
                 }
             }
         }
-        s_shown_type = (int)es->palette_type;
-        s_shown_place = placing;
+        es->palette_view.shown_type = (int)es->palette_type;
+        es->palette_view.shown_place = placing;
     }
 
     /*
@@ -417,7 +411,7 @@ void palette_render(EditorState *es, int start_y, int available_h)
      * top goes: above content_top once earlier entries have scrolled away.
      */
     int view_h = panel_h - TITLE_H;
-    int content_h = palette_content_height() - TITLE_H;
+    int content_h = palette_content_height(&es->palette_view) - TITLE_H;
     /* The scrollbar takes its clicks before the rows below can see them. */
     (void)ui_scrollbar_input(&es->ui, &es->palette_scroll, panel_x + PANEL_W - SCROLLBAR_W,
                              content_top, SCROLLBAR_W, view_h, view_h, content_h);
@@ -439,10 +433,10 @@ void palette_render(EditorState *es, int start_y, int available_h)
         /* A header or row is drawn (and clickable) only if some of it
          * overlaps the visible band [content_top, clip_bottom). */
         if (cursor_y + CATEGORY_H > content_top && cursor_y < clip_bottom)
-            palette_category_header(&es->ui, cat, panel_x, cursor_y);
+            palette_category_header(&es->ui, &es->palette_view, cat, panel_x, cursor_y);
         cursor_y += CATEGORY_H;
 
-        if (!category_open[cat]) continue;
+        if (!es->palette_view.category_open[cat]) continue;
 
         int entry_count = editor_entity_palette_entry_count();
         for (int i = 0; i < entry_count; i++) {
@@ -461,14 +455,8 @@ void palette_render(EditorState *es, int start_y, int available_h)
                       content_top, SCROLLBAR_W, view_h, view_h, content_h);
 }
 
-int palette_category_is_open(int category)
+int palette_category_is_open(const EditorState *es, int category)
 {
-    return category >= 0 && category < EDITOR_ENTITY_CATEGORY_COUNT && category_open[category];
+    return category >= 0 && category < EDITOR_ENTITY_CATEGORY_COUNT &&
+           es->palette_view.category_open[category];
 }
-
-#ifdef MANGO_TESTING
-void palette_set_category_open_for_test(int category, int open)
-{
-    if (category >= 0 && category < EDITOR_ENTITY_CATEGORY_COUNT) category_open[category] = open;
-}
-#endif

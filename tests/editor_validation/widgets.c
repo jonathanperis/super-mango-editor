@@ -295,8 +295,8 @@ static int layer_buttons_record_their_own_undo_step(void)
         editor_widget_test_context_cleanup(&context);
         return 1;
     }
-    g_plx_open = 1;
     if (config_state_init(&es, context.font, root, sizeof(root)) != 0) goto done;
+    es.config_foldout.background_layers = 1;
 
     /* Baseline: "+ Add" with no field active adds one undoable layer. */
     config_frame(&es, NULL, 1, add_x, CFG_FIRST_LAYER_Y + 5);
@@ -346,7 +346,6 @@ static int layer_buttons_record_their_own_undo_step(void)
     result = 0;
 
 done:
-    g_plx_open = 0;
     config_state_cleanup(&es, root);
     editor_widget_test_context_cleanup(&context);
     return result;

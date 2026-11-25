@@ -107,8 +107,3 @@ void properties_apply_shared_field(EditorState *es);
 #define CONFIG_LAYER_DOWN_X    345
 #define CONFIG_LAYER_REMOVE_X  362
 
-/* Level Config foldout state shared with layout measurement. */
-extern int g_plx_open;
-extern int g_fg_open;
-extern int g_fog_open;
-extern int g_phys_open;

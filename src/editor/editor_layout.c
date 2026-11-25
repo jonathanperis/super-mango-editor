@@ -4,7 +4,6 @@
 
 #include "editor_layout.h"
 
-#include "properties.h"  /* g_plx_open/g_fg_open/g_fog_open/g_phys_open */
 
 enum {
     CFG_H_HEADER          = 28,
@@ -60,16 +59,16 @@ int editor_config_total_height(const EditorState *es)
               + CFG_H_SCORE_ROW + CFG_H_PHYS_HEADER + CFG_H_BG_HEADER
               + CFG_H_FG_HEADER + CFG_H_FOG_HEADER + CFG_H_MARGIN_BOTTOM;
 
-    if (g_plx_open)
+    if (es->config_foldout.background_layers)
         total += es->level.background_layer_count * CFG_H_LAYER_ROW
                + CFG_H_LAYER_ACTIONS;
-    if (g_fg_open)
+    if (es->config_foldout.foreground_layers)
         total += es->level.foreground_layer_count * CFG_H_LAYER_ROW
                + CFG_H_LAYER_ACTIONS;
-    if (g_fog_open)
+    if (es->config_foldout.fog_layers)
         total += es->level.fog_layer_count * CFG_H_LAYER_ROW
                + CFG_H_LAYER_ACTIONS;
-    if (g_phys_open)
+    if (es->config_foldout.physics)
         total += CFG_H_PHYS_ROWS;
 
     return total;

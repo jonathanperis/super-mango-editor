@@ -341,7 +341,6 @@ static int layer_rows_move_and_remove_as_one_step(void)
     static const char *const sky = "assets/sprites/backgrounds/sky_blue.png";
     static const char *const clouds = "assets/sprites/backgrounds/clouds_bg.png";
     static const char *const mountains = "assets/sprites/backgrounds/glacial_mountains.png";
-    const int saved_plx_open = g_plx_open;
     CHECK(open_editor(&es, NULL) == 0);
 
     /* Three background layers, back to front: sky, clouds, mountains. */
@@ -360,8 +359,7 @@ static int layer_rows_move_and_remove_as_one_step(void)
     /* Draw the panel alone and unscrolled; no recent files or messages
      * above the layer rows, so they start where the widget tests expect. */
     es.recent_file_count = 0;
-    g_plx_open = 1;
-    g_fg_open = g_fog_open = g_phys_open = 0;
+    es.config_foldout = (EditorConfigFoldouts){.background_layers = 1};
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(es.validation_report.message_count == 0 && es.load_report.count == 0);
     const int row0 = TOOLBAR_H + 368 + 5;        /* a point inside row 0 */
@@ -430,8 +428,8 @@ static int layer_rows_move_and_remove_as_one_step(void)
     es.level.fog_layers[1].speed = 0.75f;
     es.level.fog_layer_count = 2;
     es.level.background_layer_count = 0;
-    g_plx_open = 0;
-    g_fog_open = 1;
+    es.config_foldout.background_layers = 0;
+    es.config_foldout.fog_layers = 1;
     editor_sync_config_resources(&es);
     {
         /* Closed lists are one header each: find fog row 0 by its dropdown. */
@@ -440,10 +438,10 @@ static int layer_rows_move_and_remove_as_one_step(void)
             config_only_frame(&es, 1, CANVAS_W + 60, y);
             if (es.ui.dropdown_open_id == 9600) fog_row = y;
             es.ui.dropdown_open_id = 0;
-            g_plx_open = 0;      /* a probe may have clicked a header */
-            g_phys_open = 0;
-            g_fg_open = 0;
-            g_fog_open = 1;
+            es.config_foldout.background_layers = 0;      /* a probe may have clicked a header */
+            es.config_foldout.physics = 0;
+            es.config_foldout.foreground_layers = 0;
+            es.config_foldout.fog_layers = 1;
         }
         CHECK(fog_row > 0);
         const int steps = es.undo->top;
@@ -455,8 +453,6 @@ static int layer_rows_move_and_remove_as_one_step(void)
         CHECK(es.undo->top == steps + 2);
     }
 done:
-    g_plx_open = saved_plx_open;
-    g_fg_open = g_fog_open = g_phys_open = 0;
     clear_dialog_seams();
     close_editor(&es);
     return failed;

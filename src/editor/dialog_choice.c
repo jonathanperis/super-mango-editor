@@ -37,8 +37,13 @@
 #include "../shared/graphics.h"      /* display_present */
 #include "../input/input_backend.h"  /* input_collect, input_poll, input_push */
 
+/*
+ * The editor the prompts draw in.  dialog_choice() is called from deep in
+ * the file dialogs, which have no EditorState to pass, so the editor
+ * attaches itself once at startup (dialog_choice_attach).  Whether a prompt
+ * is showing is the editor's own state: es->prompt_open.
+ */
 static EditorState *s_host;
-static int s_open;           /* a prompt is showing: never stack another */
 #ifdef MANGO_TESTING
 static int s_frames;
 static DialogLayout s_last_layout;   /* the last prompt's, for tests */
@@ -359,18 +364,18 @@ static int run_prompt(const char *title, const char *message, const char *const 
         cancel_index < 0 || cancel_index >= count) return -1;
     /* Nobody could answer: no editor or no window.  Fail rather than wait
      * forever. */
-    if (!es || s_open || !IsWindowReady() || !es->font) return -1;
+    if (!es || es->prompt_open || !IsWindowReady() || !es->font) return -1;
 #if !defined(MANGO_TESTING) && !defined(MANGO_RAYLIB_MEMORY)
     /* Nor in a hidden window (the render smoke test).  Tests use hidden
      * windows too, but answer with queued events (see below). */
     if (IsWindowHidden()) return -1;
 #endif
 
-    s_open = 1;
+    es->prompt_open = 1;
     ui_init(&s_ui, es->font);
     s_ui.style = es->ui.style;
     if (layout_prompt(&s_ui, message, labels, count, field != NULL, &layout) != 0) {
-        s_open = 0;
+        es->prompt_open = 0;
         return -1;
     }
 #ifdef MANGO_TESTING
@@ -477,7 +482,7 @@ static int run_prompt(const char *title, const char *message, const char *const 
     /* Back into the interrupted frame: its target, then its clip. */
     if (bound) BeginTextureMode(*bound);
     if (clip) ui_clip_begin(&es->ui, clip_x, clip_y, clip_w, clip_h);
-    s_open = 0;
+    es->prompt_open = 0;
     if (failed) return -1;
     *selected = answer;
     return 0;

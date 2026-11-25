@@ -12,8 +12,7 @@
  * Level Config, above any properties panel; while a selection is edited
  * with Select or Delete it folds to its title bar.
  *
- * Include this header in editor.c (or wherever the right-panel rendering is
- * orchestrated) to call palette_render each frame.
+ * editor_panels.c includes this header to call palette_render each frame.
  */
 #pragma once
 
@@ -43,8 +42,4 @@
 void palette_render(EditorState *es, int start_y, int available_h);
 
 /* Whether a palette category is open (for tests and the layout). */
-int palette_category_is_open(int category);
-#ifdef MANGO_TESTING
-/* Open or close a category directly (tests). */
-void palette_set_category_open_for_test(int category, int open);
-#endif
+int palette_category_is_open(const EditorState *es, int category);
