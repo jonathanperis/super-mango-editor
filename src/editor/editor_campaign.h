@@ -40,7 +40,7 @@
 /* A one-line notice between the last row and the buttons, shown while Undo
  * is stopped at a step it cannot replay. */
 #define CAMPAIGN_NOTICE_Y      (CAMPAIGN_BUTTONS_Y - 14)
-#define CAMPAIGN_NAME_FIELD_ID 7000                /* + row index          */
+/* Row i's name field is widget WIDGET_CAMPAIGN_NAME_FIRST + i (widget_ids.h). */
 
 /*
  * The buttons along the bottom, left to right: the edits of the list, then

@@ -417,7 +417,7 @@ static int validation_messages_take_you_to_the_problem(void)
     CHECK(strcmp(es.validation_report.locations[0].path, "coin_score") == 0);
     click_frame(&es, row_x, row_y);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(es.ui.active_id == 9012);
+    CHECK(es.ui.active_id == WIDGET_COIN_SCORE);
     key_frame(&es, KEY_ESCAPE, 0);
     es.level.coin_score = 10;
 
@@ -467,13 +467,13 @@ static int validation_messages_take_you_to_the_problem(void)
     CHECK(strcmp(es.validation_report.locations[0].path, "background_layers") == 0);
     CHECK(editor_focus_validation_issue(&es, 0) == 1);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(es.config_foldout.background_layers == 1 && es.ui.dropdown_open_id == 9201);
+    CHECK(es.config_foldout.background_layers == 1 && es.ui.dropdown_open_id == WIDGET_BACKGROUND_PATH_FIRST + 1);
     click_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     {
         LevelIssueLocation speed = {"background_layers", 1, "speed"};
         CHECK(properties_focus_config(&es, &speed) == 1);
         ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-        CHECK(es.ui.active_id == 9101);
+        CHECK(es.ui.active_id == WIDGET_BACKGROUND_SPEED_FIRST + 1);
         key_frame(&es, KEY_ESCAPE, 0);
     }
 done:

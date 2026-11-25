@@ -20,9 +20,7 @@
 
 #include "editor.h"  /* EditorState, EntityType, LevelDef */
 
-/* The search field's widget ID.  9000 and up are level-wide widgets, which
- * editor_finish_field_edit treats as "not a field of the selected entity". */
-#define ENTITY_LIST_SEARCH_ID 9900
+/* The search field's widget ID is WIDGET_ENTITY_LIST_SEARCH (widget_ids.h). */
 
 /*
  * Layout, in pixels.  The panel is: a title bar, the search field, then

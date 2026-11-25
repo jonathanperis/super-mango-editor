@@ -57,6 +57,11 @@
  */
 #define FIELD_ID(type, field)  ((int)(type) * 100 + (field) + 1)
 
+/* Every entity field ID stays below the editor's named IDs (widget_ids.h),
+ * so a property field can never share state with a Level Config field. */
+_Static_assert((int)ENT_COUNT * 100 <= WIDGET_CAMPAIGN_NAME_FIRST,
+               "FIELD_ID's range must end before the named widget IDs");
+
 /*
  * Limits the level validator puts on a few fields.  The fields clamp typed
  * values to them, so an edit cannot turn a valid level into one that

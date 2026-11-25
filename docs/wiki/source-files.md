@@ -101,7 +101,8 @@ src/
 │   ├── editor_undo_apply.h / .c  Undo operation application
 │   ├── snapshot_equal.h / .c     Field comparison of placement and config snapshots (undo)
 │   ├── file_dialog.h / .c        Native file dialogs
-│   └── undo.h / .c               Compact history with owned config snapshots; `undo_try_push(stack, const Command *)`
+│   ├── undo.h / .c               Compact history with owned config snapshots; `undo_try_push(stack, const Command *)`
+│   └── widget_ids.h              Every fixed widget ID (Level Config fields, zoom, search) as one enum, with the ID ranges
 ├── shared/
 │   ├── graphics.h / .c          Window and icon, sprite pivots and logical presentation; declares the texture handles
 │   ├── texture.c                `texture_load`, `texture_own`, `texture_unload`: owned texture handles

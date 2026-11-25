@@ -26,7 +26,7 @@ static int text_fields_move_the_caret_and_tab_between_fields(void)
     CHECK(strcmp(es.level.name, "Untitled") == 0);
 
     click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
-    CHECK(es.ui.active_id == 9000);
+    CHECK(es.ui.active_id == WIDGET_LEVEL_NAME);
     key_frame(&es, KEY_HOME, 0);
     text_frame(&es, "\xc3\xa9");                 /* é, two bytes */
     CHECK(strcmp(es.ui.edit_buf, "\xc3\xa9Untitled") == 0 && es.ui.edit_cursor == 2);
@@ -62,25 +62,25 @@ static int text_fields_move_the_caret_and_tab_between_fields(void)
     /* Tab commits the typed value as one undo step and moves on. */
     int undo_top = es.undo->top;
     click_frame(&es, CANVAS_W + 90, CFG_SCREENS_Y);
-    CHECK(es.ui.active_id == 9011);
+    CHECK(es.ui.active_id == WIDGET_SCREEN_COUNT);
     key_frame(&es, KEY_END, 0);
     key_frame(&es, KEY_BACKSPACE, 0);
     text_frame(&es, "5");
     key_frame(&es, KEY_TAB, 0);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(es.level.screen_count == 5 && es.undo->top == undo_top + 1);
-    CHECK(es.ui.active_id != 0 && es.ui.active_id != 9011);
+    CHECK(es.ui.active_id != 0 && es.ui.active_id != WIDGET_SCREEN_COUNT);
     /* Shift+Tab comes back, with nothing to commit. */
     key_frame(&es, KEY_TAB, INPUT_SHIFT);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(es.ui.active_id == 9011 && es.undo->top == undo_top + 1);
+    CHECK(es.ui.active_id == WIDGET_SCREEN_COUNT && es.undo->top == undo_top + 1);
     /* An invalid value keeps the focus where it is. */
     key_frame(&es, KEY_END, 0);
     key_frame(&es, KEY_BACKSPACE, 0);
     text_frame(&es, "-");
     key_frame(&es, KEY_TAB, 0);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(es.ui.active_id == 9011 && es.level.screen_count == 5);
+    CHECK(es.ui.active_id == WIDGET_SCREEN_COUNT && es.level.screen_count == 5);
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.ui.active_id == 0);
 
@@ -144,7 +144,7 @@ static int up_and_down_step_number_fields(void)
     CHECK(es.level.screen_count == 4);
 
     click_frame(&es, CANVAS_W + 90, CFG_SCREENS_Y);
-    CHECK(es.ui.active_id == 9011);
+    CHECK(es.ui.active_id == WIDGET_SCREEN_COUNT);
     key_frame(&es, KEY_UP, 0);
     CHECK(strcmp(es.ui.edit_buf, "5") == 0);
     key_frame(&es, KEY_UP, INPUT_SHIFT);
@@ -174,7 +174,7 @@ static int up_and_down_step_number_fields(void)
 
     /* A text field keeps its text and caret. */
     click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
-    CHECK(es.ui.active_id == 9000);
+    CHECK(es.ui.active_id == WIDGET_LEVEL_NAME);
     key_frame(&es, KEY_HOME, 0);
     key_frame(&es, KEY_UP, 0);
     key_frame(&es, KEY_DOWN, 0);
@@ -314,17 +314,17 @@ static int text_fields_keep_line_breaks_on_one_row(void)
 
     snprintf(es.level.description, sizeof(es.level.description), "ab");
     click_frame(&es, field_x + 100, desc_y + 4);
-    CHECK(es.ui.active_id == 9001 && es.ui.edit_multiline);
+    CHECK(es.ui.active_id == WIDGET_LEVEL_DESCRIPTION && es.ui.edit_multiline);
     key_frame(&es, KEY_END, 0);
     key_frame(&es, KEY_LEFT, 0);
     key_frame(&es, KEY_ENTER, INPUT_SHIFT);
-    CHECK(es.ui.active_id == 9001);
+    CHECK(es.ui.active_id == WIDGET_LEVEL_DESCRIPTION);
     text_frame(&es, "c");
     key_frame(&es, KEY_ENTER, 0);
     CHECK(es.ui.active_id == 0 && strcmp(es.level.description, "a\ncb") == 0);
 
     click_frame(&es, field_x + 100, CFG_NAME_Y);
-    CHECK(es.ui.active_id == 9000 && !es.ui.edit_multiline);
+    CHECK(es.ui.active_id == WIDGET_LEVEL_NAME && !es.ui.edit_multiline);
     key_frame(&es, KEY_END, 0);
     key_frame(&es, KEY_ENTER, INPUT_SHIFT);
     CHECK(es.ui.active_id == 0 && strcmp(es.level.name, "Untitled") == 0);
@@ -342,7 +342,7 @@ static int text_fields_select_copy_cut_and_paste(void)
     editor_test_set_clipboard("");
 
     click_frame(&es, CANVAS_W + 60, CFG_NAME_Y);
-    CHECK(es.ui.active_id == 9000 && strcmp(es.ui.edit_buf, "Untitled") == 0);
+    CHECK(es.ui.active_id == WIDGET_LEVEL_NAME && strcmp(es.ui.edit_buf, "Untitled") == 0);
     /* Nothing selected: Ctrl+C copies nothing and says how to select. */
     key_frame(&es, KEY_C, INPUT_CTRL);
     CHECK(editor_test_clipboard()[0] == '\0' && strstr(es.status_message, "Nothing selected"));
@@ -388,7 +388,7 @@ static int text_fields_select_copy_cut_and_paste(void)
      * edge select everything; Backspace deletes the selection. */
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, 0, field_right - 10, CFG_NAME_Y);
     ui_frame(&es, field_right - 10, CFG_NAME_Y);
-    CHECK(es.ui.active_id == 9000 && es.ui.edit_cursor == (int)strlen(es.ui.edit_buf));
+    CHECK(es.ui.active_id == WIDGET_LEVEL_NAME && es.ui.edit_cursor == (int)strlen(es.ui.edit_buf));
     ui_frame(&es, field_left + 1, CFG_NAME_Y);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, field_left + 1, CFG_NAME_Y);
     ui_frame(&es, field_left + 1, CFG_NAME_Y);

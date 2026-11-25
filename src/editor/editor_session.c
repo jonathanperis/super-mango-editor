@@ -259,7 +259,7 @@ int editor_finish_field_edit(EditorState *es)
     outer_kind = es->change_tracking_kind;
     outer_before_change = es->ui.before_change;
     outer_context = es->ui.before_change_context;
-    kind = es->ui.active_id >= 9000 ? EDITOR_CHANGE_CONFIG
+    kind = es->ui.active_id >= WIDGET_LEVEL_FIRST ? EDITOR_CHANGE_CONFIG
                                     : EDITOR_CHANGE_ENTITY;
     /* A field shared by several selected entities gives its value to all
      * of them, however it is left (properties.h); ask before the edit
