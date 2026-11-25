@@ -4,7 +4,7 @@
 
 #include "player_animation.h"
 
-#include "player_internal.h"  /* FRAME_W/H */
+#include "player_internal.h"  /* PLAYER_FRAME_W/H */
 
 /*
  * Animation tables — indexed by AnimState (0=IDLE, 1=WALK, 2=JUMP, 3=FALL).
@@ -94,6 +94,6 @@ void player_animate(Player *player, float dt_ms) {
      */
     int sheet_frame_index = ANIM_FIRST_FRAME[player->anim_state] +
                             player->anim_frame_index;
-    player->frame.x = (sheet_frame_index % PLAYER_SHEET_COLS) * FRAME_W;
-    player->frame.y = (sheet_frame_index / PLAYER_SHEET_COLS) * FRAME_H;
+    player->frame.x = (sheet_frame_index % PLAYER_SHEET_COLS) * PLAYER_FRAME_W;
+    player->frame.y = (sheet_frame_index / PLAYER_SHEET_COLS) * PLAYER_FRAME_H;
 }

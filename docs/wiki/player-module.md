@@ -4,7 +4,7 @@
 
 ---
 
-The player module is split across focused files under `src/player/`. `player.h` is the public API; `player_internal.h` holds private sprite/hitbox constants shared by implementation files.
+The player module is split across focused files under `src/player/`. `player.h` is the public API, including the sprite frame and physics-box sizes other modules use; `player_internal.h` holds the constants only the player files share (coyote time).
 
 | File | Role |
 |------|------|

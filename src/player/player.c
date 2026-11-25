@@ -113,7 +113,7 @@ void player_update(Player *player, float dt, SoundEffect *snd_jump,
     /*
      * prev_top — sprite top edge before this frame's physics update.
      * Derived from prev_bottom: prev_top = prev_bottom − player->h + PLAYER_FLOOR_SINK.
-     * Combined with PHYS_PAD_TOP below to obtain the physical head position
+     * Combined with PLAYER_PHYS_PAD_TOP below to obtain the physical head position
      * for the spike-platform ceiling crossing test.
      */
     const float prev_top    = prev_bottom - player->h + PLAYER_FLOOR_SINK;

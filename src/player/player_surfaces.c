@@ -95,11 +95,11 @@ void player_resolve_floor_collision(Player *player,
                 const Bouncepad *bp = &list->pads[i];
 
                 /*
-                 * Horizontal overlap test: use the inset PHYS_PAD_X physics box
+                 * Horizontal overlap test: use the inset PLAYER_PHYS_PAD_X physics box
                  * so only the visible character art overlaps, not transparent padding.
                  */
-                if (!bouncepad_launches(bp, player->x + PHYS_PAD_X,
-                                        player->x + player->w - PHYS_PAD_X)) continue;
+                if (!bouncepad_launches(bp, player->x + PLAYER_PHYS_PAD_X,
+                                        player->x + player->w - PLAYER_PHYS_PAD_X)) continue;
 
                 /*
                  * The player's physics bottom has reached the floor inside the
@@ -164,8 +164,8 @@ void player_resolve_platform_collisions(Player *player,
         const Platform *plat = &platforms[i];
 
         /* Horizontal overlap: use the inset physics box, not the full sprite. */
-        int h_overlap = (player->x + player->w - PHYS_PAD_X > plat->x) &&
-                        (player->x + PHYS_PAD_X < plat->x + plat->w);
+        int h_overlap = (player->x + player->w - PLAYER_PHYS_PAD_X > plat->x) &&
+                        (player->x + PLAYER_PHYS_PAD_X < plat->x + plat->w);
         if (!h_overlap) continue;
 
         /* Vertical crossing: bottom was at or above surface, now below. */
@@ -209,8 +209,8 @@ void player_resolve_platform_collisions(Player *player,
             if (!fp->active) continue;
 
             /* Horizontal overlap using the same inset physics box. */
-            int h_overlap = (player->x + player->w - PHYS_PAD_X > fp->x) &&
-                            (player->x + PHYS_PAD_X < fp->x + fp->w);
+            int h_overlap = (player->x + player->w - PLAYER_PHYS_PAD_X > fp->x) &&
+                            (player->x + PLAYER_PHYS_PAD_X < fp->x + fp->w);
             if (!h_overlap) continue;
 
             /* Vertical crossing, relative to the moving top surface. */
@@ -243,8 +243,8 @@ void player_resolve_platform_collisions(Player *player,
 
             const FloatPlatform *sfp = &float_platforms[prev_fp_landed_idx];
             if (sfp->active) {
-                int h_ov = (player->x + player->w - PHYS_PAD_X > sfp->x) &&
-                           (player->x + PHYS_PAD_X < sfp->x + sfp->w);
+                int h_ov = (player->x + player->w - PLAYER_PHYS_PAD_X > sfp->x) &&
+                           (player->x + PLAYER_PHYS_PAD_X < sfp->x + sfp->w);
                 /* gap > 0 means player is below the surface (platform rose). */
                 float gap = bottom - sfp->y;
                 if (h_ov && gap >= 0.0f && gap < (float)FLOAT_PLATFORM_STICK_TOL) {
@@ -282,8 +282,8 @@ void player_resolve_bridge_collision(Player *player,
     for (int i = 0; i < bridge_count; i++) {
         const Bridge *br = &bridges[i];
 
-        int h_overlap = (player->x + player->w - PHYS_PAD_X > br->x) &&
-                        (player->x + PHYS_PAD_X < br->x + br->brick_count * BRIDGE_TILE_W);
+        int h_overlap = (player->x + player->w - PLAYER_PHYS_PAD_X > br->x) &&
+                        (player->x + PLAYER_PHYS_PAD_X < br->x + br->brick_count * BRIDGE_TILE_W);
         if (!h_overlap) continue;
 
         if (!bridge_has_solid_at(br, pcx)) continue;
@@ -316,8 +316,8 @@ void player_resolve_spike_platform_top_collision(Player *player,
         const SpikePlatform *sp = &spike_platforms[i];
         if (!sp->active) continue;
 
-        int h_overlap = (player->x + player->w - PHYS_PAD_X > sp->x) &&
-                        (player->x + PHYS_PAD_X < sp->x + sp->w);
+        int h_overlap = (player->x + player->w - PLAYER_PHYS_PAD_X > sp->x) &&
+                        (player->x + PLAYER_PHYS_PAD_X < sp->x + sp->w);
         if (!h_overlap) continue;
 
         if (prev_bottom <= sp->y && bottom >= sp->y) {
@@ -342,7 +342,7 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
      * and zero vy, just like hitting a solid ceiling.  No damage is dealt —
      * damage only comes from the spike tips (handled in game_collision.c).
      *
-     * We use the PHYSICAL top (player->y + PHYS_PAD_TOP) rather than the
+     * We use the PHYSICAL top (player->y + PLAYER_PHYS_PAD_TOP) rather than the
      * raw sprite top so the head snaps flush with the platform underside
      * instead of leaving an 18 px visible gap caused by the transparent
      * top padding in the player sprite.
@@ -355,14 +355,14 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
         return;
     }
 
-    const float prev_phys_top = prev_top  + PHYS_PAD_TOP;
-    float curr_phys_top = player->y + PHYS_PAD_TOP;
+    const float prev_phys_top = prev_top  + PLAYER_PHYS_PAD_TOP;
+    float curr_phys_top = player->y + PLAYER_PHYS_PAD_TOP;
     for (int i = 0; i < spike_platform_count; i++) {
         const SpikePlatform *sp = &spike_platforms[i];
         if (!sp->active) continue;
 
-        int h_overlap = (player->x + player->w - PHYS_PAD_X > sp->x) &&
-                        (player->x + PHYS_PAD_X < sp->x + sp->w);
+        int h_overlap = (player->x + player->w - PLAYER_PHYS_PAD_X > sp->x) &&
+                        (player->x + PLAYER_PHYS_PAD_X < sp->x + sp->w);
         if (!h_overlap) continue;
 
         /*
@@ -373,7 +373,7 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
         float sp_bottom = sp->y + SPIKE_PLAT_SRC_H;
         if (prev_phys_top >= sp_bottom && curr_phys_top < sp_bottom) {
             /* Snap sprite top so that physical head sits at sp_bottom. */
-            player->y  = sp_bottom - PHYS_PAD_TOP;
+            player->y  = sp_bottom - PLAYER_PHYS_PAD_TOP;
             player->vy = 0.0f;
             curr_phys_top = sp_bottom;
         }
@@ -383,14 +383,14 @@ void player_resolve_spike_platform_ceiling_collision(Player *player,
 void player_clamp_world_x(Player *player, int world_w) {
     /*
      * Keep the PHYSICS body inside the world horizontally. We clamp the
-     * inset edge (x + PHYS_PAD_X), not the sprite left edge, so the
+     * inset edge (x + PLAYER_PHYS_PAD_X), not the sprite left edge, so the
      * transparent side-padding can slide off-screen while the visible
      * character stays flush with the border instead of stopping early.
      */
-    if (player->x + PHYS_PAD_X < 0.0f)
-        player->x = -(float)PHYS_PAD_X;
-    if (player->x + player->w - PHYS_PAD_X > world_w)
-        player->x = (float)(world_w - player->w + PHYS_PAD_X);
+    if (player->x + PLAYER_PHYS_PAD_X < 0.0f)
+        player->x = -(float)PLAYER_PHYS_PAD_X;
+    if (player->x + player->w - PLAYER_PHYS_PAD_X > world_w)
+        player->x = (float)(world_w - player->w + PLAYER_PHYS_PAD_X);
 }
 
 void player_resolve_world_bounds(Player *player, int world_w) {
@@ -398,11 +398,11 @@ void player_resolve_world_bounds(Player *player, int world_w) {
 
     /*
      * Ceiling clamp — stop upward movement when the physics top hits the
-     * canvas ceiling.  PHYS_PAD_TOP lets the transparent head-room of the
+     * canvas ceiling.  PLAYER_PHYS_PAD_TOP lets the transparent head-room of the
      * sprite frame slide above y=0 before the physics edge triggers.
      */
-    if (player->y + PHYS_PAD_TOP < 0.0f) {
-        player->y  = -(float)PHYS_PAD_TOP;
+    if (player->y + PLAYER_PHYS_PAD_TOP < 0.0f) {
+        player->y  = -(float)PLAYER_PHYS_PAD_TOP;
         player->vy = 0.0f;
     }
 }
