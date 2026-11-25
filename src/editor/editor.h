@@ -463,6 +463,20 @@ typedef struct {
 } EditorResize;
 
 /*
+ * EditorBoxSelect — the rubber-band selection (tools.c).
+ *
+ * A Select-tool press on empty canvas starts a box from (x0, y0) to the
+ * cursor (x1, y1), in world px; `active` is 1 until the release.  On
+ * release every entity the box touches is selected; with Shift held they
+ * are added to the current selection (additive).
+ */
+typedef struct {
+    int   active;
+    int   additive;
+    float x0, y0, x1, y1;
+} EditorBoxSelect;
+
+/*
  * EditorMouse — the pointer as the editor last saw it, updated from every
  * input event (editor_events.c), and the view panning it drives.
  *
@@ -794,15 +808,7 @@ typedef struct {
     UIScroll       entity_list_scroll;
 
     /* ---- Box (rubber-band) selection ---------------------------------- */
-    /*
-     * A Select-tool press on empty canvas starts a box from (box_x0, box_y0)
-     * to the cursor (box_x1, box_y1), in world px.  On release every entity
-     * the box touches is selected; with Shift held they are added to the
-     * current selection (box_additive).
-     */
-    int            box_selecting;
-    int            box_additive;
-    float          box_x0, box_y0, box_x1, box_y1;
+    EditorBoxSelect box;
 
     /*
      * Arrow-key nudges.  A quick run of nudges of the same selection is one

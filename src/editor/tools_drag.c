@@ -134,10 +134,10 @@ static void arm_drag(EditorState *es, Selection grabbed, const Selection *items,
 /* Start a rubber-band box at the press point. */
 static void start_box(EditorState *es, float world_x, float world_y, int additive)
 {
-    es->box_selecting = 1;
-    es->box_additive = additive;
-    es->box_x0 = es->box_x1 = world_x;
-    es->box_y0 = es->box_y1 = world_y;
+    es->box.active = 1;
+    es->box.additive = additive;
+    es->box.x0 = es->box.x1 = world_x;
+    es->box.y0 = es->box.y1 = world_y;
 }
 
 /*
@@ -166,7 +166,7 @@ static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
     Selection hit;
 
     es->drag.active = 0;
-    es->box_selecting = 0;
+    es->box.active = 0;
 
     if (!shift && !alt && editor_resize_begin(es, world_x, world_y)) return;
 
@@ -281,16 +281,16 @@ static void finish_box(EditorState *es)
 {
     static Selection found[EDITOR_MAX_SELECTION];
     float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
-    float x0 = fminf(es->box_x0, es->box_x1), x1 = fmaxf(es->box_x0, es->box_x1);
-    float y0 = fminf(es->box_y0, es->box_y1), y1 = fmaxf(es->box_y0, es->box_y1);
+    float x0 = fminf(es->box.x0, es->box.x1), x1 = fmaxf(es->box.x0, es->box.x1);
+    float y0 = fminf(es->box.y0, es->box.y1), y1 = fmaxf(es->box.y0, es->box.y1);
     int count = 0;
     int skipped = 0;
 
-    es->box_selecting = 0;
+    es->box.active = 0;
     if ((x1 - x0) * zoom < DRAG_THRESHOLD_PX && (y1 - y0) * zoom < DRAG_THRESHOLD_PX)
         return;
 
-    if (es->box_additive) count = editor_selection_items(es, found, EDITOR_MAX_SELECTION);
+    if (es->box.additive) count = editor_selection_items(es, found, EDITOR_MAX_SELECTION);
     for (int type = 0; type < ENT_COUNT; type++) {
         for (int i = 0; i < editor_entity_count(&es->level, (EntityType)type); i++) {
             EditorRect r;
@@ -341,7 +341,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         tools_end_paint(es);
         return;
     }
-    if (es->box_selecting) {
+    if (es->box.active) {
         finish_box(es);
         return;
     }
@@ -428,9 +428,9 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
         paint_step(es, world_x, world_y);
         return;
     }
-    if (es->box_selecting) {
-        es->box_x1 = world_x;
-        es->box_y1 = world_y;
+    if (es->box.active) {
+        es->box.x1 = world_x;
+        es->box.y1 = world_y;
         return;
     }
     if (es->resize.active) {
@@ -483,8 +483,8 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
 void tools_cancel_drag(EditorState *es)
 {
     if (!es) return;
-    if (es->box_selecting) {
-        es->box_selecting = 0;
+    if (es->box.active) {
+        es->box.active = 0;
         return;
     }
     if (es->resize.active) {

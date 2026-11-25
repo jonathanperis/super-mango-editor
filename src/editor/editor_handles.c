@@ -563,7 +563,7 @@ int editor_resize_begin(EditorState *es, float world_x, float world_y)
     es->drag.active = 1;       /* the gesture owns the document (see editor.h) */
     es->drag.moved = 0;
     es->drag.count = 0;     /* no entity is being moved */
-    es->box_selecting = 0;
+    es->box.active = 0;
     es->last_click_valid = 0;
     es->resize.handle = (int)kind;
     es->resize.moved = 0;

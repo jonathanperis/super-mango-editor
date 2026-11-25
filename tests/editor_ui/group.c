@@ -24,10 +24,10 @@ static int box_and_shift_select_act_on_the_group(void)
     push_event(INPUT_MOUSE_MOVE, 0, 0, 250, 300);
     push_event(INPUT_MOUSE_MOVE, 0, 0, 350, 350);
     ui_frame(&es, 350, 350);
-    CHECK(es.box_selecting);
+    CHECK(es.box.active);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 350, 350);
     ui_frame(&es, 350, 350);
-    CHECK(!es.box_selecting && editor_selection_count(&es) == 3);
+    CHECK(!es.box.active && editor_selection_count(&es) == 3);
     for (int i = 0; i < 3; i++) CHECK(editor_is_selected(&es, ENT_COIN, i));
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);           /* "3 selected" panel */
 
