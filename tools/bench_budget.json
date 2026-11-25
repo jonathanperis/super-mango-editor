@@ -1,10 +1,10 @@
 {
-  "about": "Limits for make bench BENCH_CHECK=1 (tools/bench.py), per campaign level and per frame. Times are milliseconds from an Apple M-series Mac (headless Memory backend, release build). CI machines are slower and noisier, so a level fails only above tolerance x budget. Texture switches are the same on every machine, so their tolerance is tight. Lower a budget when an optimization lands; raise one only with the reason in the commit message.",
-  "tolerance": 3,
+  "about": "Limits for make bench BENCH_CHECK=1 (tools/bench.py), per campaign level and per frame. Times are milliseconds measured by the Bench workflow on a GitHub-hosted ubuntu-latest runner (x86_64, headless Memory backend, release build); an Apple M-series Mac takes about a third of that. Shared runners vary from run to run, so a level fails only above tolerance x budget. Texture switches are the same on every machine, so their tolerance is tight. Lower a budget when an optimization lands; raise one only with the reason in the commit message.",
+  "tolerance": 2,
   "texture_switch_tolerance": 1.25,
   "levels": {
-    "levels/00_sandbox_01.toml": {"update_ms": 0.05, "draw_ms": 12.0, "frame_ms": 12.0, "texture_switches": 25},
-    "levels/01_lugio_01.toml": {"update_ms": 0.05, "draw_ms": 13.5, "frame_ms": 13.5, "texture_switches": 23},
-    "levels/02_lugio_02.toml": {"update_ms": 0.05, "draw_ms": 13.0, "frame_ms": 13.0, "texture_switches": 22}
+    "levels/00_sandbox_01.toml": {"update_ms": 0.05, "draw_ms": 36.0, "frame_ms": 36.0, "texture_switches": 25},
+    "levels/01_lugio_01.toml": {"update_ms": 0.05, "draw_ms": 38.0, "frame_ms": 38.0, "texture_switches": 23},
+    "levels/02_lugio_02.toml": {"update_ms": 0.05, "draw_ms": 38.0, "frame_ms": 38.0, "texture_switches": 22}
   }
 }
