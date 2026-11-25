@@ -233,7 +233,8 @@ static int fire_flame_hitbox(const GameWorld *world, int i, IntRect *box)
  *
  * Each row names the kind for the debug log ("HIT spider[3]"), says where
  * its count lives in GameWorld (offsetof gives the byte offset of that
- * int field), and points at its hitbox function. The order only matters
+ * int field; "The byte-offset table pattern" in shared/serializer_schema.h
+ * explains how a row reaches it), and points at its hitbox function. The order only matters
  * when two things touch the player in the same step: the first row wins
  * and decides the knockback direction.
  *

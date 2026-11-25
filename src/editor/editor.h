@@ -153,6 +153,33 @@ typedef enum {
  * number of entity types.  This is a common C pattern: placing a _COUNT
  * value at the end of an enum gives you the array size automatically,
  * and it updates itself whenever you add new values above it.
+ *
+ * NEW ENTITY CHECKLIST (the editor's half; the game's half is the list
+ * above s_update_steps in core/game_update.c).  Several editor files
+ * handle each type in an explicit switch, one case per type, so that a
+ * reader can see what happens to a spider without following a table.
+ * Adding ENT_<NEW> means a case (or a row) in every one of them:
+ *
+ *   entity_meta.c        its s_entity_meta row (names, category, capacity,
+ *                        LevelDef storage, preview) and its slot in
+ *                        s_palette_order
+ *   hit_test.c           editor_entity_bounds (its box on the canvas) and
+ *                        its place in s_hit_order
+ *   tools_place.c        default_placement (what a click places)
+ *   tools_bounds.c       editor_clamp_placement and get_entity_anchor
+ *   editor_handles.c     patrol_fields, editor_entity_handles, get_sizes,
+ *                        set_sizes and wanted_sizes, when it can be resized
+ *   snapshot_equal.c     placement_same (what undo compares)
+ *   properties_entities.c  a PropertyRow table in s_row_tables, or a
+ *                        panel function in s_property_panels (properties.c)
+ *   undo.h               its placement in the PlacementData union
+ *   editor.h             its sprite's field in EntityTextures, and
+ *   editor_textures.c    LOAD_TEX / DESTROY_TEX for it
+ *
+ * Most switches list ENT_COUNT and have no `default:`, so the compiler's
+ * -Wswitch warning names every switch a new value is missing from; the
+ * tables carry _Static_asserts that their length is ENT_COUNT.
+ * docs/wiki/entity-walkthrough.md walks through each file.
  */
 typedef enum {
     ENT_FLOOR_GAP = 0,     /* hole in the ground floor (exposes water)      */

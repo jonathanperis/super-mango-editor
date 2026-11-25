@@ -398,7 +398,8 @@ static const char *get_str(toml_datum_t tab, const char *key, const char *fallba
  * [physics].
  *
  * Both work on "the struct at this address", a char pointer, and reach a
- * member by adding the row's offset. For an [[array]] that address is one
+ * member by adding the row's offset ("The byte-offset table pattern" in
+ * serializer_schema.h). For an [[array]] that address is one
  * element (moved in steps of item_size); for a level-wide key or a single
  * [table] it is the LevelDef itself. memcpy moves the value in or out: it
  * needs no cast to the member's type and does not care how the struct is

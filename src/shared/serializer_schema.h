@@ -21,6 +21,48 @@
 #include "../levels/level.h"                /* LevelDef */
 
 /* ================================================================== */
+/* The byte-offset table pattern                                        */
+/* ================================================================== */
+
+/*
+ * Three places in this project describe many struct members with a table
+ * instead of writing one function per member:
+ *
+ *   - the schema rows below (serializer_schema.c): every key of a level
+ *     file and the LevelDef member it is loaded into;
+ *   - s_damage_sources (collision/game_collision.c): where each enemy's
+ *     count is in GameWorld;
+ *   - the PropertyRow tables (editor/properties_entities.c): which member
+ *     of a placement each field of the properties panel edits.
+ *
+ * A row cannot hold "the member x of a SpiderPlacement" as a pointer,
+ * because there is no SpiderPlacement yet when the table is written, and
+ * there will be many of them.  It holds a number instead:
+ *
+ *     offsetof(SpiderPlacement, x)     how many bytes into a
+ *                                      SpiderPlacement the member x starts
+ *
+ * offsetof (<stddef.h>) is a compile-time constant, so the table can be a
+ * static const array.  To reach the member of one real struct, add that
+ * number to the struct's address, counted in bytes:
+ *
+ *     char *member = (char *)item + row->offset;    item: a SpiderPlacement *
+ *
+ * (char is one byte, so pointer arithmetic on a char * moves byte by
+ * byte.)  member now points at that struct's x.  The value is then copied
+ * out with memcpy (the serializer), read through a pointer of the
+ * member's type (game_collision.c's world_count), or the address is handed
+ * to a widget that writes through it (properties_entities.c's draw_row).
+ * Either way the row must also say what type the member is, since the
+ * offset alone does not: a float read as an int gives nonsense.  The
+ * serializer's MEMBER_IS check makes the compiler verify that.
+ *
+ * The payoff is that the loader, the writer, the collision pass and the
+ * properties panel are each one loop over a table: adding an entity, or a
+ * key to one, adds a row, not a function.
+ */
+
+/* ================================================================== */
 /* The schema rows (serializer_schema.c)                               */
 /* ================================================================== */
 
