@@ -2,6 +2,7 @@ export type DocsSectionId =
   | 'home'
   | 'learning-path'
   | 'debugging-c'
+  | 'optimization-lessons'
   | 'c-concepts'
   | 'mechanics-museum'
   | 'entity-walkthrough'
@@ -45,6 +46,7 @@ export type DocsCategory = {
 export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
   'learning-path': { id: 'learning-path', label: 'Sandbox School', description: 'Eight guided experiments from first frame to reproducible replay.', route: '/docs/learning-path/' },
   'debugging-c': { id: 'debugging-c', label: 'Debugging C', description: 'Find crashes and memory bugs with sanitizers, lldb or gdb, and a quick profiling pass.', route: '/docs/debugging-c/' },
+  'optimization-lessons': { id: 'optimization-lessons', label: 'Optimization Lessons', shortLabel: 'Optimization', description: 'Measure a frame with make bench, then each optimization with its numbers, and the ones left out and why.', route: '/docs/optimization-lessons/' },
   'c-concepts': { id: 'c-concepts', label: 'C in This Codebase', shortLabel: 'C Concepts', description: 'Each C idea the game relies on, mapped to the file and function where you can read it.', route: '/docs/c-concepts/' },
   'mechanics-museum': { id: 'mechanics-museum', label: 'Mechanics Museum', description: 'Six focused levels and the simulation inspector.', route: '/docs/mechanics-museum/' },
   'entity-walkthrough': { id: 'entity-walkthrough', label: 'Entity Walkthrough', description: 'Trace a collectible through parser, runtime, editor, undo and tests, then add your own entity.', route: '/docs/entity-walkthrough/' },
@@ -194,7 +196,7 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
   {
     label: 'Engine & Code',
     description: 'How the game works inside: every source file, the player, the numbers that tune it.',
-    ids: ['c-concepts', 'source-files', 'entity-walkthrough', 'player-module', 'constants-reference', 'decisions'],
+    ids: ['c-concepts', 'optimization-lessons', 'source-files', 'entity-walkthrough', 'player-module', 'constants-reference', 'decisions'],
   },
   {
     label: 'World Builder',

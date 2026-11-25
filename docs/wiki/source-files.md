@@ -620,9 +620,14 @@ HUD renderer. Draws heart icons (health), player icon + lives counter, coin icon
 ### `core/debug.h` / `core/debug.c`
 
 Debug overlay (activated with `--debug` flag): collision hitbox visualization for all entities, the performance line, the one-line player readout and the event log. `debug_draw_panel` draws the small translucent text panels every debug readout shares, and `debug_draw_box` the box alone.
-The performance line shows the measured FPS, the frame interval in milliseconds
-(the time between rendered frames, not CPU utilization) and, where the OS
-reports it, resident memory in MB.
+The first performance line shows the measured FPS, the frame interval in
+milliseconds (`frame`: the time between rendered frames, which with VSync is
+mostly waiting for the display) and, where the OS reports it, resident memory
+in MB. The second shows the CPU time a frame actually worked, as averages over
+the last half second: `update` for the fixed steps and `draw` for the drawing
+up to the hand-over to the renderer, then `tex`, the texture switches per frame
+(about one draw call each). `make bench` reads the same numbers; see
+[Optimization lessons](../optimization-lessons/).
 
 ### Shared raylib boundaries (`shared/` and `input/input_backend.*`)
 

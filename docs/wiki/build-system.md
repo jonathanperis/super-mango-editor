@@ -191,6 +191,9 @@ and forth recompiles each time, so give long-lived flag combinations their own
 from `tools/gen_sounds.py`; `make docs-drift` runs its `--check` mode.
 `make timing-lab` prints a small integration experiment for 30/60/144 Hz that
 shows why the game simulates fixed 1/60 s steps instead of a variable frame dt.
+`make bench` builds an optimized Memory-backend copy in `out/bench` and prints
+the CPU time of update and drawing per campaign level; `BENCH_CHECK=1` compares
+it with `tools/bench_budget.json` ([Optimization lessons](../optimization-lessons/)).
 Python 3.11+ and Node.js are required for host checks. Use a current Python
 (3.12+ recommended) for the raylib bootstrap, which also uses `tarfile` extraction
 filters. Linux dialogs use zenity.
