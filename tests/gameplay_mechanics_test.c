@@ -1435,6 +1435,11 @@ static int parallax_scrolls_and_wraps(void)
     CHECK(ps.count == 2);
     CHECK(ps.layers[0].texture && ps.layers[0].tex_w > 0 && ps.layers[0].speed == 0.0f);
     CHECK(!ps.layers[1].texture && ps.layers[1].tex_w == 0 && ps.layers[1].speed == 0.25f);
+    /* The sky has no transparent pixel, so it is drawn without blending;
+     * a cloud layer and a missing file keep blending on. */
+    CHECK(ps.layers[0].opaque == 1 && ps.layers[1].opaque == 0);
+    CHECK(image_file_is_opaque("assets/sprites/backgrounds/clouds_mg_1.png") == 0);
+    CHECK(image_file_is_opaque("assets/sprites/backgrounds/missing_layer.png") == 0);
 done:
     parallax_cleanup(&ps, NULL);
     if (!failed && ps.count != 0) failed = 1;
