@@ -1,3 +1,11 @@
+/*
+ * game_inspector.c — The opt-in debug inspector (--debug).
+ *
+ * Freeze, single-step and slow motion through the fixed-step accumulator,
+ * live tuning of the player's physics fields (an offsetof table), and the
+ * on-screen readout of what is under inspection.
+ */
+
 #include "game_inspector.h"
 #include "../shared/platform.h"  /* str_copy */
 #include "game_experiment.h"

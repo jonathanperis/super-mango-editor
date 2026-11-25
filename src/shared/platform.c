@@ -1,3 +1,9 @@
+/*
+ * platform.c — Small OS services raylib does not cover the way the project
+ * needs: a monotonic clock, checked string and path copies, the per-user
+ * preference folder and the executable's own folder. See platform.h.
+ */
+
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE 700  /* glibc declares realpath only for X/Open */
 #include "platform.h"

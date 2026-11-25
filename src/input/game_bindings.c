@@ -1,3 +1,10 @@
+/*
+ * game_bindings.c — Which keys and gamepad buttons a player may rebind.
+ *
+ * Debug-inspector keys and the fixed menu, pause and arrow keys are refused,
+ * so a remap can never strand a player; also checks a whole GameSettings.
+ */
+
 #include "../core/game_profile.h"
 
 int game_settings_key_debug_reserved(int key)

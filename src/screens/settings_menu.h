@@ -1,3 +1,9 @@
+/*
+ * settings_menu.h — The F1 settings panel shared by the start menu and game.
+ *
+ * Two pages (settings and controls) that edit the borrowed GameProfile:
+ * volumes, dead zone, window scale, accessibility toggles and remapping.
+ */
 #pragma once
 #include "../core/game_profile.h"
 #include "../shared/ui.h"

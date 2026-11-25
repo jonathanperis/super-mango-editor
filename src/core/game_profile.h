@@ -1,3 +1,8 @@
+/*
+ * game_profile.h — The player profile: settings, key bindings, per-level
+ * best results and the one Continue point, encoded as TOML and kept in a
+ * file in the OS preference folder (native) or in localStorage (browser).
+ */
 #pragma once
 
 #include "../input/input_backend.h"

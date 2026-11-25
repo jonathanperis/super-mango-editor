@@ -1,3 +1,10 @@
+/*
+ * text.c — Measure and draw text with raylib's built-in bitmap font.
+ *
+ * The font belongs to raylib; this module only hands out small handles to
+ * it and never unloads the font itself. See text.h.
+ */
+
 #include "text.h"
 #include <stdlib.h>
 
