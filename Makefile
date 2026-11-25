@@ -838,7 +838,7 @@ $(foreach program,$(TEST_TARGETS),$(eval $(call native_test_rule,$(program))))
 # Extra objects, one line per program. A line with no recipe only adds
 # prerequisites to the rule above; a program that needs nothing beyond its
 # own tests/<name>_test.c has no line here at all.
-$(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/parser_boundary_test.o \
+$(OUTDIR)/level-serializer-test: $(TEST_SOURCE_DIR)/parser_boundary_test.o $(TEST_SOURCE_DIR)/serializer_io_test.o \
 		$(TEST_SERIALIZER_OBJS) $(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
 
 # level_validate.c shares the levels/<name>.toml rule from level_ref.c.
@@ -902,7 +902,8 @@ $(OUTDIR)/game-events-test: $(TEST_GAME_EVENTS_OBJ) $(TEST_GAME_INPUT_OBJ) $(TES
 # link command only takes the .o files.
 $(OUTDIR)/session-test: $(TEST_SOURCE_DIR)/game_profile_test.o $(TEST_SOURCE_DIR)/simulation_test.o \
 		$(TEST_SOURCE_DIR)/audio_contract_test.o $(TEST_SOURCE_DIR)/web_frame_pacing_test.o \
-		$(TEST_SOURCE_DIR)/asset_cache_test.o $(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
+		$(TEST_SOURCE_DIR)/asset_cache_test.o $(TEST_SOURCE_DIR)/platform_paths_test.o \
+		$(SESSION_RUNTIME_OBJS) levels/campaigns/main.toml
 
 $(OUTDIR)/game-checkpoint-test: $(TEST_GAME_CHECKPOINT_OBJ)
 
