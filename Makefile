@@ -438,6 +438,25 @@ $(filter-out $(TEST_OBJDIR)/%,$(sort $(OBJS) $(EDITOR_OBJS) $(TEST_OBJECTS) $(TO
 $(filter $(TEST_OBJDIR)/%,$(TEST_OBJECTS)): $(TEST_FLAGS_STAMP)
 $(TARGET) $(EDITOR_TARGET) $(TEST_TARGETS): $(LINK_FLAGS_STAMP)
 
+# Render snapshots (tests/render_snapshot.h): the cases that compare a frame
+# with tests/snapshots/, and the command that records them again after an
+# intended change. Frames are only recorded on the Memory backend, so a
+# desktop configuration re-runs this target in OUTDIR/headless with it.
+RENDER_SNAPSHOT_CASES_gameplay-mechanics-test = hud_frame_matches_its_snapshot \
+                                                level_frame_matches_its_snapshot
+RENDER_SNAPSHOT_CASES_editor-ui-test = side_panels_match_their_snapshot
+.PHONY: render-snapshots-update
+ifeq ($(RAYLIB_PLATFORM),memory)
+render-snapshots-update: $(OUTDIR)/gameplay-mechanics-test $(OUTDIR)/editor-ui-test ## Generate: Re-record the render snapshots in tests/snapshots/
+	rm -rf "$(OUTDIR)/snapshots"
+	$(foreach program,gameplay-mechanics-test editor-ui-test,MANGO_SNAPSHOT_UPDATE=1 $(RUN_PREFIX) \
+		"$(abspath $(OUTDIR))/$(program)" $(addprefix --case ,$(RENDER_SNAPSHOT_CASES_$(program)))$(newline))
+	python3 tools/render_snapshots.py "$(OUTDIR)/snapshots" tests/snapshots
+else
+render-snapshots-update:
+	$(MAKE) render-snapshots-update OUTDIR="$(OUTDIR)/headless" RAYLIB_PLATFORM=memory
+endif
+
 # Extra standalone parser probes; keep the 18-regression-binary inventory above.
 .PHONY: parser-allocation-probe parser-encoding-probe
 parser-allocation-probe: $(OUTDIR)/parser-allocation-probe
@@ -882,7 +901,7 @@ $(OUTDIR)/phase-transition-test: $(TEST_PHASE_OBJ)
 $(OUTDIR)/editor-validation-test $(OUTDIR)/editor-undo-recovery-test \
 $(OUTDIR)/editor-ui-test: $(TEST_EDITOR_OBJS) $(TEST_RAIL_OBJ) $(TEST_SERIALIZER_OBJS) \
 		$(TEST_VALIDATE_OBJ) $(TEST_TOMLC_OBJ)
-$(OUTDIR)/editor-ui-test: $(TEST_EDITOR_FRAME_OBJS)
+$(OUTDIR)/editor-ui-test: $(TEST_EDITOR_FRAME_OBJS) $(TEST_SOURCE_DIR)/render_snapshot.o
 
 $(OUTDIR)/gameplay-damage-test: $(TEST_COLLISION_DAMAGE_OBJ) $(TEST_GAME_OVERLAY_OBJ) \
 		$(TEST_GAME_CHECKPOINT_OBJ) $(TEST_HUD_OBJ) $(TEST_GAME_GHOST_OBJ)
@@ -915,8 +934,8 @@ GAMEPLAY_TEST_OBJS = $(filter-out $(OBJDIR)/src/main.o $(OBJDIR)/src/input/game_
                      $(TEST_GAME_INPUT_OBJ)
 $(OUTDIR)/gameplay-mechanics-test: $(TEST_SOURCE_DIR)/game_replay_test.o \
 		$(TEST_SOURCE_DIR)/creature_update_test.o $(TEST_SOURCE_DIR)/player_climb_test.o \
-		$(TEST_SOURCE_DIR)/thin_coverage_test.o \
-		$(GAMEPLAY_TEST_OBJS)
+		$(TEST_SOURCE_DIR)/thin_coverage_test.o $(TEST_SOURCE_DIR)/render_snapshot_test.o \
+		$(TEST_SOURCE_DIR)/render_snapshot.o $(GAMEPLAY_TEST_OBJS)
 
 # ── WebAssembly (Emscripten) ──────────────────────────────────────────
 # Requires the Emscripten SDK (emcc on PATH).

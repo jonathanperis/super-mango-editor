@@ -66,6 +66,7 @@
 #include <rlgl.h>  /* rlGetActiveFramebuffer: which target draws land in */
 
 #include "check.h"  /* CHECK, test_run_cases */
+#include "render_snapshot.h"
 
 /* A spot in the status bar: drawn every frame, but nothing there to click. */
 #define NEUTRAL_X (CANVAS_W / 2)
@@ -316,6 +317,7 @@ static int settle_probe(EditorState *es, int x, int y, uint64_t before,
 #include "editor_ui/text.c"
 #include "editor_ui/playtest.c"
 #include "editor_ui/prompts.c"
+#include "editor_ui/snapshot.c"
 
 
 /* ------------------------------------------------------------------ */
@@ -423,6 +425,7 @@ int main(int argc, char **argv)
         CASE(prompt_returns_to_the_interrupted_frame),
         CASE(closing_the_window_during_a_prompt_still_quits),
         CASE(unfocused_editor_slows_its_frames),
+        CASE(side_panels_match_their_snapshot),
 #undef CASE
     };
     TestHooks hooks = {.after_each = editor_ui_after_each};

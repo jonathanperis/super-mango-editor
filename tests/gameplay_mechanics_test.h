@@ -37,4 +37,8 @@ int climb_a_whole_vine_up_and_down(void);
 /* thin_coverage_test.c: spike platforms, last star, saws, bouncepads, fog. */
 int thin_modules_cover_their_branches(void);
 
+/* render_snapshot_test.c: frames compared with tests/snapshots/. */
+int hud_frame_matches_its_snapshot(void);
+int level_frame_matches_its_snapshot(void);
+
 #endif

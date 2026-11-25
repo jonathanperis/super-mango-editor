@@ -1,0 +1,6 @@
+# Render snapshots (raylib Memory backend): name, width, height, FNV-1a 64
+# hash of the RGBA pixels. The frames are the PNGs beside this file.
+# Written by `make render-snapshots-update`; see tests/render_snapshot.h.
+editor_side_panels 1280 720 0bca42125d72e4fa
+hud 400 300 201b8508866035ee
+level_hazards 400 300 3023a0a2a38a2f69

@@ -1477,6 +1477,8 @@ int main(int argc, char **argv)
         CASE(replay_scripts_drive_the_game),
         CASE(replay_scripts_reject_malformed_files),
         CASE(thin_modules_cover_their_branches),
+        CASE(hud_frame_matches_its_snapshot),
+        CASE(level_frame_matches_its_snapshot),
 #undef CASE
     };
     int listing = argc > 1 && strcmp(argv[1], "--list") == 0;
