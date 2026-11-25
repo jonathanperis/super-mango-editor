@@ -8,12 +8,11 @@
 #include "start_menu.h"
 #include "../shared/platform.h"  /* str_copy */
 #include "settings_menu.h"
+#include "../game_constants.h"   /* GAME_W, GAME_H: the menu draws at the game's size */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define MENU_GAME_W 400
-#define MENU_GAME_H 300
 /* The logo keeps its 4:3 shape at three quarters of its old size, which
  * leaves room for the level list between it and the Play button. */
 #define LOGO_DISPLAY_W 96
@@ -21,10 +20,10 @@
 #define LOGO_Y 6
 #define BTN_W 120
 #define BTN_H 28
-#define BTN_X ((MENU_GAME_W-BTN_W)/2)
+#define BTN_X ((GAME_W-BTN_W)/2)
 #define BTN_Y 170
 /* With a Continue point, Continue and Play sit side by side, 8 px apart. */
-#define BTN_PAIR_X ((MENU_GAME_W-2*BTN_W-8)/2)
+#define BTN_PAIR_X ((GAME_W-2*BTN_W-8)/2)
 /* Level list: START_MENU_LIST_ROWS rows of LIST_ROW_H pixels from LIST_Y. */
 #define LIST_X 20
 #define LIST_W 360
@@ -219,7 +218,7 @@ static void draw_button(StartMenu *menu, const UIStyle *style, IntRect r,
 
 int start_menu_init(StartMenu *menu)
 {
-    menu->frame_target = LoadRenderTexture(MENU_GAME_W, MENU_GAME_H);
+    menu->frame_target = LoadRenderTexture(GAME_W, GAME_H);
     if (!IsRenderTextureValid(menu->frame_target)) return -1;
     SetTextureFilter(menu->frame_target.texture, TEXTURE_FILTER_POINT);
     /*
@@ -319,7 +318,7 @@ int start_menu_frame(StartMenu *menu)
     BeginDrawing();
     BeginTextureMode(menu->frame_target);
     ClearBackground(BLACK);
-    IntRect logo = {(MENU_GAME_W - LOGO_DISPLAY_W) / 2, LOGO_Y, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
+    IntRect logo = {(GAME_W - LOGO_DISPLAY_W) / 2, LOGO_Y, LOGO_DISPLAY_W, LOGO_DISPLAY_H};
     sprite_draw(menu->logo_tex, NULL, &logo, 0, SPRITE_NORMAL, WHITE);
     UIStyle style = start_menu_style(menu);
     draw_level_list(menu, &style);
@@ -337,12 +336,12 @@ int start_menu_frame(StartMenu *menu)
     const GameProgress *best = row.cleared ? game_profile_result(menu->profile, entry->path) : NULL;
     if (best) snprintf(text, sizeof(text), "Best: %s  %s coins  %d pts", row.time, row.coins, best->best_score);
     else snprintf(text, sizeof(text), "%s: not cleared yet", entry->display_name);
-    font_draw_centered(menu->font, text, MENU_GAME_W/2, 214, grey);
+    font_draw_centered(menu->font, text, GAME_W/2, 214, grey);
     if (menu->error_message[0])
-        font_draw_centered(menu->font, menu->error_message, MENU_GAME_W/2, 232, red);
+        font_draw_centered(menu->font, menu->error_message, GAME_W/2, 232, red);
     else if (!entry->available) {
         snprintf(text, sizeof(text), "Unavailable: %s", entry->problem);
-        font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, red);
+        font_draw_centered(menu->font, text, GAME_W/2, 232, red);
     } else if (can_continue) {
         /* Say where Continue picks up, so it is not a surprise. */
         const GameResume *resume = game_profile_resume(menu->profile, menu->selected_level_path);
@@ -350,11 +349,11 @@ int start_menu_frame(StartMenu *menu)
         if (resume->checkpoint >= 0) snprintf(at, sizeof(at), "checkpoint %d", resume->checkpoint + 1);
         else snprintf(at, sizeof(at), "%s", resume->legacy_screen > 0 ? "last screen reached" : "the start");
         snprintf(text, sizeof(text), "Continue from %s: %d pts, %d lives", at, resume->score, resume->lives);
-        font_draw_centered(menu->font, text, MENU_GAME_W/2, 232, style.color[UI_COLOR_ACCENT]);
+        font_draw_centered(menu->font, text, GAME_W/2, 232, style.color[UI_COLOR_ACCENT]);
     }
     font_draw_centered(menu->font, can_continue ? "Arrows: level  Enter/A: play  C/X: continue  Esc: exit"
                                                 : "Arrows/D-pad: level  Enter/A: play  Esc: exit",
-                       MENU_GAME_W/2, 250, grey);
+                       GAME_W/2, 250, grey);
     if (menu->settings_menu)
         draw_button(menu, &style, settings_button(), "Settings (F1 / Y)", 1);
     settings_menu_render(menu->settings_menu, menu->profile, menu->font, menu->controller);
