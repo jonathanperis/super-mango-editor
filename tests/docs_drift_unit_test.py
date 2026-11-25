@@ -390,5 +390,118 @@ class DocsDriftUnitTest(unittest.TestCase):
                          ["tools/card.html:1", "tools/card.html:2"], failures)
 
 
+    def mutated_failures(self, check, target, old, new):
+        """FAILURES from `check` with `old` replaced by `new` in one file."""
+        original_read = drift.read
+        self.assertIn(old, original_read(target))
+
+        def mutated(path):
+            text = original_read(path)
+            return text.replace(old, new) if path == target else text
+
+        drift.FAILURES.clear()
+        with patch.object(drift, "read", side_effect=mutated):
+            check()
+        found = list(drift.FAILURES)
+        drift.FAILURES.clear()
+        return found
+
+    def test_every_source_file_starts_with_a_summary(self):
+        drift.FAILURES.clear()
+        drift.check_source_headers()
+        self.assertEqual(drift.FAILURES, [])
+        header = drift.read(ROOT / "src" / "core" / "game_overlay.h").split("*/\n", 1)[0] + "*/\n"
+        found = self.mutated_failures(drift.check_source_headers, ROOT / "src" / "core" / "game_overlay.h",
+                                      header, "")
+        self.assertTrue(any("src/core/game_overlay.h: must start with a module summary comment" in item
+                            and "`#pragma once`" in item for item in found), found)
+        # Without git the files on disk are listed instead.
+        with patch.object(drift, "run_git", return_value=None):
+            self.assertIn("src/core/game_overlay.h", drift.tracked_source_files())
+
+    def test_generated_sound_claims_follow_assets(self):
+        index = ROOT / "docs" / "wiki" / "index.md"
+        cases = [
+            ("The 12 generated QOA files", "The 12 generated WAVs", "calls the generated sounds WAV"),
+            ("The 12 generated QOA files", "The 11 generated QOA files", "says 11 generated sounds"),
+        ]
+        for old, new, expected in cases:
+            with self.subTest(expected=expected):
+                found = self.mutated_failures(drift.check_generated_sound_format, index, old, new)
+                self.assertTrue(any(expected in item for item in found), found)
+
+    def test_enemy_and_hazard_counts_follow_the_entity_enum(self):
+        drift.FAILURES.clear()
+        drift.check_entity_type_counts()
+        self.assertEqual(drift.FAILURES, [])
+        self.assertEqual(len(drift.entity_groups()["enemy"]), 6)
+        index = ROOT / "docs" / "wiki" / "index.md"
+        state = ROOT / ".specs" / "project" / "STATE.md"
+        editor = ROOT / "src" / "editor" / "editor.h"
+        cases = [
+            (index, "Six enemy types", "Five enemy types", "says Five enemy types"),
+            (index, "7 hazard types", "8 hazard types", "says 8 hazard types"),
+            (state, "| Hazard types | 7 |", "| Hazard types | 6 |", "Hazard types row says 6"),
+            (state, "fish, faster_fish |", "fish |", "Enemy types row says 6 (spider"),
+            # The code side: an enemy kind removed from the enum.
+            (editor, "    ENT_FASTER_FISH,", "", "says Six enemy types; the editor's entity enum has 5"),
+        ]
+        for target, old, new, expected in cases:
+            with self.subTest(expected=expected):
+                found = self.mutated_failures(drift.check_entity_type_counts, target, old, new)
+                self.assertTrue(any(expected in item for item in found), found)
+
+    def test_in_progress_rows_name_open_branches(self):
+        state = ROOT / ".specs" / "project" / "STATE.md"
+        anchor = "| Item | Status | Notes |\n|------|--------|-------|\n"
+        row = anchor + "| Something | In progress (branch feat/x) | notes |\n"
+
+        def fake_git(remote_branches, cherry="", current="feat/other"):
+            def run(*args):
+                if args[:3] == ("branch", "-r", "--list"):
+                    return args[3] + "\n" if args[3] in remote_branches else ""
+                if args[0] == "rev-parse":
+                    return current + "\n"
+                if args[0] == "cherry":
+                    return cherry
+                return None
+            return run
+
+        cases = [
+            ("deleted after merge", fake_git({"origin/main"}), "origin/feat/x does not exist"),
+            ("rebase-merged", fake_git({"origin/main", "origin/feat/x"}, cherry="- abc\n- def\n"),
+             "already on origin/main"),
+            ("still open", fake_git({"origin/main", "origin/feat/x"}, cherry="- abc\n+ def\n"), None),
+            ("checked out", fake_git({"origin/main"}, current="feat/x"), None),
+            ("shallow CI clone", fake_git(set()), None),
+            ("no git", lambda *args: None, None),
+        ]
+        for name, runner, expected in cases:
+            with self.subTest(name), patch.object(drift, "run_git", side_effect=runner):
+                found = self.mutated_failures(drift.check_in_progress_branches, state, anchor, row)
+                if expected is None:
+                    self.assertEqual(found, [])
+                else:
+                    self.assertTrue(any(expected in item for item in found), found)
+
+    def test_module_graph_reads_includes_and_the_makefile(self):
+        sys.path.insert(0, str(ROOT / "tools"))
+        import gen_module_graph as graph
+        with tempfile.TemporaryDirectory() as scratch:
+            src = Path(scratch) / "src"
+            (src / "core").mkdir(parents=True)
+            (src / "shared").mkdir()
+            (src / "game.h").write_text('/* g */\n#include "shared/util.h"\n', encoding="utf-8")
+            (src / "core" / "loop.c").write_text(
+                '/* l */\n#include "../game.h"\n#include "loop.h"\n#include "tomlc17.h"\n', encoding="utf-8")
+            (src / "core" / "loop.h").write_text("/* l */\n", encoding="utf-8")
+            (src / "shared" / "util.h").write_text("/* u */\n", encoding="utf-8")
+            edges = graph.include_edges(src)
+        self.assertEqual(edges, {"src": {"src/shared"}, "src/core": {"src"}, "src/shared": set()})
+        self.assertIn("`src/shared/serializer.c`", graph.render())
+        self.assertIsNone(graph.replace_block("no markers", "x"))
+        page = f"a\n{graph.START}\nold\n{graph.END}\nb"
+        self.assertEqual(graph.replace_block(page, "NEW"), "a\nNEW\nb")
+
 if __name__ == "__main__":
     unittest.main()

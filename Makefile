@@ -276,7 +276,7 @@ SANITIZE_CFLAGS     = -fsanitize=address,undefined -fno-sanitize-recover=undefin
 SANITIZE_LDFLAGS    = -fsanitize=address,undefined
 SANITIZE_ENV        = UBSAN_OPTIONS="halt_on_error=1:print_stacktrace=1$${UBSAN_OPTIONS:+:$$UBSAN_OPTIONS}"
 
-.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels web-host-contract level-catalog overlay-snapshots docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke dist-native dist-wasm compile-commands
+.PHONY: all clean run run-debug run-level run-level-debug web editor run-editor test validate-levels web-host-contract level-catalog overlay-snapshots module-graph docs-drift roadmap-quality smoke scripted-smoke sanitize sanitize-smoke dist-native dist-wasm compile-commands
 
 all: $(OUTDIR) $(TARGET) ## Build: Compile the game into OUTDIR (default target)
 
@@ -524,6 +524,9 @@ level-catalog: ## Generate: Level catalog page from the campaign manifest
 overlay-snapshots: ## Generate: Overlay text snapshots page
 	python3 tools/generate_overlay_snapshots.py
 
+module-graph: ## Generate: Module dependency tables in docs/wiki/architecture.md
+	python3 tools/gen_module_graph.py
+
 # Regenerate vendor/raygui/raygui_icons.h, the editor's toolbar icons, from
 # the pinned raygui.h. Needed after adding an icon to the ICONS table in the
 # script or after changing the pin in vendor/raygui/manifest.json (see
@@ -549,6 +552,7 @@ docs-drift: ## Check: Generated docs, sounds and manual facts match the code
 	python3 tools/gen_sounds.py --check
 	python3 tools/generate_level_catalog.py --check
 	python3 tools/generate_overlay_snapshots.py --check
+	python3 tools/gen_module_graph.py --check
 	python3 tools/check_docs_drift.py
 	python3 tools/check_roadmap_quality.py
 	$(foreach script,$(DOCS_PYTHON_TESTS),python3 $(script)$(newline))

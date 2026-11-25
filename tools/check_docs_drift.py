@@ -15,6 +15,7 @@ import ast
 import json
 import re
 import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -1377,6 +1378,143 @@ def check_update_order_doc() -> None:
                      f"which `{function}()` in {rel} does not call")
 
 
+def tracked_source_files() -> list[str]:
+    """src/ .c and .h files git tracks, or every one on disk when git cannot say."""
+    listed = run_git("ls-files", "--", "src")
+    if listed is not None:
+        names = listed.splitlines()
+    else:
+        names = [p.relative_to(ROOT).as_posix() for p in (ROOT / "src").rglob("*")]
+    return sorted(name for name in names if name.endswith((".c", ".h")))
+
+
+def check_source_headers() -> None:
+    """Every src/ file opens with a module summary comment (developer guide,
+    "Comments and Module Layout"). Blank lines before it are fine; code,
+    #pragma once, #include or #define before it are not."""
+    for rel in tracked_source_files():
+        path = ROOT / rel
+        if not path.is_file():
+            continue
+        text = read(path).lstrip()
+        if not text.startswith(("/*", "//")):
+            first = text.splitlines()[0] if text else "(empty file)"
+            fail(f"{rel}: must start with a module summary comment (see docs/wiki/developer-guide.md, "
+                 f"\"Comments and Module Layout\"); it starts with `{first}`")
+
+
+def run_git(*args: str) -> str | None:
+    """Output of `git -C ROOT <args>`, or None when git is missing or the call fails."""
+    try:
+        done = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True,
+                              timeout=20, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+IN_PROGRESS_BRANCH_RE = re.compile(r"In progress \(branch `?([\w./-]+?)`?\)")
+
+
+def check_in_progress_branches() -> None:
+    """A table row in .specs/ that says "In progress (branch X)" must name a branch
+    that still exists on origin and still has work main lacks.
+
+    The check reads only refs already in the clone, so it never needs the
+    network. It skips itself without git, and in a clone that has no
+    origin/main (a pull request's shallow CI checkout), where the remote
+    branch list says nothing. The branch you are on is left alone, so a pull
+    request may describe itself as in progress until it merges.
+    """
+    claims = []
+    for page in SPEC_PAGES:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            if line.lstrip().startswith("|"):  # table rows only; prose may quote the pattern
+                claims += [(page, line_no, branch) for branch in IN_PROGRESS_BRANCH_RE.findall(line)]
+    if not claims or not (run_git("branch", "-r", "--list", "origin/main") or "").strip():
+        return
+    current = (run_git("rev-parse", "--abbrev-ref", "HEAD") or "").strip()
+    for page, line_no, branch in claims:
+        if branch == current:
+            continue
+        label = page_label(page, line_no)
+        if not (run_git("branch", "-r", "--list", f"origin/{branch}") or "").strip():
+            fail(f"{label}: says \"In progress (branch {branch})\", but origin/{branch} does not exist; "
+                 "if it merged, mark the row Shipped")
+            continue
+        # `git cherry` compares patches, so rebase-merged commits count as merged.
+        cherry = run_git("cherry", "origin/main", f"origin/{branch}")
+        if cherry is not None and not any(line.startswith("+") for line in cherry.splitlines()):
+            fail(f"{label}: says \"In progress (branch {branch})\", but every commit on it is already "
+                 "on origin/main; mark the row Shipped")
+
+
+SOUND_FORMATS = "WAV|QOA|OGG|MP3|FLAC"
+GENERATED_SOUND_RE = re.compile(
+    rf"\b(?:(\d+|{SCREEN_WORD_PATTERN})\s+)?generated\s+({SOUND_FORMATS})s?\b"
+    rf"|\b({SOUND_FORMATS})s?(?:\s+files)?\s+(?:generated|synthesized)\s+by\b", re.I)
+
+
+def check_generated_sound_format() -> None:
+    """Pages that name the format (and count) of the generated sounds match assets/sounds."""
+    files = [p for p in (ROOT / "assets" / "sounds").rglob("*") if p.is_file() and p.suffix]
+    formats = {p.suffix[1:].upper() for p in files}
+    for page in doc_pages() + SPEC_PAGES + [ROOT / "PRODUCT.md"]:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for match in GENERATED_SOUND_RE.finditer(line):
+                count, fmt = match.group(1), (match.group(2) or match.group(3)).upper()
+                if fmt not in formats:
+                    fail(f"{page_label(page, line_no)}: calls the generated sounds {fmt}; "
+                         f"assets/sounds holds {', '.join(sorted(formats)) or 'no'} files")
+                number = parse_screen_count_token(count) if count else None
+                if number is not None and number != len(files):
+                    fail(f"{page_label(page, line_no)}: says {count} generated sounds; "
+                         f"assets/sounds holds {len(files)}")
+
+
+# The editor's entity enum lists every kind in palette order: enemies from
+# ENT_SPIDER up to ENT_AXE_TRAP, hazards from ENT_AXE_TRAP up to
+# ENT_FLOAT_PLATFORM. Each group's size is what the pages may claim.
+ENTITY_GROUPS = {"enemy": ("ENT_SPIDER", "ENT_AXE_TRAP"), "hazard": ("ENT_AXE_TRAP", "ENT_FLOAT_PLATFORM")}
+ENTITY_COUNT_RE = re.compile(rf"\b(\d+|{SCREEN_WORD_PATTERN})\s+(enemy|hazard)\s+types\b", re.I)
+
+
+def entity_groups() -> dict[str, list[str]]:
+    """{"enemy": ["spider", ...], "hazard": [...]} from the entity enum in src/editor/editor.h."""
+    names = re.findall(r"^\s*(ENT_[A-Z0-9_]+)\b", read(ROOT / "src" / "editor" / "editor.h"), re.M)
+    groups: dict[str, list[str]] = {}
+    for group, (first, stop) in ENTITY_GROUPS.items():
+        if first not in names or stop not in names:
+            fail(f"src/editor/editor.h: no `{first}` … `{stop}` range in the entity enum; "
+                 "tools/check_docs_drift.py reads it")
+            continue
+        groups[group] = [n[4:].lower() for n in names[names.index(first):names.index(stop)]]
+    return groups
+
+
+def check_entity_type_counts() -> None:
+    """"Six enemy types", "7 hazard types" and STATE.md's count rows match the code."""
+    groups = entity_groups()
+    for page in doc_pages() + SPEC_PAGES + [ROOT / "PRODUCT.md"]:
+        for line_no, line in enumerate(read(page).splitlines(), start=1):
+            for token, group in ENTITY_COUNT_RE.findall(line):
+                kinds = groups.get(group.lower())
+                number = parse_screen_count_token(token)
+                if kinds is not None and number is not None and number != len(kinds):
+                    fail(f"{page_label(page, line_no)}: says {token} {group} types; the editor's entity "
+                         f"enum has {len(kinds)} ({', '.join(kinds)})")
+    state = read(ROOT / ".specs" / "project" / "STATE.md")
+    for group, kinds in groups.items():
+        row = re.search(rf"^\| {group.capitalize()} types \| (\d+) \| ([^|]+) \|", state, re.M)
+        if not row:
+            fail(f".specs/project/STATE.md: missing the `| {group.capitalize()} types |` count row")
+            continue
+        listed = [name.strip() for name in row.group(2).split(",")]
+        if int(row.group(1)) != len(kinds) or sorted(listed) != sorted(kinds):
+            fail(f".specs/project/STATE.md: {group.capitalize()} types row says {row.group(1)} "
+                 f"({', '.join(listed)}); the editor's entity enum has {len(kinds)} ({', '.join(kinds)})")
+
+
 def main() -> int:
     check_test_targets_documented()
     check_source_file_map()
@@ -1418,6 +1556,10 @@ def main() -> int:
     check_inspector_keys_doc()
     check_render_order_doc()
     check_update_order_doc()
+    check_source_headers()
+    check_in_progress_branches()
+    check_generated_sound_format()
+    check_entity_type_counts()
 
     if FAILURES:
         print("docs drift check failed:")

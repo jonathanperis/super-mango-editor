@@ -25,7 +25,7 @@ adding an entity; this page covers the conventions around it.
 The source is a learning resource for C and raylib. Readable layout and teaching
 comments are intentional, even when shorter code could do the same job:
 
-- Start headers and source files with a short module summary. Headers use `#pragma once` and expose constants, types, and public function declarations.
+- Start headers and source files with a short module summary comment, before `#pragma once`, any `#define` and any `#include`; `make docs-drift` fails on a file under `src/` that does not. Headers use `#pragma once` and expose constants, types, and public function declarations.
 - Explain nontrivial raylib calls, including important arguments, return values, and resource ownership.
 - Give numeric constants their units and origin, especially logical pixels, pixels per second, and animation durations.
 - Document pointer ownership, float-to-integer rendering casts, and cleanup order where they matter.
