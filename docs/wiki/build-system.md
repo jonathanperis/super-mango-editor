@@ -412,6 +412,12 @@ needed), and `tests/docs_checks_test.py`, which reads the built site, runs from
 `TEST_TARGETS` inventory; profile, simulation and parser-boundary cases are linked
 into existing harnesses rather than separate binaries.
 
+The case-table programs (`editor-ui-test`, `editor-validation-test`,
+`editor-undo-recovery-test`, `session-test`, `gameplay-mechanics-test`) take
+`--list`, `--case NAME` (repeatable) and `--shuffle[=SEED]` through the shared
+runner in `tests/check.h`; `MANGO_TEST_SHUFFLE=random make test` shuffles all
+of them at once. See [Testing](../testing/#the-test-harness).
+
 `make test` also runs the standalone `parser-allocation-probe` and Python
 `parser-encoding-probe` (`tests/parser_validator_test.py`). These focused targets
 verify allocation-growth limits and consistent UTF-8/BOM decoding across tools.
@@ -450,15 +456,35 @@ Builds the game and editor and runs `make test` in a separate `out-sanitize/` tr
 
 ### `make coverage`
 
-Rebuilds and runs `make test` in `out/coverage/` with clang source-based coverage, then prints an `llvm-cov` per-file summary and compares each file with `tools/coverage_baseline.txt` (`COVERAGE_TOLERANCE=<points>` makes a drop fail). Requires clang plus `llvm-profdata`/`llvm-cov` (`xcrun` on macOS). See [Testing](../testing/#coverage).
+Rebuilds and runs `make test` in `out/coverage/` with clang source-based coverage, then prints an `llvm-cov` per-file summary and compares each file's line and branch coverage with `tools/coverage_baseline.txt` (`COVERAGE_TOLERANCE=<points>` makes a drop fail). `COVERAGE_MIN` and `COVERAGE_BRANCH_MIN` are floors for the total line and branch coverage, and `COVERAGE_NEW_FILE_MIN_LINES` / `COVERAGE_NEW_FILE_MIN_BRANCHES` the floors for a file the baseline does not list yet. All are empty (report only) by default; CI sets them. Requires clang plus `llvm-profdata`/`llvm-cov` (`xcrun` on macOS). See [Testing](../testing/#coverage).
+
+### `make coverage-ratchet`
+
+Runs `make coverage`, then raises each number in `tools/coverage_baseline.txt` that improved, adds files that are new and drops files that are gone. It never lowers a number, so it is the one to run after adding tests. Use the CI configuration, which the baseline describes:
+
+```sh
+make coverage-ratchet CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+```
 
 ### `make coverage-baseline`
 
-Runs `make coverage`, then rewrites `tools/coverage_baseline.txt` with every file's line coverage. Use the CI configuration, which the baseline describes:
+Runs `make coverage`, then rewrites `tools/coverage_baseline.txt` with every file's line and branch coverage, lower numbers included: for an intended drop (tests moved, a file split). Same configuration:
 
 ```sh
 make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
 ```
+
+### `make render-snapshots-update`
+
+Re-records the render snapshots (`tests/snapshots/`: the HUD, a level frame and the editor's side panels) after an intended change to what they draw. It runs the snapshot cases of `gameplay-mechanics-test` and `editor-ui-test` with `MANGO_SNAPSHOT_UPDATE=1`, which rewrites their hashes in `tests/snapshots/render_snapshots.txt`, then `tools/render_snapshots.py` copies the new frames there as compressed PNGs. Snapshots are recorded on the Memory backend only, so in a desktop configuration it runs itself again in `OUTDIR/headless` with `RAYLIB_PLATFORM=memory`. See [Testing](../testing/#render-snapshots).
+
+### `make replay-state-update`
+
+Re-records `tests/fixtures/determinism/expected_state.txt`, the state the committed replay reaches, after an intended change to the simulation. See [Testing](../testing/#cross-platform-determinism).
+
+### `make mutate`
+
+Runs `tools/mutate.py`: one small change at a time to `src/collision/` and the serializer's parsing code, a rebuild in `out/mutate/` on the Memory backend, and the test programs that exercise that file; it reports the kill rate and every change no test noticed. Slow (most of an hour for everything); `MUTATE_ARGS="--max 50"` samples, `MUTATE_ARGS="--target src/core/game_score.c"` picks another file. The weekly `mutation.yml` workflow runs it. See [Testing](../testing/#mutation-testing).
 
 ### `make doctor`
 
@@ -483,7 +509,7 @@ make doctor
 
 ### `make fuzz-corpus` / `make fuzz`
 
-`fuzz-corpus` replays the level, editor round-trip, profile and campaign/experiment fuzz seeds under ASan/UBSan with a plain driver; CI's sanitizer job passes `FUZZ_MUTATIONS=50`. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). `make fuzz-merge`, run after `make fuzz`, minimises each corpus under `out/fuzz/` with libFuzzer's `-merge=1` (only inputs that add coverage are kept); the weekly fuzz workflow runs it before saving the corpus. See [Testing](../testing/#fuzzing).
+`fuzz-corpus` replays the level, editor round-trip, profile, campaign/experiment, replay-script and bindings fuzz seeds under ASan/UBSan with a plain driver; CI's sanitizer job passes `FUZZ_MUTATIONS=50`. `fuzz` runs coverage-guided libFuzzer for `FUZZ_SECONDS` per harness and needs a clang with libFuzzer (`FUZZ_CC`). `make fuzz-merge`, run after `make fuzz`, minimises each corpus under `out/fuzz/` with libFuzzer's `-merge=1` (only inputs that add coverage are kept); the weekly fuzz workflow runs it before saving the corpus. `make fuzz-corpus-export`, also after `make fuzz`, copies into `tests/fuzz/corpus/<harness>/` only the inputs that reach code the committed seeds do not, for review and commit. See [Testing](../testing/#fuzzing).
 
 ```sh
 make fuzz-corpus FUZZ_MUTATIONS=500
@@ -719,14 +745,15 @@ make
 
 ## CI/CD Pipelines
 
-Five workflow files handle automated builds, docs checks, analysis and fuzzing; GitHub Pages publishing is part of `build.yml`:
+Six workflow files handle automated builds, docs checks, analysis, fuzzing and mutation testing; GitHub Pages publishing is part of `build.yml`:
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (a required check; see the [release checklist](../release-checklist/)), which on `main` pushes also warns when `main` is more than 50 commits past the latest `v*` tag (this was the separate `Release freshness` job); a `Changed paths` job that marks documentation-only pull requests; native game/editor tests, smoke and packaging (Windows with GCC); a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); scripted replay smoke on Linux; level validation on every native OS; WASM build/artifact/package checks; one informational `Windows x86_64 extras (clang -Werror, Mesa desktop backend)` job builds and tests with Clang under `-Werror`, then runs the Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL with GCC (hosted macOS runners have no OpenGL pixel format); a `Coverage (Linux x86_64)` job runs `make coverage` on the Memory backend with a line-coverage floor and a per-file check against `tools/coverage_baseline.txt` (no file may drop more than 2 points), posts the per-file table and the baseline comparison to the job summary and uploads `summary.txt` as the `coverage-summary` artifact; the Windows build leg and the extras job each cover something the other does not (comments in `build.yml`): the GCC build leg ships and checks the release zip, the extras job catches Clang warnings in `_WIN32`-only code and runs the real GLFW/OpenGL backend and the scripted smoke. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` (the tag is `v` plus the `VERSION` file; routine releases stay on 2.0.x) |
+| Build & Release | `build.yml` | Push to `main`, pull requests, `v*` tags, manual | Always-on `Docs drift` job (a required check; see the [release checklist](../release-checklist/)), which on `main` pushes also warns when `main` is more than 50 commits past the latest `v*` tag (this was the separate `Release freshness` job); a `Changed paths` job that marks documentation-only pull requests; native game/editor tests, smoke and packaging (Windows with GCC); a parallel `Sanitizers (Linux x86_64)` job runs `make sanitize` and `make sanitize-smoke` (ASan/UBSan/LeakSanitizer, undefined behaviour fatal); scripted replay smoke on Linux; level validation on every native OS; WASM build/artifact/package checks; one informational `Windows x86_64 extras (clang -Werror, Mesa desktop backend)` job builds and tests with Clang under `-Werror`, then runs the Windows (Mesa llvmpipe) tests, smoke and scripted smoke on real GLFW/OpenGL with GCC (hosted macOS runners have no OpenGL pixel format); a `Coverage (Linux x86_64)` job runs `make coverage` on the Memory backend with line and branch coverage floors and a per-file check against `tools/coverage_baseline.txt` (no file's line or branch coverage may drop more than 2 points, and a file not in the baseline yet must reach 80% of its lines and 60% of its branches), posts the per-file table and the baseline comparison to the job summary and uploads `summary.txt` as the `coverage-summary` artifact; the Windows build leg and the extras job each cover something the other does not (comments in `build.yml`): the GCC build leg ships and checks the release zip, the extras job catches Clang warnings in `_WIN32`-only code and runs the real GLFW/OpenGL backend and the scripted smoke. Superseded PR runs are cancelled; main/tag runs never are. Releases only on `v*` tags or manual dispatch on `main` (the tag is `v` plus the `VERSION` file; routine releases stay on 2.0.x) |
 | Docs | `docs.yml` | Relevant pull requests, weekly, manual | Frozen Bun install, lint, `bun audit`, build and `bun run check-site`; filters include root docs, source, content and workflows. `make docs-drift` is left to the always-on `Docs drift` job, and on `main` the `Pages build` job lints, builds and checks the site, so neither runs twice. The weekly run audits the lockfile against new advisories. Superseded PR runs are cancelled |
 | CodeQL | `codeql.yml` | Push/PR to `main`, weekly, manual | C/C++ (built), GitHub Actions, Python and JavaScript/TypeScript (no build) security-and-quality analysis; superseded PR runs are cancelled. The C/C++ job analyzes without uploading, drops code-quality (non-security) results located in third-party code (`out/` raylib headers, `vendor/`) with `tools/filter_codeql_sarif.py`, then uploads the SARIF with `upload-sarif` |
-| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 300 seconds per harness) on the level loader, the editor's save → load round trip, the profile and ghost decoders, and the campaign manifest loader and experiment capture decoder. After a successful search `make fuzz-merge` minimises each corpus (`-merge=1`); the result is kept in the Actions cache for the next run and uploaded as the `fuzz-corpus` artifact (90 days), and a run that finds no cache entry downloads the newest such artifact with `gh run download` instead of starting from the seeds. Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
+| Fuzz | `fuzz.yml` | Weekly, manual | Coverage-guided libFuzzer (`make fuzz`, 300 seconds per harness) on the level loader, the editor's save → load round trip, the profile and ghost decoders, the campaign manifest loader and experiment capture decoder, the `--replay-script` parser and the key/button bindings. After a successful search `make fuzz-merge` minimises each corpus (`-merge=1`); the result is kept in the Actions cache for the next run and uploaded as the `fuzz-corpus` artifact (90 days), and a run that finds no cache entry downloads the newest such artifact with `gh run download` instead of starting from the seeds. `make fuzz-corpus-export` then picks out the inputs that reach code the committed seeds do not; they are uploaded as the `fuzz-corpus-new` artifact and listed in the job summary, to be committed into `tests/fuzz/corpus/` by hand (the job has read-only access). Not a required check. Every pull request still replays the fuzz seed corpus, plus 50 blind mutations of each seed, under `make sanitize` |
+| Mutation | `mutation.yml` | Weekly, manual (optional `max` sample size) | `make mutate` on Linux: `tools/mutate.py` flips one comparison, operator or constant at a time in `src/collision/` and the serializer's parsing code, rebuilds and reruns the tests that exercise the file, and writes the kill rate and every surviving mutant to the job summary and the `mutation-report` artifact. Informational: it fails only when the unmutated code does not build or pass, never because mutants survived. Not a required check |
 | Static analysis | `static-analysis.yml` | Pull requests (not documentation-only ones), manual | `clang-tidy (informational)`: builds the pinned raylib for its headers, writes `compile_commands.json` and runs `tools/run_clang_tidy.py` with the checks in `.clang-tidy` (Clang static analyzer, `bugprone-*`, a few CERT C rules) over `src/` and `tools/` only. Findings go to the job summary; the job never fails on them and is not a required check |
 | Pages | `build.yml` jobs `pages-build` → `pages-deploy` → `live-site-check` | Main push/manual run on main, after `Docs drift`, the build matrix and `Sanitizers (Linux x86_64)` pass | Lints, builds and checks docs at the run's commit with read-only permissions, adds the same run's WASM artifact, HTTP-smokes the assembly; a separate job with only Pages/OIDC permissions deploys `docs/out/`. Keeping both in one workflow avoids a `workflow_run` trust boundary (no artifact from another run is consumed). `Live site check` then loads the published game in headless Chromium (`tools/live-check/check_live_site.mjs`, see [Testing](../testing/)) and reports without blocking anything |
 
@@ -782,9 +809,17 @@ action's `install:` input (which also lets the action's package cache cover
 them). Only runs on `main` turn that package cache on (`cache:`): the action
 has no restore-only mode, and with it on every pull request saved its own copy
 whenever MSYS2 shipped new packages, so pull requests and tags download the
-packages instead. MSYS2 cannot reliably install older
-package versions, so these are not pinned. A new compiler release can add a
-warning and fail a Windows leg with no source change. Each Windows job prints
+packages instead. MSYS2's mirrors keep only the newest build of each
+package, but its primary server, repo.msys2.org, keeps older ones, so the
+gating `Build (Windows x86_64)` leg pins its GCC: the action's `pin-gcc`
+input downloads that GCC and the two runtime packages it needs at its exact
+version (`libgcc`, `libstdc++`), checks each against a SHA-256 recorded in
+the action, and installs them over the rolling ones with `pacman -U`.
+Moving the pin is a deliberate edit of three file names and hashes. The
+`Windows x86_64 extras` job keeps the rolling GCC and Clang on purpose: it is
+where a new compiler's warnings appear first, without blocking a merge.
+Pinning Clang as well would mean pinning LLVM's many runtime packages, and the
+other MSYS2 packages (CMake, Python) keep rolling everywhere. Each Windows job prints
 `--version` and `pacman -Q` output in that action's "Record rolling MSYS2 toolchain versions" step;
 when a Windows-only `-Werror` failure appears, compare that output with the last
 green run before changing code. A Clang-only failure shows up in the Clang
