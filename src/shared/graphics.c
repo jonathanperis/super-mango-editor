@@ -1,7 +1,7 @@
 /* Window creation and final presentation. Individual render modules draw in
  * logical coordinates; this file maps their completed canvas to the window. */
 #include "graphics.h"
-#include "platform.h"  /* clock_seconds */
+#include "platform.h"  /* clock_cpu_seconds */
 #include "../input/input_backend.h"
 #include <rlgl.h>      /* rlDrawRenderBatchActive; after raylib.h */
 
@@ -208,7 +208,7 @@ double display_present(RenderTexture2D target)
      * first thing anyway) and read the clock: everything up to here is
      * drawing work, while EndDrawing mostly waits for the display. */
     rlDrawRenderBatchActive();
-    double drawn = clock_seconds();
+    double drawn = clock_cpu_seconds();
     EndDrawing(); /* Exactly one event poll and frame-pacing owner. */
     return drawn;
 }

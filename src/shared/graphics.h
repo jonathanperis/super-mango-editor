@@ -51,7 +51,7 @@ void display_follow_monitor(void);
 int display_monitor_changed(int paced_monitor, int current_monitor);
 
 /* Finish the frame: end texture mode, draw the canvas into the window
- * (display_viewport) and call EndDrawing. Returns clock_seconds() taken when
+ * (display_viewport) and call EndDrawing. Returns clock_cpu_seconds() taken when
  * every draw had been handed to the renderer but before EndDrawing, which
  * waits for the display; the game subtracts its start time from it to show
  * how long drawing took. Callers that do not time frames ignore it. */

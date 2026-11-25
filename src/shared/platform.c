@@ -35,16 +35,26 @@ uint64_t clock_millis(void)
 #endif
 }
 
-double clock_seconds(void)
+double clock_cpu_seconds(void)
 {
-#ifdef _WIN32
+#if defined(_WIN32)
+    /* Windows reports thread CPU time only in 15.6 ms ticks, far too coarse
+     * for one frame, so this is wall time from the performance counter. */
     LARGE_INTEGER frequency, now;
     QueryPerformanceFrequency(&frequency);
     QueryPerformanceCounter(&now);
     return (double)now.QuadPart / (double)frequency.QuadPart;
-#else
+#elif defined(__EMSCRIPTEN__)
+    /* A browser has no per-thread CPU clock; performance.now() it is. */
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
+    return (double)now.tv_sec + (double)now.tv_nsec * 1e-9;
+#else
+    /* Time this thread spent on a CPU. Unlike wall time it does not grow
+     * while the OS runs another program, so a busy machine (a build in
+     * the background) disturbs `make bench` much less. */
+    struct timespec now;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &now);
     return (double)now.tv_sec + (double)now.tv_nsec * 1e-9;
 #endif
 }

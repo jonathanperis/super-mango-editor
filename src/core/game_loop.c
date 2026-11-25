@@ -21,14 +21,14 @@
 #include "../input/game_replay.h"
 #include "../input/game_web_input.h"
 #include "../render/game_render.h"
-#include "../shared/platform.h"  /* clock_seconds */
+#include "../shared/platform.h"  /* clock_cpu_seconds */
 
 /* Execute one frame. AppSession is the only cross-platform loop owner. */
 int game_frame(GameState *gs)
 {
     /* CPU timing for the debug overlay and `make bench`: clock stamps
      * around the steps and the drawing (debug_note_frame_work, below). */
-    double frame_start = clock_seconds();
+    double frame_start = clock_cpu_seconds();
 
     /* ---- 1. Time ------------------------------------------------- */
     /* Real seconds since the last frame (clamped); smoke/replay runs get
@@ -57,7 +57,7 @@ int game_frame(GameState *gs)
      */
     if (game_simulation_blocked(gs)) (void)game_web_input_take_touch_mask();
 
-    double update_start = clock_seconds();
+    double update_start = clock_cpu_seconds();
     int steps = game_inspector_steps(gs, frame_seconds);
     for (int i = 0; i < steps; i++) {
         /* Every step, live or replayed, is GAME_FIXED_STEP; a replayed
@@ -74,7 +74,7 @@ int game_frame(GameState *gs)
         if (game_simulation_blocked(gs)) break;
     }
 
-    double update_end = clock_seconds();
+    double update_end = clock_cpu_seconds();
 
     /* ---- 4. Render ----------------------------------------------- */
     /* Rendering still runs on zero-step and blocked frames, so the last
@@ -83,7 +83,7 @@ int game_frame(GameState *gs)
      * handed over, before EndDrawing waits for the display. */
     gs->screen.debug.draw_submitted = update_end;
     int presented = game_render_frame(gs, cam_x, frame_seconds);
-    double frame_end = clock_seconds();
+    double frame_end = clock_cpu_seconds();
     debug_note_frame_work(&gs->screen.debug, (update_end - update_start) * 1000.0,
                           (gs->screen.debug.draw_submitted - update_end) * 1000.0,
                           (frame_end - frame_start) * 1000.0, texture_take_switches());

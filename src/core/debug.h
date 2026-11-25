@@ -69,7 +69,7 @@ typedef struct {
     float  frame_ms;          /* last frame duration in milliseconds      */
     float  frame_ms_display;  /* smoothed frame time shown on screen      */
 
-    /* CPU work per frame, measured with clock_seconds() around the fixed
+    /* CPU work per frame, measured with clock_cpu_seconds() around the fixed
      * steps (update) and around the drawing up to the hand-over to the
      * renderer (draw); see debug_note_frame_work. Summed between samples
      * and shown as averages, so one slow frame does not hide the trend. */
@@ -84,7 +84,7 @@ typedef struct {
     double run_update_ms, run_draw_ms, run_frame_ms;
     long   run_texture_switches;
     int    run_frames;
-    /* clock_seconds() when this frame's drawing was handed to the renderer
+    /* clock_cpu_seconds() when this frame's drawing was handed to the renderer
      * (the value display_present returns), set by game_render_frame. */
     double draw_submitted;
 
