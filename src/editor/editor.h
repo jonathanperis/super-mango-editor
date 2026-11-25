@@ -491,6 +491,18 @@ typedef struct {
 } EditorEntityList;
 
 /*
+ * EditorNudge — the last arrow-key nudge (tools_nudge.c).  A quick run of
+ * nudges of the same selection is one undo step: group is the undo group
+ * of the last nudge, ms when it happened (clock_millis), and
+ * selection_key which entities it moved.
+ */
+typedef struct {
+    int      group;
+    uint32_t ms;
+    uint64_t selection_key;
+} EditorNudge;
+
+/*
  * EditorMouse — the pointer as the editor last saw it, updated from every
  * input event (editor_events.c), and the view panning it drives.
  *
@@ -816,14 +828,8 @@ typedef struct {
     /* ---- Box (rubber-band) selection ---------------------------------- */
     EditorBoxSelect box;
 
-    /*
-     * Arrow-key nudges.  A quick run of nudges of the same selection is one
-     * undo step: nudge_group is the undo group of the last nudge, nudge_ms
-     * when it happened, and nudge_selection_key which entities it moved.
-     */
-    int            nudge_group;
-    uint32_t       nudge_ms;
-    uint64_t       nudge_selection_key;
+    /* ---- Arrow-key nudges (tools_nudge.c) ------------------------------ */
+    EditorNudge    nudge;
 
     /* ---- Play-test state ---------------------------------------------- */
     /*

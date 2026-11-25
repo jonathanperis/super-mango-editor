@@ -102,11 +102,11 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
      */
     now = (uint32_t)clock_millis();
     key = selection_key(items, count);
-    merge = es->nudge_group != 0 &&
-            undo_top_group(es->undo) == es->nudge_group &&
+    merge = es->nudge.group != 0 &&
+            undo_top_group(es->undo) == es->nudge.group &&
             es->undo->redo_top == 0 &&
-            now - es->nudge_ms < NUDGE_COALESCE_MS &&
-            key == es->nudge_selection_key;
+            now - es->nudge.ms < NUDGE_COALESCE_MS &&
+            key == es->nudge.selection_key;
     if (!merge) {
         /* Room for every selected entity, so a later nudge of the same
          * selection merged into this step fits too.  Without it, put the
@@ -118,24 +118,24 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
             editor_set_status(es, "Nothing moved: cannot allocate undo history");
             return;
         }
-        es->nudge_group = group;
+        es->nudge.group = group;
     }
     for (int i = 0; i < count; i++) {
         Command cmd;
         if (placement_same(items[i].type, &before[i], &after[i])) continue;
-        if (merge && undo_amend_after(es->undo, es->nudge_group, (int)items[i].type,
+        if (merge && undo_amend_after(es->undo, es->nudge.group, (int)items[i].type,
                                       items[i].index, &after[i])) continue;
         memset(&cmd, 0, sizeof(cmd));
         cmd.type = CMD_MOVE;
         cmd.entity_type = (int)items[i].type;
         cmd.entity_index = items[i].index;
-        cmd.group = es->nudge_group;
+        cmd.group = es->nudge.group;
         cmd.before = before[i];
         cmd.after = after[i];
         (void)undo_try_push(es->undo, &cmd);  /* fits the room begin reserved */
     }
     if (!merge) undo_group_end(es->undo);
-    es->nudge_ms = now;
-    es->nudge_selection_key = key;
+    es->nudge.ms = now;
+    es->nudge.selection_key = key;
     editor_refresh_dirty(es);
 }

@@ -104,7 +104,7 @@ static int nudge_after_undo_is_a_new_step(void)
     CHECK(es.undo->top == undo_top + 1 && es.undo->redo_top == 1);
 
     editor_select_only(&es, ENT_COIN, coin);
-    es.nudge_ms = (uint32_t)clock_millis();             /* well inside the run */
+    es.nudge.ms = (uint32_t)clock_millis();             /* well inside the run */
     key_frame(&es, KEY_RIGHT, 0);
     CHECK(es.level.coins[coin].x == x0 + 2.0f);
     CHECK(es.undo->top == undo_top + 2);                /* a step of its own */
@@ -141,7 +141,7 @@ static int arrow_keys_nudge_and_backspace_deletes(void)
     CHECK(es.level.coins[coin].x == x0 + 3.0f && es.level.coins[coin].y == y0 + 16.0f);
 
     /* After a pause, the next nudge is a step of its own. */
-    es.nudge_ms -= 2 * NUDGE_COALESCE_MS;
+    es.nudge.ms -= 2 * NUDGE_COALESCE_MS;
     key_frame(&es, KEY_LEFT, INPUT_SHIFT);
     key_frame(&es, KEY_UP, 0);
     CHECK(es.level.coins[coin].x == x0 + 3.0f - 16.0f && es.level.coins[coin].y == y0 + 15.0f);
