@@ -108,6 +108,36 @@ static void render_platforms(GameState *gs, int cam_x)
 }
 
 /*
+ * floor_piece_column — The 9-slice column (0 left cap, 1 fill, 2 right cap)
+ * of the floor piece at world x = tx, or -1 when it lies inside a gap.
+ * One pass over the gaps answers both questions.
+ */
+static int floor_piece_column(const GameState *gs, int tx)
+{
+    const int P = FLOOR_PIECE_W;
+    int at_left_edge  = tx <= 0;                                /* world start */
+    int at_right_edge = tx + P >= gs->world.runtime.world_w;    /* world end   */
+
+    for (int g = 0; g < gs->world.floor_gap_count; g++) {
+        int gx = gs->world.floor_gaps[g];
+        /*
+         * A piece at tx is inside a gap when both of its edges are:
+         *   gap_x <= tx  AND  tx + P <= gap_x + FLOOR_GAP_W
+         * (the 16-px piece fits in the 32-px gap).
+         */
+        if (tx >= gx && tx + P <= gx + FLOOR_GAP_W) return -1;
+        /* Beside a gap: a right cap if the gap starts right after this
+         * piece, a left cap if it ends right before it. */
+        if (tx + P == gx)               at_right_edge = 1;
+        if (tx     == gx + FLOOR_GAP_W) at_left_edge  = 1;
+    }
+
+    if (at_left_edge && !at_right_edge) return 0;
+    if (at_right_edge && !at_left_edge) return 2;
+    return 1;  /* fill, including a piece squeezed between two edges */
+}
+
+/*
  * Layer 3: the floor. 9-slice rendering, camera-aware, world-wide.
  *
  * The 48×48 floor tileset (the level's floor_tile_path, by default
@@ -141,6 +171,18 @@ static void render_floor(GameState *gs, int cam_x)
     /* First piece column at or before the left edge of the viewport */
     int floor_start_tx = (cam_x / P) * P;
 
+    /*
+     * Which 9-slice column each visible piece uses, worked out once per
+     * frame. It depends on tx alone, not on the row, so deciding it inside
+     * the row loop below repeated the same gap checks for all three rows.
+     * At most GAME_W / P + 1 pieces are visible; one spare slot is a guard.
+     */
+    enum { FLOOR_COLUMNS_MAX = GAME_W / FLOOR_PIECE_W + 2 };
+    int piece_cols[FLOOR_COLUMNS_MAX];
+    int columns = 0;
+    for (int tx = floor_start_tx; tx < cam_x + GAME_W && columns < FLOOR_COLUMNS_MAX; tx += P)
+        piece_cols[columns++] = floor_piece_column(gs, tx);
+
     for (int ty = FLOOR_Y; ty < GAME_H; ty += P) {
         /* Choose which row of the 9-slice to sample */
         int piece_row;
@@ -148,47 +190,9 @@ static void render_floor(GameState *gs, int cam_x)
         else if (ty + P >= GAME_H) piece_row = 2;  /* bottom: base edge  */
         else                       piece_row = 1;  /* middle: dirt fill  */
 
-        for (int tx = floor_start_tx; tx < cam_x + GAME_W; tx += P) {
-            /*
-             * Skip this piece if it falls inside any sea gap.
-             * A piece at tx is inside a gap when:
-             *   gap_x <= tx  AND  tx + P <= gap_x + FLOOR_GAP_W
-             * (both edges of the 16-px piece are within the 32-px gap).
-             */
-            int in_gap = 0;
-            for (int g = 0; g < gs->world.floor_gap_count; g++) {
-                int gx = gs->world.floor_gaps[g];
-                if (tx >= gx && tx + P <= gx + FLOOR_GAP_W) {
-                    in_gap = 1;
-                    break;
-                }
-            }
-            if (in_gap) continue;
-
-            /*
-             * Choose which column of the 9-slice to sample.
-             * Use edge caps at gap boundaries so the floor has
-             * clean left/right edges beside each hole.
-             */
-            int piece_col;
-            int at_left_edge  = 0;
-            int at_right_edge = 0;
-
-            /* World boundaries */
-            if (tx <= 0)                at_left_edge  = 1;
-            if (tx + P >= gs->world.runtime.world_w)  at_right_edge = 1;
-
-            /* Gap boundaries: piece is a right-cap if next piece is gap,
-             * left-cap if previous piece was gap. */
-            for (int g = 0; g < gs->world.floor_gap_count; g++) {
-                int gx = gs->world.floor_gaps[g];
-                if (tx + P == gx)                at_right_edge = 1;  /* gap starts right after this piece */
-                if (tx     == gx + FLOOR_GAP_W)  at_left_edge  = 1;  /* gap ends right before this piece  */
-            }
-
-            if (at_left_edge && !at_right_edge)       piece_col = 0;
-            else if (at_right_edge && !at_left_edge)  piece_col = 2;
-            else                                      piece_col = 1;  /* fill, including a piece squeezed between two edges */
+        for (int i = 0; i < columns; i++) {
+            if (piece_cols[i] < 0) continue;  /* a sea gap: no floor here */
+            int tx = floor_start_tx + i * P;
 
             /*
              * src  — the 16×16 region to cut from the tile sheet.
@@ -196,8 +200,8 @@ static void render_floor(GameState *gs, int cam_x)
              *        Pieces outside the viewport are discarded by the target's
              *        internal clipping — no manual culling needed.
              */
-            IntRect src = { piece_col * P, piece_row * P, P, P };
-            IntRect dst = { tx - cam_x,    ty,            P, P };
+            IntRect src = { piece_cols[i] * P, piece_row * P, P, P };
+            IntRect dst = { tx - cam_x,        ty,            P, P };
             sprite_draw(tileset, &src, &dst, 0, SPRITE_NORMAL, WHITE);
         }
     }
