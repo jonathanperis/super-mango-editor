@@ -719,6 +719,13 @@ FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
 FUZZ_CAMPAIGN_SRCS = tests/fuzz_campaign_experiment.c src/levels/campaign_catalog.c \
                      src/levels/level_path.c src/core/game_experiment_file.c \
                      $(FUZZ_SERIALIZER_SRCS)
+# The `--replay-script` parser (tests/fuzz_replay_script.c): input/game_replay.c
+# pushes its key events through input_backend.c.
+FUZZ_REPLAY_SRCS = tests/fuzz_replay_script.c src/input/game_replay.c src/input/input_backend.c \
+                   src/shared/graphics.c src/shared/platform.c
+# The key and button bindings (tests/fuzz_bindings.c): game_bindings.c and the
+# profile code that saves and loads them, the same files the profile harness uses.
+FUZZ_BINDINGS_SRCS = tests/fuzz_bindings.c $(filter-out tests/fuzz_profile_decode.c,$(FUZZ_PROFILE_SRCS))
 FUZZ_HEADERS = $(wildcard $(SRCDIR)/*.h $(SRCDIR)/*/*.h $(VENDOR_DIR)/*.h)
 # Seeds are read in place: shipped levels, schema fixtures, extra edge cases.
 FUZZ_LEVEL_SEEDS = levels levels/labs tests/fixtures/serializer_v1 \
@@ -730,6 +737,13 @@ FUZZ_EDITOR_SEEDS = $(FUZZ_LEVEL_SEEDS) tests/fuzz/corpus/editor
 # Manifests (shipped, broken fixtures, edge cases) and captures.
 FUZZ_CAMPAIGN_SEEDS = levels/campaigns tests/fixtures/campaign_manifest \
                       tests/fuzz/corpus/campaign tests/fuzz/corpus/experiment
+# Replay scripts (committed_determinism.replay is the determinism fixture) and
+# bindings. libFuzzer reads seed folders, never single files.
+FUZZ_REPLAY_SEEDS = tests/fuzz/corpus/replay
+FUZZ_BINDINGS_SEEDS = tests/fuzz/corpus/bindings
+# Every harness, by the name its fuzzer, its OUTDIR/fuzz/ folder and its
+# tests/fuzz/corpus/ folder share.
+FUZZ_HARNESSES = level profile editor campaign replay bindings
 FUZZ_MUTATIONS ?= 0
 FUZZ_SECONDS ?= 60
 # Words libFuzzer may splice into an input, and the longest input it builds:
@@ -738,14 +752,18 @@ FUZZ_SECONDS ?= 60
 FUZZ_DICT = tests/fuzz/toml.dict
 FUZZ_RUN_FLAGS = -max_total_time=$(FUZZ_SECONDS) -close_fd_mask=2 \
                  -dict=$(FUZZ_DICT) -max_len=65536
+# Replay scripts are not TOML: their harness gets its own words.
+FUZZ_REPLAY_RUN_FLAGS = $(filter-out -dict=%,$(FUZZ_RUN_FLAGS)) -dict=tests/fuzz/replay.dict
 FUZZ_CC ?= $(firstword $(wildcard /opt/homebrew/opt/llvm/bin/clang /usr/local/opt/llvm/bin/clang) clang)
 
 .PHONY: fuzz-corpus fuzz
-fuzz-corpus: $(OUTDIR)/fuzz-level-replay $(OUTDIR)/fuzz-profile-replay $(OUTDIR)/fuzz-editor-replay $(OUTDIR)/fuzz-campaign-replay ## Test: Replay the fuzz seeds under ASan/UBSan (FUZZ_MUTATIONS=N)
+fuzz-corpus: $(addprefix $(OUTDIR)/fuzz-,$(addsuffix -replay,$(FUZZ_HARNESSES))) ## Test: Replay the fuzz seeds under ASan/UBSan (FUZZ_MUTATIONS=N)
 	"$(abspath $(OUTDIR))/fuzz-level-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-profile-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_PROFILE_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-editor-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_EDITOR_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz-campaign-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_CAMPAIGN_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz-replay-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_REPLAY_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz-bindings-replay" -mutate=$(FUZZ_MUTATIONS) $(FUZZ_BINDINGS_SEEDS)
 
 # level.h includes raylib's headers, so every replay waits for raylib's build
 # even where it links no raylib code.
@@ -761,10 +779,17 @@ $(OUTDIR)/fuzz-profile-replay: tests/fuzz_replay_main.c $(FUZZ_PROFILE_SRCS) $(F
 $(OUTDIR)/fuzz-campaign-replay: tests/fuzz_replay_main.c $(FUZZ_CAMPAIGN_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
 	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_CAMPAIGN_SRCS) $(MATH_LIBS)
 
+$(OUTDIR)/fuzz-replay-replay: tests/fuzz_replay_main.c $(FUZZ_REPLAY_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
+	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_REPLAY_SRCS) $(LIBS)
+
+$(OUTDIR)/fuzz-bindings-replay: tests/fuzz_replay_main.c $(FUZZ_BINDINGS_SRCS) $(FUZZ_HEADERS) $(RAYLIB_LIB) $(FUZZ_FLAGS_STAMP) | $(OUTDIR)
+	$(CC) $(FUZZ_FLAGS) -o $@ tests/fuzz_replay_main.c $(FUZZ_BINDINGS_SRCS) $(LIBS)
+
 # -close_fd_mask=2 hides the loaders' per-input error lines; libFuzzer keeps
 # its own and the sanitizer reports.  Crashes land in $(OUTDIR)/fuzz/ and
 # replay with the matching program: $(OUTDIR)/fuzz-level-replay <crash-file>
-# (or fuzz-profile-replay, fuzz-editor-replay, fuzz-campaign-replay).
+# (or fuzz-profile-replay, fuzz-editor-replay, fuzz-campaign-replay,
+# fuzz-replay-replay, fuzz-bindings-replay).
 #
 # Each harness gets its own folder under $(OUTDIR)/fuzz/. libFuzzer writes
 # every input that reached new code there, and reads them back on the next
@@ -778,11 +803,13 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 		echo "      make fuzz FUZZ_CC=\$$(brew --prefix llvm)/bin/clang"; \
 		echo "fuzz: without libFuzzer, 'make fuzz-corpus FUZZ_MUTATIONS=500' runs blind mutations."; \
 		exit 1; }
-	mkdir -p $(OUTDIR)/fuzz/level $(OUTDIR)/fuzz/profile $(OUTDIR)/fuzz/editor $(OUTDIR)/fuzz/campaign
+	mkdir -p $(addprefix $(OUTDIR)/fuzz/,$(FUZZ_HARNESSES))
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/level-fuzzer $(FUZZ_LEVEL_SRCS) $(MATH_LIBS)
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/profile-fuzzer $(FUZZ_PROFILE_SRCS) $(LIBS)
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/editor-fuzzer $(FUZZ_EDITOR_SRCS) $(MATH_LIBS)
 	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/campaign-fuzzer $(FUZZ_CAMPAIGN_SRCS) $(MATH_LIBS)
+	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/replay-fuzzer $(FUZZ_REPLAY_SRCS) $(LIBS)
+	$(FUZZ_CC) $(FUZZ_FLAGS) -fsanitize=fuzzer -o $(OUTDIR)/fuzz/bindings-fuzzer $(FUZZ_BINDINGS_SRCS) $(LIBS)
 	"$(abspath $(OUTDIR))/fuzz/level-fuzzer" $(FUZZ_RUN_FLAGS) \
 		-artifact_prefix=$(OUTDIR)/fuzz/level- $(OUTDIR)/fuzz/level $(FUZZ_LEVEL_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz/profile-fuzzer" $(FUZZ_RUN_FLAGS) \
@@ -791,6 +818,10 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 		-artifact_prefix=$(OUTDIR)/fuzz/editor- $(OUTDIR)/fuzz/editor $(FUZZ_EDITOR_SEEDS)
 	"$(abspath $(OUTDIR))/fuzz/campaign-fuzzer" $(FUZZ_RUN_FLAGS) \
 		-artifact_prefix=$(OUTDIR)/fuzz/campaign- $(OUTDIR)/fuzz/campaign $(FUZZ_CAMPAIGN_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz/replay-fuzzer" $(FUZZ_REPLAY_RUN_FLAGS) \
+		-artifact_prefix=$(OUTDIR)/fuzz/replay- $(OUTDIR)/fuzz/replay $(FUZZ_REPLAY_SEEDS)
+	"$(abspath $(OUTDIR))/fuzz/bindings-fuzzer" $(FUZZ_RUN_FLAGS) \
+		-artifact_prefix=$(OUTDIR)/fuzz/bindings- $(OUTDIR)/fuzz/bindings $(FUZZ_BINDINGS_SEEDS)
 
 # A corpus only grows: every run adds the inputs that reached new code, and
 # many of them are later covered by other inputs too. libFuzzer's -merge=1
@@ -798,7 +829,6 @@ fuzz: $(RAYLIB_LIB) | $(OUTDIR) ## Test: libFuzzer search for FUZZ_SECONDS (need
 # first, and that folder then replaces the old one. It reuses the fuzzers
 # `make fuzz` built; the weekly CI job runs it after each search, before the
 # corpus goes into the cache and the fuzz-corpus artifact.
-FUZZ_HARNESSES = level profile editor campaign
 .PHONY: fuzz-merge
 fuzz-merge: ## Test: Minimise the libFuzzer corpora in OUTDIR/fuzz with -merge=1 (after make fuzz)
 	@for harness in $(FUZZ_HARNESSES); do \
@@ -810,6 +840,29 @@ fuzz-merge: ## Test: Minimise the libFuzzer corpora in OUTDIR/fuzz with -merge=1
 		before=$$(ls "$$corpus" | wc -l | tr -d ' '); after=$$(ls "$$corpus.merged" | wc -l | tr -d ' '); \
 		rm -rf "$$corpus" && mv "$$corpus.merged" "$$corpus" || exit 1; \
 		echo "fuzz-merge: $$harness corpus $$before -> $$after inputs"; \
+	done
+
+# Bring what the search found back into the committed seeds. For each
+# harness, libFuzzer's -merge=1 copies into tests/fuzz/corpus/<harness>/ only
+# the inputs of OUTDIR/fuzz/<harness>/ that reach code the committed seeds
+# do not (named by their SHA-1), so the folder grows by what is new, not by
+# everything the search kept. Inputs longer than FUZZ_EXPORT_MAX_LEN bytes
+# are cut to that length, to keep the corpus small enough to read. Run it
+# after `make fuzz` (or after unpacking the weekly fuzz-corpus artifact into
+# OUTDIR/fuzz), then review `git status tests/fuzz/corpus` and commit.
+FUZZ_EXPORT_MAX_LEN ?= 4096
+.PHONY: fuzz-corpus-export
+fuzz-corpus-export: ## Generate: Copy inputs that add fuzz coverage into tests/fuzz/corpus
+	@for harness in $(FUZZ_HARNESSES); do \
+		fuzzer="$(abspath $(OUTDIR))/fuzz/$$harness-fuzzer"; \
+		found="$(OUTDIR)/fuzz/$$harness"; corpus="tests/fuzz/corpus/$$harness"; \
+		[ -x "$$fuzzer" ] || { echo "fuzz-corpus-export: $$fuzzer is missing; run make fuzz first"; exit 1; }; \
+		[ -d "$$found" ] || { echo "fuzz-corpus-export: no $$found, skipping $$harness"; continue; }; \
+		mkdir -p "$$corpus" || exit 1; \
+		before=$$(ls "$$corpus" | wc -l | tr -d ' '); \
+		"$$fuzzer" -merge=1 -close_fd_mask=2 -max_len=$(FUZZ_EXPORT_MAX_LEN) "$$corpus" "$$found" || exit 1; \
+		after=$$(ls "$$corpus" | wc -l | tr -d ' '); \
+		echo "fuzz-corpus-export: $$corpus $$before -> $$after inputs"; \
 	done
 
 # Test objects: one rule for every source. $(OUTDIR) is skipped once out/

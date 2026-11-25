@@ -2,9 +2,11 @@ name: Fuzz
 
 # Weekly coverage-guided search of the level loader, the editor's save -> load
 # round trip (tests/fuzz_editor_roundtrip.c), the profile and ghost decoders,
-# and the campaign manifest loader and experiment capture decoder
-# (tests/fuzz_campaign_experiment.c); `make fuzz` runs each harness in turn
-# for FUZZ_SECONDS. Pull requests already replay the seed corpus under
+# the campaign manifest loader and experiment capture decoder
+# (tests/fuzz_campaign_experiment.c), the `--replay-script` parser
+# (tests/fuzz_replay_script.c) and the key/button bindings
+# (tests/fuzz_bindings.c); `make fuzz` runs each harness in turn for
+# FUZZ_SECONDS. Pull requests already replay the seed corpus under
 # `make sanitize` in build.yml. This job is not a required check: a crash
 # here is a bug to fix, and the failing input is uploaded from out/fuzz/.
 #
@@ -17,6 +19,14 @@ name: Fuzz
 # unused, or the repository's 10 GB limit); when no cache entry is found,
 # the job downloads the newest `fuzz-corpus` artifact of an earlier
 # successful run with the GitHub CLI instead of starting from the seeds.
+#
+# The cache and the artifact expire, the repository does not: each run also
+# runs `make fuzz-corpus-export`, which picks out the inputs that reach code
+# the committed seeds in tests/fuzz/corpus/ do not, and uploads just those
+# as the `fuzz-corpus-new` artifact (and lists them in the job summary). To
+# keep them, download that artifact into tests/fuzz/corpus/ and commit it.
+# The job cannot push: it only has read access, and main takes changes
+# through reviewed pull requests.
 on:
   schedule:
     - cron: "15 4 * * 1"
@@ -39,8 +49,9 @@ jobs:
     permissions:
       contents: read
       actions: read
-    # Four harnesses of FUZZ_SECONDS each, plus the build and the merge.
-    timeout-minutes: 50
+    # Six harnesses of FUZZ_SECONDS each, plus the build, the merge and the
+    # export.
+    timeout-minutes: 60
     env:
       RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
       CC: clang
@@ -77,6 +88,8 @@ jobs:
             out/fuzz/profile
             out/fuzz/editor
             out/fuzz/campaign
+            out/fuzz/replay
+            out/fuzz/bindings
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: |
             fuzz-corpus-
@@ -116,7 +129,40 @@ jobs:
             out/fuzz/profile
             out/fuzz/editor
             out/fuzz/campaign
+            out/fuzz/replay
+            out/fuzz/bindings
           if-no-files-found: warn
+          retention-days: 90
+
+      # What is new against the committed seeds: export into a copy of
+      # tests/fuzz/corpus, then keep only the files the copy gained.
+      - name: Pick out inputs the committed seeds do not cover
+        run: |
+          cp -R tests/fuzz/corpus out/fuzz/corpus-before
+          make fuzz-corpus-export
+          mkdir -p out/fuzz/corpus-new
+          (cd tests/fuzz/corpus && find . -type f) | sort > out/fuzz/after.txt
+          (cd out/fuzz/corpus-before && find . -type f) | sort > out/fuzz/before.txt
+          comm -13 out/fuzz/before.txt out/fuzz/after.txt > out/fuzz/new.txt
+          while read -r file; do
+            mkdir -p "out/fuzz/corpus-new/$(dirname "$file")"
+            cp "tests/fuzz/corpus/$file" "out/fuzz/corpus-new/$file"
+          done < out/fuzz/new.txt
+          {
+            echo "### Fuzz inputs the committed seeds do not cover"
+            echo
+            echo "$(wc -l < out/fuzz/new.txt | tr -d ' ') new inputs. Download the"
+            echo '`fuzz-corpus-new` artifact into `tests/fuzz/corpus/` and commit it to keep them.'
+            echo
+            sed 's/^/- /' out/fuzz/new.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the new inputs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-corpus-new
+          path: out/fuzz/corpus-new
+          if-no-files-found: ignore
           retention-days: 90
 
       - name: Upload crashes
