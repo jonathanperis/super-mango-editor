@@ -1,0 +1,9 @@
+format_version = 1
+last_level = "levels/kon.toml"
+[[levels]]
+path = "levels/kon.toml"
+score = 5
+coins = 1
+time = 3
+[[levels]]
+# # A Super

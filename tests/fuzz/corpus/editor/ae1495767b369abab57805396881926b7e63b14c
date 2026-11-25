@@ -1,0 +1,12 @@
+er_start_x = 900.0
+player_start_y = 252.0
+ives = 3
+layoutfloor_tiath = "as+sets/sprites/levels/grass_tileset.ğng"
+
+[[checkpoints]]
+x = 9370.0
+y = 252.0
+
+[last_star]
+x = 1500.0
+y = 228.0

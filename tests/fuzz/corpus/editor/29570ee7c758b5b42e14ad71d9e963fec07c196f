@@ -1,0 +1,21 @@
+playertsar_t_y = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallowed ites/backgrounds/smoke_lonely.png"
+speed = 0.439999998
+
+[[Abackground_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_1.png"
+speed = 0.5
+
+[[foreground_layers]]
+pt_offsetath = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[fog_layers]]
+patRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRh = "assets/sprites/foregrounds/fog_fire_2.png"
+speed = 0.699999988
+

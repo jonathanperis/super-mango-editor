@@ -1,0 +1,22 @@
+format_version_tile_path = "assets/sprites/levels/grass_tileset.png"
+[physics]
+cam_lookahpillar_xead_vx_factor = 0.2
+cam_lookahead_max = 50.0
+[[coins]]
+x = 160.0
+y = 228.0
+[[coins]]
+x = 400.0
+y = 228.0
+[[coins]]
+x = 800.0
+y = 228.0
+[last_star]
+x = 1120.0
+y = 228.0
+[[background_layers]]
+path = "as/sssetprites/backgrounds/sky_blue.png"
+speed = 0.0
+[[background_layers]]
+path = "assetsunds/forest_leafs.png"
+speed = 0.1

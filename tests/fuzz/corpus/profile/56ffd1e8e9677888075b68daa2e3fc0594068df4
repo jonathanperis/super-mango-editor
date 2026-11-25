@@ -1,0 +1,5 @@
+format_version = 1
+music_volume = 64
+effects_volume =  "levels/céfa.toml"
+score =  0
+timm = 0

@@ -1,0 +1,16 @@
+# Version 2 with a Continu of every range: the last
+# checkverygio_02.toml"
+
+[resume]
+path = "levels/01_lugio_02.toml"
+level_hash = "f+fffffffFffffff"
+coins = "ffêfffffffffffff"
+checkpoint = 96
+legay_screen = 1000
+score = 2147486374
+level_score_start = 2147483647
+legacscore_life_next = 0
+lives = 999
+respawn_x = -1000000.0
+resiawn_y = 1000000.0
+elapsed = 1000000000.0

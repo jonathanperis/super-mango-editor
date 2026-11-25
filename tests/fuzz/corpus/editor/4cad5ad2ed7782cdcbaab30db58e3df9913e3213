@@ -1,0 +1,9 @@
+fo= 40
+w = 6
+h = 0
+end_cap = 0
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = -2.0

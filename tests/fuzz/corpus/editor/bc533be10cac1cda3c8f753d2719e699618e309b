@@ -1,0 +1,185 @@
+format_version = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened iprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2157.5
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2600.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 3050.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[coins]]
+x = 155.0
+y = 236.0
+
+[[coins]]
+x = 250.0
+y = 236.0
+
+[[coins]]
+x = 320.0
+y = 236.0
+
+[[coins]]
+x = 216.0
+y = 108.0
+
+[[coins]]
+x =2560.0
+
+[[fire_flames]]
+x = 2880.0
+
+[[float_platforms]]
+mode = "STATIC"
+x = 442.5
+y = 186.5
+tile_count = 3
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[float_platforms]]
+mode = "CRUMBLE"
+x = 1344.0
+y = 184.0
+tile_count = 3
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[float_platforms]]
+mode = "RAIL"
+x = 0.0
+y = 0.0
+tile_count = 3
+rail_index = 1
+t_offset = 3.0
+speed = 2.0
+
+[[bridges]]
+x = 2700.0
+y = 172.0
+brick_count = 10
+
+[[bouncepads_small]]
+x = 504.5
+launch_vy = -380.0
+pad_type = "GREEN"
+
+[[bouncepads_medium]]
+x = 1764.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_medium]]
+x = 2288.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_high]]
+x = 3120.0
+launch_vy = -700.0
+pad_type = "RED"
+
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
+[[vines]]
+x = 568.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 1858.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 2165.5
+y = 126.0
+tile_count = 3
+vine_type = 1
+
+[[ropes]]
+x = 87.5
+y = 172.0
+tile_count = 2
+
+[[ropes]]
+x = 808.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1228.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1688.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 2608.0
+y = 124.0
+tile_count = 3
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_fire.png"
+speed = 0.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_bg.png"
+speed = 0.0799999982
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/volcanic_mountains.png"
+speed = 0.150000006
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_3.png"
+speed = 0.25
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_2.png"
+speed = 0.379999995
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_lonely.png"
+speed = 0.439999998
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_1.png"
+speed = 0.5
+
+[[foreground_layers]]
+path = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_2.png"
+speed = 0.699999988
+

@@ -1,0 +1,8 @@
+player_okahead_vx_fact= "bell\u0006 unit\u001F% nl\n"
+screen_count = 2
+floor_gaps = [64, 384]
+
+[last_star]
+h = 700.0
+y = 100.0
+next_phase = "l0selv/1e_lugio_01.toml"

@@ -1,0 +1,8 @@
+# Sup:1
+level = "levels/00_01.toml"
+level_hash = "fedãba9876543210"
+time = 0.0833333358
+steps = 2
+frames = [
+  "0900022c0004510ghost04540117steps_path2d",
+]

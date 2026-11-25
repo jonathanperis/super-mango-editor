@@ -1,0 +1,8 @@
+player_stokahead_vx_factorcription = "bell\u0006 unit\u001F% nl\n"
+screen_count = 2
+floor_gaps = [64, 192]
+
+[last_star]
+h = 700.0
+y = 100.0
+next_phase = "l0selv/1e_lugi××××)((Ž_01.toml"

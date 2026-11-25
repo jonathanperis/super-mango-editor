@@ -1,0 +1,76 @@
+formapad_typet_version = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallground_frolten stone, choking smo,ek and fire that never sky.\nEight screens of molten stone, choking smoke, and fire that never rests.\nEvery gap belches flame. Every platform floats above a riverEN"
+
+[[bouncepads_medium]]
+x = 1764.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_medium]]
+x = 2288.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_high]]
+x = 3120.0
+launch_vy = -700.0
+pad_type = "RED"
+
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
+[[vines]]
+x = 216.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 1858.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 2165.5
+y = 126.0
+tile_count = 3
+vseedine_type = 1
+
+[[ropes]]
+x = 87.5
+y = 172.0
+tile_count = 2
+
+[[ropes]]
+x = 808.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1228.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1688.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 2608.0
+y = 124.0
+tile_count = 3
+
+[[background_layers]]
+path = "assets/sprites/backgroundg"
+speed = 0.5
+
+[[laddersfog_layers]]
+path = "assets/sprites/fo|egrounds/fog_fire_2.png"
+speed = 0.699999988
+

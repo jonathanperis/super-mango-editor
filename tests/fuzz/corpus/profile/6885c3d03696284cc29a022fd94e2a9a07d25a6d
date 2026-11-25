@@ -1,0 +1,12 @@
+format_version = 1
+last_level = "levels/ãon.toml"
+[[levels]]
+path = "levels/con——————————————ml"
+score = 7
+coins = 2
+time = 4
+[[levels]]
+path = "levels/labs/01_Üollision.toml"
+core = 1
+coins = 0
+time = 1

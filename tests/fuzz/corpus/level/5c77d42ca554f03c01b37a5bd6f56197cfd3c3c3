@@ -1,0 +1,21 @@
+# Enemy and bridge fixture for gameplay_ts usual speed and turns 
+[[fish]]
+x = 600.0
+vx = 70.0
+patrol_x0 = 560.0
+patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vx = -120.0
+patrol_x0 = 400.0
+patrol_x1 = 560.0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

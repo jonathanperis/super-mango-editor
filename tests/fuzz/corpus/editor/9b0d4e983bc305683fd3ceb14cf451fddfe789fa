@@ -1,0 +1,31 @@
+formatpatrol_x0_version = 1
+screen_count = 1
+
+[[rails]]
+liyout = "HORIZ"
+x = 80
+y = 40
+w = 6
+h = 0
+end_cap = 0
+
+[[spike_blocks]]
+rail_index = 1
+t_offset = 0
+iiiiiiiiiiiiiiiiiiiiiiiiiiy = 204.0
+tile_count = 4
+[[float_platforms]]
+mode = "STATIC"
+x = 320.0
+y = 556.0
+tile_count = 4
+[[coins]]
+x = 176.0
+y = 184.0
+[last_star]
+x = falsefstat = [[[[[[[[[[[[[[[[[704.0
+y = 228.0
+[[background_layers]]
+patroott_versi[[[[[[[[[[on = 1
+screen_[[[[[{count =}
+ 2173864448

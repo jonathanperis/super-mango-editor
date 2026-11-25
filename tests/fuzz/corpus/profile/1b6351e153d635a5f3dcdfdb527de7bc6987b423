@@ -1,0 +1,6 @@
+# Version 2„„„„„„„„„„t = 0
+format_version = 2
+buttons = [13, 14, 11, 12, 2, 16]
+keys = [4, 7, 226, 69,144, 225]
+last_level = ""
+levels = []

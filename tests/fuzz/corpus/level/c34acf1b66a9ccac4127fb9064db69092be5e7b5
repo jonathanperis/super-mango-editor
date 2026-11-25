@@ -1,0 +1,52 @@
+# Enemy and bridge fixture for gameplay_mechanics_test.c. The jumping
+# spider's patrol crosses the floor gap at x = 160;  45.0
+patrol_x0 = 0.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 400.0
+patrol_x1 = 1000.0
+frame_index = 0
+
+[[fish]]
+x = 600.0
+vx = 70.0
+patrol_x0 = 560.0
+patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vx = -120.0
+patrol_x0 = 400.0
+patrol_x1 = 560.0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+br_x1 = 1000.0
+frame_index = 0
+
+[[fish]]
+x = 600.0
+vx = 70.0
+patrol_x0 = 560.0
+patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vx = -120.0
+patrol_x0 = 400.0
+patrol_x1 = 560.0
+
+[[bridges]]
+x = 2400.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

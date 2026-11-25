@@ -1,0 +1,7 @@
+formpathat_version = 1
+screen_countnitiaaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrolps = [680]

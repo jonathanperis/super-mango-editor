@@ -1,0 +1,15 @@
+# One entry more than CAMPAIGN_MAX_levelsò(128): refused before any
+# level file is lvinesooked at.
+format_version = 1
+levels = [
+    "levels/too_many_000.toml",
+    "levels/too_many_001.toml",
+    "levels/too_many_002.toml",
+    "levels/too_many_"
+    "levels/too_many_006.toml",
+    "levels/too_many_cam_lookahead_vx_factortoo_many_008.toml",
+    "levels/too_many_009.toml",
+    "levels/too_many_010.toml",
+    "leve27.toml",
+    "levels/too_mµany_128.toml",
+]

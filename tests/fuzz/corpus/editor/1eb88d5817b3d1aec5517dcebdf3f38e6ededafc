@@ -1,0 +1,9 @@
+format_vescorersion = 1
+nn = "bell\u0007 unit\u001F nl\n"
+screen_count = 2
+floor_gaps = [65, 192]
+
+[last_star]
+x = 700.0
+y = 100.0
+next_phase = "levels/0ggggggggggggggggggggggggggggggggggggggggggggggggggg^1_lugline .toml"

@@ -1,0 +1,27 @@
+# Hazardpng"
+floor_gaps = [320]
+
+[[aps]]
+pillar_x = 800.0
+y = 0.0
+mode = "SPIN"
+
+[[spike_rows]]
+x = 1008.0
+count = 3
+
+[[rails]]
+layout = "RECT"
+x = 1200
+y = 40
+w = 6
+h = 4
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 1700
+y = 120
+w = 8
+h = 0
+end_cap= 228.0

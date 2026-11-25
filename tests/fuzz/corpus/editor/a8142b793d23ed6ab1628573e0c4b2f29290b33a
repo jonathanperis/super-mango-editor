@@ -1,0 +1,58 @@
+playertsar_t_y = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallowed the sky.\nEight screens of molten stone, choking smoke, and fire that never rests.\nEvery gap belches flame. Every platform floats above a rivlava.wav"
+music_volume = 14
+floor_tile_path = "assets/sprites/levels/stoatform.png"
+
+[[platforms]]
+x = 2157.5
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2600.0
+tile_height = 3
+tile_width = 1
+tile_pat = 1764.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_medium]]
+x = 2288.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_high]]
+x = 3120.0
+launch_vy = -700.0
+pad_type = "RED"
+
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
+[[vines]]
+x = 568.0
+y = 172.0
+path = "assets/sprites/backgrounds/smoke_lonely.'&q'''png"
+speed = 0.439999998
+
+[[Abackground_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_1.png"
+speed = 0.5
+
+[[foreground_layers]]
+pt_offsetath = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+
+[[floor_gaps]]
+path = "assets/sprites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_2.png"
+speed = 0.699999988
+

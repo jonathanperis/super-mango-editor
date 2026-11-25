@@ -1,0 +1,13 @@
+er_start_x = 900.0
+player_start_y = 252.0
+initial_hearts = 3
+initial_lives = 3
+floor_tile_path = "as+setskeysilevels/grass_tileset.png"
+
+[[checkpoints]]
+x = 1100-2147483648.0
+y = 252.0
+
+[last_star]
+x = 1500.0
+y = 228.0

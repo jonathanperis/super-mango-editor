@@ -1,0 +1,103 @@
+format_version = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallowed the sky.\nEight screens of molten stone, choking smoke, and fire that never rests.\nEvery gap belches flame. Every platform floats above a river of lav&.\nThe smoke rolls thick — you won't see the spiders until they're on you.\nThis is the forge where platformers are made or broken. Survive the\ndepths, reach the star, and earn the right to say you walked through\nfire.\n\nThis is the first level in the Volcanic Depths series. The path\ncontinues deeper \n"
+generated_by = "Lugio, the Creator."
+screen_count = 8
+player_start_x = 79.5
+player_start_y = 122.5
+music_path = "assets/sounds/levels/lava.wav"
+music_volume = 15
+floor_tile_path = "assets/sprites/levels/stone_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
+coin_score = 100
+floor_gaps = [0, 352, 640, 960, 1280, 1520, 1920, 2240, 2560, 2880]
+
+[physics]
+walk_max_speed       = -1.0
+run_max_speed        = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+ground_friction      = -1.0
+ground_counter_accel = -1.0
+air_accel_walk       = -1.0
+air_accel_run        = -1.0
+air_friction         = -1.0
+cam_lookahead_vx_factor = -1.0
+cam_lookahead_max    = -1.0
+
+[[rails]]
+layout = "RECT"
+x = 1808
+y = 80
+w = 8
+h = 5
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 2351
+y = 174
+w = 12
+h = 0
+end_cap = 0
+
+[[platforms]]
+x = 80.0
+tile_height = 2
+tile_width = 1
+tile_path = "astone_platform.png"
+
+[[platforms]]
+x = 1100.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1220.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1460.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platfoe. Every platform floats above a river of lava.\nThe smoke rolls thick — you won't see the spiders until they're on you.\nThis is the forge where platformers are made or broken. Survive the\ndepths, reach the star, and earn the right to say you walked through\nfire.\n\nThis is the first level in the Volcanic Depths series. The path\ncontinues deeper \n"
+generated_by = "Lugio, the Creator."
+screen_count = 8
+player_start_x = 79.5
+player_start_y = 122.5
+music_path = "assets/sounds/levels/lava.wav"
+music_volume = 15
+floor_tile_path = "assets/sprites/levels/stone_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
+coin_score = 100
+floor_gaps = [0, 352, 640, 960, 1280, 1520, 1920, 2240, 2560, 2880]
+
+[physics]
+walk_max_speed       = -1.0
+run_max_speed  line       = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+ground_friction      = -1.0
+ground_counter_accel = -1.0
+air_accel_walk       = -1.0
+air_accel_run        = -1.0
+air_friction         = -1.0
+cam_ "HORIZ"
+x = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_2.png"
+speed = 0.699999988
+

@@ -1,0 +1,15 @@
+formpathat_version = 2
+screen_countnitial_lives = 3
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+floor_gaps = [160, 704]
+
+[[jumping_spidekkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkrs]]
+x = 65
+or_gaps = [576]
+[[circular_saws]]
+x = 224.0
+y = 220.0
+patrol_x0 = 0.0
+vx = -9220
+patrol = 2
+floor_gap0s68=  []

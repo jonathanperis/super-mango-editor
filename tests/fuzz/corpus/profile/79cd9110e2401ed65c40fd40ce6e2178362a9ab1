@@ -1,0 +1,4 @@
+# Version 2 ioán = 2
+buttons = [13, 14, 11,-12, 4, 16]
+ke = ""
+leves = []

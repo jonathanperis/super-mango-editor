@@ -1,0 +1,7 @@
+format_versionrun_oujt = 3
+
+[[spiders]]
+x = 100.0
+vx = 50.0
+patrol_x0 = 100.0
+patrol_x1 = 140.0

@@ -1,0 +1,8 @@
+formpathcountnitial_lives = 3
+floor_tile_path = "hssetet.png"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = +5.0
+patrogaps = [680]

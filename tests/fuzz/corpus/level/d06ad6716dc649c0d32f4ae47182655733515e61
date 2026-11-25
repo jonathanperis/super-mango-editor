@@ -1,0 +1,251 @@
+format_version = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallowed the sky.\nEight screens of molten stone, choking s, reach the star, and earn the right to say you walked through\nfire.\n\nThis is the first level in the Volcanic Depths series. The path\ncontinues deeper \n"
+generated_by = "Lugio, the Creator."
+screen_count = 8
+player_start_x = 79.5
+player_start_y = 122.5
+music_path = "assets/sounds/levels/lava.wav"
+music_volume = 15
+floor_tile_path = "assets/sprites/levels/stone_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
+coin_score = 100
+floor_gaps = [0, 352, 640, 960, 1280, 1520, 1920, 2240, 2560, 2880]
+
+[physics]
+walk_max_speed       = -1.0
+run_max_speed        = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+ground_friction      = -1.0
+ground_counter_accel = -1.0
+air_accel_walk       = -1.0
+air_accel_run        = -1.0
+air_friction         = -1.0
+cam_lookahead_vx_factor = -1.0
+cam_lookahead_max    = -1.0
+
+[[rails]]
+layout = "RECT"
+x = 1808
+y = 80
+w = 8
+h = 5
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 2351
+y = 174
+w = 12
+h = 0
+end_cap = 0
+
+[[platforms]]
+x = 80.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/-evels/stone_platform.png"
+
+[[platforms]]
+x = 200.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 560.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 800.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 900.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1100.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/sto.ne_platform.png"
+
+[[platforms]]
+x = 1220.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1460.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1680.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 1850.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2005.0
+tile_height = 2
+tile_width = 2
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2157.5
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2600.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 30156.0
+
+[[coins]]
+x = 1696.0
+y = 108.0
+
+[[coins]]
+x = 1866.0
+y = 156.0
+
+[[coins]]
+x = 2047.5
+y = 154.0
+
+[[coins]]
+x = 2750.0
+y = 236.0
+
+[[star_yellows]]
+x = 1116.0
+y = 108.0
+
+[[star_yellows]]
+x = 1866.0
+y = 108.0
+
+[[star_yellows]]
+x = 2172.0
+y = 106.0
+
+[[star_yellows]]
+x = 2885.0
+y = 126.5
+
+[last_star]
+x = 3060.0
+y = 98.0
+next_phase = "levels/02_lugio_02.toml"
+
+[[spiders]]
+x = 260.0
+vx = 50.0
+patrol_x0 = 180.0
+patrol_x1 = 340.0
+frame_index = 0
+
+[[spiders]]
+x = 3004.5
+vx = -50.0
+patrol_x0 = 3000.0
+patrol_x1 = 3160.0
+frame_index = 1
+
+[[spiders]]
+x = 1400.0
+vx = 50.0
+patrol_x0 = 1350.0
+patrol_x1 = 1510.0
+frame_index = 0
+
+[[spiders]]
+x = 2150.0
+vx = 50.0
+patrol_x0 = 2050.0
+patrol_x1 = 2230.0
+frame_index = 2
+
+[[jumping_spiders]]
+x = 864.0
+vx = 55.0
+patrol_x0 = 864.0
+patrol_x1 = 1024.0
+
+[[jumping_spiders]]
+x = 1900.0
+vx = -55.0
+patrol_x0 = 1872.0
+patrol_x1 = 2032.0
+
+[[birds]]
+x = 500.0
+base_y = 70.0
+vx = 45.0
+patrol_x0 = 300.0
+patrol_x1 = 900.0
+frame_index = 0
+
+[[birds]]
+x = 2700.0
+base_y = 60.0
+vx = 45.0
+patrol_x0 = 2500.0
+patrol_x1 = 3100.0
+frame_index = 0
+
+[[faster_birds]]
+x = 1800.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 1500.0
+patrol_x1 = 2200.0
+frame_index = 1
+
+[[axe_traps]]
+pillar_x = 200.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 3050.0
+y = 0.0
+mode = "SPIN"
+
+[[axe_traps]]
+pillar_x = 2600.0
+y = 0.0
+mode = "PENDULUM"
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = 2.0
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 12.0
+speed = 2.0

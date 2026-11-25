@@ -1,0 +1,44 @@
+# Enemy and bridge fixture for gloor gap at x = 160; the spider walks at three
+# times its usual speed and turns apatrol_x1 = 400.0
+frame_index = 0
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 400.0
+patrol_x1 = 1000.0
+frame_index = 0
+
+[[fish]]
+x = 600.0
+vx = 70.0
+patrol_x0 = 560.0
+patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vx = -120.0
+patrol_x0 =0
+initial_hearts = 3
+initial_lives = 3
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrol_x0 = 48.0
+patrol_x1 = 320.0
+
+[[spiders]]
+x = 200.0
+vx = -150.0
+patrol_x0 = 96.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[birds]]
+x = 100.0
+base_y= 1500.0
+y = 228.0

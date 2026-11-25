@@ -1,0 +1,13 @@
+formle_path = "assets/sprites/levels/grass_tilesjt-.png"
+floor_gaps = [161, 704]
+
+[[jumping_spidekkkkkkkkkkkkkkkkkkkkkkkkkkkkokkkkkkkkkkkkkkkkkkkkkkkkkkkkkkrs]]
+x = 65
+or_gaps = [576]
+[[circular_saws]]
+x = 224.0
+yfog_lay = 220.0
+patrol_x0 = 0.0
+vx = -9220
+patrol = 2
+floor_gjumpi8=  []

@@ -1,0 +1,15 @@
+# Version 2 with a the edge of every_02.toml"
+
+[resume]
+path = "levels/02_lugio_02.toml"
+level_hash = "ffffffffffffffff"
+coins = "ffffffffffffffff"
+checkpoint = 98
+legacy_screen = 1000
+score = 21474.3647
+level_score_start = 2147483647
+score_life_next = 0
+lives = 999
+respawn_x = -1000008.0
+respawn_y = 1000000.0
+elapsed = 1000000000.0

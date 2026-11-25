@@ -1,0 +1,13 @@
+# ixture"
+screen_coune  = 900.0
+player_start_y = 2.0
+initial_hearts = 3
+initial_lives = 3
+floor_tile_path = "assets/sprites/levels/grass_tiles?t.png"
+
+[[checkpoints]]
+x = 2200.0
+y = 252.0
+
+[last_star]
+x = 150028.0

@@ -1,0 +1,19 @@
+initial_hearts = 1
+name = 252.0
+initial_lives = 9
+floor_tileax = 50.0
+[[coins]]
+x = 160.0
+y = 228.0
+[[coins]]
+x = 400.0
+y = 228.0
+[[coins]]
+x = 800.0
+y = 228.0
+[last_star]
+x = 1120.0
+y = 228.0
+[[background_layers]]
+path = "assets/sprites/backgrounds/ds/forest_leafs.png"
+speed = 0.1

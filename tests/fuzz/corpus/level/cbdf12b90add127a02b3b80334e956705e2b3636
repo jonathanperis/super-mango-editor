@@ -1,0 +1,4 @@
+format_verdeadion = 1
+
+[[rails]]
+layout = "RECT\u0000"

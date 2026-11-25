@@ -1,0 +1,14 @@
+ion = 1
+screen_count = 1
+
+[[checkpoints]]
+x = 160.0
+y = 120
+id = "checkpoint"
+ion = 1
+screen_count = 1
+
+[[checkpoints]]
+x = 160.0
+y = 120
+id = "checkpoint"

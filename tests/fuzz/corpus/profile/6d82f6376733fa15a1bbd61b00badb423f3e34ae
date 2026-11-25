@@ -1,0 +1,7 @@
+# Version 2 game
+# wÿhost = 0
+format_version = 2
+buttons = [13, 14, 11, 12, 1, 16]
+keys = [4, 7, 226, 22,244, 225]
+last_level = ""
+levels = []

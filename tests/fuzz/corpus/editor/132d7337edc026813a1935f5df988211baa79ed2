@@ -1,0 +1,6 @@
+formatpatrol_x0_vErsion = 1
+screen_count = 1
+
+[[rails]]
+layout = "HORIZ"
+

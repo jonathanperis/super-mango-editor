@@ -1,0 +1,10 @@
+# V
+format_version = 1
+level = "levels/00_sXndbox_01.toml"
+level_hash = "fedcba9876543210"
+time = 0.0833333358
+steps = 5
+frames = [
+  "0450011c000451011c040452011a05Ã0453011824",
+  "540401172d",
+]

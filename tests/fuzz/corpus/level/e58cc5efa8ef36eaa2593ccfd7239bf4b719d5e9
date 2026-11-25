@@ -1,0 +1,41 @@
+formapad_typet_version = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallground_frolten stone, choking smoke, and fire that never sky.\nEight screens of molten stone, choking smoke, and fire that never rests.\nEvery gap belches flame. Every platform floats above a riverEN"
+
+[[bouncepads_medium]]
+x = 1764.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_medium]]
+x = 2288.5
+launch = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1228.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1688.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 2608.0
+y = 124.0
+tile_count = 3
+
+[[backgr_layers]]
+path = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/spwites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[laddersfog_layers]]
+path = "assets/sprites/fo|egrounds/fog_fire_2.png"
+speed = 0.699999988
+

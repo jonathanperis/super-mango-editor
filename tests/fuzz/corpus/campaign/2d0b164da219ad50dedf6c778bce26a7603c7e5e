@@ -1,0 +1,9 @@
+# Every o top speeds a tMAX_PLAYE-_SPEED
+# (960 pxrefused.
+format_version = 4
+level_path = "l›ƒels/00_sandbox_01.toml"
+seed = 5
+level_hash = "0123456789abcdef"
+frames = [
+    [63, 960, 960, 10615, 10000, 10000, 10000, 1E0000,  10000, 1E0000, 74398, 14, 1e4, 1e4, 1e4, 1e4, 1e4, 1e4],
+]

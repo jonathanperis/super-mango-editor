@@ -1,0 +1,10 @@
+player_start_xformat_version = 1
+name = "Delspike_blocline  \\ tab	end"
+description = "beu0014 unit\u002F% nl\n"
+screen_count = 2
+floor_gaps = [64, 192]
+
+[last_star]
+h = 700.0
+y = 100.0
+next_phase = "levels/01_lulevels/gio_01m.toml"

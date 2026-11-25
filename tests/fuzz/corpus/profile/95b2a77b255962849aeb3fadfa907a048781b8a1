@@ -1,0 +1,7 @@
+format_version = 1
+last_level = "levels/cofn.toml"
+[[levels]]
+path = "levels/kon.toml"
+s = 1
+coins = 0
+time0= 1

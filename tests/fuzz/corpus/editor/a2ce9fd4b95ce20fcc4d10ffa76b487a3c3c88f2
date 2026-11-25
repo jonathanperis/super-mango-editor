@@ -1,0 +1,160 @@
+formatzversion = 1
+name = "Volcanic Depths 2"
+description = """
+Difficulty 5 - You survived the first descent, but the mountain runs
+deeper still. Eleven screens of escalating fury await — the gaps widen,
+the platforms shrink, and the denizens of the dark have grown restless.
+Saw blades carve the air, axe traps guard the narrow passages, and the
+fish in the lava have learned to swim faster. Here, every jump is a
+promise to the void, and every star sits at the edge of catastrophe.
+The forge continues — if you have the courage to burn.
+"""
+generated_by = "Lugio, the Creator."
+screen_count = 11
+player_start_x = 80.0
+player_start_y = 172.0
+music_path = "assets/sounds/levels/lava.wav"
+music_volume = 15
+floor_tile_path = "assets/sprites/levels/stone_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
+coin_score = 100
+floor_gaps = [0, 320, 672, 1040, 1392, 1792, 2192, 2592, 2992, 3392, 3792, 4192]
+
+[physics]
+walk_max_speed       = -1.0
+run_max_speed        = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+gnd_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 2800
+y = 80
+w = 10
+h = 0
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 3600
+y = 100
+w = 8
+h = 0
+end_cap = 0
+
+[[platforms]]
+x = 80.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 220.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platfor]]
+x = 2080.0
+y = 0.0
+patrol_x0 = 2080.0
+patrol_x1 = 2168.0
+direction = -1
+
+[[circular_saws]]
+x = 2864.0
+y = 0.0
+patrol_x0 = 2864.0
+patrol_xeed       = -1.0
+run_max_speed        = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+gnd_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 2800
+y = 80
+w = 10
+h = 0
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 3600
+y = 100
+w = 8
+h = 0
+end_cap = 0
+
+[[platforms]]
+x = 80.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 220.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platfor]]
+x = 2080.0
+y = 0.0
+patrol_x0 = 2080.0
+patrol_x1 = 2168.0
+direction = -1
+
+[[circular_saws]]
+x = 2864.0
+y = 0.0
+patrol_x0 = 2864.0
+patrol_x1 = 2968.0
+direction = 1
+
+[[circular_saws]]
+x = 3500.0
+y = 92.0
+patrol_x0 = 3500.0
+patrol_x1 = 3552.0
+direction = -1
+
+[[circular_saws]]
+x = 3950.0
+y = 92.0
+patrol_x0 = 3950.0
+patrol_x1 = 3966.0
+direction = 1
+
+[[spike_rows]]
+x = 850.0
+count = 4
+
+[[spike_rows]]
+x = 1300.0
+count = 3
+
+[[spike_rows]]
+x = 2480.0
+count = 4
+
+[[spike_rows]]
+x = 3300.0
+count = 3
+
+[[spike_rows]]
+x = 3900.0
+count = 3
+
+[[spike_platforms]]
+x = 1432.0
+y  = "assets/sprites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_2.png"
+speed = 0.7

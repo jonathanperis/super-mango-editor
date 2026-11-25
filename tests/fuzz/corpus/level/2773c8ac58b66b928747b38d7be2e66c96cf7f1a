@@ -1,0 +1,21 @@
+format_version = 1
+name = "Lab: One-way collision"
+description = 48.0
+player_start_y = 252.0
+initial_lives = 9
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+[[float_platforms]]
+mode  = 4
+[[float_platforms]]
+mode = "STATIC"
+x = 320.0
+y = 156.0
+tile_count = 4
+[[coins]]
+x = 176.0
+y = 184.0
+[last_star]
+x = 7040
+[[background_layers]]
+path = "assets/sprites/backgroÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿunds/sky_blue.png"
+speed = 0.0

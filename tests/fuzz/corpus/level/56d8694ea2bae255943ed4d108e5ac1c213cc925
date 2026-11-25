@@ -1,0 +1,332 @@
+format_version = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat ats/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2600.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 3050.0
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[coins]]
+x = 155.0
+y = 236.0
+
+[[coins]]
+x = 250.0
+y = 236.0
+
+[[coins]]
+x = 320.0
+y = 236.0
+
+[[coins]]
+x = 216.0
+y = 108.0
+
+[[coins]]
+x = 576.0
+y = 156.0
+
+[[coins]]
+x = 816.0
+y = 108.0
+
+[[coins]]
+x = 916.0
+y = 156.0
+
+[[coins]]
+x = 1050.0
+y = 236.0
+
+[[coins]]
+x = 1350.0
+y = 236.0
+
+[[coins]]
+x = 1476.0
+y = 156.0
+
+[[coins]]
+x = 1696.0
+y = 108.0
+
+[[coins]]
+x = 1866.0
+y = 156.0
+
+[[coins]]
+x = 2047.5
+y = 154.0
+
+[[coins]]
+x = 2750.0
+y = 236.0
+
+[[star_yellows]]
+x = 1116.0
+y = 108.0
+
+[[star_yellows]]
+x = 1866.0
+y = 108.0
+
+[[star_yellows]]
+x = 2172.0
+y = 106.0
+
+[[star_yellows]]
+x = 2885.0
+y = 126.5
+
+[last_star]
+x = 3060.0
+y = 98.0
+next_phase = "levels/02_lugio_02.toml"
+
+[[spiders]]
+x = 260.0
+vx = 50.0
+patrol_x0 = 180.0
+patrol_x1 = 340.0
+frame_index = 0
+
+[[spiders]]
+x = 3004.5
+vx = -50.0
+patrol_x0 = 3000.0
+patrol_x1 = 3160.0
+frame_index = 1
+
+[[spiders]]
+x = 1400.0
+vx = 50.0
+patrol_x0 = 1350.0
+patrol_x1 = 1510.0
+frame_index = 0
+
+[[spiders]]
+x = 2150.0
+vx = 50.0
+patrol_x0 = 2050.0
+patrol_x1 = 2230.0
+frame_index = 2
+
+[[jumping_spiders]]
+x = 864.0
+vx = 55.0
+patrol_x0 = 864.0
+patrol_x1 = 1024.0
+
+[[jumping_spiders]]
+x = 1900.0
+vx = -55.0
+patrol_x0 = 1872.0
+patrol_x1 = 2032.0
+
+[[birds]]
+x = 500.0
+base_y = 70.0
+vx = 45.0
+patrol_x0 = 300.0
+patrol_x1 = 900.0
+frame_index = 0
+
+[[birds]]
+x = 2700.0
+base_y = 60.0
+vx = 45.0
+patrol_x0 = 2500.0
+patrol_x1 = 3100.0
+frame_index = 0
+
+[[faster_birds]]
+x = 1800.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 1500.0
+patrol_x1 = 2200.0
+frame_index = 1
+
+[[axe_traps]]
+pillar_x = 200.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 3050.0
+y = 0.0
+mode = "SPIN"
+
+[[axe_traps]]
+pillar_x = 2600.0
+y = 0.0
+mode = "PENDULUM"
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = 2.0
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 12.0
+speed = 2.0
+
+[[spike_blocks]]
+rail_index = 1
+t_offset = 0.0
+speed = 4.0
+
+[[fire_flames]]
+x = 352.0
+
+[[fire_flames]]
+x = 640.0
+
+[[fire_flames]]
+x = 960.0
+
+[[fire_flames]]
+x = 1920.0
+
+[[fire_flames]]
+x = 4480.0
+
+[[fire_flames]]
+x = 2560.0
+
+[[fire_flames]]
+x = 2880.0
+
+[[float_platforms]]
+mode = "STATIC"
+x = 442.5
+y = 186.5
+tile_count = 3
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[float_platforms]]
+mode = "CRUMBLE"
+x = 1344.0
+y = 184.0
+tile_count = 3
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[float_platforms]]
+mode = "RAIL"
+x = 0.0
+y = 0.0
+tile_count = 3
+rail_index = 1
+t_offset = 3.0
+speed = 2.0
+
+[[bridges]]
+x = 2700.0
+y = 172.0
+brick_count = 10
+
+[[bouncepads_small]]
+x = 504.5
+launch_vy = -380.0
+pad_type = "GREEN"
+
+[[bouncepads_medium]]
+x = 1764.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_medium]]
+x = 2288.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_high]]
+x = 3120.0
+launch_vy = -700.0
+pad_type = "RED"
+
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
+[[vines]]
+x = 568.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 1858.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 2165.5
+y = 126.0
+tile_count = 3
+vine_type = 1
+
+[[ropes]]
+x = 87.5
+y = 172.0
+tile_count = 2
+
+[[ropes]]
+x = 808.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1228.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1688.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 2608.0
+y = 124.0
+tile_count = 3
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_fire.png"
+speed = 0.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_bg.png"
+speed = 0.0799999982
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/volcanic_mountains.png"
+speed = 0.150000006
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_3.png"
+speed = 0.24
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_2.png"
+speed = 0.379999995
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_lonely.png"
+speed = 0.43999999

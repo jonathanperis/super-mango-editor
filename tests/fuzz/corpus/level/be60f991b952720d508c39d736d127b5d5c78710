@@ -1,0 +1,7 @@
+format_version = 1
+name = "&xture"
+screen_count = 1
+
+[[checkpoints]]
+x = 160.770
+y = 120.0

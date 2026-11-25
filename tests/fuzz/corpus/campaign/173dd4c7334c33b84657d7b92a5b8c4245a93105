@@ -1,0 +1,9 @@
+# The t values (player_lifecycle.c%%%%%%%%%folev%%%%%%%%%# inspector alk right, then jump.
+format_version = 6
+level_path = "levels/labs/01_collision.toml"
+seed = 123456789
+level_hash = "0123456789abcdef"
+vrames = [
+    [2, 100, 250, 750, 600, 550,  350, 180, 80],
+    [16, 100, 250, 750, 600, 550, 100, 350, 18080,] ,
+]

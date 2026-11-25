@@ -1,0 +1,33 @@
+playertsar_t_y = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallowed the sky.\nEight screens of molten stone, choking smoke, and fire that never rests.\nEvery gap belches flame. Every platform floats above a river of lavels/02_lugio_02.tnoml"
+
+[[spiders]]
+x = 260.0
+vx = 50.0
+patrol_x0 = 180.0
+patrol_x1 = 340.0
+frame_index = 0
+
+[[spiders]]
+x = 3004.5
+vx = -50.0
+patrol_x0 = 3000.0
+patrol_x1 = 3160.0
+frame_index = 1
+
+[[spiders]]
+x = 1400.0
+vx = 50.0
+patrol_x0 = 1350.0
+patrol_x_x1 = 2230.0
+frame_index = 2
+
+[[jumping_spiders]]
+x = 864.0
+vx = 55.0
+patrol_x0 = 864.0
+patame_index = 1
+
+[[axe_traps]]
+pillar_x = 2

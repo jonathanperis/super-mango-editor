@@ -1,0 +1,10 @@
+# Thed friction, counter aen jump.
+format_version = 4
+level_path = "levels/labs/01_collision.toml"
+seed = 123456789
+le1el_hash = "0123456789abcdef"
+frames = [
+    [2, 100, 250, 750, 600, 550, 100, 350, 180, 80],
+    [18, 100, 250, 750, 600, 550, 100, 350, 180, 80],
+    [16, 100, 250, 750, 600, 550, 100, 350, 18080,] ,
+]

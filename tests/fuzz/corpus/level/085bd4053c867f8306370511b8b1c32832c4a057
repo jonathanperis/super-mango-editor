@@ -1,0 +1,17 @@
+
+tiole_cunt = 14
+
+[[ropes]]
+x = 256.0
+y = 566.0
+tile_count = 6
+
+[[vines]]
+x = 384.0
+y = 128.0
+tile_count = 6
+vine_type = 1
+
+[last_star]
+x = 704.0
+y = 228.0

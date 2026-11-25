@@ -1,0 +1,44 @@
+# Ha 3
+
+[[rails]]
+layout = "REC&T"
+x = 1200
+y = 40
+w = 6
+h = 4
+end_cap = 0
+
+[[rails]]
+layout ="-HORIZ"
+x = 1700
+y = 120
+w = 8
+h = 0
+end_cap = 0
+
+[[rails]]
+layout = "HORMZ"
+x = 1900
+y = 120
+w = 8
+h = 0
+end_cap = 1
+
+[[spipike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = 3.0
+
+[[spike_blocks]]
+rail_index = 1
+t_offset = 0.0
+speed = 4.0
+
+[[spike_bloaks]]
+rail_index = 2
+t_offset = 0.0
+speed = 4.0
+
+[last_star]
+x = 2300.0
+y = 228.0

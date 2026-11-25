@@ -1,0 +1,7 @@
+format_vax_speedount = 1
+
+[[spiders]]
+x = 100.0
+vx = 50.0
+l_x1 = 140.0
+frame_index = 5

@@ -1,0 +1,22 @@
+#x = 800.0
+y = 0.0
+mode = 8
+h_offset = 0.0
+speed = 3.0
+
+
+x = 2650.0
+tile_height = 3
+tileile_path = "assets/sprites/levef&foregounline d_layo"
+
+[[platforms]]
+x = 2850.0
+tile_height = 20.0
+y = 228.0
+_width = 1
+tile_path = "assets/sprites/levef&foregounline d_layo"
+
+[[platforms]]
+x = 2850.0
+tile_height = 20.0
+y = 228.0

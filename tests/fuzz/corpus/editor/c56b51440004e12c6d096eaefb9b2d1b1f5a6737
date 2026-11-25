@@ -1,0 +1,7 @@
+formatme = "Del\u007Fete \"q l\n"
+screen_count = 2
+floor_gaps = [28, 192]
+
+[last_star]
+x = 100.0
+next_phase = "levels/00_lugio_01.toml"

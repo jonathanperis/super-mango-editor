@@ -1,0 +1,325 @@
+format_version = 1
+name = "Volcanic Depths 2"
+description = """
+Difficulty 5 - You survived the first descent, but the mountain runs
+deeper still. Eleven screens of escalating fury await — the gaps widen,
+the platforms shrink, and the denizens of the dark have grown restless.
+Saw blades carve the  and every star sits at the edge of catastrophe.
+The forge continues — if you have the courage to burn.
+"""
+generated_by = "Lugio, the Creator."
+screen_count = 11
+player_start_x = 156.0
+
+[[coins]]
+x = 1450.0
+y = 236.0
+
+[[coins]]
+x = 1516.0
+y = 60.0
+
+[[coins]]
+x = 1716.0
+y = 156.0
+
+[[coins]]
+x = 1850.0
+y = 236.0
+
+[[coins]]
+x = 1916.0
+y = 108.0
+
+[[coins]]
+x = 2160.0
+y = 236.0
+
+[[coins]]
+x = 2066.0
+y = 156.0
+
+[[coins]]
+x = 2380.0
+y = 236.0
+
+[[coins]]
+x = 2432.0
+y = 156.0
+
+[[coins]]
+x = 2516.0
+y = 236.0
+
+[[coins]]
+x = 2666.0
+y = 108.0
+
+[[coins]]
+x = 2800.0
+y = 236.0
+
+[[coins]]
+x = 2866.0
+y = 156.0
+
+[[coins]]
+x = 3116.0
+y = 60.0
+
+[[coins]]
+x = 3266.0
+y = 156.0
+
+[[coins]]
+x = 3516.0
+y = 108.0
+
+[[coins]]
+x = 3716.0
+y = 156.0
+
+[[coins]]
+x = 3860.0
+y = 236.0
+
+[[coins]]
+x = 4066.0
+y = 12.0
+
+[[star_yellows]]
+x = 1916.0
+y = 60.0
+
+[[star_yellows]]
+x = 6860.0
+y = 108.0
+
+[last_star]
+x = 4074.0
+y = 4.0
+
+[[spiders]]
+x = 220.0
+vx = 50.0
+patrol_x0 = 160.0
+patrol_x1 = 320.0
+frame_index = 0
+
+[[spiders]]
+x = 2300.0
+vx = -50.0
+patrol_x0 = 2232.0
+patrol_x1 = 2400.0
+frame_index = 1
+
+[[spiders]]
+x = 2700.0
+vx = 50.0
+patrol_x0 = 2632.0
+patrol_x1 = 2792.0
+frame_index = 0
+
+[[spiders]]
+x = 1500.0
+vx = 50.0
+patrol_x0 = 1432.0
+patrol_x1 = 1600.0
+frame_index = 2
+
+[[spiders]]
+x = 2080.0
+vx = -50.0
+patrol_x0 = 2048.0
+patrol_x1 = 2200.0
+frame_index = 1
+
+[[spiders]]
+x = 3100.0
+vx = 50.0
+patrol_x0 = 3032.0
+patrol_x1 = 3200.0
+frame_index = 0
+
+[[jumping_spiders]]
+x = 520.0
+vx = 55.0
+patrol_x0 = 500.0
+patrol_x1 = 720.0
+
+[[jumping_spiders]]
+x = 1000.0
+vx = -55.0
+patrol_x0 = 900.0
+patrol_x1 = 1110.0
+
+[[jumping_spiders]]
+x = 2900.0
+vx = 55.0
+patrol_x0 = 2848.0
+patrol_x1 = 3040.0
+
+[[birds]]
+x = 450.0
+base_y = 65.0
+vx = 45.0
+patrol_x0 = 250.0
+patrol_x1 = 750.0
+frame_index = 0
+
+[[birds]]
+x = 1650.0
+base_y = 70.0
+vx = -45.0
+patrol_x0 = 1400.0
+patrol_x1 = 1950.0
+frame_index = 1
+
+[[birds]]
+x = 3400.0
+base_y = 60.0
+vx = 45.0
+patrol_x0 = 3200.0
+patrol_x1 = 3800.0
+frame_index = 0
+
+[[faster_birds]]
+x = 2500.0
+base_y = 55.0
+vx = -80.0
+patrol_x0 = 2200.0
+patrol_x1 = 2900.0
+frame_index = 1
+
+[[faster_birds]]
+x = 4000.0
+base_y = 50.0
+vx = 80.0
+patrol_x0 = 3800.0
+patrol_x1 = 4300.0
+frame_index = 0
+
+[[fish]]
+x = 600.0
+vx = 70.0
+patrol_x0 = 500.0
+patrol_x1 = 950.0
+
+[[fish]]
+x = 1400.0
+vx = -70.0
+patrol_x0 = 1100.0
+patrol_x1 = 1700.0
+
+[[fish]]
+x = 2700.0
+vx = 70.0
+patrol_x0 = 2500.0
+patrol_x1 = 3000.0
+
+[[faster_fish]]
+x = 2100.0
+vx = -120.0
+patrol_x0 = 1900.0
+patrol_x1 = 2400.0
+
+[[faster_fish]]
+x = 3500.0
+vx = 120.0
+patrol_x0 = 3300.0
+patrol_x1 = 3900.0
+
+[[axe_traps]]
+pillar_x = 550.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 900.0
+y = 0.0
+mode = "SPIN"
+
+[[axe_traps]]
+pillar_x = 1700.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 2650.0
+y = 0.0
+mode = "SPIN"
+
+[[circular_saws]]
+x = 1500.0
+y = 44.0
+patrol_x0 = 1500.0
+patrol_x1 = 1548.0
+direction = 1
+
+[[circular_saws]]
+x = 2080.0
+y = 0.0
+patrol_x0 = 2080.0
+patrol_x1 = 2168.0
+direction = -1
+
+[[circular_saws]]
+x = 2864.0
+y = 0.0
+patrol_x0 = 2864.0
+patrol_x1 = 2968.0
+direction = 1
+
+[[circular_saws]]
+x = 3500.0
+y = 92.0
+patrol_x0 = 3500.0
+patrol_x1 = 3552.0
+direction = -1
+
+[[circular_saws]]
+x = 3950.0
+y = 92.0
+patrol_x0 = 3950.0
+patrol_x1 = 3966.0
+direction = 1
+
+[[spike_rows]]
+x = 850.0
+count = 4
+
+[[spike_rows]]
+x = 1300.0
+count = 3
+
+[[spike_rows]]
+x = 2480.0
+count = 4
+
+[[spike_rows]]
+x = 3300.0
+count = 3
+
+[[spike_rows]]
+x = 3900.0
+count = 3
+
+[[spike_platforms]]
+x = 1432.0
+y = 180.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_1.png"
+speed = 0.5
+
+[[foreground_layers]]
+path = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_2.png"
+speed = 0.7

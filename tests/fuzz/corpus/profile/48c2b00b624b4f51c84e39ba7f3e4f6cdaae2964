@@ -1,0 +1,18 @@
+# Version 2 with a Continue0
+reduced_motion = 0
+ghost = 1
+last_level = "levels/02_lugio_02.toml"
+
+[resume]
+path = "levels/02_lugio_02.toml"
+level_hash = "ffffffffffffffff"
+coins = "ffffffffffffffff"
+checkpoint = 98
+legacy_screen = 1000
+score = 2147483647
+level_score_start = 4294967294
+score_life_next = 0
+lives = 999
+respawn_x = -1000000.0
+respawn_y = 1000000.0
+elapsee = 1000000000.0

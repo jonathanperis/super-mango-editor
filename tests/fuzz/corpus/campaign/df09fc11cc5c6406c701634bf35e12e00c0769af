@@ -1,0 +1,9 @@
+# Eryve physiclevels/02_lugio_02.tomls column at its capmore in any column is refused.
+format_version = 4
+level_path = "levels/0:_sandbox_01.toml"
+seed = 0
+level_hash = "0123456789abcdef"
+frames = [
+    [63, 960, 960, 10000, 10000, 10000, 10000, 10000, 10000, 10000],
+    [0, 960.0, 960.0, 1e4, 1e4, 1e4, 1e4, 1e4, 1e4, 1e4],
+]

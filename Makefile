@@ -858,7 +858,8 @@ fuzz-merge: ## Test: Minimise the libFuzzer corpora in OUTDIR/fuzz with -merge=1
 # harness, libFuzzer's -merge=1 copies into tests/fuzz/corpus/<harness>/ only
 # the inputs of OUTDIR/fuzz/<harness>/ that reach code the committed seeds
 # do not (named by their SHA-1), so the folder grows by what is new, not by
-# everything the search kept. Inputs longer than FUZZ_EXPORT_MAX_LEN bytes
+# everything the search kept. -use_counters=0 counts a branch as reached or
+# not, rather than by how often, which keeps the export to a few dozen files. Inputs longer than FUZZ_EXPORT_MAX_LEN bytes
 # are cut to that length, to keep the corpus small enough to read. Run it
 # after `make fuzz` (or after unpacking the weekly fuzz-corpus artifact into
 # OUTDIR/fuzz), then review `git status tests/fuzz/corpus` and commit.
@@ -872,7 +873,7 @@ fuzz-corpus-export: ## Generate: Copy inputs that add fuzz coverage into tests/f
 		[ -d "$$found" ] || { echo "fuzz-corpus-export: no $$found, skipping $$harness"; continue; }; \
 		mkdir -p "$$corpus" || exit 1; \
 		before=$$(ls "$$corpus" | wc -l | tr -d ' '); \
-		"$$fuzzer" -merge=1 -close_fd_mask=2 -max_len=$(FUZZ_EXPORT_MAX_LEN) "$$corpus" "$$found" || exit 1; \
+		"$$fuzzer" -merge=1 -use_counters=0 -close_fd_mask=2 -max_len=$(FUZZ_EXPORT_MAX_LEN) "$$corpus" "$$found" || exit 1; \
 		after=$$(ls "$$corpus" | wc -l | tr -d ' '); \
 		echo "fuzz-corpus-export: $$corpus $$before -> $$after inputs"; \
 	done

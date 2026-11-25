@@ -1,0 +1,27 @@
+# Enemy and bst.c. The jumping
+# syider¢s patrol cre
+# times swim over the gap at
+# x = 704 and the faster fish patrolt 400..560; the bridge stands alon of the level.
+format_version = 1
+name = "Runtime creaturxture"
+screen_count = 4
+player_start_x = 48.0
+player_start_y = 252.0
+initial_hearts = 3
+initial_lives = 3
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+music_path = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrol_x0 = 0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

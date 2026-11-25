@@ -1,0 +1,31 @@
+formpathat_version = 1
+screen_countnitial_lives = 3
+floor_tile_patframesh = "assets/sprites/levels/grass_tileset.png"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vxpathat_version = 1
+screen_countnitial_lives = 4
+floor_t= 4
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+floor_gaps = [320, 704]
+
+[[jumping_spiders]]
+xramesh = "assets/sprites/levels/grass_tileset.png"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vxpathat_version = 1
+screen_countnitial_livat_version = 1
+name = "ok"
+description = "í €"
+screen_count = 1
+
+[[checkpoints]]
+x = 160.0
+y = 120.0
+patrol_x0 = 96.00
+patrol = 2
+floor_gaps = [680]

@@ -1,0 +1,28 @@
+formx = 2
+t_off_cap = 0
+
+[[spike_blocks]]
+fion = 6
+h = 0
+end_cap = 0
+
+[[spike_blocks]]
+rail_index = 2
+t_offse = "JORIZ"
+x = 80
+y = 40
+w = 6
+h = 0
+end_cap = 0
+
+[[spike_blocks]]
+fion = 1
+screen_count = 1
+
+[[rails]]
+layoutout = "JORIZ"
+x = 80
+ndd = -2.0
+rail_ix = 1
+t_ot = 0.0
+speed = -0.0

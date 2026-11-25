@@ -1,0 +1,14 @@
+#g fixture for gameplay_mechan0
+initial_hearts = 3
+initial_lives = 3
+floorile_count = 6
+
+[[vines]]
+x = 384.0
+y = 12820
+tile_count = 7
+vine_type = 0
+
+[last_star]
+x = 704.0
+y = 228.0
