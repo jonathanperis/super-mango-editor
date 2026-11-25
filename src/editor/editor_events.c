@@ -144,7 +144,7 @@ static void open_dropped_level(EditorState *es, const char *path)
     }
     /* A drag owns the document until the button is released (see
      * editor_key_while_dragging); a load would pull the level out from under it. */
-    if (es->dragging) {
+    if (es->drag.active) {
         editor_set_status(es, "Release the mouse to finish the move first (Esc cancels it)");
         return;
     }
@@ -273,7 +273,7 @@ static void editor_history(EditorState *es, int redo)
     int placed_count = 0;
     Command command;
     int group;
-    if (es->dragging) return;  /* see editor_key_while_dragging */
+    if (es->drag.active) return;  /* see editor_key_while_dragging */
     if (!editor_finish_field_edit(es)) return;
     if (!(redo ? redo_pop(es->undo, &command) : undo_pop(es->undo, &command))) {
         editor_set_status(es, "Nothing to %s", redo ? "redo" : "undo");
@@ -633,7 +633,7 @@ static void editor_key(EditorState *es, const InputEvent *event)
     int key = event->key;
     int ctrl = (event->mods & (INPUT_CTRL | INPUT_SUPER)) != 0;
     int shift = (event->mods & INPUT_SHIFT) != 0;
-    if (es->dragging || es->painting) {
+    if (es->drag.active || es->painting) {
         editor_key_while_dragging(es, key);
         return;
     }
@@ -757,14 +757,14 @@ static void editor_mouse_down(EditorState *es, const InputEvent *event, float wx
     } else if (event->button == MOUSE_BUTTON_RIGHT) {
         es->mouse.right_down = 1;
         /* Right-click deletes. During a left-button drag that would shift
-         * the array under drag_index, so the drag would then overwrite a
+         * the array under drag.index, so the drag would then overwrite a
          * different entity. Finish (release) the drag first. A row being
          * painted with the Place tool owns the document the same way: its
          * undo group is open, and a delete now would be folded into the
          * "Placed N" step (or, with the group full, left out of history
          * altogether). The same goes for a click under an open dropdown
          * list. */
-        if (!es->dragging && !es->painting && es->ui.dropdown_open_id == 0 && !es->campaign &&
+        if (!es->drag.active && !es->painting && es->ui.dropdown_open_id == 0 && !es->campaign &&
             canvas_contains(event->x, event->y) &&
             editor_finish_field_edit(es))
             tools_right_click(es, wx, wy);

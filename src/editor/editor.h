@@ -389,6 +389,37 @@ typedef struct {
  * the function would receive a copy and changes would be lost.
  */
 /*
+ * EditorDrag — moving entities with the Select tool (tools_drag.c).
+ *
+ * A drag starts at mouse-down on an entity.  The entity is remembered by
+ * (type, index), and everything the drag moves (the grabbed entity alone,
+ * or the whole multi-selection) is listed in items, with each one's
+ * placement at mouse-down in befores.  Every motion event recomputes the
+ * positions from those originals (no drift), and mouse-up records them as
+ * the undo step's "before".
+ *
+ * grab_x/y is the cursor's offset from the entity's top-left corner at
+ * mouse-down, so the entity does not jump to put its corner under the
+ * cursor.  moved stays 0 until the cursor travels a few pixels, so a plain
+ * click selects without changing anything.  All positions are world px.
+ */
+typedef struct {
+    int            active;        /* 1 while a drag (or a resize) is in progress */
+    int            moved;         /* 1 once the cursor passed the threshold    */
+    EntityType     type;          /* entity grabbed (its corner snaps)          */
+    int            index;
+    int            count;         /* how many entities the drag moves         */
+    Selection      items[EDITOR_MAX_SELECTION];
+    PlacementData  befores[EDITOR_MAX_SELECTION];
+    float          start_x;       /* entity top-left at mouse-down             */
+    float          start_y;
+    float          grab_x;        /* cursor minus entity top-left at mouse-down */
+    float          grab_y;
+    float          mouse_x;       /* cursor world position at mouse-down       */
+    float          mouse_y;
+} EditorDrag;
+
+/*
  * EditorMouse — the pointer as the editor last saw it, updated from every
  * input event (editor_events.c), and the view panning it drives.
  *
@@ -692,19 +723,8 @@ typedef struct {
     /* ---- Mouse state (updated every frame from input commands) -------- */
     EditorMouse    mouse;
 
-    /* ---- Drag state (moving one entity with the Select tool) ---------- */
-    /*
-     * A drag starts at mouse-down on an entity.  The entity is remembered by
-     * (drag_type, drag_index) and its original placement is kept in
-     * drag_before, so every motion event recomputes the position from the
-     * original (no drift) and mouse-up can record an exact undo "before".
-     *
-     * drag_grab_x/y is the cursor's offset from the entity's top-left corner
-     * at mouse-down, so the entity does not jump to put its corner under
-     * the cursor.  drag_moved stays 0 until the cursor travels a few pixels,
-     * so a plain click selects without changing anything.
-     */
-    int            dragging;      /* 1 while a drag operation is in progress   */
+    /* ---- Drag state (moving entities with the Select tool) ------------- */
+    EditorDrag     drag;
     /* Place tool: while the button is held, dragging paints a row of the
      * palette's entity, one step apart, as one undo step (tools.c). */
     int            painting;
@@ -712,20 +732,6 @@ typedef struct {
     int            paint_count;    /* entities placed by this press            */
     float          paint_x, paint_y; /* where the last one went (world px)    */
     PlacementData  paint_last;     /* the last one placed, as stored        */
-    int            drag_moved;    /* 1 once the cursor passed the threshold    */
-    EntityType     drag_type;     /* entity grabbed (its corner snaps)          */
-    int            drag_index;
-    /* Everything the drag moves (the grabbed entity alone, or the whole
-     * multi-selection) and each one's placement at mouse-down. */
-    int            drag_count;
-    Selection      drag_items[EDITOR_MAX_SELECTION];
-    PlacementData  drag_befores[EDITOR_MAX_SELECTION];
-    float          drag_start_x;  /* entity top-left (world) at mouse-down     */
-    float          drag_start_y;
-    float          drag_grab_x;   /* cursor minus entity top-left at mouse-down */
-    float          drag_grab_y;
-    float          drag_mouse_x;  /* cursor world position at mouse-down       */
-    float          drag_mouse_y;
     /*
      * Where the last Select click landed (world px) when it selected
      * something without moving it.  A second click on that same spot steps
@@ -740,7 +746,7 @@ typedef struct {
      * With one entity selected and the Select tool active, the canvas draws
      * small square handles: the ends of a patrol range, the growing edge of
      * a tiled entity, a rail's corner.  A press on one starts a resize:
-     * `resizing` is 1 until the button is released, and `dragging` is 1
+     * `resizing` is 1 until the button is released, and `drag.active` is 1
      * with it, so everything that waits for a move to finish (keys, Undo,
      * right-click, a dropped file) waits for a resize too.
      *

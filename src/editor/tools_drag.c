@@ -112,23 +112,23 @@ static void arm_drag(EditorState *es, Selection grabbed, const Selection *items,
     if (!get_entity_anchor(&es->level, grabbed.type, grabbed.index,
                            &anchor_x, &anchor_y)) return;
     if (count > EDITOR_MAX_SELECTION) count = EDITOR_MAX_SELECTION;
-    es->dragging     = 1;
-    es->drag_moved   = 0;
+    es->drag.active     = 1;
+    es->drag.moved   = 0;
     editor_level_issue_snapshot(&es->level, &drag_issues);
-    es->drag_type    = grabbed.type;
-    es->drag_index   = grabbed.index;
-    es->drag_count   = count;
+    es->drag.type    = grabbed.type;
+    es->drag.index   = grabbed.index;
+    es->drag.count   = count;
     for (int i = 0; i < count; i++) {
-        es->drag_items[i] = items[i];
-        es->drag_befores[i] = editor_snapshot_entity(&es->level, items[i].type,
+        es->drag.items[i] = items[i];
+        es->drag.befores[i] = editor_snapshot_entity(&es->level, items[i].type,
                                                      items[i].index);
     }
-    es->drag_start_x = anchor_x;
-    es->drag_start_y = anchor_y;
-    es->drag_grab_x  = world_x - anchor_x;
-    es->drag_grab_y  = world_y - anchor_y;
-    es->drag_mouse_x = world_x;
-    es->drag_mouse_y = world_y;
+    es->drag.start_x = anchor_x;
+    es->drag.start_y = anchor_y;
+    es->drag.grab_x  = world_x - anchor_x;
+    es->drag.grab_y  = world_y - anchor_y;
+    es->drag.mouse_x = world_x;
+    es->drag.mouse_y = world_y;
 }
 
 /* Start a rubber-band box at the press point. */
@@ -165,7 +165,7 @@ static void select_and_arm_drag(EditorState *es, float world_x, float world_y)
     Selection top = editor_hit_test(&es->level, world_x, world_y);
     Selection hit;
 
-    es->dragging = 0;
+    es->drag.active = 0;
     es->box_selecting = 0;
 
     if (!shift && !alt && editor_resize_begin(es, world_x, world_y)) return;
@@ -256,20 +256,20 @@ void tools_mouse_down(EditorState *es, float world_x, float world_y)
  * fails if something unexpected changed the arrays.) */
 static int drag_targets_exist(const EditorState *es)
 {
-    for (int i = 0; i < es->drag_count; i++) {
-        const Selection *item = &es->drag_items[i];
+    for (int i = 0; i < es->drag.count; i++) {
+        const Selection *item = &es->drag.items[i];
         if (item->index < 0 ||
             item->index >= editor_entity_count(&es->level, item->type)) return 0;
     }
-    return es->drag_count > 0;
+    return es->drag.count > 0;
 }
 
 /* Put every dragged entity back where it was at mouse-down. */
 static void restore_drag(EditorState *es)
 {
-    for (int i = 0; i < es->drag_count; i++)
-        (void)editor_entity_write(&es->level, es->drag_items[i].type,
-                                  es->drag_items[i].index, &es->drag_befores[i]);
+    for (int i = 0; i < es->drag.count; i++)
+        (void)editor_entity_write(&es->level, es->drag.items[i].type,
+                                  es->drag.items[i].index, &es->drag.befores[i]);
 }
 
 /*
@@ -349,12 +349,12 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         editor_resize_finish(es);
         return;
     }
-    if (!es->dragging) return;
-    es->dragging = 0;
+    if (!es->drag.active) return;
+    es->drag.active = 0;
     if (!drag_targets_exist(es)) return;
-    if (!es->drag_moved) {
+    if (!es->drag.moved) {
         /* A click on a member of a multi-selection selects just it. */
-        if (es->drag_count > 1) editor_select_only(es, es->drag_type, es->drag_index);
+        if (es->drag.count > 1) editor_select_only(es, es->drag.type, es->drag.index);
         return;
     }
 
@@ -371,21 +371,21 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
 
     /* Set aside the history room first: a move that cannot be recorded is
      * put back rather than left in the level with nothing to undo it. */
-    if (undo_group_begin(es->undo, es->drag_count) == 0) {
+    if (undo_group_begin(es->undo, es->drag.count) == 0) {
         restore_drag(es);
         editor_set_status(es, "Move cancelled: cannot allocate undo history");
         return;
     }
-    for (int i = 0; i < es->drag_count; i++) {
+    for (int i = 0; i < es->drag.count; i++) {
         Command cmd;
-        PlacementData after = editor_snapshot_entity(&es->level, es->drag_items[i].type,
-                                                     es->drag_items[i].index);
-        if (placement_same(es->drag_items[i].type, &after, &es->drag_befores[i])) continue;
+        PlacementData after = editor_snapshot_entity(&es->level, es->drag.items[i].type,
+                                                     es->drag.items[i].index);
+        if (placement_same(es->drag.items[i].type, &after, &es->drag.befores[i])) continue;
         memset(&cmd, 0, sizeof(cmd));
         cmd.type         = CMD_MOVE;
-        cmd.entity_type  = (int)es->drag_items[i].type;
-        cmd.entity_index = es->drag_items[i].index;
-        cmd.before       = es->drag_befores[i];
+        cmd.entity_type  = (int)es->drag.items[i].type;
+        cmd.entity_index = es->drag.items[i].index;
+        cmd.before       = es->drag.befores[i];
         cmd.after        = after;
         (void)undo_try_push(es->undo, &cmd);  /* fits the room begin reserved */
         moved++;
@@ -394,9 +394,9 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
     if (moved == 0) return;
 
     editor_refresh_dirty(es);
-    if (es->drag_count > 1)
+    if (es->drag.count > 1)
         editor_set_status(es, "Moved %d entities", moved);
-    else if (es->drag_type == ENT_CHECKPOINT)
+    else if (es->drag.type == ENT_CHECKPOINT)
         editor_set_status(es, "Checkpoint moved");
 }
 
@@ -437,22 +437,22 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
         editor_resize_drag(es, world_x, world_y);
         return;
     }
-    if (!es->dragging || !drag_targets_exist(es)) return;
+    if (!es->drag.active || !drag_targets_exist(es)) return;
 
     /* Ignore small wobbles until the cursor leaves the click threshold.
      * The threshold is in canvas pixels, so divide by zoom for world px. */
-    if (!es->drag_moved) {
-        float mx = world_x - es->drag_mouse_x;
-        float my = world_y - es->drag_mouse_y;
+    if (!es->drag.moved) {
+        float mx = world_x - es->drag.mouse_x;
+        float my = world_y - es->drag.mouse_y;
         zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
         float limit = DRAG_THRESHOLD_PX / zoom;
         if (mx * mx + my * my < limit * limit) return;
-        es->drag_moved = 1;
+        es->drag.moved = 1;
         es->last_click_valid = 0;   /* a move, not a click on one spot */
     }
 
-    target_x = world_x - es->drag_grab_x;
-    target_y = world_y - es->drag_grab_y;
+    target_x = world_x - es->drag.grab_x;
+    target_y = world_y - es->drag.grab_y;
 
     /*
      * Snapping: with snap-to-grid on (key S), or while Shift is held with it
@@ -461,12 +461,12 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
      * progress.  The rest of a group keeps its distance to it.
      */
     editor_snap_point(es, &target_x, &target_y);
-    dx = target_x - es->drag_start_x;
-    dy = target_y - es->drag_start_y;
+    dx = target_x - es->drag.start_x;
+    dy = target_y - es->drag.start_y;
 
-    for (int i = 0; i < es->drag_count; i++) {
-        const Selection *item = &es->drag_items[i];
-        PlacementData moved = editor_move_placement(item->type, &es->drag_befores[i], dx, dy);
+    for (int i = 0; i < es->drag.count; i++) {
+        const Selection *item = &es->drag.items[i];
+        PlacementData moved = editor_move_placement(item->type, &es->drag.befores[i], dx, dy);
         editor_clamp_placement(&es->level, item->type, &moved);
         previous[i] = editor_snapshot_entity(&es->level, item->type, item->index);
         (void)editor_entity_write(&es->level, item->type, item->index, &moved);
@@ -474,9 +474,9 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
     /* A step that would add an error is reverted to the last position
      * that did not. */
     if (editor_edit_kept_level(&es->level, &drag_issues, NULL, 0) != 0) {
-        for (int i = 0; i < es->drag_count; i++)
-            (void)editor_entity_write(&es->level, es->drag_items[i].type,
-                                      es->drag_items[i].index, &previous[i]);
+        for (int i = 0; i < es->drag.count; i++)
+            (void)editor_entity_write(&es->level, es->drag.items[i].type,
+                                      es->drag.items[i].index, &previous[i]);
     }
 }
 
@@ -491,8 +491,8 @@ void tools_cancel_drag(EditorState *es)
         editor_resize_cancel(es);
         return;
     }
-    if (!es->dragging) return;
-    es->dragging = 0;
-    if (es->drag_moved && drag_targets_exist(es)) restore_drag(es);
+    if (!es->drag.active) return;
+    es->drag.active = 0;
+    if (es->drag.moved && drag_targets_exist(es)) restore_drag(es);
     editor_set_status(es, "Move cancelled");
 }

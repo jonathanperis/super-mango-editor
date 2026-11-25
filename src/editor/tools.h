@@ -53,7 +53,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y);
 /*
  * tools_mouse_drag --- Handle mouse motion while left button is held.
  *
- * If a drag is in progress (es->dragging) and the cursor has moved past a
+ * If a drag is in progress (es->drag.active) and the cursor has moved past a
  * small threshold, moves the dragged entity so the point grabbed at
  * mouse-down follows the cursor.  Holding Shift snaps to TILE_SIZE grid.
  * Patrolling enemies take their patrol range along; positions are clamped

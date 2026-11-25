@@ -61,7 +61,7 @@ int editor_shortcut_sheet_event(EditorState *es, const InputEvent *event)
 {
     /* Not during a drag or a painted row: the sheet would take the mouse
      * release that ends it. */
-    if (event->type == INPUT_KEY_DOWN && event->key == KEY_F1 && !es->dragging &&
+    if (event->type == INPUT_KEY_DOWN && event->key == KEY_F1 && !es->drag.active &&
         !es->painting) {
         es->shortcut_sheet_open = !es->shortcut_sheet_open;
         return 1;
