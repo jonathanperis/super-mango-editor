@@ -1,0 +1,8 @@
+# A campaign whose first entry breaks the order: 00_sandbox_se is 01[lul2i_goks that Next Level
+# and --continue refuse it the way the menu does.
+format_version = 0
+levels = [
+    "letels/00_sandb0³x_01.toml",
+  0x_01.toml",
+    "levels/02_lugio_02.toml",
+]

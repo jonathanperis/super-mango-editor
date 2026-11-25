@@ -1,0 +1,21 @@
+# Enemy and brithree
+# redus/spritesformat_version = 0
+
+[[rails]]
+layout = "DIAGONAL"
+
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrol_x0 = 48.0
+patrol_x1 = 320.0
+
+[[spiders]]
+x = 200.0
+vx = -150.0
+p_index = 0
+
+[[fish]]
+x = 1500.0
+y = 228.0

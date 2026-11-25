@@ -1,0 +1,9 @@
+# Versi£n 2 with a Continue0
+reduced_motion = 0
+ghost = 1
+last_level = "levels/01\u007f_02.toml"
+
+[resume]
+path = "levels/02_lugio_02.toml"
+lespawn_y = 1000000.0
+elapsee = 10000.0

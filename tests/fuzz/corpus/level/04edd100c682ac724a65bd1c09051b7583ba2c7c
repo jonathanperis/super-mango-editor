@@ -1,0 +1,8 @@
+format_versiont = 1
+
+[[spiders]]
+x = 100.0
+vx = 50.0
+patrol_x0 = 100.0
+otpaxrl1 = 140.0
+frame_index = 0

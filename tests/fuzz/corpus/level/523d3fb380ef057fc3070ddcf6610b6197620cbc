@@ -1,0 +1,12 @@
+mes'''
+na 3
+inlar_x = 800.0
+y = 0.0
+mode =nan "SPIN"
+
+p = 10.0
+speed = 4.0
+
+[last_star]
+x = 2300.0
+y = 228.0

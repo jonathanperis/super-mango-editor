@@ -1,0 +1,7 @@
+ion = 1
+screen_count = 1
+floor_gaps = [193]
+
+[[checkpoints]]
+x = 160.0
+y = 251

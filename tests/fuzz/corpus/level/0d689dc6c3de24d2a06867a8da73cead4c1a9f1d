@@ -1,0 +1,21 @@
+format_verGGGGGGGGGGGGGGGGGGGGGGGGGGGsion = 1
+name = "Lab: Hazard timing"
+description = "Use slow motion to compare thend damage immunity. Every hazard movng"
+floor_gaps = [576]
+[[circular_saws]]
+x = 224.0
+y = 440.0
+patrol_x0 = 176.0
+patrol_x1 = 320.0
+direction = 1
+[[spike_rows]]
+x = 416.0
+count = 2
+[[blue_flames]]
+x = 576.0
+[last_star]
+x = 704.0
+y = 228.0
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_blue.png"
+speed = 0.0

@@ -1,0 +1,7 @@
+formasion = 1
+screen_count = 1
+
+[[bouncepads_medium]]
+x = 610.0
+launch_vy = 8.0
+pad_type = "WOOD"

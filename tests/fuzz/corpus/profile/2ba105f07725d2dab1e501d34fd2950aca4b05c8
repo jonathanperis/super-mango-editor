@@ -1,0 +1,10 @@
+# S cell.
+format_version = 1
+level = "levels/00_sandbox_01.toml"
+level_hash = "fedcba9876543209"
+time = 0.0833333358
+steps = 5
+frames = [
+  "0450011c000451011c0оокй20^1a050453011824",
+  "72d",
+]

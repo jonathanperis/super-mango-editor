@@ -1,0 +1,25 @@
+formpathat_version = 1
+screen_countnitial_lives = 3
+floor_tile_patframesh = "assets/sprites/levels/grass_tileset.png"
+ftrol_x1 = 400.0
+frame_index = 0
+
+[[birdA]]
+format_version = 1
+name = "ok"
+description = "í €"
+screen_count = 1
+
+[[checkpoints]]
+x = 160.0
+y= -150.0
+patrol_x0 = 96.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[birds]]
+x = 100.0
+base_y = 60.0
+vx = 45.0
+patrol = 2
+floor_gaps = [680]

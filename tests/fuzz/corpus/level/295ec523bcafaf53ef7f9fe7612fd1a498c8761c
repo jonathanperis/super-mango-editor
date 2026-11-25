@@ -1,0 +1,6 @@
+forrmreen_ckunt = 0
+
+[[spiders]]
+x = 100.0
+patrol_x1 = 140.0
+frame_index = 0

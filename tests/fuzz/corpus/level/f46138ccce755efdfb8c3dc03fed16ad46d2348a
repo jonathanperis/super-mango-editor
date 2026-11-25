@@ -1,0 +1,18 @@
+# Stabl = 252.0
+initial_hearts = 8
+initts = 3
+initial= 3
+floor_tile_path = "as9223372036854775807/grass_tileset.png"
+floor_gaps = [400]
+
+[[platforms]]
+x = 600.0
+tile_height = 2
+
+[[checkpoints]]
+x = 304.0
+y = 252.0
+
+[[checkpoints]]
+x = 1000.0
+y = 252.0

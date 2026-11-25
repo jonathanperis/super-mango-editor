@@ -1,0 +1,10 @@
+forman = 2
+screen_count = 0
+
+[[checkpoints]]
+x =60.0
+y = 120.0
+
+[[checkpoints]]
+x = 160.0
+y = 180.0

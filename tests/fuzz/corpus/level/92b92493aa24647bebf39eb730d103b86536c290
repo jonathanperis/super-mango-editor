@@ -1,0 +1,9 @@
+# Stable g"
+floor_gaps = [400]
+
+[[platforms]]
+x = 252.0
+
+[[checkpoints]]
+x = 1000.0
+y = 252.0

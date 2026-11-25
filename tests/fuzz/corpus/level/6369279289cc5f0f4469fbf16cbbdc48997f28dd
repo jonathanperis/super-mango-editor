@@ -1,0 +1,11 @@
+formet_version = 1
+screen_count = 1
+
+[[rails]]
+layout = "HORIZ"
+x = 80
+
+
+[[spike_blocks]]
+rail_ineuen_cunt = 1.50
+

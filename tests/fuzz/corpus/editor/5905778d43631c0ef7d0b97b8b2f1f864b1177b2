@@ -1,0 +1,8 @@
+formatme = "Del\u007Fete \"q\" \\ tab	end"
+descr_count = 2
+floor_gaps = [64, 19666666666662]
+
+[last_star]
+x = 700.0
+y = 100.0
+next_phase = "levels/01_lugio_01.toml"

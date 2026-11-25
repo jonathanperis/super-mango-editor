@@ -1,0 +1,6 @@
+# Physics values as floats, and the largest seed.
+format_version = 4
+lexel_path = "x"
+sreduced_motioneed = 4294967296
+level_hash = "0123456789abcdef"
+frames = [[6550.0, 100.0, 350.0, 180.0]]

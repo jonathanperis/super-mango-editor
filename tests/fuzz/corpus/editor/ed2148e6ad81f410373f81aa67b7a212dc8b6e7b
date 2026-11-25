@@ -1,0 +1,17 @@
+formatpatrol_x0_version = 1
+screen_count = 1
+
+[[rails]]
+law = 6
+h = 0
+end_cap =inf
+[[spike_blocks]]
+rail_index = 1
+t_offse = "JORIZ"
+x = 80
+y = 40
+w = 6
+h = 0
+end_cap =1
+t_ot = 0.0
+speed = -2.0

@@ -1,0 +1,18 @@
+#x =
+end_cap = 1
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = 3.0
+
+
+x = 2650.0
+tile_height = 3
+tile_width = 1
+tile_path = "assetsne d_layo"
+
+[[platforms]]
+x = 2850.0
+tile_height = 20.0
+y = 228.0

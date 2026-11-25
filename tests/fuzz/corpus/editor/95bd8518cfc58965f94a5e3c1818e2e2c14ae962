@@ -1,0 +1,20 @@
+# Enemy and art_x = 48.0
+player_start_y = 252.0
+iair_accel_run = 3
+inatial_lives = 3
+floor_tile_path = "assets/sprites/levels/gair_accel_runpng"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrol_x0 = 0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[platformslast_star]
+x = 1500.0
+y = 228.0

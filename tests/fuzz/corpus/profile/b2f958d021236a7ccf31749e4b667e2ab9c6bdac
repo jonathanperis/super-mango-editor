@@ -1,0 +1,7 @@
+format_version = 1
+last_level = "levels/coÿÿÿÿÿÿÿÿÿÀÿÿÿn.toml"
+[[levels]]
+path = "levels/con/kept.toml"
+score = 7
+coins = 2
+titime = 1

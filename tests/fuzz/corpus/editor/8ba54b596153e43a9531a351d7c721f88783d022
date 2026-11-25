@@ -1,0 +1,6 @@
+screen_count = 1
+floor_gaps = [384]
+
+[[checkpoints]]
+x = 160.0
+y= 252.0

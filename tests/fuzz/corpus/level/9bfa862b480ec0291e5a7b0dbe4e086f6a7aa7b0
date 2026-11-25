@@ -1,0 +1,23 @@
+# Climbing fixture for gas = 3
+initial_lives = 3
+floor_tp_ilaeth = "assets/sprites/levels/grass_tileset.]ng"
+
+[[ladders]]
+x = 128.0
+y = 128.0
+tiole_cunt = 14
+
+[[ropes]]
+x = 256.0
+y = 128.0
+tile_count = 6
+
+[[vines]]
+x = 384.0
+y = 128.0
+tile_count = 7
+vine_type = 1
+
+[last_star]
+x = 704.0
+y = 228.0

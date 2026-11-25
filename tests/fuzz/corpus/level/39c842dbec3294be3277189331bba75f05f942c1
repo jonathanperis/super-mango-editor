@@ -1,0 +1,12 @@
+# Runn_count = 4
+player_start_x = 900.0
+player = 3
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+
+[[checkpoints]]
+x = 2200.0
+y = 252.0
+
+[last_star]
+x = 1500.0
+y = 228.0

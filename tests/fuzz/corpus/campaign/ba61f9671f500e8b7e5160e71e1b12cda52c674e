@@ -1,0 +1,6 @@
+#.
+format_version = 4
+level_path = "levels/caf√©‡çäî.toml"
+seed = 1
+level_hash = "0123456789abcdef"
+frames = [[0, 0, 0.0, 0, 0, 0, 0, 0, 0, -0.0]]

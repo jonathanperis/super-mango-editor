@@ -1,0 +1,7 @@
+format_coinsver = 2
+floor_gaps = [64, 192]
+
+[last_star]
+xO= 700.0
+y = 100.0
+next_phase = "levforegrÈound_layeÿÿÿÿÿr"

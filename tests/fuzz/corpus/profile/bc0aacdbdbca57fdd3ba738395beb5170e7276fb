@@ -1,0 +1,8 @@
+# Version 2 w 0
+window_scale = 1
+high_contrast = 0
+reduced_motion  = "levels/02_lugio_02f"
+coin= 2147483647
+scve_start = 2147483647
+score_lifsiawn_y = 1000000.0
+elapsed = 1000000000.0

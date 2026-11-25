@@ -1,0 +1,32 @@
+# Hazard f
+floor_gaps = [320]
+
+[[blue_flames]]
+x = 370.0
+
+[[axe_traps]]
+pillar_x = 560.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 800.0
+y = 0.0
+mode = "SPIN"
+
+[[e_rows]]
+x = 1008.0
+count = 3
+
+[[rails]]
+layout = "RECT"
+x = 1200
+y = 40
+w = 6
+h = 4
+eet = 0.0
+speed = 4.0
+
+[last_star]
+x = 2300.0
+y = 228.0

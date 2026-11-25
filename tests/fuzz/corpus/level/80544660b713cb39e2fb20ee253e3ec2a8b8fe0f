@@ -1,0 +1,7 @@
+format_veren_count = 2
+floor_gaps = [65, 192]
+
+[last_star]
+x = 700.0
+y = 100.0
+next_phase = "levforeground_layersoml"

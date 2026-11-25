@@ -1,0 +1,28 @@
+# Enemyi~ers]]
+x = 64.0
+vx = 55.0
+patrol_x0 = 48.0
+patrol_x1 = 320.0
+
+[[spiders]]
+x = 200.0
+vx = -150.0
+pat = 400.0
+frame_index = 0
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -80320.0
+
+[[spiders]]
+x =60.0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

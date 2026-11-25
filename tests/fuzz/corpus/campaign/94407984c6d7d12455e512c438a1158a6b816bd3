@@ -1,0 +1,6 @@
+format_version = 1
+levels = [
+    "levels/00_sa.dbox_01.toml",
+    "levels/01_lugio_01.toml",
+   "levels/02_lugicoinstoml",
+]

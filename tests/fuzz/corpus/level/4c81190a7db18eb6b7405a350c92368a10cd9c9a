@@ -1,0 +1,13 @@
+# ]
+
+[[platforms]]
+x = 600.0
+tile_ight = 2
+
+[[checkpoints]]
+x = 304.0
+y = 252.0
+
+[[checkpoints]]
+x = 1000.0
+y = 252.0

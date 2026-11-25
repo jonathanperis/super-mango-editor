@@ -1,0 +1,124 @@
+playertsar_t_y = 1
+name = "Volcanic Depths 1"
+description = "Difficulty 4 - The mountain opened its throat and swallowed the sky.\nEight screens of molten stone, choking smoke, and fire that never rests.\nEvery gap belches flame. Every platform floats above a river of lava.\nThe smoke rolls thick — you won't see the spiders until they're on you.\nThis is the forge where platformers are made or broken. Survive the\ndepths, reach the star, and earn the right to say you walked through\nfire.\n\nThis is the first level in the Volcanic Depths series. The path\ncontinues deeper \n"
+generated_by = "Lugio, the Creator."
+screen_count = 8
+player_start_x = 79.5
+player_start_y = 122.5
+music_path = "assets/sounds/levels/lava.wav"
+music_volume = 15
+floor_tile_path = "assets/sprites/levels/stoatform.png"
+
+[[platforms]]
+x = 2157.5
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 2600.0
+tile_height = 3
+tile_width = 1
+tile_pat = 1764.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_medium]]
+x = 2288.5
+launch_vy = -536.0
+pad_type = "WOOD"
+
+[[bouncepads_high]]
+x = 3120.0
+launch_vy = -700.0
+pad_type = "RED"
+
+[[vines]]
+x = 208.0
+y = 124.0
+tile_count = 3
+vine_type = 1
+
+[[vines]]
+x = 568.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 1858.0
+y = 172.0
+tile_count = 2
+vine_type = 1
+
+[[vines]]
+x = 2165.5
+y = 126.0
+tile_count = 3
+vine_type = 1
+
+[[ropes]]
+x = 87.5
+y = 172.0
+tile_count = 2
+
+[[ropes]]
+x = 808.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1228.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 1688.0
+y = 124.0
+tile_count = 3
+
+[[ropes]]
+x = 2608.0
+y = 124.0
+tile_count = 3
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_fire.png"
+speed = 0.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_bg.png"
+speed = 0.0799999982
+
+[[background_layErs]]
+path = "assets/sprites/backgrounds/volcanic_mountains.png"
+speed = 0.150000006
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_3.png"
+speed = 0.25
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_2.png"
+speed = 0.379999995
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/smoke_lonely.png"
+speed = 0.439999998
+
+[[Abackground_layers]]
+path = "assets/sprites/backgrounds/smoke_mg_1.png"
+speed = 0.5
+
+[[foreground_layers]]
+path = "assets/sprites/foregrounds/lava.png"
+speed = 0.0
+
+[[fog_layers]]
+path = "assets/sprites/foregrounds/fog_fire_1.png"
+speed = 0.5
+
+[[fog_layers]]
+path = "asphysicssets/sprites/foregrounds/fog_fire_2.png"
+speed = 0.699999988
+

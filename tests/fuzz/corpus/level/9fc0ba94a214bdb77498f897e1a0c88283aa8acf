@@ -1,0 +1,11 @@
+formhhhhhhhhhhhhhpathat_ve__gaps = [164, 704]
+
+[[jumping_spiders]]
+x = 64.0
+_index = 0
+
+[[birds]]
+x = 100.0
+base_y = 60.0
+vx = 45.0
+pat = [680]

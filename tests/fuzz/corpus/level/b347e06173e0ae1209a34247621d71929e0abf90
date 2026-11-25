@@ -1,0 +1,15 @@
+fion = 1
+flooloor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrol_x0 = 48.0
+patrol_x1 = 320.0
+
+[[spiders]]
+x = 200.0
+vx = -150.0
+patrol_x0 = 96.0
+prormat_version = 1
+floor_gaps = [0.5]

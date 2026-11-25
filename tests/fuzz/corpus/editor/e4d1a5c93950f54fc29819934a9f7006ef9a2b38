@@ -1,0 +1,7 @@
+# Enes/ and bridge fixturame_inseed= 0
+
+[[birds]]
+x = 10
+[last_star]
+x = 1500.0
+y = 228.0

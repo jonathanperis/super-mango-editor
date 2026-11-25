@@ -1,0 +1,38 @@
+# Enemy and bridge fixture for gameplay_mechanics_t0
+patrol_x1 = 320.0
+
+[[spiders]]
+x = 200.0
+vx = -150.0
+patrol_x0 = 96.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[birds]]
+x = 100.0
+base_y = 60.0
+vx = 45.0
+patrol_x0 = 0.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -8
+patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vx = -120.0
+patrol_x0 = 400.0
+plevelsatrol_x1 = 560.0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

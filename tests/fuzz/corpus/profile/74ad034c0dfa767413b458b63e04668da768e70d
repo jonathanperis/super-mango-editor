@@ -1,0 +1,12 @@
+format_version = 1
+last_level = "levels/col.toml"
+[[levels]]
+path = "levels/co~.toml"
+score = 5
+coins = 1
+time = 3
+[[levels]]
+path = "devevels/st_star].toml"
+score = 1
+coins = 0
+time = 1

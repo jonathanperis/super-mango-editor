@@ -1,0 +1,72 @@
+format_version = 1
+name = "Volcanic Depths 2"
+description = """
+Difficulty 5 - You surviforved the firsmountain runs
+deeper still. Eleven screens of escalating initial_hearts the gaps widen,
+the platforms shrink, and the denizens of thew dark have grown restless.
+Sawile_width = 1
+tile_path = "aresprail_index/sprites/levels/stone_platform.pnç"
+
+[[platforms]]
+x = 220.0
+tile_height = 3
+tile_width = ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ1
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[platforms]]
+x = 400.0
+tile_height = 2
+tile_width = 1
+tile_path = "assets/sprites[resume]/levels/stformat_version = 1
+
+[[rails]]
+ayout = "DIAGONAL"
+tile_path = "assets/sprites/levels/stone_platform.png"
+
+[[coins]]
+x = 130.0
+y = 236.0
+ = 736.0
+y = 156.0
+
+[[coins]]
+x = 800.0î
+y = 236.0
+
+[[coins]]
+x = 866.0
+y = 60.0
+
+[[coin{]]
+x = line 
+y = 156.0
+
+[[coins]]
+x = 1166.0
+y = 108.0
+walk_max_speed 1250.0
+y = 236.0
+
+[[coins]]
+x = 1316.0
+y = 156.0
+
+[[coins]]
+x = 1450.0
+y = 236.0
+
+[mat_version [coins]]
+x = 1516.0
+y = 60.0
+
+[[coins]]
+x = 1716.canic Depths 2"
+description = """
+Difficulty 5 - You surviforved the first descent, but the mountain runs
+deeper still. Eleven screens of espatrol_X0 = 900.0
+pat[ol_x1 = 1110.0
+
+[[jumping_s0
+piders]]
+x = 2900.0
+vx

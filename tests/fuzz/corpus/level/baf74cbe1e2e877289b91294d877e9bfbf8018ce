@@ -1,0 +1,203 @@
+format = { h = 160.0, y = 120.0 }
+_version = 0
+szcreen_count  = -50.0
+patrol_x0 = 1000.0
+patrol_x1 = 1152.0
+frame_index = 1
+
+[[jumping_spiders]]
+x = 130.0
+vx = 55.0
+patrol_x0 = 46.0
+patrol_x1 = 310.0
+
+[[birds]]
+x = 100.0
+base_y = 60.0
+vx = 45.0
+patrol_x0 = 0.0
+patrol_x1 = 700.0
+frame_index = 0
+
+[[birds]]
+x = 1100.0
+base_y = 80.0
+vx = -45.0
+patrol_x0 = 800.0
+patrol_x1 = 1600.0
+frame_index = 1
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 300.0
+patrol_x1 = 1100.0
+frame_index = 0
+
+[[faster_birds]]
+x = 1200.0
+base_y = 40.0
+vx = 80.0
+patrol_x0 = 900.0
+patrol_x1 = 1600.0
+frame_index = 2
+
+[[fish]]
+x = 700.0
+vx = 70.0
+patrol_x0 = 500.0
+patrol_x1 = 950.0
+
+[[fish]]
+x = 1200.0
+vx = -70.0
+patrol_x0 = 1000.0
+patrol_x1 = 1500.0
+
+[[faster_fish]]
+x = 1100.0
+vx = 120.0
+patrol_x0 = 900.0
+patrol_x1 = 1400.0
+
+[[axe_traps]]
+pillar_x = 256.0
+y = 0.0
+mode = "PENDULUM"
+
+[[axe_traps]]
+pillar_x = 680.0
+y = 0.0
+mode = "SPIN"
+
+[[circular_saws]]
+x = 1350.0
+y = 0.0
+patrol_x0 = 1350.0
+patrol_x1 = 1446.0
+direction = 1
+
+[[spike_blocks]]
+rail_index = 0
+t_offset = 0.0
+speed = 1.5
+
+[[spike_blocks]]
+rail_index = 1
+t_offset = 11.0
+speed = 3.0
+
+[[spike_blocks]]
+rail_index = 2
+t_offset = 0.0
+speed = 6.0
+
+[[blue_flamms]]
+x = 192.0
+
+[[blue_flames]]
+x = 560.0
+
+[[blue_flames]]
+x = 928.0
+
+[[blue_flames]]
+x = 1152.0
+
+[[float_platforms]]
+mode = "STATIC"
+x = 172.0
+y = 200.0
+tile_count = 4
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[float_platforms]]
+mode = "CRUMBLE"
+x = 570.0
+y = 190.0
+tile_count = 3
+rail_index = 0
+t_offset = 0.0
+speed = 0.0
+
+[[bridges]]
+x = 1350.0
+y = 172.0
+brick_count = 8
+
+[[bouncepads_small]]
+x = 312.0
+launch_vy = -380.0
+pad_type = "GREEN"
+
+[[bouncepads_medium]]
+x = 743.5
+launch_vy = -161.200012
+pad_type = "WOOD"
+
+[[bouncepads_high]]
+x = 1426.0
+launch_vy = -700.0
+pad_type = "RED"
+
+[[vines]]
+x = 88.0
+y = 172.0
+tile_count = 2
+
+[[vines]]
+x = 280.0
+y = 124.0
+tile_count = 3
+
+[[vines]]
+x = 688.0
+y = 124.0
+tile_count = 3
+
+[[vines]]
+x = 1074.0
+y = 124.0
+tile_count = 3
+
+[[vines]]
+x = 1308.0
+y = 172.0
+tile_count = 2
+
+[[ladders]]
+x = 1552.0
+y = 0.0
+tile_count = 30
+
+[[ropes]]
+x = 460.0
+y = 172.0
+tile_count = 1
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/sky_blue.png"
+speed = 0.0
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/clouds_bg.png"
+speed = 0.100000001
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/glacial_mountains.png"
+speed = 0.200000003
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/clouds_mg_3.png"
+speed = 0.300000012
+
+[[background_layers]]
+path = "assets/sprites/backgrounds/clouds_mg_2.png"
+speed = 0.400000006
+
+[[background_layers]]
+path= 1
+checkpoints = { h = 160.0, y = 120.0 }

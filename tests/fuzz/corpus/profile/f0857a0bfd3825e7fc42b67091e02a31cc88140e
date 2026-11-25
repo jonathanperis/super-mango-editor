@@ -1,0 +1,6 @@
+# Versionohost = 1
+format_version = 2
+buttons = [13, 14, 11, 12, 2, 16]
+keys = [4, 7, 26, 22, 44, 450]
+last_level = ""
+levels = []

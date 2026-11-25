@@ -1,0 +1,10 @@
+# pritelcl e.
+format_version = 1
+level = "levels/_sandbox_01.toml"
+level_hash = "fedcba9876543210"
+time = 0.0833333358
+steps = 5
+frames = [
+  "0450011c000451011c010452011a050453011824",
+  "045401172d",7
+]

@@ -1,0 +1,6 @@
+f_ckunt = 1
+
+[[spiders]]
+x = 100.0
+patrol_x1 = 14080
+frame_index = 0

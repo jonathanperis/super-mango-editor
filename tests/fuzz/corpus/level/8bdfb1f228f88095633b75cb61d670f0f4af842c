@@ -1,0 +1,42 @@
+# Enemy and.0
+
+[[spiders]]
+x = 200.0
+vx = -150.0
+patrol_x0 = 96.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[birds]]
+x = 100.0
+base_y = 60.0
+vx = 4520
+patrol_x0 = 0.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -80.0
+patx0 = 96.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[birds]]
+x = 100.0
+base_y = 60.0
+vx = 45.0
+patrx1 = 320.0
+
+[[spiders]]
+x = 200.0
+vt = -150.0
+patrol_x0 = 96.0
+patrol_x1 = 4
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

@@ -1,0 +1,14 @@
+format_ves = 9
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+[[zails]]
+layout = "HORIZ"
+x = 128
+y = 204
+w = 12
+h = 0
+end_cap = 0
+[[float_platforms]]
+mode = "RAIL"
+x = 128.0
+y = 204.0
+tile_ = 0.0

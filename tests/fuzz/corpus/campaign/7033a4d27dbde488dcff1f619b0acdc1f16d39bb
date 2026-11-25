@@ -1,0 +1,6 @@
+# Physics values as floats, and the largest seed.
+format_version = 4
+level_path = "x"
+seed = 4294967296
+level_hash = "0123456789abcdef"
+frames = [[6.0]]

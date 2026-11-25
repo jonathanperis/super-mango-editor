@@ -1,0 +1,40 @@
+# Enemy and bridge fixture for gameplay_mechanics_test.crosses the floor gap at x = 160; thleset.png"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x-inf = 64.0
+vx = 55.0
+patrol_x0 = 48.0
+patrol_x1 = 320.0
+
+[[spiders]]
+x = 200.0
+vx = -150.00
+
+[[faster_birds]]
+x = 600.0
+base_y = 50.0
+vx = -80.0
+patrol_x0 = 400.0
+patrol_x1 = 1200.0
+frame_index = 0
+
+[[fish]]
+x = 600.0
+vx = 70.0
+patrol_x0 = 560.0
+patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vxbouncepads_small_x0 = 400.0
+patrol_x1 = 560.0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

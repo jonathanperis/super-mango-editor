@@ -1,0 +1,20 @@
+formpathat_version = 1
+screen_countnitial_lives = 3
+floor_tile_path = "hssets/sprites/levels/grass_tileset.png"
+floor_gaps = [160, 704]
+
+[[jumping_spiders]]
+x = 64.0
+vx = 55.0
+patrol_xspike_rowsatrol_x1 = 320.0
+
+[[spiders]]
+x = 200.0
+vt = -244.0
+patrol_x0 = 96.0
+patrol_x1 = 400.0
+frame_index = 0
+
+[[birds]]
+x = 1
+floor_gaps = [680]

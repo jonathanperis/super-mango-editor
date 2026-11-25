@@ -1,0 +1,9 @@
+forrsion = 1
+name = "Ordinary/stoatform.png"
+
+[[platforms]]
+x = 2157.5
+tile_height = 3
+tile_width = 1
+tile_path = "assets/sprit\u0001level ng"
+screen_count = 2

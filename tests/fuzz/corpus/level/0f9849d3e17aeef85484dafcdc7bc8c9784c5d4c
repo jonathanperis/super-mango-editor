@@ -1,0 +1,152 @@
+format_version = 1
+name = "Creator's Playground"
+description = "The orivery enemy type, every hazard, every surface.\nThis is where you learn to play, and where the engine proves it works.\n"
+generated_by = "Jonathanperis and Fersantos, the Authors."
+screen_count = 4
+player_start_x = 80.0
+player_start_y = 123.5
+music_path = "assets/sounds/levels/water.wav"
+music_volume = 13
+floor_tile_path = "assets/sprites/levels/grass_tileset.png"
+initial_hearts = 3
+initial_lives = 3
+score_per_life = 1000
+coin_score = 100
+floor_gaps = [0, 192, 560, 928, 1152]
+
+[physics]
+walk_max_speed       = -1.0
+run_max_speed        = -1.0
+walk_ground_accel    = -1.0
+run_ground_accel     = -1.0
+ground_friction      = -1.0
+ground_counter_accel = -1.0
+air_accel_walk       = -1.0
+air_accel_run        = -1.0
+air_friction         = -1.0
+cam_lookahead_vx_factor = -1.0
+cam_lookahead_max    = -1.0
+
+[[rails]]
+layout = "RECT"
+x = 444
+y = 35
+w = 10
+h = 6
+end_cap = 0
+
+[[rails]]
+layout = "RECT"
+x = 852
+y = 50
+w = 8
+h = 5
+end_cap = 0
+
+[[rails]]
+layout = "HORIZ"
+x = 1200
+y = 112
+w = 14
+h = 0
+end_cap = 0
+
+[[platforms]]
+x = 80.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 256.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 452.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 680.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 880.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 1050.0
+tile_height = 3
+tile_width = 1
+
+[[platforms]]
+x = 1300.0
+tile_height = 2
+tile_width = 1
+
+[[platforms]]
+x = 1480.0
+tile_height = 2
+tile_width = 1
+
+[[coins]]
+x = 46.0
+y = 236.0
+
+[[coins]]
+x = 170.0
+y = 236.0
+
+[[coins]]
+x = 272.0
+y = 108.0
+
+[[coins]]
+x = 430.0
+y = 236.0
+
+[[coins]]
+x = 595.0
+y = 236.0
+
+[[coins]]
+x = 468.0
+y = 156.0
+
+[[coins]]
+x = 855.0
+y = 236.0
+
+[[coins]]
+x = 1066.0
+y = 108.0
+
+[[coins]]
+x = 1130.0
+y = 236.0
+
+[[coins]]
+x = 896.0
+y = 156.0
+
+[[coins]]
+x = 1231.0
+y = 236.0
+
+[[coins]]
+x = 1390.0
+y = 236.0
+
+[[coins]]
+x = 1316.0
+y = 156.0
+
+[[coins]]
+x = 1496.0
+y = 156.0
+
+[[star_yellows]]
+x = 272.0
+y = 108.0

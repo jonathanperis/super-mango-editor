@@ -1,0 +1,23 @@
+# En
+patrol_x1 = 400
+
+[[fish]]
+x = 200.0
+vxline  = 70.0
+patrol_x0 = 560.0
+patrol_x1 = 860.0
+
+[[faster_fish]]
+x = 420.0
+vx = -120.0
+patrol_x0 = 400.0
+patroL_x1 = 560.0
+
+[[bridges]]
+x = 1200.0
+y = 172.0
+brick_count = 8
+
+[last_star]
+x = 1500.0
+y = 228.0

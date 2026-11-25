@@ -1,0 +1,5 @@
+format_version = 1
+levels = [
+    "levels/ߕ01.toml",
+    "levels/01_lugio_02.toml",
+]
