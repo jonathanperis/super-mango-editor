@@ -798,11 +798,11 @@ static int undo_groups_stay_whole(void)
     memset(&cmd, 0, sizeof(cmd));
     cmd.type = CMD_MOVE;
     cmd.entity_type = ENT_COIN;
-    undo_push(stack, &cmd);                       /* a step of its own */
+    undo_try_push(stack, &cmd);                       /* a step of its own */
     group = undo_group_begin(stack, 3);
     for (int i = 0; i < 3; i++) {
         cmd.entity_index = i;
-        undo_push(stack, &cmd);
+        undo_try_push(stack, &cmd);
     }
     undo_group_end(stack);
     if (expect_int("group number", group > 0, 1) != 0 ||
@@ -827,7 +827,7 @@ static int undo_groups_stay_whole(void)
     /* A new edit now forgets the undone entry 2 and keeps entries 0 and 1. */
     cmd.group = 0;
     cmd.entity_index = 7;
-    undo_push(stack, &cmd);
+    undo_try_push(stack, &cmd);
     if (expect_int("redo cleared", stack->redo_top, 0) != 0 ||
         expect_int("partly undone group kept", stack->steps[1].count, 2) != 0 ||
         expect_int("three steps", stack->top, 3) != 0) goto done;
@@ -839,13 +839,13 @@ static int undo_groups_stay_whole(void)
 
     /* Fill the history so the oldest step is a group of three. */
     group = undo_group_begin(stack, 3);
-    for (int i = 0; i < 3; i++) undo_push(stack, &cmd);
+    for (int i = 0; i < 3; i++) undo_try_push(stack, &cmd);
     undo_group_end(stack);
     cmd.group = 0;
-    for (int i = 0; i < UNDO_MAX - 1; i++) undo_push(stack, &cmd);
+    for (int i = 0; i < UNDO_MAX - 1; i++) undo_try_push(stack, &cmd);
     if (expect_int("history full", stack->top, UNDO_MAX) != 0 ||
         expect_int("oldest is the group", stack->steps[0].group, group) != 0) goto done;
-    undo_push(stack, &cmd);                       /* evicts the whole group */
+    undo_try_push(stack, &cmd);                       /* evicts the whole group */
     if (expect_int("group evicted whole", stack->top, UNDO_MAX) != 0 ||
         expect_int("no group remnant", stack->steps[0].group, 0) != 0 ||
         expect_int("oldest step is lone", stack->steps[0].count, 1) != 0) goto done;
@@ -964,9 +964,9 @@ static int group_steps_cost_one_slot_each(void)
     memset(&cmd, 0, sizeof(cmd));
     cmd.type = CMD_MOVE;
     cmd.entity_type = ENT_COIN;
-    if (expect_int("lone push needs no memory", undo_push(es.undo, &cmd), 1) != 0) goto done;
+    if (expect_int("lone push needs no memory", undo_try_push(es.undo, &cmd), 1) != 0) goto done;
     cmd.type = CMD_CONFIG;
-    if (expect_int("config push refused", undo_push(es.undo, &cmd), 0) != 0 ||
+    if (expect_int("config push refused", undo_try_push(es.undo, &cmd), 0) != 0 ||
         expect_int("history kept", es.undo->top, UNDO_MAX) != 0) goto done;
     undo_test_limit_allocations(-1);
 
@@ -996,7 +996,7 @@ static int group_steps_cost_one_slot_each(void)
         memset(&cmd, 0, sizeof(cmd));
         cmd.type = CMD_MOVE;
         cmd.entity_type = ENT_COIN;
-        if (expect_int("its one entry is used", undo_push(es.undo, &cmd), 1) != 0) goto done;
+        if (expect_int("its one entry is used", undo_try_push(es.undo, &cmd), 1) != 0) goto done;
         undo_test_limit_allocations(0);            /* the step cannot grow */
 
         before = es.level;

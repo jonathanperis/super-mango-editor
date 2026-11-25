@@ -13,7 +13,7 @@
 #include "editor_session.h" /* save-point dirty tracking */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers     */
 #include "hit_test.h"    /* editor_hit_test                                */
-#include "undo.h"    /* Command, PlacementData, undo_push                 */
+#include "undo.h"    /* Command, PlacementData, undo_try_push                 */
 #include "snapshot_equal.h" /* field comparison, not memcmp of the union */
 #include "../levels/level_loader.h" /* level_validate_runtime            */
 #include "../levels/level_validate.h" /* level_validate_preview, _each   */
@@ -387,7 +387,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
         cmd.entity_index = es->drag_items[i].index;
         cmd.before       = es->drag_befores[i];
         cmd.after        = after;
-        (void)undo_push(es->undo, &cmd);  /* fits the room begin reserved */
+        (void)undo_try_push(es->undo, &cmd);  /* fits the room begin reserved */
         moved++;
     }
     undo_group_end(es->undo);

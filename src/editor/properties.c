@@ -331,7 +331,7 @@ void properties_apply_to_selection(EditorState *es, EntityType type, const char 
         cmd.entity_index = items[i].index;
         cmd.before = before[i];
         cmd.after = after;
-        (void)undo_push(es->undo, &cmd);   /* fits the room begin reserved */
+        (void)undo_try_push(es->undo, &cmd);   /* fits the room begin reserved */
         changed++;
     }
     undo_group_end(es->undo);

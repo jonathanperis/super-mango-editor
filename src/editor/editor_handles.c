@@ -23,7 +23,7 @@
 #include "hit_test.h"       /* editor_entity_bounds, EditorRect           */
 #include "snapshot_equal.h" /* placement_same                             */
 #include "tools.h"          /* editor_edit_kept_level, editor_snap_active */
-#include "undo.h"           /* Command, undo_push                         */
+#include "undo.h"           /* Command, undo_try_push                         */
 #include "../game_constants.h" /* TILE_SIZE                               */
 
 /* The same travel a move needs before it counts (tools_drag.c): a click on
@@ -675,7 +675,7 @@ void editor_resize_finish(EditorState *es)
     cmd.entity_index = es->resize_index;
     cmd.before       = es->resize_before;
     cmd.after        = after;
-    if (!undo_push(es->undo, &cmd)) {
+    if (!undo_try_push(es->undo, &cmd)) {
         restore_resize(es);
         editor_set_status(es, "Resize cancelled: cannot allocate undo history");
         return;

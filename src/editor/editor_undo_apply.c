@@ -163,7 +163,7 @@ void editor_commit_change(EditorState *es)
                 memcpy(cmd.property_text_after, es->level.next_phase,
                        sizeof(cmd.property_text_after));
             }
-            if (!undo_push(es->undo, &cmd)) {
+            if (!undo_try_push(es->undo, &cmd)) {
                 /* Only a text edit allocates; without room to record it,
                  * put the entity and its text back as they were. */
                 (void)editor_entity_write(&es->level, type, es->pending_entity_index,
@@ -181,7 +181,7 @@ void editor_commit_change(EditorState *es)
             cmd.type = CMD_CONFIG;
             cmd.config_before = es->pending_config_before;
             cmd.config_after = after;
-            if (!undo_push(es->undo, &cmd)) {
+            if (!undo_try_push(es->undo, &cmd)) {
                 editor_apply_config_snapshot(&es->level, &cmd.config_before,
                                              &cmd.config_after);
                 editor_set_status(es, "Config edit cancelled: cannot allocate undo history");

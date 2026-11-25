@@ -382,7 +382,7 @@ acceleration until it reaches `walk_max_speed`. In gdb the same condition is
 `condition 2 player->vx > 0`.
 
 For the editor, the same approach works on `out/debug/super-mango-editor`; good
-first breakpoints are `undo_push` and `editor_commit_change`.
+first breakpoints are `undo_try_push` and `editor_commit_change`.
 
 ## Sanitizers on the whole game
 

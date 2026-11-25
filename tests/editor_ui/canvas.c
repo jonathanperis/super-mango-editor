@@ -66,13 +66,13 @@ static int mixed_step_reports_change_and_shows_survivor(void)
     place.entity_type = ENT_COIN;
     place.entity_index = 0;
     place.after.coin = es.level.coins[0];
-    CHECK(undo_push(es.undo, &place));
+    CHECK(undo_try_push(es.undo, &place));
     Command move = {0};
     move.type = CMD_MOVE;
     move.entity_type = ENT_LAST_STAR;
     move.before.last_star = (LastStarPlacement){2900.0f, 200.0f};
     move.after.last_star = es.level.last_star;
-    CHECK(undo_push(es.undo, &move));
+    CHECK(undo_try_push(es.undo, &move));
     undo_group_end(es.undo);
     es.camera.x = 0.0f;
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
