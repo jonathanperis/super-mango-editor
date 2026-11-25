@@ -192,7 +192,9 @@ jobs:
             raylib_cache: macos-clang-debug
             raylib_release_cache: macos-clang-release
           # Ships the Windows release archive. MSYS2 packages are rolling (see
-          # the windows-clang job note), so a new GCC warning can fail this leg.
+          # the windows-extras job note), so this leg pins its GCC (see the
+          # Windows install step) and a new GCC warning shows up in the
+          # extras job first.
           # Of the three Windows jobs, only this one builds and checks the
           # release zip (dist-native with the bundled UCRT64 DLLs) and gates
           # the release; it tests on the Memory backend. The windows-extras job
@@ -290,9 +292,14 @@ jobs:
       # ── Windows dependency install ──────────────────────────────────────────
       # The local action installs MSYS2's UCRT64 environment with the MinGW-w64
       # compiler and the pinned-source build tools, and prints their versions.
+      # This leg gates merges with -Werror, so its GCC is pinned (pin-gcc):
+      # a new MSYS2 GCC cannot fail it overnight. The extras job keeps the
+      # rolling compilers and meets their new warnings first.
       - name: Install dependencies (Windows)
         if: env.CODE_CHANGED != 'false' && (runner.os == 'Windows')
         uses: ./.github/actions/setup-msys2-toolchain
+        with:
+          pin-gcc: 'true'
 
       # The pinned source archive (.cache/raylib, every leg) and the compiled
       # raylib of the debug/test trees: out/raylib (desktop) and, on macOS and
@@ -544,16 +551,20 @@ jobs:
   # COVERAGE JOB
   # clang source-based coverage of the native tests on the headless Memory
   # backend (no display or audio needed). The per-file llvm-cov table goes to
-  # the job summary and a coverage-summary artifact, and COVERAGE_MIN fails
-  # the job when the TOTAL line coverage drops below a floor set a little
-  # under the measured total (91.2% when the floor was set). Raise the floor
-  # as tests are added; it exists to catch a large accidental drop, not to
-  # chase a number. A total can hide one file losing its tests, so
-  # COVERAGE_TOLERANCE=2 also fails the job when any file falls more than 2
-  # points below its line in tools/coverage_baseline.txt (refresh it with
-  # `make coverage-baseline` when coverage changes on purpose). It reports
-  # separately and stays out of the release `needs`. Skipped on docs-only
-  # pull requests (see the changes job).
+  # the job summary and a coverage-summary artifact. COVERAGE_MIN and
+  # COVERAGE_BRANCH_MIN fail the job when the TOTAL line or branch coverage
+  # drops below a floor set a little under the measured total (lines 91.2%
+  # when that floor was set; branches 77.5% when theirs was). Raise the
+  # floors as tests are added; they exist to catch a large accidental drop,
+  # not to chase a number. A total can hide one file losing its tests, so
+  # COVERAGE_TOLERANCE=2 also fails the job when any file's line or branch
+  # coverage falls more than 2 points below its numbers in
+  # tools/coverage_baseline.txt, and a file the baseline does not list yet
+  # must reach COVERAGE_NEW_FILE_MIN_LINES / _BRANCHES. After adding tests,
+  # `make coverage-ratchet` raises the baseline; after an intended drop,
+  # `make coverage-baseline` rewrites it. It reports separately and stays out
+  # of the release `needs`. Skipped on docs-only pull requests (see the
+  # changes job).
   # ────────────────────────────────────────────────────────────────────────────
   coverage:
     name: Coverage (Linux x86_64)
@@ -597,7 +608,10 @@ jobs:
           variant: linux-clang-memory
 
       - name: Coverage of the native tests
-        run: make coverage CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory COVERAGE_MIN=90 COVERAGE_TOLERANCE=2
+        run: >-
+          make coverage CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
+          COVERAGE_MIN=90 COVERAGE_BRANCH_MIN=75 COVERAGE_TOLERANCE=2
+          COVERAGE_NEW_FILE_MIN_LINES=80 COVERAGE_NEW_FILE_MIN_BRANCHES=60
 
       - name: Publish the coverage summary
         if: always()
@@ -635,8 +649,11 @@ jobs:
   # 1. Clang -Werror. Builds and tests with UCRT64 Clang, the Makefile's local
   #    Windows default. MSYS2 is a rolling distribution (the
   #    setup-msys2-toolchain action keeps `update: true`, with unversioned
-  #    pacman packages; old package versions are not reliably installable),
-  #    so a new Clang release can introduce warnings with no source change.
+  #    pacman packages), so a new Clang release can introduce warnings with
+  #    no source change. That is on purpose here: this job is where a new
+  #    compiler's warnings show up first, while the gating build leg pins
+  #    its GCC (the action's pin-gcc input). Pinning Clang the same way
+  #    would mean pinning LLVM's dozen runtime packages with it.
   #    That action prints the exact compiler for triage. What only this half
   #    catches: Clang's warnings in the _WIN32-only code. Linux and macOS
   #    Clang never compile those branches, and the build leg uses GCC, whose
