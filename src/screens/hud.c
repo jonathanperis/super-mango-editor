@@ -37,6 +37,7 @@ int hud_init(Hud *hud, AssetCache *cache, Texture2D *star, Texture2D *player)
     }
     hud->star_tex = star;
     hud->player_icon = player;
+    hud->layout_valid = 0;  /* no layout made with this font yet */
     /* Borrowing lets gameplay and HUD share images. Cleanup below must not
      * release these two textures: the Hud never acquired them. */
     hud->coin_icon = asset_cache_texture_acquire(cache, "assets/sprites/screens/hud_coins.png");
@@ -73,20 +74,29 @@ void hud_layout(const Hud *hud, int hearts, int lives, int score, HudLayout *lay
                                   HUD_COIN_ICON_SIZE, HUD_COIN_ICON_SIZE};
 }
 
-void hud_render(const Hud *hud, int hearts, int lives, int score,
+void hud_render(Hud *hud, int hearts, int lives, int score,
                 int checkpoint_index, int feedback_kind, uint32_t feedback_until,
                 uint32_t now)
 {
-    HudLayout layout;
-    hud_layout(hud, hearts, lives, score, &layout);
-    for (int i = 0; i < layout.heart_count; i++)
-        sprite_draw(hud->star_tex, NULL, &layout.hearts[i], 0, SPRITE_NORMAL, WHITE);
+    /* Lay out again only when a number changed (see Hud in hud.h); the
+     * result is the same, so drawing from the remembered one is too. */
+    if (!hud->layout_valid || hearts != hud->layout_hearts ||
+        lives != hud->layout_lives || score != hud->layout_score) {
+        hud_layout(hud, hearts, lives, score, &hud->layout);
+        hud->layout_hearts = hearts;
+        hud->layout_lives = lives;
+        hud->layout_score = score;
+        hud->layout_valid = 1;
+    }
+    const HudLayout *layout = &hud->layout;
+    for (int i = 0; i < layout->heart_count; i++)
+        sprite_draw(hud->star_tex, NULL, &layout->hearts[i], 0, SPRITE_NORMAL, WHITE);
     /* Crop visible player art out of its larger animation-sheet frame. */
     IntRect src = {16, 19, 16, 13};
-    sprite_draw(hud->player_icon, &src, &layout.player_icon, 0, SPRITE_NORMAL, WHITE);
-    font_draw(hud->font, layout.lives, layout.lives_text.x, layout.lives_text.y, WHITE);
-    font_draw(hud->font, layout.score, layout.score_text.x, layout.score_text.y, WHITE);
-    sprite_draw(hud->coin_icon, NULL, &layout.coin_icon, 0, SPRITE_NORMAL, WHITE);
+    sprite_draw(hud->player_icon, &src, &layout->player_icon, 0, SPRITE_NORMAL, WHITE);
+    font_draw(hud->font, layout->lives, layout->lives_text.x, layout->lives_text.y, WHITE);
+    font_draw(hud->font, layout->score, layout->score_text.x, layout->score_text.y, WHITE);
+    sprite_draw(hud->coin_icon, NULL, &layout->coin_icon, 0, SPRITE_NORMAL, WHITE);
     char text[32];
     if (hud_checkpoint_feedback_visible(feedback_kind, feedback_until, now)) {
         const char *label = hud_checkpoint_feedback_label(feedback_kind, checkpoint_index);

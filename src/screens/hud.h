@@ -22,30 +22,6 @@
 #define HUD_ROW_H      16     /* row height for text alignment (font px)   */
 
 /*
- * Hud — resources needed by the HUD renderer.
- *
- * font     : raylib's built-in font at TEXT_FONT_SIZE px, held from the
- *            asset cache (one reference).
- * star_tex : borrowed star_yellow.png used as the health indicator.
- * coin_icon: hud_coins.png beside the score, held from the asset cache.
- * player_icon: borrowed player sprite sheet, cropped for the lives counter.
- *
- * "Held" and "borrowed" differ in who must act at cleanup: hud_cleanup
- * releases the two held ones to the cache and leaves the borrowed ones alone.
- */
-/*
- * HUD_COIN_ICON_SIZE — display size of the coin icon next to the score.
- */
-#define HUD_COIN_ICON_SIZE  12
-
-typedef struct {
-    TextFont *font;           /* held from the asset cache */
-    Texture2D *star_tex;      /* borrowed heart indicator */
-    Texture2D *coin_icon;     /* held from the asset cache */
-    Texture2D *player_icon;   /* borrowed player sprite sheet */
-} Hud;
-
-/*
  * HudLayout — where each HUD element sits this frame.
  *
  * hud_render draws into these rectangles and the --debug overlay outlines
@@ -63,6 +39,40 @@ typedef struct {
     char    score[32];            /* the formatted score text             */
 } HudLayout;
 
+/*
+ * Hud — resources needed by the HUD renderer.
+ *
+ * font     : raylib's built-in font at TEXT_FONT_SIZE px, held from the
+ *            asset cache (one reference).
+ * star_tex : borrowed star_yellow.png used as the health indicator.
+ * coin_icon: hud_coins.png beside the score, held from the asset cache.
+ * player_icon: borrowed player sprite sheet, cropped for the lives counter.
+ *
+ * "Held" and "borrowed" differ in who must act at cleanup: hud_cleanup
+ * releases the two held ones to the cache and leaves the borrowed ones alone.
+ *
+ * layout and the three numbers after it remember the last layout drawn.
+ * Laying out formats two strings and measures them glyph by glyph, yet
+ * hearts, lives and score change a few times a minute while the HUD is
+ * drawn 60 times a second; hud_render lays out again only when one of the
+ * three differs from what layout was made for.
+ */
+/*
+ * HUD_COIN_ICON_SIZE — display size of the coin icon next to the score.
+ */
+#define HUD_COIN_ICON_SIZE  12
+
+typedef struct {
+    TextFont *font;           /* held from the asset cache */
+    Texture2D *star_tex;      /* borrowed heart indicator */
+    Texture2D *coin_icon;     /* held from the asset cache */
+    Texture2D *player_icon;   /* borrowed player sprite sheet */
+    HudLayout layout;         /* the last layout hud_render made          */
+    int layout_hearts, layout_lives, layout_score; /* what it was made for */
+    int layout_valid;         /* 0 until the first one is made            */
+} Hud;
+
+
 /* Fill layout for these values; needs hud->font to measure the text. */
 void hud_layout(const Hud *hud, int hearts, int lives, int score, HudLayout *layout);
 
@@ -78,8 +88,9 @@ int hud_init(Hud *hud, AssetCache *cache, Texture2D *star_tex, Texture2D *player
  * score      : current score to display.
  * checkpoint_index is zero-based; temporary feedback labels display index+1.
  * feedback_until/now use the same wrapping millisecond clock.
+ * Not const: it keeps the layout it drew in hud->layout for the next frame.
  */
-void hud_render(const Hud *hud,
+void hud_render(Hud *hud,
                 int hearts, int lives, int score,
                 int checkpoint_index, int feedback_kind, uint32_t feedback_until,
                 uint32_t now);
