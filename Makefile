@@ -735,10 +735,11 @@ FUZZ_LEVEL_SRCS = tests/fuzz_level_parse.c $(FUZZ_SERIALIZER_SRCS)
 # The editor's save -> load round trip (tests/fuzz_editor_roundtrip.c).
 FUZZ_EDITOR_SRCS = tests/fuzz_editor_roundtrip.c $(FUZZ_SERIALIZER_SRCS)
 # input_backend.c maps the pointer through graphics.c's display_viewport.
+# graphics.c counts texture switches with texture.c (texture_note_use).
 FUZZ_PROFILE_SRCS = tests/fuzz_profile_decode.c src/core/game_profile.c \
                     src/core/game_ghost.c src/core/game_ghost_file.c \
                     src/input/game_bindings.c src/input/input_backend.c \
-                    src/shared/graphics.c \
+                    src/shared/graphics.c src/shared/texture.c \
                     src/levels/level_ref.c src/shared/serializer_io.c \
                     src/shared/platform.c $(VENDOR_DIR)/tomlc17.c
 # The campaign manifest loader and the experiment capture decoder
