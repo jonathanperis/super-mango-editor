@@ -1,5 +1,5 @@
 # State after 900 frames of jump-right.replay on sandbox.toml, seed 7.
 # Written by `make replay-state-update`; read by
 # committed_replay_reaches_the_recorded_state (tests/game_replay_test.c).
-hash 25599fd14c1671c3
+hash ce6b2be3066c1f91
 state player 400.000,91.722 hearts 3 lives 5 score 400 camera 224.0 steps 900

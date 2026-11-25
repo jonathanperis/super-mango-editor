@@ -26,6 +26,7 @@
 #include "core/game_experiment.h"
 #include "core/game_overlay.h"
 #include "core/game_profile.h"
+#include "core/game_random.h"   /* game_random_seed */
 #include "core/game_camera.h"   /* game_camera_snap */
 #include "collision/game_collision.h"  /* game_damage_source_* */
 #include "core/game_ghost.h"
@@ -60,6 +61,10 @@ int mechanics_open_level(GameState *gs, const char *path, int debug)
 {
     memset(gs, 0, sizeof(*gs));
     gs->screen.random_seed = 7;
+    /* The random streams are process-wide and only main() seeds them (from
+     * --seed). Seed them here as a fresh run would, or each case would
+     * inherit wherever the case before it left them. */
+    game_random_seed(gs->screen.random_seed);
     gs->screen.debug_mode = debug;
     snprintf(gs->world.level_path, sizeof(gs->world.level_path), "%s", path);
     if (game_init(gs) != 0) return -1;
