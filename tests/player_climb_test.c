@@ -19,7 +19,7 @@
 #include "core/game_timing.h"       /* GAME_FIXED_STEP */
 #include "player/player.h"
 #include "player/player_climb.h"
-#include "player/player_internal.h" /* PLAYER_PHYS_PAD_X/TOP, PLAYER_FLOOR_SINK */
+#include "player/player.h" /* PLAYER_FRAME_W/H, PLAYER_PHYS_PAD_X/TOP, PLAYER_FLOOR_SINK */
 #include "gameplay_mechanics_test.h"
 
 #define CHECK(test) do { if (!(test)) { \

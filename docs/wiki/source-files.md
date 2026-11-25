@@ -169,7 +169,7 @@ src/
 │   └── level_validate.h / .c     LevelDef count, schema-range and geometry validation
 ├── player/
 │   ├── player.h / .c             Public API + high-level glue
-│   ├── player_internal.h         Private frame/hitbox/coyote constants
+│   ├── player_internal.h         Private player constants (coyote time)
 │   ├── player_lifecycle.c        Init/render/hitbox/reset/cleanup/default physics
 │   ├── player_input.c            Keyboard/gamepad/climb input sampling
 │   ├── player_motion.h / .c      Horizontal acceleration/friction
@@ -407,7 +407,7 @@ presents the frame. `make docs-drift` checks `s_update_steps` and
 
 ## Player Module (`player/`)
 
-**Role:** Player character lifecycle, input, horizontal motion, jumps, climbables, surface collision, animation, rendering, hitbox, and reset. Public declarations live in `player.h`; private constants live in `player_internal.h`; implementation is split across focused `.c` files. See [Player Module](../player-module/) for the deep dive.
+**Role:** Player character lifecycle, input, horizontal motion, jumps, climbables, surface collision, animation, rendering, hitbox, and reset. Public declarations live in `player.h`; the coyote-time constant only the player files use lives in `player_internal.h`; implementation is split across focused `.c` files. See [Player Module](../player-module/) for the deep dive.
 
 **Key functions:** `player_init`, `player_apply_default_physics`, `player_handle_input`, `player_update`, `player_render`, `player_get_hitbox`, `player_reset`, `player_cleanup`
 

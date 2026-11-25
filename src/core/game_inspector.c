@@ -13,7 +13,7 @@
 #include "game_timing.h"
 #include "../levels/level_physics.h"
 #include "../screens/settings_menu.h"
-#include "../player/player_internal.h"
+#include "../player/player.h"   /* PLAYER_FLOOR_SINK */
 #include <math.h>    /* fabsf */
 #include <stddef.h>
 #include <stdio.h>

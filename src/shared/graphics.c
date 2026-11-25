@@ -13,7 +13,7 @@ static int s_paced_monitor = -1;
 #endif
 
 /* The player's first sprite frame (48x48 at the top-left of the sheet; see
- * PLAYER_FRAME_W in src/player/player_internal.h) doubles as the window and
+ * PLAYER_FRAME_W in src/player/player.h) doubles as the window and
  * taskbar icon on Windows and Linux. macOS takes an application's icon from
  * its bundle and GLFW refuses to set one there; a browser tab shows the
  * page's favicon. Neither of those tries. */

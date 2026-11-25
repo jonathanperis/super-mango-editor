@@ -143,7 +143,7 @@ from x = 0.
 
 ## Player Constants
 
-Frame/hitbox constants live in `player_internal.h`, except `PLAYER_FLOOR_SINK`, which is in the public `player.h` because the level loader uses it too; movement defaults live in `player_lifecycle.c`; jump/climb constants live in focused helper files.
+Frame and hitbox constants (`PLAYER_FRAME_W/H`, `PLAYER_PHYS_PAD_X/TOP`, `PLAYER_FLOOR_SINK`) are in the public `player.h`, because the level loader, the playtest start check and the editor use them too; `PLAYER_COYOTE_TIME` is private, in `player_internal.h`; movement defaults live in `player_lifecycle.c`; jump/climb constants live in focused helper files.
 
 | Constant | Value | Description |
 |----------|-------|-------------|

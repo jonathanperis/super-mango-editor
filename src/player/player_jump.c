@@ -52,7 +52,7 @@ int player_update_jump_timers(Player *player, float dt, int was_on_ground) {
     if (player->vy >= 0.0f) player->jump_cut_armed = 0;
 
     if (player->on_ground || (was_on_ground && player->vy >= 0.0f)) {
-        player->coyote_timer = COYOTE_TIME;
+        player->coyote_timer = PLAYER_COYOTE_TIME;
     } else if (player->coyote_timer > 0.0f) {
         player->coyote_timer -= dt;
         if (player->coyote_timer < 0.0f) player->coyote_timer = 0.0f;

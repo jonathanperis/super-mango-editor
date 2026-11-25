@@ -18,6 +18,22 @@
 #include "../surfaces/ladder.h"         /* LadderDecor — climbable, same mechanics as vine */
 #include "../surfaces/rope.h"           /* RopeDecor — climbable, same mechanics as vine   */
 
+/* Width and height of one sprite frame in the sheet (pixels).  The player
+ * is drawn at this size, so it is also the player's on-screen size: the
+ * editor draws the spawn marker this big, and level_start.c centres a
+ * start point's sprite in its tile column with it. */
+#define PLAYER_FRAME_W 48
+#define PLAYER_FRAME_H 48
+
+/*
+ * Physics-box insets from the 48×48 frame to the visible character art.
+ * Pixel analysis: art occupies x=15..32 (18 px), y=18..33 (16 px).
+ * Public because level_start.c tests a start point against platforms with
+ * the same box the player collides with.
+ */
+#define PLAYER_PHYS_PAD_X   15
+#define PLAYER_PHYS_PAD_TOP 18
+
 /*
  * PLAYER_FLOOR_SINK — pixels the player overlaps with the floor top.
  * Transparent padding at the bottom of the 48×48 frame would otherwise make

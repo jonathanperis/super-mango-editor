@@ -179,8 +179,8 @@ int player_update_climbing(Player *player, float dt,
     }
 
     /* Vertical clamp at climbable top. */
-    if (player->y + PHYS_PAD_TOP < climb_top) {
-        player->y  = climb_top - (float)PHYS_PAD_TOP;
+    if (player->y + PLAYER_PHYS_PAD_TOP < climb_top) {
+        player->y  = climb_top - (float)PLAYER_PHYS_PAD_TOP;
         player->vy = 0.0f;
     }
 

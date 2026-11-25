@@ -9,7 +9,7 @@
 
 #include "../game_constants.h"        /* FLOOR_Y, FLOOR_GAP_W, TILE_SIZE, GAME_W */
 #include "../shared/raymath_inline.h" /* Clamp */
-#include "../player/player_internal.h"  /* PLAYER_FRAME_W, PLAYER_PHYS_PAD_X */
+#include "../player/player.h"           /* PLAYER_FRAME_W, PLAYER_PHYS_PAD_X */
 #include "../surfaces/float_platform.h" /* FLOAT_PLATFORM_PIECE_W */
 
 /* Bridges are drawn and collided as 16-px bricks (level_validate.c checks

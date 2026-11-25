@@ -42,7 +42,7 @@
 #include "input/game_input.h"
 #include "input/input_backend.h"
 #include "levels/level_validate.h"  /* level_jumping_spider_min_gap_speed */
-#include "player/player_internal.h"
+#include "player/player.h"   /* PLAYER_PHYS_PAD_X/TOP */
 #include "shared/audio.h"
 #include "gameplay_mechanics_test.h"
 
