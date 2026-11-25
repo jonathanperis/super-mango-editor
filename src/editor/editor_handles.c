@@ -197,7 +197,7 @@ int editor_handles_shown(const EditorState *es)
     if (editor_selection_count(es) != 1) return 0;
     /* While the selected entity is being moved its handles would only be
      * in the way; while one of them is being dragged they stay. */
-    if (es->drag.active && !es->resizing) return 0;
+    if (es->drag.active && !es->resize.active) return 0;
     return 1;
 }
 
@@ -410,11 +410,11 @@ static float clamp_float(float v, float lo, float hi)
 static PlacementData moved_patrol_end(const EditorState *es, EditorHandleKind handle,
                                       float x)
 {
-    PlacementData pd = es->resize_before;
+    PlacementData pd = es->resize.before;
     PatrolFields fields;
     float world_w = editor_world_width(&es->level);
 
-    if (!patrol_fields(es->resize_type, &pd, &fields)) return pd;
+    if (!patrol_fields(es->resize.type, &pd, &fields)) return pd;
 
     /* Whole pixels; the nearest 48 px grid line while snapping. */
     if (editor_snap_active(es)) x = roundf(x / TILE_SIZE) * TILE_SIZE;
@@ -444,8 +444,8 @@ static PlacementData moved_patrol_end(const EditorState *es, EditorHandleKind ha
  * fails if something unexpected changed the arrays.) */
 static int resize_target_exists(const EditorState *es)
 {
-    return es->resize_index >= 0 &&
-           es->resize_index < editor_entity_count(&es->level, es->resize_type);
+    return es->resize.index >= 0 &&
+           es->resize.index < editor_entity_count(&es->level, es->resize.type);
 }
 
 #ifdef MANGO_TESTING
@@ -466,15 +466,15 @@ int editor_resize_test_validations(void)
  */
 static int try_placement(EditorState *es, const PlacementData *candidate)
 {
-    PlacementData shown = editor_snapshot_entity(&es->level, es->resize_type,
-                                                 es->resize_index);
+    PlacementData shown = editor_snapshot_entity(&es->level, es->resize.type,
+                                                 es->resize.index);
 
 #ifdef MANGO_TESTING
     resize_validations++;
 #endif
-    (void)editor_entity_write(&es->level, es->resize_type, es->resize_index, candidate);
+    (void)editor_entity_write(&es->level, es->resize.type, es->resize.index, candidate);
     if (editor_edit_kept_level(&es->level, &resize_issues, NULL, 0) == 0) return 1;
-    (void)editor_entity_write(&es->level, es->resize_type, es->resize_index, &shown);
+    (void)editor_entity_write(&es->level, es->resize.type, es->resize.index, &shown);
     return 0;
 }
 
@@ -488,9 +488,9 @@ static int try_count(EditorState *es, const PlacementData *base, int across, int
     PlacementData candidate = *base;
     int base_across, base_down;
 
-    (void)get_sizes(es->resize_type, base, &base_across, &base_down);
-    if (across) set_sizes(es->resize_type, &candidate, count, base_down);
-    else        set_sizes(es->resize_type, &candidate, base_across, count);
+    (void)get_sizes(es->resize.type, base, &base_across, &base_down);
+    if (across) set_sizes(es->resize.type, &candidate, count, base_down);
+    else        set_sizes(es->resize.type, &candidate, base_across, count);
     return try_placement(es, &candidate);
 }
 
@@ -528,22 +528,22 @@ static int nearest_count(EditorState *es, const PlacementData *base, int across,
 /* Say in the status bar what the entity measures now. */
 static void show_live_value(EditorState *es)
 {
-    PlacementData pd = editor_snapshot_entity(&es->level, es->resize_type,
-                                              es->resize_index);
-    const char *name = editor_entity_type_name(es->resize_type);
+    PlacementData pd = editor_snapshot_entity(&es->level, es->resize.type,
+                                              es->resize.index);
+    const char *name = editor_entity_type_name(es->resize.type);
     PatrolFields fields;
     int across, down;
 
-    if (patrol_fields(es->resize_type, &pd, &fields)) {
+    if (patrol_fields(es->resize.type, &pd, &fields)) {
         editor_set_status(es, "%s patrol: %.0f to %.0f (%.0f px)", name,
                           *fields.x0, *fields.x1, *fields.x1 - *fields.x0);
         return;
     }
-    if (!get_sizes(es->resize_type, &pd, &across, &down)) return;
-    if (es->resize_type == ENT_PLATFORM ||
-        (es->resize_type == ENT_RAIL && pd.rail.layout == RAIL_LAYOUT_RECT))
+    if (!get_sizes(es->resize.type, &pd, &across, &down)) return;
+    if (es->resize.type == ENT_PLATFORM ||
+        (es->resize.type == ENT_RAIL && pd.rail.layout == RAIL_LAYOUT_RECT))
         editor_set_status(es, "%s: %d x %d tiles", name, across, down);
-    else if (es->resize_handle == EDITOR_HANDLE_HEIGHT)
+    else if (es->resize.handle == EDITOR_HANDLE_HEIGHT)
         editor_set_status(es, "%s: %d tile%s tall", name, down, down == 1 ? "" : "s");
     else
         editor_set_status(es, "%s: %d tile%s wide", name, across, across == 1 ? "" : "s");
@@ -555,33 +555,33 @@ int editor_resize_begin(EditorState *es, float world_x, float world_y)
     EditorHandleKind kind;
     int count;
 
-    if (!es || es->resizing) return 0;
+    if (!es || es->resize.active) return 0;
     kind = editor_handle_at(es, world_x, world_y);
     if (kind == EDITOR_HANDLE_NONE) return 0;
 
-    es->resizing = 1;
+    es->resize.active = 1;
     es->drag.active = 1;       /* the gesture owns the document (see editor.h) */
     es->drag.moved = 0;
     es->drag.count = 0;     /* no entity is being moved */
     es->box_selecting = 0;
     es->last_click_valid = 0;
-    es->resize_handle = (int)kind;
-    es->resize_moved = 0;
-    es->resize_type = es->selection.type;
-    es->resize_index = es->selection.index;
-    es->resize_before = editor_snapshot_entity(&es->level, es->resize_type,
-                                               es->resize_index);
-    es->resize_press_x = world_x;
-    es->resize_press_y = world_y;
-    es->resize_grab_x = 0.0f;
-    es->resize_grab_y = 0.0f;
+    es->resize.handle = (int)kind;
+    es->resize.moved = 0;
+    es->resize.type = es->selection.type;
+    es->resize.index = es->selection.index;
+    es->resize.before = editor_snapshot_entity(&es->level, es->resize.type,
+                                               es->resize.index);
+    es->resize.press_x = world_x;
+    es->resize.press_y = world_y;
+    es->resize.grab_x = 0.0f;
+    es->resize.grab_y = 0.0f;
     /* Where on the handle the press landed, so its edge does not jump to
      * put its centre under the pointer. */
-    count = editor_entity_handles(&es->level, es->resize_type, es->resize_index, handles);
+    count = editor_entity_handles(&es->level, es->resize.type, es->resize.index, handles);
     for (int i = 0; i < count; i++) {
         if (handles[i].kind != kind) continue;
-        es->resize_grab_x = world_x - handles[i].x;
-        es->resize_grab_y = world_y - handles[i].y;
+        es->resize.grab_x = world_x - handles[i].x;
+        es->resize.grab_y = world_y - handles[i].y;
     }
     editor_level_issue_snapshot(&es->level, &resize_issues);
     return 1;
@@ -595,23 +595,23 @@ void editor_resize_drag(EditorState *es, float world_x, float world_y)
     float x, y;
     int across, down, want_across, want_down;
 
-    if (!es || !es->resizing || !resize_target_exists(es)) return;
-    handle = (EditorHandleKind)es->resize_handle;
+    if (!es || !es->resize.active || !resize_target_exists(es)) return;
+    handle = (EditorHandleKind)es->resize.handle;
 
     /* Ignore small wobbles until the pointer leaves the click threshold.
      * The threshold is in canvas pixels, so divide by zoom for world px. */
-    if (!es->resize_moved) {
+    if (!es->resize.moved) {
         float zoom = es->camera.zoom > 0.0f ? es->camera.zoom : 1.0f;
         float limit = RESIZE_THRESHOLD_PX / zoom;
-        float dx = world_x - es->resize_press_x;
-        float dy = world_y - es->resize_press_y;
+        float dx = world_x - es->resize.press_x;
+        float dy = world_y - es->resize.press_y;
         if (dx * dx + dy * dy < limit * limit) return;
-        es->resize_moved = 1;
+        es->resize.moved = 1;
     }
 
     /* Where the handle's centre should be. */
-    x = world_x - es->resize_grab_x;
-    y = world_y - es->resize_grab_y;
+    x = world_x - es->resize.grab_x;
+    y = world_y - es->resize.grab_y;
 
     if (handle == EDITOR_HANDLE_PATROL_START || handle == EDITOR_HANDLE_PATROL_END) {
         /* A patrol end the level would not accept stays where it last was. */
@@ -629,13 +629,13 @@ void editor_resize_drag(EditorState *es, float world_x, float world_y)
      * first and down second, so a rail's corner can stop at a different
      * limit on each axis.
      */
-    shown = editor_snapshot_entity(&es->level, es->resize_type, es->resize_index);
-    if (!editor_entity_bounds(&es->level, es->resize_type, es->resize_index, &bounds)) return;
-    if (!get_sizes(es->resize_type, &shown, &across, &down)) return;
-    wanted_sizes(es->resize_type, handle, &shown, &bounds, x, y, &want_across, &want_down);
+    shown = editor_snapshot_entity(&es->level, es->resize.type, es->resize.index);
+    if (!editor_entity_bounds(&es->level, es->resize.type, es->resize.index, &bounds)) return;
+    if (!get_sizes(es->resize.type, &shown, &across, &down)) return;
+    wanted_sizes(es->resize.type, handle, &shown, &bounds, x, y, &want_across, &want_down);
 
     (void)nearest_count(es, &shown, 1, across, want_across);
-    shown = editor_snapshot_entity(&es->level, es->resize_type, es->resize_index);
+    shown = editor_snapshot_entity(&es->level, es->resize.type, es->resize.index);
     (void)nearest_count(es, &shown, 0, down, want_down);
     show_live_value(es);
 }
@@ -644,8 +644,8 @@ void editor_resize_drag(EditorState *es, float world_x, float world_y)
 static void restore_resize(EditorState *es)
 {
     if (!resize_target_exists(es)) return;
-    (void)editor_entity_write(&es->level, es->resize_type, es->resize_index,
-                              &es->resize_before);
+    (void)editor_entity_write(&es->level, es->resize.type, es->resize.index,
+                              &es->resize.before);
 }
 
 void editor_resize_finish(EditorState *es)
@@ -653,14 +653,14 @@ void editor_resize_finish(EditorState *es)
     PlacementData after;
     Command cmd;
 
-    if (!es || !es->resizing) return;
-    es->resizing = 0;
+    if (!es || !es->resize.active) return;
+    es->resize.active = 0;
     es->drag.active = 0;
     if (!resize_target_exists(es)) return;
 
-    after = editor_snapshot_entity(&es->level, es->resize_type, es->resize_index);
+    after = editor_snapshot_entity(&es->level, es->resize.type, es->resize.index);
     /* A click on a handle, or a drag that ended where it began. */
-    if (placement_same(es->resize_type, &after, &es->resize_before)) return;
+    if (placement_same(es->resize.type, &after, &es->resize.before)) return;
 
     /*
      * Every motion kept the level sound, but never leave an unrecorded
@@ -674,9 +674,9 @@ void editor_resize_finish(EditorState *es)
     }
     memset(&cmd, 0, sizeof(cmd));
     cmd.type         = CMD_PROPERTY;   /* a changed value: "Undid: changed Rail" */
-    cmd.entity_type  = (int)es->resize_type;
-    cmd.entity_index = es->resize_index;
-    cmd.before       = es->resize_before;
+    cmd.entity_type  = (int)es->resize.type;
+    cmd.entity_index = es->resize.index;
+    cmd.before       = es->resize.before;
     cmd.after        = after;
     if (!undo_try_push(es->undo, &cmd)) {
         restore_resize(es);
@@ -689,8 +689,8 @@ void editor_resize_finish(EditorState *es)
 
 void editor_resize_cancel(EditorState *es)
 {
-    if (!es || !es->resizing) return;
-    es->resizing = 0;
+    if (!es || !es->resize.active) return;
+    es->resize.active = 0;
     es->drag.active = 0;
     restore_resize(es);
     editor_set_status(es, "Resize cancelled");

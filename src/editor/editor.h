@@ -433,6 +433,36 @@ typedef struct {
 } EditorPaint;
 
 /*
+ * EditorResize — dragging one of a selected entity's handles
+ * (editor_handles.c).
+ *
+ * With one entity selected and the Select tool active, the canvas draws
+ * small square handles: the ends of a patrol range, the growing edge of a
+ * tiled entity, a rail's corner.  A press on one starts a resize: `active`
+ * is 1 until the button is released, and drag.active is 1 with it, so
+ * everything that waits for a move to finish (keys, Undo, right-click, a
+ * dropped file) waits for a resize too.
+ *
+ * handle is the EditorHandleKind grabbed, and before the entity as it was
+ * at the press: every motion recomputes the value from it, Esc writes it
+ * back, and the release records it as the undo step's "before".
+ * grab_x/y is the pointer's offset from the handle's centre at the press
+ * (world px), so the edge does not jump to the pointer, and press_x/y
+ * where the press was.  moved stays 0 until the pointer has travelled a
+ * few pixels, so a click on a handle changes nothing.
+ */
+typedef struct {
+    int            active;
+    int            handle;
+    int            moved;
+    EntityType     type;
+    int            index;
+    PlacementData  before;
+    float          grab_x, grab_y;
+    float          press_x, press_y;
+} EditorResize;
+
+/*
  * EditorMouse — the pointer as the editor last saw it, updated from every
  * input event (editor_events.c), and the view panning it drives.
  *
@@ -750,30 +780,7 @@ typedef struct {
     float          last_click_y;
 
     /* ---- Resize handles (editor_handles.c) ----------------------------- */
-    /*
-     * With one entity selected and the Select tool active, the canvas draws
-     * small square handles: the ends of a patrol range, the growing edge of
-     * a tiled entity, a rail's corner.  A press on one starts a resize:
-     * `resizing` is 1 until the button is released, and `drag.active` is 1
-     * with it, so everything that waits for a move to finish (keys, Undo,
-     * right-click, a dropped file) waits for a resize too.
-     *
-     * resize_handle is the EditorHandleKind grabbed, and resize_before the
-     * entity as it was at the press: every motion recomputes the value from
-     * it, Esc writes it back, and the release records it as the undo
-     * step's "before".  resize_grab_x/y is the pointer's offset from the
-     * handle's centre at the press (world px), so the edge does not jump
-     * to the pointer.  resize_moved stays 0 until the pointer has
-     * travelled a few pixels, so a click on a handle changes nothing.
-     */
-    int            resizing;
-    int            resize_handle;
-    int            resize_moved;
-    EntityType     resize_type;
-    int            resize_index;
-    PlacementData  resize_before;
-    float          resize_grab_x, resize_grab_y;
-    float          resize_press_x, resize_press_y;
+    EditorResize   resize;
 
     /* ---- Entity list (editor_entity_list.c) ---------------------------- */
     /*

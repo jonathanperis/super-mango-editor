@@ -150,7 +150,7 @@ static int patrol_handles_move_the_range_ends(void)
     CHECK(handle_screen_point(&es, ENT_SPIDER, 0, EDITOR_HANDLE_PATROL_END, &sx, &sy));
     const int undo_top = es.undo->top;
     press_and_move(&es, sx, sy, 60, 0);
-    CHECK(es.resizing && es.drag.active);
+    CHECK(es.resize.active && es.drag.active);
     CHECK(spider->patrol_x1 == 430.0f && spider->patrol_x0 == 150.0f && spider->x == 200.0f);
     CHECK(strstr(es.status_message, "patrol: 150 to 430") != NULL);
     CHECK(es.ui.cursor_shown == MOUSE_CURSOR_RESIZE_EW);
@@ -163,7 +163,7 @@ static int patrol_handles_move_the_range_ends(void)
     key_frame(&es, KEY_F1, 0);
     CHECK(!es.shortcut_sheet_open);
     release_at(&es, sx + 60, sy);
-    CHECK(!es.resizing && !es.drag.active && !es.mouse.down);
+    CHECK(!es.resize.active && !es.drag.active && !es.mouse.down);
     CHECK(es.undo->top == undo_top + 1 && es.modified && level_is_valid(&es));
     key_frame(&es, KEY_Z, INPUT_CTRL);
     CHECK(spider->patrol_x1 == 400.0f && es.undo->top == undo_top);
@@ -177,7 +177,7 @@ static int patrol_handles_move_the_range_ends(void)
     press_and_move(&es, sx, sy, -40, 0);
     CHECK(spider->patrol_x0 == 130.0f);
     key_frame(&es, KEY_ESCAPE, 0);
-    CHECK(!es.resizing && !es.drag.active && spider->patrol_x0 == 150.0f);
+    CHECK(!es.resize.active && !es.drag.active && spider->patrol_x0 == 150.0f);
     CHECK(strstr(es.status_message, "Resize cancelled") != NULL);
     release_at(&es, sx - 40, sy);
     CHECK(spider->patrol_x0 == 150.0f && es.undo->top == undo_top);
@@ -186,7 +186,7 @@ static int patrol_handles_move_the_range_ends(void)
     /* A click on a handle that does not move changes nothing. */
     const uint64_t before = doc_hash(&es);
     click_frame(&es, sx, sy);
-    CHECK(doc_hash(&es) == before && es.undo->top == undo_top && !es.resizing);
+    CHECK(doc_hash(&es) == before && es.undo->top == undo_top && !es.resize.active);
     CHECK(es.selection.type == ENT_SPIDER && es.selection.index == 0);
 
     /* The left end cannot pass the spider itself, and the right end stays
@@ -274,11 +274,11 @@ static int handles_leave_other_clicks_alone(void)
     /* A click on the far coin selects it: the handle is not under it. */
     world_to_screen(&es, 308.0f, 108.0f, &fx, &fy);
     click_frame(&es, (int)fx, (int)fy);
-    CHECK(es.selection.type == ENT_COIN && es.selection.index == 1 && !es.resizing);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 1 && !es.resize.active);
     /* The spike row is no longer selected, so its handle is gone: a press
      * there now picks the coin lying under it. */
     click_frame(&es, sx, sy);
-    CHECK(es.selection.type == ENT_COIN && es.selection.index == 0 && !es.resizing);
+    CHECK(es.selection.type == ENT_COIN && es.selection.index == 0 && !es.resize.active);
 
     /* Shift+click on the handle adds the coin under it to the selection
      * instead of starting a resize. */
@@ -286,7 +286,7 @@ static int handles_leave_other_clicks_alone(void)
     push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_LEFT, INPUT_SHIFT, sx, sy);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, INPUT_SHIFT, sx, sy);
     ui_frame(&es, sx, sy);
-    CHECK(!es.resizing && editor_selection_count(&es) == 2);
+    CHECK(!es.resize.active && editor_selection_count(&es) == 2);
     CHECK(editor_is_selected(&es, ENT_COIN, 0) && editor_is_selected(&es, ENT_SPIKE_ROW, 0));
     /* Two entities selected: no handles, so a plain press there does not
      * resize either. */
@@ -324,7 +324,7 @@ static int size_handles_change_tile_counts(void)
     int undo_top = es.undo->top;
     /* 64 canvas px = 32 world px = two more tiles. */
     press_and_move(&es, sx, sy, 64, 0);
-    CHECK(es.resizing && es.level.spike_rows[0].count == 5);
+    CHECK(es.resize.active && es.level.spike_rows[0].count == 5);
     CHECK(strstr(es.status_message, "Spike Row: 5 tiles wide") != NULL);
     /* Less than half a tile further rounds back to the same count. */
     push_event(INPUT_MOUSE_MOVE, 0, 0, sx + 76, sy);
@@ -473,7 +473,7 @@ static int size_handle_search_is_bounded(void)
     /* 3000 canvas px at 2x zoom asks for the 128-tile maximum. */
     before = editor_resize_test_validations();
     press_and_move(&es, sx, sy, 3000, 0);
-    CHECK(es.resizing);
+    CHECK(es.resize.active);
     CHECK(editor_resize_test_validations() - before <= 9);   /* 1 + log2(128) */
     {
         const int most = es.level.spike_rows[0].count;

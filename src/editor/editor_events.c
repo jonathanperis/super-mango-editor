@@ -342,7 +342,7 @@ static void editor_key_while_dragging(EditorState *es, int key)
     else if (!is_modifier_key(key))
         editor_set_status(es, es->paint.active
             ? "Release the mouse to finish the row first (Esc ends it)"
-            : es->resizing
+            : es->resize.active
             ? "Release the mouse to finish the resize first (Esc cancels it)"
             : "Release the mouse to finish the move first (Esc cancels it)");
 }
