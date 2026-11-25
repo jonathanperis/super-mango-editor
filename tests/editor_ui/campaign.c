@@ -265,7 +265,7 @@ static int campaign_view_reorders_renames_and_saves(void)
 
     /* Rename the first level: the field holds its name, typing appends. */
     click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + 8);
-    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID);
+    CHECK(es.ui.active_id == WIDGET_CAMPAIGN_NAME_FIRST);
     push_text("!");
     key_frame(&es, KEY_ENTER, 0);
     CHECK(strcmp(view->levels[0].level.name, "Alpha!") == 0);
@@ -285,7 +285,7 @@ static int campaign_view_reorders_renames_and_saves(void)
     /* Ctrl+S saves the campaign even while a name is being typed (the
      * name is applied first), and never saves the level instead. */
     click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + CAMPAIGN_ROW_H + 8);
-    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID + 1);
+    CHECK(es.ui.active_id == WIDGET_CAMPAIGN_NAME_FIRST + 1);
     push_text("?");
     key_frame(&es, KEY_S, INPUT_CTRL);
     CHECK(es.ui.active_id == 0);
@@ -294,7 +294,7 @@ static int campaign_view_reorders_renames_and_saves(void)
     CHECK(strcmp(reloaded.levels[1].display_name, "Charlie?") == 0);
     /* Esc first cancels a name being typed, then closes. */
     click_frame(&es, CAMPAIGN_NAME_X + 10, CAMPAIGN_ROWS_Y + 8);
-    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID);
+    CHECK(es.ui.active_id == WIDGET_CAMPAIGN_NAME_FIRST);
     key_frame(&es, KEY_ESCAPE, 0);
     CHECK(es.ui.active_id == 0 && es.campaign != NULL);
 
@@ -482,7 +482,7 @@ static int campaign_rename_is_one_undo_step(void)
 
     /* Three keystrokes in three frames, then Enter. */
     click_campaign_name(&es, 0);
-    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID);
+    CHECK(es.ui.active_id == WIDGET_CAMPAIGN_NAME_FIRST);
     push_text("1");
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     push_text("2");
@@ -510,7 +510,7 @@ static int campaign_rename_is_one_undo_step(void)
     click_campaign_name(&es, 1);
     push_text("?");
     click_campaign_name(&es, 2);
-    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID + 2);
+    CHECK(es.ui.active_id == WIDGET_CAMPAIGN_NAME_FIRST + 2);
     CHECK(strcmp(view->levels[1].level.name, "Bravo?") == 0);
     CHECK(editor_campaign_undo_steps(&es) == 2);
 
@@ -764,7 +764,7 @@ static int campaign_undo_and_redo_buttons_replay_each_edit(void)
     click_campaign_name(&es, 1);
     push_text("#");
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID + 1);
+    CHECK(es.ui.active_id == WIDGET_CAMPAIGN_NAME_FIRST + 1);
     click_campaign_button(&es, CAMPAIGN_BUTTON_UNDO);
     CHECK(es.ui.active_id == 0);
     CHECK(strcmp(view->levels[1].level.name, "Bravo") == 0);
@@ -1282,11 +1282,11 @@ static int campaign_save_names_survive_older_config_steps(void)
     es.config_open = 1;
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     /* An open file adds rows above the fields: find screen_count's. */
-    for (int y = TOOLBAR_H + 30; y < EDITOR_H - STATUS_H && es.ui.active_id != 9011; y += 6) {
+    for (int y = TOOLBAR_H + 30; y < EDITOR_H - STATUS_H && es.ui.active_id != WIDGET_SCREEN_COUNT; y += 6) {
         if (es.ui.active_id) key_frame(&es, KEY_ESCAPE, 0);
         click_frame(&es, CANVAS_W + 90, y);
     }
-    CHECK(es.ui.active_id == 9011);                /* screen_count */
+    CHECK(es.ui.active_id == WIDGET_SCREEN_COUNT);                /* screen_count */
     snprintf(es.ui.edit_buf, sizeof(es.ui.edit_buf), "6");
     es.ui.edit_cursor = 1;
     key_frame(&es, KEY_ENTER, 0);
@@ -1299,7 +1299,7 @@ static int campaign_save_names_survive_older_config_steps(void)
     CHECK(editor_campaign_open(&es, NULL) == 0);
     CHECK(editor_campaign_move(&es, 2, -1) == 0);
     click_campaign_name(&es, 2);
-    CHECK(es.ui.active_id == CAMPAIGN_NAME_FIELD_ID + 2);
+    CHECK(es.ui.active_id == WIDGET_CAMPAIGN_NAME_FIRST + 2);
     push_text("!");
     key_frame(&es, KEY_ENTER, 0);
     (void)editor_campaign_link_in_order(&es);

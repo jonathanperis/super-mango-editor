@@ -310,7 +310,7 @@ static int layer_buttons_record_their_own_undo_step(void)
     /* Name mid-edit, then "+ Add", choosing Apply: two separate steps. */
     config_frame(&es, NULL, 1, CFG_X + 60, CFG_NAME_Y + 4);
     config_frame(&es, "2", 0, CFG_X + 60, CFG_NAME_Y + 4);
-    if (expect_int("name field active", es.ui.active_id, 9000) != 0) goto done;
+    if (expect_int("name field active", es.ui.active_id, WIDGET_LEVEL_NAME) != 0) goto done;
     editor_test_set_finish_field_choice(1);
     config_frame(&es, NULL, 1, add_x, CFG_FIRST_LAYER_Y + 5);
     if (expect_string("applied name", es.level.name, "Untitled2") != 0 ||
@@ -384,7 +384,7 @@ static int leaving_a_field_applies_valid_values_silently(void)
     /* Valid: no canned answer is armed, so a prompt would fail the test
      * (dialog_choice has no display here and reports an error). */
     config_frame(&es, NULL, 1, CFG_X + 90, CFG_SCREENS_Y + 4);
-    if (expect_int("screens active", es.ui.active_id, 9011) != 0) goto done;
+    if (expect_int("screens active", es.ui.active_id, WIDGET_SCREEN_COUNT) != 0) goto done;
     strcpy(es.ui.edit_buf, "6");
     es.ui.edit_cursor = 1;
     editor_handle_event(&es, &canvas_click);
@@ -398,7 +398,7 @@ static int leaving_a_field_applies_valid_values_silently(void)
     es.ui.edit_cursor = 1;
     config_frame(&es, NULL, 1, CFG_X + 80, CFG_HEARTS_Y + 4);
     if (expect_int("field to field applies", es.level.screen_count, 7) != 0 ||
-        expect_int("second field active", es.ui.active_id, 9006) != 0) goto done;
+        expect_int("second field active", es.ui.active_id, WIDGET_INITIAL_HEARTS) != 0) goto done;
     ui_cancel_active_edit(&es.ui);
 
     /* Invalid: "Keep Editing" keeps the field open and the command waits. */
@@ -407,7 +407,7 @@ static int leaving_a_field_applies_valid_values_silently(void)
     es.ui.edit_cursor = 1;
     editor_test_set_finish_field_choice(0);
     if (expect_int("invalid blocks", editor_finish_field_edit(&es), 0) != 0 ||
-        expect_int("invalid stays active", es.ui.active_id, 9011) != 0 ||
+        expect_int("invalid stays active", es.ui.active_id, WIDGET_SCREEN_COUNT) != 0 ||
         expect_prefix("invalid explained", es.status_message,
                       "Command blocked: invalid field value") != 0) goto done;
     /* ...and "Discard" drops the typed text and lets the command run. */
@@ -445,7 +445,7 @@ static int field_limits_apply_on_every_commit_path(void)
 
     /* Screens: type 0, then click the canvas and choose Apply. */
     config_frame(&es, NULL, 1, CFG_X + 90, CFG_SCREENS_Y + 4);
-    if (expect_int("screens active", es.ui.active_id, 9011) != 0) goto done;
+    if (expect_int("screens active", es.ui.active_id, WIDGET_SCREEN_COUNT) != 0) goto done;
     strcpy(es.ui.edit_buf, "0");
     es.ui.edit_cursor = 1;
     editor_test_set_finish_field_choice(1);
@@ -457,7 +457,7 @@ static int field_limits_apply_on_every_commit_path(void)
      * (0 is allowed: it means the default)... */
     es.level.initial_hearts = 2;
     config_frame(&es, NULL, 1, CFG_X + 80, CFG_HEARTS_Y + 4);
-    if (expect_int("hearts active", es.ui.active_id, 9006) != 0) goto done;
+    if (expect_int("hearts active", es.ui.active_id, WIDGET_INITIAL_HEARTS) != 0) goto done;
     strcpy(es.ui.edit_buf, "7");
     es.ui.edit_cursor = 1;
     editor_test_set_finish_field_choice(1);
@@ -467,7 +467,7 @@ static int field_limits_apply_on_every_commit_path(void)
     /* Music volume accepts the whole 0..128 range the format allows (it
      * used to stop at 99). */
     config_frame(&es, NULL, 1, CFG_X + 60, CFG_MUSIC_Y + 22 + 4);
-    if (expect_int("volume active", es.ui.active_id, 9003) != 0) goto done;
+    if (expect_int("volume active", es.ui.active_id, WIDGET_MUSIC_VOLUME) != 0) goto done;
     strcpy(es.ui.edit_buf, "128");
     es.ui.edit_cursor = 3;
     if (expect_int("volume applied", editor_finish_field_edit(&es), 1) != 0 ||
@@ -684,8 +684,8 @@ static int open_dropdown_owns_the_next_click(void)
     es.ui.mouse_clicked = 1;
     es.ui.mouse_x = 360;
     es.ui.mouse_y = 10;
-    (void)ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel);
-    if (expect_int("zoom list open", es.ui.dropdown_open_id, 8888) != 0) goto done;
+    (void)ui_dropdown(&es.ui, WIDGET_ZOOM_DROPDOWN, 344, 6, 80, zoom, 4, &sel);
+    if (expect_int("zoom list open", es.ui.dropdown_open_id, WIDGET_ZOOM_DROPDOWN) != 0) goto done;
 
     /* Choose "Zoom: 3x" over the canvas. */
     ui_begin_frame(&es.ui);
@@ -695,7 +695,7 @@ static int open_dropdown_owns_the_next_click(void)
     es.ui.mouse_y = down.y;
     if (expect_int("button before list", ui_button(&es.ui, 344, 60, 80, 20, "a"), 0) != 0 ||
         expect_int("zoom picked",
-                   ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel), 1) != 0 ||
+                   ui_dropdown(&es.ui, WIDGET_ZOOM_DROPDOWN, 344, 6, 80, zoom, 4, &sel), 1) != 0 ||
         expect_int("zoom option", sel, 2) != 0 ||
         expect_int("button after list", ui_button(&es.ui, 344, 60, 80, 20, "b"), 0) != 0 ||
         expect_int("no coin under the list", es.level.coin_count, 1) != 0 ||
@@ -706,7 +706,7 @@ static int open_dropdown_owns_the_next_click(void)
     es.ui.mouse_clicked = 1;
     es.ui.mouse_x = 360;
     es.ui.mouse_y = 10;
-    (void)ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel);
+    (void)ui_dropdown(&es.ui, WIDGET_ZOOM_DROPDOWN, 344, 6, 80, zoom, 4, &sel);
     ui_begin_frame(&es.ui);
     down.x = 600;
     up.x = 600;
@@ -715,7 +715,7 @@ static int open_dropdown_owns_the_next_click(void)
     es.ui.mouse_x = down.x;
     es.ui.mouse_y = down.y;
     if (expect_int("outside press is not a pick",
-                   ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel), 0) != 0 ||
+                   ui_dropdown(&es.ui, WIDGET_ZOOM_DROPDOWN, 344, 6, 80, zoom, 4, &sel), 0) != 0 ||
         expect_int("outside press closes", es.ui.dropdown_open_id, 0) != 0 ||
         expect_int("outside press places nothing", es.level.coin_count, 1) != 0)
         goto done;
@@ -725,7 +725,7 @@ static int open_dropdown_owns_the_next_click(void)
     es.ui.mouse_clicked = 1;
     es.ui.mouse_x = 360;
     es.ui.mouse_y = 10;
-    (void)ui_dropdown(&es.ui, 8888, 344, 6, 80, zoom, 4, &sel);
+    (void)ui_dropdown(&es.ui, WIDGET_ZOOM_DROPDOWN, 344, 6, 80, zoom, 4, &sel);
     ui_begin_frame(&es.ui);          /* frame without the dropdown */
     ui_begin_frame(&es.ui);
     editor_handle_event(&es, &down);
@@ -827,7 +827,7 @@ static int dropdowns_accept_any_option_for_unknown_values(void)
     editor_set_document_save_point(&es);
 
     config_frame(&es, NULL, 1, CFG_X + 200, CFG_MUSIC_Y + 4);
-    if (expect_int("music list open", es.ui.dropdown_open_id, 9009) != 0) goto done;
+    if (expect_int("music list open", es.ui.dropdown_open_id, WIDGET_MUSIC_PATH) != 0) goto done;
     config_frame(&es, NULL, 1, CFG_X + 200, CFG_MUSIC_Y + 20 + 4);
     if (expect_string("custom music set to none", es.level.music_path, "") != 0 ||
         expect_int("none choice undoable", es.undo->top, 1) != 0 ||

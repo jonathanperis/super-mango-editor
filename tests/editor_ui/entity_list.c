@@ -73,7 +73,7 @@ static int entity_list_finds_and_selects_entities(void)
     CHECK(strcmp(editor_shortcut_tooltip(EDITOR_SHORTCUT_ENTITY_LIST), "Entities list (Ctrl+F)") == 0);
 
     key_frame(&es, KEY_F, INPUT_CTRL);
-    CHECK(es.entity_list_open && es.ui.active_id == ENTITY_LIST_SEARCH_ID);
+    CHECK(es.entity_list_open && es.ui.active_id == WIDGET_ENTITY_LIST_SEARCH);
     editor_side_panel_layout(&es, &layout);
     CHECK(layout.list_open && layout.list_y == TOOLBAR_H && layout.config_h == 0);
     CHECK(layout.list_h == EDITOR_H - STATUS_H - TOOLBAR_H);   /* nothing selected */
@@ -368,7 +368,7 @@ static int layer_rows_move_and_remove_as_one_step(void)
     const int remove = CANVAS_W + CONFIG_LAYER_REMOVE_X + CONFIG_LAYER_BUTTON_W / 2;
     /* Check the rows are where this test clicks: row 1's dropdown opens. */
     config_only_frame(&es, 1, CANVAS_W + 40, row0 + 20);
-    CHECK(es.ui.dropdown_open_id == 9200 + 1);
+    CHECK(es.ui.dropdown_open_id == WIDGET_BACKGROUND_PATH_FIRST + 1);
     es.ui.dropdown_open_id = 0;
     const int undo_top = es.undo->top;
     const uint64_t original = doc_hash(&es);
@@ -436,7 +436,7 @@ static int layer_rows_move_and_remove_as_one_step(void)
         int fog_row = -1;
         for (int y = TOOLBAR_H + 360; y < EDITOR_H - 20 && fog_row < 0; y += 4) {
             config_only_frame(&es, 1, CANVAS_W + 60, y);
-            if (es.ui.dropdown_open_id == 9600) fog_row = y;
+            if (es.ui.dropdown_open_id == WIDGET_FOG_PATH_FIRST) fog_row = y;
             es.ui.dropdown_open_id = 0;
             es.config_foldout.background_layers = 0;      /* a probe may have clicked a header */
             es.config_foldout.physics = 0;

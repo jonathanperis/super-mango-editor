@@ -219,8 +219,8 @@ static void edited(EditorCampaign *c)
 /* The entry whose name field is being typed in, or -1. */
 static int name_being_typed(const EditorState *es)
 {
-    int row = es->ui.active_id - CAMPAIGN_NAME_FIELD_ID;
-    if (!es->campaign || es->ui.active_id < CAMPAIGN_NAME_FIELD_ID ||
+    int row = es->ui.active_id - WIDGET_CAMPAIGN_NAME_FIRST;
+    if (!es->campaign || es->ui.active_id < WIDGET_CAMPAIGN_NAME_FIRST ||
         (size_t)row >= es->campaign->catalog.count) return -1;
     return row;
 }
@@ -1328,7 +1328,7 @@ static void draw_row(EditorState *es, EditorCampaign *c, int i, int y)
          * until then, so a rename is one step however long it took. */
         char before[LEVEL_NAME_CAPACITY];
         memcpy(before, entry->level.name, sizeof(before));
-        if (ui_text_field(&es->ui, CAMPAIGN_NAME_FIELD_ID + i, CAMPAIGN_NAME_X, y,
+        if (ui_text_field(&es->ui, WIDGET_CAMPAIGN_NAME_FIRST + i, CAMPAIGN_NAME_X, y,
                           CAMPAIGN_NAME_W, entry->level.name,
                           (int)sizeof(entry->level.name))) {
             record_rename(c, i, before);

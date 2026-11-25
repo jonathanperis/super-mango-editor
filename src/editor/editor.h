@@ -30,6 +30,7 @@
 #include <stdint.h>        /* uint64_t — document save-point fingerprint */
 #include "../levels/level.h" /* LevelDef — the data-driven level definition we edit */
 #include "../shared/ui.h"  /* UIState — shared immediate-mode widgets */
+#include "widget_ids.h"     /* EditorWidgetId: every fixed widget ID */
 #include "undo.h"          /* UndoStack, PlacementData — undo system + clipboard */
 #include "editor_validation.h" /* EditorValidationReport                         */
 #include "../shared/serializer_io.h" /* SerializerFileFingerprint */

@@ -2,8 +2,8 @@
  * properties_config.c — The Level Config panel.
  *
  * Drawn top to bottom by one config_* helper per settings group.
- * level_config_render is that list. Widget ids here are the 9000+ literals
- * properties_focus_config jumps to; they stay next to their widgets.
+ * level_config_render is that list. Its widget IDs are the WIDGET_* names
+ * in widget_ids.h (9000 and up), which properties_focus_config jumps to.
  */
 
 #include <float.h>      /* FLT_MAX for one-sided field limits    */
@@ -28,6 +28,7 @@
 #include "../surfaces/rail.h"  /* MAX_RAIL_SPEED (rail rider speed limit)    */
 #include "../game_constants.h" /* MAX_PATROL_SPEED (enemy vx limit)          */
 #include "properties_internal.h"
+#include "widget_ids.h"   /* WIDGET_LEVEL_NAME... */
 
 /* The description field edits the whole description in the widget's own
  * buffer, so that buffer must be at least as large. */
@@ -49,9 +50,9 @@ static int cfg_clip_bottom = 0;
  * and returns where the next group starts, so level_config_render reads as
  * the list of groups in panel order.
  *
- * Widget IDs use the 9000+ range to avoid collisions with entity fields
- * (FIELD_ID stays below 9000).  Every ID is a literal next to its widget,
- * so moving a field between helpers cannot change which ID it has.
+ * Widget IDs are the WIDGET_* names in widget_ids.h, 9000 and up, clear
+ * of the entity fields' FIELD_ID range.  Each widget names its own ID, so
+ * moving a field between helpers cannot change which ID it has.
  */
 
 /* Is the mouse over the 18-px header row of a subsection at y, on the part
@@ -245,20 +246,20 @@ static int config_recent_files(EditorState *es, int x, int y)
 static int config_level_fields(EditorState *es, int x, int y)
 {
     ui_label(&es->ui, x + 8, y, "Name:");
-    if (ui_text_field_hint(&es->ui, 9000, x + 55, y, 310, es->level.name,
+    if (ui_text_field_hint(&es->ui, WIDGET_LEVEL_NAME, x + 55, y, 310, es->level.name,
                            (int)sizeof(es->level.name), "Untitled", 0))
         editor_commit_change(es);
     y += 24;
 
     ui_label(&es->ui, x + 8, y, "Desc:");
     /* The description may run over several lines (Shift+Enter). */
-    if (ui_text_field_hint(&es->ui, 9001, x + 55, y, 310, es->level.description,
+    if (ui_text_field_hint(&es->ui, WIDGET_LEVEL_DESCRIPTION, x + 55, y, 310, es->level.description,
                            (int)sizeof(es->level.description), "(no description)", 1))
         editor_commit_change(es);
     y += 24;
 
     ui_label(&es->ui, x + 8, y, "By:");
-    if (ui_text_field_hint(&es->ui, 9002, x + 55, y, 310, es->level.generated_by,
+    if (ui_text_field_hint(&es->ui, WIDGET_LEVEL_AUTHOR, x + 55, y, 310, es->level.generated_by,
                            (int)sizeof(es->level.generated_by), "(no author)", 0))
         editor_commit_change(es);
     y += 24;
@@ -267,7 +268,7 @@ static int config_level_fields(EditorState *es, int x, int y)
     ui_label(&es->ui, x + 8, y, "Screens:");
     /* The limits live in the field, so a value applied by clicking away
      * (the Apply choice) is clamped exactly like one confirmed with Return. */
-    if (ui_int_field_limited(&es->ui, 9011, x + 80, y, 50,
+    if (ui_int_field_limited(&es->ui, WIDGET_SCREEN_COUNT, x + 80, y, 50,
                              &es->level.screen_count, 1, MAX_LEVEL_SCREENS, 1))
         editor_commit_change(es);
     {
@@ -280,7 +281,7 @@ static int config_level_fields(EditorState *es, int x, int y)
 
     /* ---- Next phase path ---- */
     ui_label(&es->ui, x + 8, y, "Next:");
-    if (ui_text_field_hint(&es->ui, 9031, x + 55, y, 310, es->level.next_phase,
+    if (ui_text_field_hint(&es->ui, WIDGET_NEXT_PHASE, x + 55, y, 310, es->level.next_phase,
                            (int)sizeof(es->level.next_phase), NEXT_PHASE_HINT, 0))
         editor_commit_change(es);
     return y + 24;
@@ -296,7 +297,7 @@ static int config_music(EditorState *es, int x, int y)
     ui_label(&es->ui, x + 8, y, "Background Sound:");
     {
         int sel = option_index(es->level.music_path, music->paths, music->count);
-        if (ui_dropdown_unlisted(&es->ui, 9009, x + 160, y, 210, music->names, music->count,
+        if (ui_dropdown_unlisted(&es->ui, WIDGET_MUSIC_PATH, x + 160, y, 210, music->names, music->count,
                                  &sel, editor_asset_unlisted_name(es->level.music_path))) {
             strncpy(es->level.music_path, music->paths[sel],
                     sizeof(es->level.music_path) - 1);
@@ -307,7 +308,7 @@ static int config_music(EditorState *es, int x, int y)
     y += 22;
     ui_label_tip(&es->ui, x + 8, y, "Vol:", "Music volume, 0-128");
     /* The same 0..128 range the validator and the TOML format accept. */
-    if (ui_int_field_limited(&es->ui, 9003, x + 50, y, 80,
+    if (ui_int_field_limited(&es->ui, WIDGET_MUSIC_VOLUME, x + 50, y, 80,
                              &es->level.music_volume, 0,
                              LEVEL_MUSIC_VOLUME_MAX, 1))
         editor_commit_change(es);
@@ -324,7 +325,7 @@ static int config_floor_tile(EditorState *es, int x, int y)
     ui_label(&es->ui, x + 8, y, "Floor Tile:");
     {
         int sel = option_index(es->level.floor_tile_path, tiles->paths, tiles->count);
-        if (ui_dropdown_unlisted(&es->ui, 9010, x + 100, y, 270, tiles->names, tiles->count,
+        if (ui_dropdown_unlisted(&es->ui, WIDGET_FLOOR_TILE, x + 100, y, 270, tiles->names, tiles->count,
                                  &sel, editor_asset_unlisted_name(es->level.floor_tile_path))) {
             strncpy(es->level.floor_tile_path, tiles->paths[sel],
                     sizeof(es->level.floor_tile_path) - 1);
@@ -343,20 +344,20 @@ static int config_lives_and_score(EditorState *es, int x, int y)
     /* 0 in each of these means the game's default; the tooltips say so.
      * The upper limits are the ones the level validator applies. */
     ui_label_tip(&es->ui, x + 8, y, "Hearts:", "Hearts the player starts with, 1-3; 0 = the default (3)");
-    if (ui_int_field_limited(&es->ui, 9006, x + 70, y, 60,
+    if (ui_int_field_limited(&es->ui, WIDGET_INITIAL_HEARTS, x + 70, y, 60,
                              &es->level.initial_hearts, 0, MAX_HEARTS, 1))
         editor_commit_change(es);
     ui_label_tip(&es->ui, x + 150, y, "Lives:", "Extra lives the player starts with; 0 = the default (3)");
-    if (ui_int_field_limited(&es->ui, 9007, x + 205, y, 60,
+    if (ui_int_field_limited(&es->ui, WIDGET_INITIAL_LIVES, x + 205, y, 60,
                              &es->level.initial_lives, 0, MAX_LIVES, 1))
         editor_commit_change(es);
     y += 22;
     ui_label_tip(&es->ui, x + 8, y, "Extra life:", "Score that earns an extra life; 0 = the default (1000)");
-    if (ui_int_field_limited(&es->ui, 9008, x + 80, y, 80, &es->level.score_per_life,
+    if (ui_int_field_limited(&es->ui, WIDGET_SCORE_PER_LIFE, x + 80, y, 80, &es->level.score_per_life,
                              0, LEVEL_SCORE_PER_LIFE_MAX, 1))
         editor_commit_change(es);
     ui_label_tip(&es->ui, x + 180, y, "Per coin:", "Points a coin is worth; 0 = the default (100)");
-    if (ui_int_field_limited(&es->ui, 9012, x + 240, y, 60, &es->level.coin_score,
+    if (ui_int_field_limited(&es->ui, WIDGET_COIN_SCORE, x + 240, y, 60, &es->level.coin_score,
                              0, LEVEL_COIN_SCORE_MAX, 1))
         editor_commit_change(es);
     return y + 24;
@@ -392,52 +393,52 @@ static int config_physics(EditorState *es, int x, int y)
     if (es->config_foldout.physics) {
         /* -- Walk / Run speeds -- */
         ui_label(&es->ui, COL1_L, y, "walk spd:");
-        if (ui_float_field(&es->ui, 9020, COL1_F, y, PHYS_FW, &es->level.physics.walk_max_speed))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_WALK_MAX_SPEED, COL1_F, y, PHYS_FW, &es->level.physics.walk_max_speed))
             editor_commit_change(es);
         ui_label(&es->ui, COL2_L, y, "run spd:");
-        if (ui_float_field(&es->ui, 9021, COL2_F, y, PHYS_FW, &es->level.physics.run_max_speed))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_RUN_MAX_SPEED, COL2_F, y, PHYS_FW, &es->level.physics.run_max_speed))
             editor_commit_change(es);
         y += 22;
 
         /* -- Ground acceleration -- */
         ui_label(&es->ui, COL1_L, y, "walk accel:");
-        if (ui_float_field(&es->ui, 9022, COL1_F, y, PHYS_FW, &es->level.physics.walk_ground_accel))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_WALK_GROUND_ACCEL, COL1_F, y, PHYS_FW, &es->level.physics.walk_ground_accel))
             editor_commit_change(es);
         ui_label(&es->ui, COL2_L, y, "run accel:");
-        if (ui_float_field(&es->ui, 9023, COL2_F, y, PHYS_FW, &es->level.physics.run_ground_accel))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_RUN_GROUND_ACCEL, COL2_F, y, PHYS_FW, &es->level.physics.run_ground_accel))
             editor_commit_change(es);
         y += 22;
 
         /* -- Ground friction / counter -- */
         ui_label(&es->ui, COL1_L, y, "friction:");
-        if (ui_float_field(&es->ui, 9024, COL1_F, y, PHYS_FW, &es->level.physics.ground_friction))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_GROUND_FRICTION, COL1_F, y, PHYS_FW, &es->level.physics.ground_friction))
             editor_commit_change(es);
         ui_label(&es->ui, COL2_L, y, "counter:");
-        if (ui_float_field(&es->ui, 9025, COL2_F, y, PHYS_FW, &es->level.physics.ground_counter_accel))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_GROUND_COUNTER, COL2_F, y, PHYS_FW, &es->level.physics.ground_counter_accel))
             editor_commit_change(es);
         y += 22;
 
         /* -- Air acceleration -- */
         ui_label(&es->ui, COL1_L, y, "air walk:");
-        if (ui_float_field(&es->ui, 9026, COL1_F, y, PHYS_FW, &es->level.physics.air_accel_walk))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_AIR_ACCEL_WALK, COL1_F, y, PHYS_FW, &es->level.physics.air_accel_walk))
             editor_commit_change(es);
         ui_label(&es->ui, COL2_L, y, "air run:");
-        if (ui_float_field(&es->ui, 9027, COL2_F, y, PHYS_FW, &es->level.physics.air_accel_run))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_AIR_ACCEL_RUN, COL2_F, y, PHYS_FW, &es->level.physics.air_accel_run))
             editor_commit_change(es);
         y += 22;
 
         /* -- Air friction -- */
         ui_label(&es->ui, COL1_L, y, "air fric:");
-        if (ui_float_field(&es->ui, 9028, COL1_F, y, PHYS_FW, &es->level.physics.air_friction))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_AIR_FRICTION, COL1_F, y, PHYS_FW, &es->level.physics.air_friction))
             editor_commit_change(es);
         y += 22;
 
         /* -- Camera lookahead -- */
         ui_label(&es->ui, COL1_L, y, "cam vx:");
-        if (ui_float_field(&es->ui, 9029, COL1_F, y, PHYS_FW, &es->level.physics.cam_lookahead_vx_factor))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_CAM_VX_FACTOR, COL1_F, y, PHYS_FW, &es->level.physics.cam_lookahead_vx_factor))
             editor_commit_change(es);
         ui_label(&es->ui, COL2_L, y, "cam max:");
-        if (ui_float_field(&es->ui, 9030, COL2_F, y, PHYS_FW, &es->level.physics.cam_lookahead_max))
+        if (ui_float_field(&es->ui, WIDGET_PHYS_CAM_MAX, COL2_F, y, PHYS_FW, &es->level.physics.cam_lookahead_max))
             editor_commit_change(es);
         y += 22;
     }
@@ -605,7 +606,8 @@ static int config_layer_buttons(EditorState *es, int x, int y,
 /* Parallax background layers — a collapsible list. */
 static int config_background_layers(EditorState *es, int x, int y)
 {
-    static const LayerChoices choices = { ASSET_CHOICES_BACKGROUNDS, 9200, 9100 };
+    static const LayerChoices choices = { ASSET_CHOICES_BACKGROUNDS, WIDGET_BACKGROUND_PATH_FIRST,
+                                            WIDGET_BACKGROUND_SPEED_FIRST };
     LevelDef *level = &es->level;
     char label[48];
 
@@ -641,7 +643,8 @@ static int config_background_layers(EditorState *es, int x, int y)
 /* Foreground strips (water, lava, clouds) drawn over the floor. */
 static int config_foreground_layers(EditorState *es, int x, int y)
 {
-    static const LayerChoices choices = { ASSET_CHOICES_FOREGROUNDS, 9300, 9400 };
+    static const LayerChoices choices = { ASSET_CHOICES_FOREGROUNDS, WIDGET_FOREGROUND_PATH_FIRST,
+                                            WIDGET_FOREGROUND_SPEED_FIRST };
     LevelDef *level = &es->level;
     char label[48];
 
@@ -677,7 +680,8 @@ static int config_foreground_layers(EditorState *es, int x, int y)
 /* Fog overlays that drift across the screen. */
 static int config_fog_layers(EditorState *es, int x, int y)
 {
-    static const LayerChoices choices = { ASSET_CHOICES_FOG, 9600, 9700 };
+    static const LayerChoices choices = { ASSET_CHOICES_FOG, WIDGET_FOG_PATH_FIRST,
+                                            WIDGET_FOG_SPEED_FIRST };
     LevelDef *level = &es->level;
     char label[48];
 
@@ -780,7 +784,7 @@ void level_config_render(EditorState *es, int start_y, int available_h,
     /* A field activated by Tab or by a clicked validation message may be
      * scrolled out of sight: scroll just enough to show it (the clamp at
      * the top of this function keeps the result in range next frame). */
-    if (es->ui.focus_landed_id >= 9000) {
+    if (es->ui.focus_landed_id >= WIDGET_LEVEL_FIRST) {
         int field_top = es->ui.focus_landed_y;
         ui_scroll_reveal(&es->config_scroll, field_top, field_top + 20,
                          cfg_clip_top, cfg_clip_bottom, 8);
@@ -827,33 +831,33 @@ static int *config_foldout_flag(EditorState *es, ConfigFoldout foldout)
 }
 
 static const ConfigTarget s_config_targets[] = {
-    {"name", NULL, 9000, FOLDOUT_NONE},             {"description", NULL, 9001, FOLDOUT_NONE},
-    {"generated_by", NULL, 9002, FOLDOUT_NONE},     {"screen_count", NULL, 9011, FOLDOUT_NONE},
-    {"next_phase", NULL, 9031, FOLDOUT_NONE},       {"music_path", NULL, 9009, FOLDOUT_NONE},
-    {"music_volume", NULL, 9003, FOLDOUT_NONE},     {"floor_tile_path", NULL, 9010, FOLDOUT_NONE},
-    {"initial_hearts", NULL, 9006, FOLDOUT_NONE},   {"initial_lives", NULL, 9007, FOLDOUT_NONE},
-    {"score_per_life", NULL, 9008, FOLDOUT_NONE},   {"coin_score", NULL, 9012, FOLDOUT_NONE},
-    {"physics.walk_max_speed", NULL, 9020, FOLDOUT_PHYSICS},
-    {"physics.run_max_speed", NULL, 9021, FOLDOUT_PHYSICS},
-    {"physics.walk_ground_accel", NULL, 9022, FOLDOUT_PHYSICS},
-    {"physics.run_ground_accel", NULL, 9023, FOLDOUT_PHYSICS},
-    {"physics.ground_friction", NULL, 9024, FOLDOUT_PHYSICS},
-    {"physics.ground_counter_accel", NULL, 9025, FOLDOUT_PHYSICS},
-    {"physics.air_accel_walk", NULL, 9026, FOLDOUT_PHYSICS},
-    {"physics.air_accel_run", NULL, 9027, FOLDOUT_PHYSICS},
-    {"physics.air_friction", NULL, 9028, FOLDOUT_PHYSICS},
-    {"physics.cam_lookahead_vx_factor", NULL, 9029, FOLDOUT_PHYSICS},
-    {"physics.cam_lookahead_max", NULL, 9030, FOLDOUT_PHYSICS},
+    {"name", NULL, WIDGET_LEVEL_NAME, FOLDOUT_NONE},             {"description", NULL, WIDGET_LEVEL_DESCRIPTION, FOLDOUT_NONE},
+    {"generated_by", NULL, WIDGET_LEVEL_AUTHOR, FOLDOUT_NONE},     {"screen_count", NULL, WIDGET_SCREEN_COUNT, FOLDOUT_NONE},
+    {"next_phase", NULL, WIDGET_NEXT_PHASE, FOLDOUT_NONE},       {"music_path", NULL, WIDGET_MUSIC_PATH, FOLDOUT_NONE},
+    {"music_volume", NULL, WIDGET_MUSIC_VOLUME, FOLDOUT_NONE},     {"floor_tile_path", NULL, WIDGET_FLOOR_TILE, FOLDOUT_NONE},
+    {"initial_hearts", NULL, WIDGET_INITIAL_HEARTS, FOLDOUT_NONE},   {"initial_lives", NULL, WIDGET_INITIAL_LIVES, FOLDOUT_NONE},
+    {"score_per_life", NULL, WIDGET_SCORE_PER_LIFE, FOLDOUT_NONE},   {"coin_score", NULL, WIDGET_COIN_SCORE, FOLDOUT_NONE},
+    {"physics.walk_max_speed", NULL, WIDGET_PHYS_WALK_MAX_SPEED, FOLDOUT_PHYSICS},
+    {"physics.run_max_speed", NULL, WIDGET_PHYS_RUN_MAX_SPEED, FOLDOUT_PHYSICS},
+    {"physics.walk_ground_accel", NULL, WIDGET_PHYS_WALK_GROUND_ACCEL, FOLDOUT_PHYSICS},
+    {"physics.run_ground_accel", NULL, WIDGET_PHYS_RUN_GROUND_ACCEL, FOLDOUT_PHYSICS},
+    {"physics.ground_friction", NULL, WIDGET_PHYS_GROUND_FRICTION, FOLDOUT_PHYSICS},
+    {"physics.ground_counter_accel", NULL, WIDGET_PHYS_GROUND_COUNTER, FOLDOUT_PHYSICS},
+    {"physics.air_accel_walk", NULL, WIDGET_PHYS_AIR_ACCEL_WALK, FOLDOUT_PHYSICS},
+    {"physics.air_accel_run", NULL, WIDGET_PHYS_AIR_ACCEL_RUN, FOLDOUT_PHYSICS},
+    {"physics.air_friction", NULL, WIDGET_PHYS_AIR_FRICTION, FOLDOUT_PHYSICS},
+    {"physics.cam_lookahead_vx_factor", NULL, WIDGET_PHYS_CAM_VX_FACTOR, FOLDOUT_PHYSICS},
+    {"physics.cam_lookahead_max", NULL, WIDGET_PHYS_CAM_MAX, FOLDOUT_PHYSICS},
     /* Layer rows: the asset dropdown and the speed field (the IDs in the
      * LayerChoices of config_background_layers and friends). */
-    {"background_layers", "path", 9200, FOLDOUT_BACKGROUND},
-    {"background_layers", "speed", 9100, FOLDOUT_BACKGROUND},
+    {"background_layers", "path", WIDGET_BACKGROUND_PATH_FIRST, FOLDOUT_BACKGROUND},
+    {"background_layers", "speed", WIDGET_BACKGROUND_SPEED_FIRST, FOLDOUT_BACKGROUND},
     {"background_layers", NULL, 0, FOLDOUT_BACKGROUND},
-    {"foreground_layers", "path", 9300, FOLDOUT_FOREGROUND},
-    {"foreground_layers", "speed", 9400, FOLDOUT_FOREGROUND},
+    {"foreground_layers", "path", WIDGET_FOREGROUND_PATH_FIRST, FOLDOUT_FOREGROUND},
+    {"foreground_layers", "speed", WIDGET_FOREGROUND_SPEED_FIRST, FOLDOUT_FOREGROUND},
     {"foreground_layers", NULL, 0, FOLDOUT_FOREGROUND},
-    {"fog_layers", "path", 9600, FOLDOUT_FOG},
-    {"fog_layers", "speed", 9700, FOLDOUT_FOG},
+    {"fog_layers", "path", WIDGET_FOG_PATH_FIRST, FOLDOUT_FOG},
+    {"fog_layers", "speed", WIDGET_FOG_SPEED_FIRST, FOLDOUT_FOG},
     {"fog_layers", NULL, 0, FOLDOUT_FOG},
 };
 

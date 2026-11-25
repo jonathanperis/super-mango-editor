@@ -38,7 +38,7 @@ void editor_entity_list_open(EditorState *es)
     /* The Place tool needs the palette, which the list covers. */
     if (es->tool == TOOL_PLACE) es->tool = TOOL_SELECT;
     /* The search field takes the caret when it is next drawn. */
-    ui_focus_field(&es->ui, ENTITY_LIST_SEARCH_ID);
+    ui_focus_field(&es->ui, WIDGET_ENTITY_LIST_SEARCH);
 }
 
 void editor_entity_list_close(EditorState *es)
@@ -194,7 +194,7 @@ const char *editor_entity_list_filter(const EditorState *es)
     /* While the search field has the caret, its text is still in the
      * widget's edit buffer (ui.h): reading it there filters as you type,
      * without waiting for Enter. */
-    if (es->ui.active_id == ENTITY_LIST_SEARCH_ID) return es->ui.edit_buf;
+    if (es->ui.active_id == WIDGET_ENTITY_LIST_SEARCH) return es->ui.edit_buf;
     return es->entity_list_filter;
 }
 
@@ -301,13 +301,13 @@ void editor_entity_list_render(EditorState *es, int start_y, int available_h)
      * typing is already in its edit buffer when the rows are filtered. */
     ui_label_tip(&es->ui, x + 8, start_y + 34, "Find:",
                  "A type name, or a coordinate such as 96; Esc closes the list");
-    (void)ui_text_field_hint(&es->ui, ENTITY_LIST_SEARCH_ID, x + 48, start_y + 32,
+    (void)ui_text_field_hint(&es->ui, WIDGET_ENTITY_LIST_SEARCH, x + 48, start_y + 32,
                              PROP_W - 48 - 12, es->entity_list_filter,
                              (int)sizeof(es->entity_list_filter),
                              "type or coordinate", 0);
     /* Level Config scrolls to a field of its own that takes the caret
-     * (focus_landed_id, 9000 and up); this one is not in that panel. */
-    if (es->ui.focus_landed_id == ENTITY_LIST_SEARCH_ID) es->ui.focus_landed_id = 0;
+     * (focus_landed_id, WIDGET_LEVEL_FIRST and up); this one is not in that panel. */
+    if (es->ui.focus_landed_id == WIDGET_ENTITY_LIST_SEARCH) es->ui.focus_landed_id = 0;
 
     if (rows_h <= 0) return;
     filter = editor_entity_list_filter(es);
