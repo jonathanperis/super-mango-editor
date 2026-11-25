@@ -71,10 +71,11 @@ second line of the top-right panel, next to the frame interval. With VSync that
 interval is mostly the wait for the display, which is why it is not a measure
 of work.
 
-`tools/bench_budget.json` holds a budget per level. A level fails only above
-three times its budget, because CI machines are slower and noisier than the
-Mac the budgets came from; texture switches are the same on every machine, so
-their limit is tight. The **Bench** workflow runs `make bench BENCH_CHECK=1` on
+`tools/bench_budget.json` holds a budget per level, measured on the CI
+runner (a GitHub-hosted x86_64 machine takes about 37 ms a frame where an
+Apple M-series Mac takes 12). Shared runners vary from run to run, so a level
+fails only above twice its budget; texture switches are the same on every
+machine, so their limit is tight. The **Bench** workflow runs `make bench BENCH_CHECK=1` on
 every pull request for information only: it is not a required check.
 
 ## Counting instructions instead of milliseconds
