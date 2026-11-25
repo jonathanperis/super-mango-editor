@@ -113,6 +113,8 @@ int game_replay_load(GameState *gs)
         fprintf(stderr, "Error: could not open replay script '%s'\n", replay_path);
         return -1;
     }
+    /* Owned by the GameState from here on: game_replay_cleanup frees it,
+     * on the error path below or when the game is cleaned up. */
     gs->screen.replay_events = calloc(MAX_REPLAY_EVENTS, sizeof(*gs->screen.replay_events));
     if (!gs->screen.replay_events) { fclose(fp); return -1; }
     char line[160];
