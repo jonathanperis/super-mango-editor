@@ -363,7 +363,7 @@ void editor_entity_list_render(EditorState *es, int start_y, int available_h)
              * then.  The search field's text is settled first, like any
              * field before a command.
              */
-            if (hovered && es->ui.mouse_clicked && !es->drag.active && !es->painting) {
+            if (hovered && es->ui.mouse_clicked && !es->drag.active && !es->paint.active) {
                 es->ui.mouse_clicked = 0;
                 if (editor_finish_field_edit(es))
                     pick_entity(es, type, i, (es->input_mods & INPUT_SHIFT) != 0);

@@ -436,8 +436,8 @@ int place_entity(EditorState *es, float world_x, float world_y)
     /* With snapping on, the click lands on the grid cell's corner, the same
      * point the placement ghost was drawn at. */
     editor_snap_point(es, &world_x, &world_y);
-    es->paint_x = world_x;
-    es->paint_y = world_y;
+    es->paint.x = world_x;
+    es->paint.y = world_y;
     if (!default_placement(type, world_x, world_y, &pd)) return -1;
     if (type == ENT_SPIKE_BLOCK) {
         int rail = editor_nearest_rail(&es->level, world_x, world_y);
@@ -448,10 +448,10 @@ int place_entity(EditorState *es, float world_x, float world_y)
     /* A row never stacks copies: past the world's edge the clamp, and for
      * a spike block or a flame its rail or gap, can land the next one
      * exactly where the last one went. */
-    if (es->painting && es->paint_count > 0 &&
-        placement_same(type, &pd, &es->paint_last)) return -1;
+    if (es->paint.active && es->paint.count > 0 &&
+        placement_same(type, &pd, &es->paint.last)) return -1;
     if (editor_add_placement(es, type, &pd, "place") != 0) return -1;
-    es->paint_last = pd;
+    es->paint.last = pd;
     return 0;
 }
 
@@ -465,14 +465,14 @@ int place_entity(EditorState *es, float world_x, float world_y)
  */
 void begin_paint(EditorState *es, float world_x, float world_y)
 {
-    es->painting = 0;
-    es->paint_count = 0;
-    es->paint_grouped = 0;
+    es->paint.active = 0;
+    es->paint.count = 0;
+    es->paint.grouped = 0;
     if (!editor_entity_type_is_singleton(es->palette_type))
-        es->paint_grouped = undo_group_begin(es->undo, UNDO_GROUP_MAX) != 0;
-    if (place_entity(es, world_x, world_y) == 0) es->paint_count = 1;
+        es->paint.grouped = undo_group_begin(es->undo, UNDO_GROUP_MAX) != 0;
+    if (place_entity(es, world_x, world_y) == 0) es->paint.count = 1;
     /* Without the room to keep the row as one step, the press places one. */
-    es->painting = es->paint_grouped;
+    es->paint.active = es->paint.grouped;
 }
 
 void paint_step(EditorState *es, float world_x, float world_y)
@@ -481,29 +481,29 @@ void paint_step(EditorState *es, float world_x, float world_y)
     float step_w = preview && preview->w > 0 ? (float)preview->w : (float)TILE_SIZE;
     float step_h = preview && preview->h > 0 ? (float)preview->h : (float)TILE_SIZE;
     float x = world_x, y = world_y;
-    float last_x = es->paint_x, last_y = es->paint_y;
+    float last_x = es->paint.x, last_y = es->paint.y;
 
-    if (es->paint_count >= UNDO_GROUP_MAX) return;
+    if (es->paint.count >= UNDO_GROUP_MAX) return;
     editor_snap_point(es, &x, &y);
     if (fabsf(x - last_x) < step_w && fabsf(y - last_y) < step_h) return;
-    if (place_entity(es, world_x, world_y) == 0) es->paint_count++;
-    else { es->paint_x = last_x; es->paint_y = last_y; }
+    if (place_entity(es, world_x, world_y) == 0) es->paint.count++;
+    else { es->paint.x = last_x; es->paint.y = last_y; }
 }
 
 void tools_end_paint(EditorState *es)
 {
-    if (!es || !es->painting) return;
-    if (es->paint_grouped) {
+    if (!es || !es->paint.active) return;
+    if (es->paint.grouped) {
         int group = undo_top_group(es->undo);
         undo_group_end(es->undo);
         /* The row reserved room for UNDO_GROUP_MAX entries before the first
          * one was placed; most rows are a single click. Give back what the
          * row did not use, or every click would keep ~12 KB in history. */
-        if (es->paint_count > 0) undo_trim_group(es->undo, group);
+        if (es->paint.count > 0) undo_trim_group(es->undo, group);
     }
-    es->painting = 0;
-    es->paint_grouped = 0;
-    if (es->paint_count > 1)
-        editor_set_status(es, "Placed %d %s", es->paint_count,
+    es->paint.active = 0;
+    es->paint.grouped = 0;
+    if (es->paint.count > 1)
+        editor_set_status(es, "Placed %d %s", es->paint.count,
                           editor_entity_type_name(es->palette_type));
 }

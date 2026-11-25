@@ -337,7 +337,7 @@ void tools_mouse_up(EditorState *es, float world_x, float world_y)
     (void)world_y;
 
     if (!es) return;
-    if (es->painting) {
+    if (es->paint.active) {
         tools_end_paint(es);
         return;
     }
@@ -424,7 +424,7 @@ void tools_mouse_drag(EditorState *es, float world_x, float world_y)
     float dx, dy;
 
     if (!es) return;
-    if (es->painting) {
+    if (es->paint.active) {
         paint_step(es, world_x, world_y);
         return;
     }
