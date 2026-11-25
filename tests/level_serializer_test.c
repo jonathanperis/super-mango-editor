@@ -384,7 +384,14 @@ static int compare_rich_roundtrip(const LevelDef *before, const LevelDef *after)
     return 0;
 }
 
+static int write_coins_fixture(const char *path, int coins);
+
 static int write_too_many_coins_fixture(const char *path)
+{
+    return write_coins_fixture(path, MAX_COINS + 1);
+}
+
+static int write_coins_fixture(const char *path, int coins)
 {
     FILE *fp = fopen(path, "w");
     if (!fp) return -1;
@@ -401,9 +408,9 @@ static int write_too_many_coins_fixture(const char *path)
     fprintf(fp, "score_per_life = 1000\n");
     fprintf(fp, "coin_score = 100\n\n");
 
-    for (int i = 0; i < MAX_COINS + 1; i++) {
+    for (int i = 0; i < coins; i++) {
         fprintf(fp, "[[coins]]\n");
-        fprintf(fp, "x = %d.0\n", i);
+        fprintf(fp, "x = %d.0\n", i % 300);
         fprintf(fp, "y = 0.0\n\n");
     }
 
@@ -2011,6 +2018,14 @@ static int rejects_oversized_arrays(void)
     if (level_load_toml(path, &def) == 0)
         return fail("oversized coins array should fail");
 
+    /* The limit itself is allowed: exactly MAX_COINS coins load (mutation
+     * testing found `>` against the limit unchecked: `>=` passed too). */
+    if (write_coins_fixture(path, MAX_COINS) != 0)
+        return fail("could not write full coins fixture");
+    if (level_load_toml(path, &def) != 0 || def.coin_count != MAX_COINS) {
+        remove(path);
+        return fail("exactly MAX_COINS coins should load");
+    }
     remove(path);
     return 0;
 }
