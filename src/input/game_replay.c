@@ -13,9 +13,15 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
-#include <ctype.h>
 
 #define MAX_REPLAY_EVENTS 4096
+
+/* A blank between the fields of a script line.  Scripts are plain ASCII,
+ * so this needs no locale (isspace would consult one). */
+static int replay_is_blank(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
 
 static int replay_keycode(const char *name)
 {
@@ -124,12 +130,12 @@ int game_replay_load(GameState *gs)
         char key_name[32] = {0};
         char extra;
         if (!strchr(line, '\n') && !feof(fp)) goto invalid;
-        while (isspace((unsigned char)*text)) text++;
+        while (replay_is_blank(*text)) text++;
         if (*text == '#' || *text == '\0') continue;
         errno = 0;
         long frame = strtol(text, &end, 10);
         if (errno || end == text || frame < 0 || frame >= INT_MAX ||
-            !isspace((unsigned char)*end) ||
+            !replay_is_blank(*end) ||
             sscanf(end, "%15s %31s %c", action, key_name, &extra) != 2 ||
             gs->screen.replay_event_count >= MAX_REPLAY_EVENTS) goto invalid;
         int key = replay_keycode(key_name);

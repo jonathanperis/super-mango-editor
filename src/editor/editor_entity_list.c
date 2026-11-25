@@ -168,7 +168,7 @@ static int name_contains(const char *name, const char *word)
 int editor_entity_list_matches(const LevelDef *level, EntityType type, int index,
                                const char *filter)
 {
-    char word[ENTITY_LIST_WORD_MAX];
+    char word[ENTITY_LIST_WORD_MAX] = {0};
     const char *rest = filter ? filter : "";
     const char *name = editor_entity_type_name(type);
     int x = 0, y = 0;

@@ -336,6 +336,9 @@ static void wanted_sizes(EntityType type, EditorHandleKind handle,
 
     (void)get_sizes(type, shown, across, down);
 
+    /* Spike rows and spike platforms have the same 16 px pieces today, so
+     * their two cases read the same numbers; they stay separate cases
+     * because they name different sprites' sizes. */
     switch (type) {
     case ENT_PLATFORM:
         if (handle == EDITOR_HANDLE_WIDTH)
@@ -348,7 +351,7 @@ static void wanted_sizes(EntityType type, EditorHandleKind handle,
                               1, RESIZE_MAX_TILES);
         }
         break;
-    case ENT_SPIKE_ROW:
+    case ENT_SPIKE_ROW: /* NOLINT(bugprone-branch-clone): see above */
         *across = tiles_for_length(length_x, SPIKE_TILE_W, SPIKE_TILE_W);
         break;
     case ENT_SPIKE_PLATFORM:
