@@ -1079,7 +1079,13 @@ WEB_OPT = -Os
 WEB_CFLAGS = -std=c11 -Wall -Wextra -Wpedantic -Wno-extra-semi -ffp-contract=off $(WEB_OPT) -D_GNU_SOURCE $(EXTRA_WEB_CFLAGS)
 # The page only runs in browsers; Node merely syntax-checks the .js and
 # compiles the .wasm (tools/check_wasm_artifacts.py), so drop Node support.
-WEB_LINK_FLAGS = -s ENVIRONMENT=web -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]'
+# --closure 1 runs the Closure Compiler over the JavaScript emcc writes:
+# super-mango.js went from 185 KB to 90 KB (47 KB to 31 KB gzipped). It
+# renames properties, so web/closure-externs.js lists the names shared with
+# web/boot.js, which it does not compile; `make web-host-contract` checks
+# that list (tools/check_web_boot_contract.py).
+WEB_LINK_FLAGS = -s ENVIRONMENT=web -s INVOKE_RUN=0 -s EXPORTED_FUNCTIONS='["_main"]' -s EXPORTED_RUNTIME_METHODS='["callMain"]' \
+                 --closure 1 --closure-args=--externs=web/closure-externs.js
 WEB_HTML = $(OUTDIR)/super-mango.html
 # The debug page runs the same program as the normal page and differs only by
 # one inline marker script (web/debug-boot.js), so it is not linked at all:

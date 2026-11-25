@@ -100,6 +100,16 @@ def main() -> None:
     problems = contract.dashboard_problems(old_dashboard)
     for token in ("createElement('script')", "webglcontextlost"):
         expect(problems, f"contains `{token}`")
+    # ── Closure externs: a shared name left off the list ─────────────────
+    externs, makefile = read(contract.EXTERNS), read("Makefile")
+    names = contract.shared_names()
+    for name in ("onGameEnded", "clearTouchInput", "SuperMangoKeyboard", "SuperMangoTouch"):
+        assert name in names, f"shared_names() missed {name}: {sorted(names)}"
+    assert "canvas" not in names, "Emscripten's own Module.canvas needs no extern"
+    expect(contract.externs_problems(externs.replace("onGameEnded", "onGameOver"), names, makefile),
+           "does not name `onGameEnded`")
+    expect(contract.externs_problems(externs, names, makefile.replace("--externs=web/closure-externs.js", "")),
+           "does not pass --externs=web/closure-externs.js")
     print("web_boot_contract_test: ok")
 
 
