@@ -788,8 +788,8 @@ static void render_rails(EditorState *es) {
 /*
  * render_float_platforms — Draw floating / crumble / rail platforms.
  *
- * Each platform is tile_count x FPLAT_PIECE_W (16) pixels wide and
- * FPLAT_PIECE_H (16) pixels tall.  For STATIC and CRUMBLE modes the
+ * Each platform is tile_count x FLOAT_PLATFORM_PIECE_W (16) pixels wide and
+ * FLOAT_PLATFORM_H (16) pixels tall.  For STATIC and CRUMBLE modes the
  * placement x/y is used directly.  For RAIL mode we draw at the
  * placement coordinates (which are set to the rail origin in the level
  * definition for v1 of the editor).
@@ -814,10 +814,10 @@ static void render_float_platforms(EditorState *es) {
             fp->rail_index >= 0 && fp->rail_index < tmp_rail_count) {
             rail_get_world_pos(&tmp_rails[fp->rail_index],
                                fp->t_offset, &fx, &fy);
-            fx -= fp->tile_count * FPLAT_PIECE_W * 0.5f;
-            fy -= FPLAT_PIECE_H * 0.5f;
+            fx -= fp->tile_count * FLOAT_PLATFORM_PIECE_W * 0.5f;
+            fy -= FLOAT_PLATFORM_H * 0.5f;
         }
-        int   total_w = fp->tile_count * FPLAT_PIECE_W;
+        int   total_w = fp->tile_count * FLOAT_PLATFORM_PIECE_W;
 
         if (es->textures.float_platform) {
             /* Draw each piece of the 3-slice platform strip */
@@ -825,25 +825,25 @@ static void render_float_platforms(EditorState *es) {
                 /*
                  * 3-slice piece selection:
                  *   piece 0 = left cap (src x = 0)
-                 *   piece 1 = centre fill (src x = FPLAT_PIECE_W)
-                 *   piece 2 = right cap (src x = 2 * FPLAT_PIECE_W)
+                 *   piece 1 = centre fill (src x = FLOAT_PLATFORM_PIECE_W)
+                 *   piece 2 = right cap (src x = 2 * FLOAT_PLATFORM_PIECE_W)
                  */
                 int piece;
                 if (p == 0 && fp->tile_count != 1)                 piece = 0; /* left   */
                 else if (p == fp->tile_count - 1 && fp->tile_count != 1) piece = 2; /* right  */
                 else                                               piece = 1; /* centre, or the only piece */
 
-                IntRect src = { piece * FPLAT_PIECE_W, 0,
-                                 FPLAT_PIECE_W, FPLAT_PIECE_H };
+                IntRect src = { piece * FLOAT_PLATFORM_PIECE_W, 0,
+                                 FLOAT_PLATFORM_PIECE_W, FLOAT_PLATFORM_H };
                 draw_tex(es, es->textures.float_platform, &src,
-                         fx + (float)(p * FPLAT_PIECE_W), fy,
-                         FPLAT_PIECE_W, FPLAT_PIECE_H);
+                         fx + (float)(p * FLOAT_PLATFORM_PIECE_W), fy,
+                         FLOAT_PLATFORM_PIECE_W, FLOAT_PLATFORM_H);
             }
         } else {
             /* Fallback: grey rectangle */
             IntRect dst = {
                 w2s_x(es, fx), w2s_y(es, fy),
-                w2s_w(es, total_w), w2s_h(es, FPLAT_PIECE_H)
+                w2s_w(es, total_w), w2s_h(es, FLOAT_PLATFORM_H)
             };
             DrawRectangle(dst.x,dst.y,dst.w,dst.h,(Color){128,128,128,255});
         }
@@ -930,35 +930,35 @@ static void render_bridges(EditorState *es) {
  * render_bouncepads — Draw all three bouncepad variants.
  *
  * All bouncepads share the same frame dimensions (48 px wide).
- * The visible art is cropped to rows BP_SRC_Y..+BP_SRC_H (14..31, 18 px).
+ * The visible art is cropped to rows BOUNCEPAD_SRC_Y..+BOUNCEPAD_SRC_H (14..31, 18 px).
  * Frame 2 (x = 96) is the idle/compressed state shown in the editor.
- * y = FLOOR_Y - BP_SRC_H = 252 - 18 = 234.
+ * y = FLOOR_Y - BOUNCEPAD_SRC_H = 252 - 18 = 234.
  */
 static void render_bouncepads(EditorState *es) {
-    float bp_y = (float)(FLOOR_Y - BP_SRC_H);
+    float bp_y = (float)(FLOOR_Y - BOUNCEPAD_SRC_H);
 
-    /* Source rect for frame 2 (idle): x = 2 * BP_FRAME_W = 96 */
-    IntRect src = { 2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H };
+    /* Source rect for frame 2 (idle): x = 2 * BOUNCEPAD_W = 96 */
+    IntRect src = { 2 * BOUNCEPAD_W, BOUNCEPAD_SRC_Y, BOUNCEPAD_W, BOUNCEPAD_SRC_H };
 
     /* Small bouncepads (green) */
     for (int i = 0; i < es->level.bouncepad_small_count; i++) {
         draw_tex(es, es->textures.bouncepad_small, &src,
                  es->level.bouncepads_small[i].x, bp_y,
-                 BP_FRAME_W, BP_SRC_H);
+                 BOUNCEPAD_W, BOUNCEPAD_SRC_H);
     }
 
     /* Medium bouncepads (wood) */
     for (int i = 0; i < es->level.bouncepad_medium_count; i++) {
         draw_tex(es, es->textures.bouncepad_medium, &src,
                  es->level.bouncepads_medium[i].x, bp_y,
-                 BP_FRAME_W, BP_SRC_H);
+                 BOUNCEPAD_W, BOUNCEPAD_SRC_H);
     }
 
     /* High bouncepads (red) */
     for (int i = 0; i < es->level.bouncepad_high_count; i++) {
         draw_tex(es, es->textures.bouncepad_high, &src,
                  es->level.bouncepads_high[i].x, bp_y,
-                 BP_FRAME_W, BP_SRC_H);
+                 BOUNCEPAD_W, BOUNCEPAD_SRC_H);
     }
 }
 

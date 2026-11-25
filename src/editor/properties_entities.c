@@ -290,8 +290,8 @@ static const PropertyRow s_bird_rows[] = {
 static const PropertyRow s_fish_rows[] = {
     FLOAT_ROW("x", 0, FishPlacement, x),
     SPEED_ROW("vx", 1, FishPlacement, vx, MAX_PATROL_SPEED),
-    PATROL_LEFT_ROW("patrol_x0", 2, FishPlacement, patrol_x0, patrol_x1, FISH_FRAME_W),
-    PATROL_RIGHT_ROW("patrol_x1", 3, FishPlacement, patrol_x1, patrol_x0, FISH_FRAME_W),
+    PATROL_LEFT_ROW("patrol_x0", 2, FishPlacement, patrol_x0, patrol_x1, FISH_RENDER_W),
+    PATROL_RIGHT_ROW("patrol_x1", 3, FishPlacement, patrol_x1, patrol_x0, FISH_RENDER_W),
 };
 
 static const PropertyRow s_axe_trap_rows[] = {

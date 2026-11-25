@@ -96,7 +96,7 @@ static int patrol_fields(EntityType type, PlacementData *pd, PatrolFields *out)
         out->x = &pd->fish.x;
         out->x0 = &pd->fish.patrol_x0;
         out->x1 = &pd->fish.patrol_x1;
-        out->sprite_w = (float)FISH_FRAME_W;
+        out->sprite_w = (float)FISH_RENDER_W;
         out->reach = 0.0f;
         return 1;
     case ENT_CIRCULAR_SAW:
@@ -360,7 +360,7 @@ static void wanted_sizes(EntityType type, EditorHandleKind handle,
          * middle. */
         if (shown->float_platform.mode == FLOAT_PLATFORM_RAIL)
             length_x = (x - (bounds->x + bounds->w / 2.0f)) * 2.0f;
-        *across = tiles_for_length(length_x, FPLAT_PIECE_W, FPLAT_PIECE_W);
+        *across = tiles_for_length(length_x, FLOAT_PLATFORM_PIECE_W, FLOAT_PLATFORM_PIECE_W);
         break;
     case ENT_BRIDGE:
         *across = tiles_for_length(length_x, BRIDGE_TILE_W, BRIDGE_TILE_W);

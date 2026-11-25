@@ -141,26 +141,26 @@ static const EditorEntityMeta s_entity_meta[] = {
         .type = ENT_STAR_YELLOW, .type_name = "Star Yellow", .palette_name = "Star Yellow",
         .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
         .capacity = MAX_STAR_YELLOWS, STORED_IN(star_yellows, star_yellow_count),
-        .preview = { TEXTURE(star_yellow), .w = YSTAR_DISPLAY_W, .h = YSTAR_DISPLAY_H },
+        .preview = { TEXTURE(star_yellow), .w = HEALTH_STAR_DISPLAY_W, .h = HEALTH_STAR_DISPLAY_H },
     },
     [ENT_STAR_GREEN] = {
         .type = ENT_STAR_GREEN, .type_name = "Star Green", .palette_name = "Star Green",
         .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
         .capacity = MAX_STAR_GREENS, STORED_IN(star_greens, star_green_count),
-        .preview = { TEXTURE(star_green), .w = YSTAR_DISPLAY_W, .h = YSTAR_DISPLAY_H },
+        .preview = { TEXTURE(star_green), .w = HEALTH_STAR_DISPLAY_W, .h = HEALTH_STAR_DISPLAY_H },
     },
     [ENT_STAR_RED] = {
         .type = ENT_STAR_RED, .type_name = "Star Red", .palette_name = "Star Red",
         .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
         .capacity = MAX_STAR_REDS, STORED_IN(star_reds, star_red_count),
-        .preview = { TEXTURE(star_red), .w = YSTAR_DISPLAY_W, .h = YSTAR_DISPLAY_H },
+        .preview = { TEXTURE(star_red), .w = HEALTH_STAR_DISPLAY_W, .h = HEALTH_STAR_DISPLAY_H },
     },
     [ENT_LAST_STAR] = {
         .type = ENT_LAST_STAR, .type_name = "Last Star", .palette_name = "Last Star",
         .category = EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
         .singleton = 1, .capacity = 1,   /* the LevelDef field last_star */
         .toml_name = "last_star",
-        .preview = { TEXTURE(last_star), .w = LSTAR_DISPLAY_W, .h = LSTAR_DISPLAY_H },
+        .preview = { TEXTURE(last_star), .w = LAST_STAR_DISPLAY_W, .h = LAST_STAR_DISPLAY_H },
     },
     /* ---- Enemies ---------------------------------------------------- */
     [ENT_SPIDER] = {
@@ -196,20 +196,20 @@ static const EditorEntityMeta s_entity_meta[] = {
         .type = ENT_FISH, .type_name = "Fish", .palette_name = "Fish",
         .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
         .capacity = MAX_FISH, STORED_IN(fish, fish_count),
-        .preview = { TEXTURE(fish), .w = FISH_FRAME_W, .h = FISH_FRAME_H },
+        .preview = { TEXTURE(fish), .w = FISH_RENDER_W, .h = FISH_RENDER_H },
     },
     [ENT_FASTER_FISH] = {
         .type = ENT_FASTER_FISH, .type_name = "Faster Fish", .palette_name = "Faster Fish",
         .category = EDITOR_ENTITY_CATEGORY_ENEMIES,
         .capacity = MAX_FASTER_FISH, STORED_IN(faster_fish, faster_fish_count),
-        .preview = { TEXTURE(faster_fish), .w = FISH_FRAME_W, .h = FISH_FRAME_H },
+        .preview = { TEXTURE(faster_fish), .w = FISH_RENDER_W, .h = FISH_RENDER_H },
     },
     /* ---- Hazards ---------------------------------------------------- */
     [ENT_AXE_TRAP] = {
         .type = ENT_AXE_TRAP, .type_name = "Axe Trap", .palette_name = "Axe Trap",
         .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
         .capacity = MAX_AXE_TRAPS, STORED_IN(axe_traps, axe_trap_count),
-        .preview = { TEXTURE(axe_trap), .w = AXE_FRAME_W, .h = AXE_FRAME_H },
+        .preview = { TEXTURE(axe_trap), .w = AXE_DISPLAY_W, .h = AXE_DISPLAY_H },
     },
     [ENT_CIRCULAR_SAW] = {
         .type = ENT_CIRCULAR_SAW, .type_name = "Circular Saw", .palette_name = "Circular Saw",
@@ -241,13 +241,13 @@ static const EditorEntityMeta s_entity_meta[] = {
         .type = ENT_BLUE_FLAME, .type_name = "Blue Flame", .palette_name = "Blue Flame",
         .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
         .capacity = MAX_BLUE_FLAMES, STORED_IN(blue_flames, blue_flame_count),
-        .preview = { TEXTURE(blue_flame), .w = BLUE_FLAME_W, .h = BLUE_FLAME_H },
+        .preview = { TEXTURE(blue_flame), .w = BLUE_FLAME_DISPLAY_W, .h = BLUE_FLAME_DISPLAY_H },
     },
     [ENT_FIRE_FLAME] = {
         .type = ENT_FIRE_FLAME, .type_name = "Fire Flame", .palette_name = "Fire Flame",
         .category = EDITOR_ENTITY_CATEGORY_HAZARDS,
         .capacity = MAX_FIRE_FLAMES, STORED_IN(fire_flames, fire_flame_count),
-        .preview = { TEXTURE(fire_flame), .w = FIRE_FLAME_W, .h = FIRE_FLAME_H },
+        .preview = { TEXTURE(fire_flame), .w = BLUE_FLAME_DISPLAY_W, .h = BLUE_FLAME_DISPLAY_H },
     },
     /* ---- Surfaces --------------------------------------------------- */
     [ENT_FLOAT_PLATFORM] = {
@@ -255,7 +255,7 @@ static const EditorEntityMeta s_entity_meta[] = {
         .palette_name = "Float Platform",
         .category = EDITOR_ENTITY_CATEGORY_SURFACES,
         .capacity = MAX_FLOAT_PLATFORMS, STORED_IN(float_platforms, float_platform_count),
-        .preview = { TEXTURE(float_platform), .w = FPLAT_PIECE_W, .h = FPLAT_PIECE_H },
+        .preview = { TEXTURE(float_platform), .w = FLOAT_PLATFORM_PIECE_W, .h = FLOAT_PLATFORM_H },
     },
     [ENT_BRIDGE] = {
         .type = ENT_BRIDGE, .type_name = "Bridge", .palette_name = "Bridge",
@@ -269,24 +269,24 @@ static const EditorEntityMeta s_entity_meta[] = {
         .palette_name = "Bouncepad Small",
         .category = EDITOR_ENTITY_CATEGORY_SURFACES,
         .capacity = MAX_BOUNCEPADS_SMALL, STORED_IN(bouncepads_small, bouncepad_small_count),
-        .preview = { TEXTURE(bouncepad_small), .w = BP_FRAME_W, .h = BP_SRC_H,
-                     CROP(2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H) },
+        .preview = { TEXTURE(bouncepad_small), .w = BOUNCEPAD_W, .h = BOUNCEPAD_SRC_H,
+                     CROP(2 * BOUNCEPAD_W, BOUNCEPAD_SRC_Y, BOUNCEPAD_W, BOUNCEPAD_SRC_H) },
     },
     [ENT_BOUNCEPAD_MEDIUM] = {
         .type = ENT_BOUNCEPAD_MEDIUM, .type_name = "Bouncepad (M)",
         .palette_name = "Bouncepad Medium",
         .category = EDITOR_ENTITY_CATEGORY_SURFACES,
         .capacity = MAX_BOUNCEPADS_MEDIUM, STORED_IN(bouncepads_medium, bouncepad_medium_count),
-        .preview = { TEXTURE(bouncepad_medium), .w = BP_FRAME_W, .h = BP_SRC_H,
-                     CROP(2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H) },
+        .preview = { TEXTURE(bouncepad_medium), .w = BOUNCEPAD_W, .h = BOUNCEPAD_SRC_H,
+                     CROP(2 * BOUNCEPAD_W, BOUNCEPAD_SRC_Y, BOUNCEPAD_W, BOUNCEPAD_SRC_H) },
     },
     [ENT_BOUNCEPAD_HIGH] = {
         .type = ENT_BOUNCEPAD_HIGH, .type_name = "Bouncepad (H)",
         .palette_name = "Bouncepad High",
         .category = EDITOR_ENTITY_CATEGORY_SURFACES,
         .capacity = MAX_BOUNCEPADS_HIGH, STORED_IN(bouncepads_high, bouncepad_high_count),
-        .preview = { TEXTURE(bouncepad_high), .w = BP_FRAME_W, .h = BP_SRC_H,
-                     CROP(2 * BP_FRAME_W, BP_SRC_Y, BP_FRAME_W, BP_SRC_H) },
+        .preview = { TEXTURE(bouncepad_high), .w = BOUNCEPAD_W, .h = BOUNCEPAD_SRC_H,
+                     CROP(2 * BOUNCEPAD_W, BOUNCEPAD_SRC_Y, BOUNCEPAD_W, BOUNCEPAD_SRC_H) },
     },
     /* ---- Decorations (climbables): one tile of the stack ------------ */
     [ENT_VINE] = {
@@ -317,8 +317,8 @@ static const EditorEntityMeta s_entity_meta[] = {
         /* player_start_x/y in LevelDef; first frame of the idle sheet. */
         .singleton = 1, .capacity = 1,
         .toml_name = "player_start",   /* validator: player_start.x / .y */
-        .preview = { TEXTURE(player), .w = PLAYER_SPAWN_W, .h = PLAYER_SPAWN_H,
-                     CROP(0, 0, PLAYER_SPAWN_W, PLAYER_SPAWN_H) },
+        .preview = { TEXTURE(player), .w = PLAYER_FRAME_W, .h = PLAYER_FRAME_H,
+                     CROP(0, 0, PLAYER_FRAME_W, PLAYER_FRAME_H) },
     },
 };
 

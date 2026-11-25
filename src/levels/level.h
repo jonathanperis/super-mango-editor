@@ -625,6 +625,17 @@ static inline float level_circular_saw_y(const CircularSawPlacement *p)
     return (p->y != 0.0f) ? p->y : level_platform_top_y(2) - (float)SAW_DISPLAY_H;
 }
 
+/*
+ * level_fish_swim_y — the y every fish (and faster fish) swims at.  A fish
+ * stores only x: it rests with its sprite half-submerged in the water strip
+ * along the bottom of the screen.  WATER_ART_H = 31 px of visible water,
+ * FISH_RENDER_H = 48, so y = (GAME_H - WATER_ART_H) - 48 / 2.
+ */
+static inline float level_fish_swim_y(void)
+{
+    return (float)(GAME_H - WATER_ART_H) - FISH_RENDER_H / 2.0f;
+}
+
 /* How many screens wide the level is: its screen_count, or
  * LEVEL_DEFAULT_SCREEN_COUNT when that is 0 (or less). */
 static inline int level_screen_count(const LevelDef *def)
