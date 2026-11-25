@@ -1169,11 +1169,11 @@ static void render_selection(EditorState *es)
     }
 
     /* The rubber band of a box selection in progress. */
-    if (es->box_selecting) {
-        float x0 = es->box_x0 < es->box_x1 ? es->box_x0 : es->box_x1;
-        float y0 = es->box_y0 < es->box_y1 ? es->box_y0 : es->box_y1;
-        float w = es->box_x0 < es->box_x1 ? es->box_x1 - es->box_x0 : es->box_x0 - es->box_x1;
-        float h = es->box_y0 < es->box_y1 ? es->box_y1 - es->box_y0 : es->box_y0 - es->box_y1;
+    if (es->box.active) {
+        float x0 = es->box.x0 < es->box.x1 ? es->box.x0 : es->box.x1;
+        float y0 = es->box.y0 < es->box.y1 ? es->box.y0 : es->box.y1;
+        float w = es->box.x0 < es->box.x1 ? es->box.x1 - es->box.x0 : es->box.x0 - es->box.x1;
+        float h = es->box.y0 < es->box.y1 ? es->box.y1 - es->box.y0 : es->box.y0 - es->box.y1;
         draw_outline(w2s_x(es, x0), w2s_y(es, y0), w2s_w(es, (int)w),
                      w2s_h(es, (int)h), 1, ui_color(&es->ui, UI_COLOR_ACCENT));
     }
