@@ -1045,7 +1045,19 @@ WEB_FLAGS = -s USE_GLFW=3 \
             --exclude-file 'assets/sprites/unused/*' \
             --exclude-file '*/.DS_Store' \
             --preload-file levels \
+            $(foreach track,$(WEB_UNUSED_MUSIC),--exclude-file '$(track)') \
             --shell-file $(WEB_SHELL)
+# Music no level in levels/ plays stays out of super-mango.data, which the
+# page downloads before the game starts. The browser runs only those levels
+# (there is no editor there, which is what offers every track), so a track
+# none of them names would be 22% of the download for nothing. A level names
+# its track as assets/sounds/levels/<name>.qoa or, in older files, .wav
+# (src/shared/serializer_load.c reads that as the .qoa of the same name).
+# tools/check_wasm_artifacts.py checks that every track a level plays was
+# packaged.
+WEB_MUSIC = $(wildcard assets/sounds/levels/*.qoa)
+WEB_PLAYED_MUSIC = $(shell sed -n 's|^music_path *= *"assets/sounds/levels/\([^".]*\)\.[a-z0-9]*".*|assets/sounds/levels/\1.qoa|p' $(LEVEL_FILES))
+WEB_UNUSED_MUSIC = $(filter-out $(WEB_PLAYED_MUSIC),$(WEB_MUSIC))
 # The page's own inline script cannot be linked into super-mango.js: it has
 # to run first, to tell Emscripten how to start. tools/web_shell.py writes
 # the shell that emcc uses from web/shell.html, pasting in web/boot.js (the

@@ -27,7 +27,8 @@ EMPTY_WASM = b"\x00asm\x01\x00\x00\x00"
 # The names the checker looks for in super-mango.js. A comment is enough,
 # and keeps the file harmless for a tool that runs it instead of parsing it.
 GOOD_JS = ("// super-mango.wasm super-mango.data SuperMangoTouch SuperMangoKeyboard\n"
-           "// _game_web_input_touch super-mango-profile-v2 navigator.locks\n")
+           "// _game_web_input_touch super-mango-profile-v2 navigator.locks\n"
+           + "".join(f"// /{track}\n" for track in sorted(check.played_music(ROOT / "levels"))))
 
 
 def build(folder: Path, version: str = "abc123") -> None:
@@ -130,6 +131,13 @@ def main() -> None:
            "missing host interface SuperMangoKeyboard")
     broken(lambda f: edit(f / "super-mango.js", "super-mango.data", "x"), "does not reference super-mango.data")
     broken(lambda f: edit(f / "super-mango.js", "//", "// _emscripten_sleep"), "unsupported emscripten_sleep")
+    # Every track a level plays must be packaged (the Makefile leaves the
+    # others out of super-mango.data).
+    broken(lambda f: edit(f / "super-mango.js", "/assets/sounds/levels/lava.qoa", "x"),
+           "does not package assets/sounds/levels/lava.qoa")
+    # A file far over its compressed budget (random bytes do not compress).
+    broken(lambda f: (f / "super-mango.data").write_bytes(os.urandom(check.GZIP_BUDGETS["super-mango.data"] + 1)),
+           "over its")
     # The CSP no longer covers the inline script once that script changes.
     broken(lambda f: edit(f / "super-mango.html", "injectScript: false", "injectScript: !1"),
            "CSP does not allow inline script")
