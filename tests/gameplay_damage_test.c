@@ -268,6 +268,69 @@ static int confirming_game_over_restores_default_spawn_when_level_start_unset(vo
     return 0;
 }
 
+/*
+ * Retry is a fresh attempt, not a resumed one, in every detail the other
+ * cases leave out (mutation testing found each of these unchecked; see the
+ * Testing page): a level's 0 hearts or lives means the default, and 1 means
+ * one; the pause, the level timer, the completion state, the level's start
+ * score and the automatic-checkpoint screen all start over; every coin comes
+ * back; it is no longer a Continue or a start-point run. And a retry that
+ * arrives when the game is not over changes nothing.
+ */
+static int retry_starts_the_level_afresh(void)
+{
+    GameState gs = {0};
+    LevelDef def;
+
+    s_reset_calls = 0;
+    level_def_init_defaults(&def);
+    def.initial_hearts = 1;
+    def.initial_lives = 1;
+    gs.world.runtime.current_level = &def;
+    gs.world.lives = 2;
+    gs.world.hearts = 2;
+
+    game_restart_after_game_over(&gs);   /* not game over: ignored */
+    if (expect_int("no retry while playing: lives", gs.world.lives, 2) ||
+        expect_int("no retry while playing: hearts", gs.world.hearts, 2) ||
+        expect_int("no retry while playing: reset", s_reset_calls, 0)) return 1;
+
+    gs.screen.game_over = 1;
+    gs.screen.paused = 1;
+    gs.screen.pause_reasons = 3u;
+    gs.screen.completion.complete = 1;
+    gs.screen.completion.level_steps = 900;
+    gs.screen.resumed = 1;
+    gs.screen.start_point_run = 1;
+    gs.world.level_score_start = 700;
+    gs.world.legacy_checkpoint_screen = 2;
+    gs.world.coin_count = 3;
+    gs.world.coins[1].active = 1;   /* the other two were collected */
+    game_restart_after_game_over(&gs);
+    if (expect_int("one life", gs.world.lives, 1) ||
+        expect_int("one heart", gs.world.hearts, 1) ||
+        expect_int("unpaused", gs.screen.paused, 0) ||
+        expect_int("no pause reasons", (int)gs.screen.pause_reasons, 0) ||
+        expect_int("not complete", gs.screen.completion.complete, 0) ||
+        expect_int("timer restarted", (int)gs.screen.completion.level_steps, 0) ||
+        expect_int("not resumed", gs.screen.resumed, 0) ||
+        expect_int("not a start-point run", gs.screen.start_point_run, 0) ||
+        expect_int("start score", gs.world.level_score_start, 0) ||
+        expect_int("screen checkpoint", gs.world.legacy_checkpoint_screen, 0) ||
+        expect_int("coin 0 back", gs.world.coins[0].active, 1) ||
+        expect_int("coin 2 back", gs.world.coins[2].active, 1) ||
+        expect_int("coin past the count untouched", gs.world.coins[3].active, 0))
+        return 1;
+
+    def.initial_hearts = 0;
+    def.initial_lives = 0;
+    gs.screen.game_over = 1;
+    game_restart_after_game_over(&gs);
+    if (expect_int("0 lives means the default", gs.world.lives, DEFAULT_LIVES) ||
+        expect_int("0 hearts means the default", gs.world.hearts, MAX_HEARTS)) return 1;
+    return 0;
+}
+
 /* Losing the last life leaves lives at -1 behind the Game Over overlay.
  * The HUD counter shows x0 there, not x-1. */
 static int hud_never_shows_negative_lives(void)
@@ -290,6 +353,7 @@ int main(void)
     if (confirming_game_over_restores_level_lives_and_score() != 0) return 1;
     if (confirming_game_over_restores_default_spawn_when_level_start_unset() != 0)
         return 1;
+    if (retry_starts_the_level_afresh() != 0) return 1;
 
     puts("gameplay_damage_test: ok");
     return 0;
