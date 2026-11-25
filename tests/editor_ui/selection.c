@@ -456,7 +456,7 @@ static int validation_messages_take_you_to_the_problem(void)
 
     /* ...and a Level Config list row: layer 1's asset dropdown unfolds
      * its group and opens, its speed field takes the caret. */
-    g_plx_open = 0;
+    es.config_foldout.background_layers = 0;
     es.level.background_layer_count = 2;
     snprintf(es.level.background_layers[0].path, sizeof(es.level.background_layers[0].path),
              "assets/sprites/backgrounds/sky_blue.png");
@@ -467,7 +467,7 @@ static int validation_messages_take_you_to_the_problem(void)
     CHECK(strcmp(es.validation_report.locations[0].path, "background_layers") == 0);
     CHECK(editor_focus_validation_issue(&es, 0) == 1);
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(g_plx_open == 1 && es.ui.dropdown_open_id == 9201);
+    CHECK(es.config_foldout.background_layers == 1 && es.ui.dropdown_open_id == 9201);
     click_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     {
         LevelIssueLocation speed = {"background_layers", 1, "speed"};

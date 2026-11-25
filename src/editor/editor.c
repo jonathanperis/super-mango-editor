@@ -43,6 +43,7 @@ int editor_init(EditorState *es, int hidden)
     editor_select_none(es);
     es->palette_type = ENT_COIN;
     es->show_grid = es->panel_open = es->config_open = es->palette_open = 1;
+    es->palette_view.shown_type = -1;   /* nothing shown while placing yet */
     es->undo = undo_create();
     if (!es->undo) goto fail;
     /* Widgets borrow the font and call back before a document command so an

@@ -15,15 +15,7 @@
 #include "../player/player.h"  /* PLAYER_FRAME_W/H: the spawn marker */
 #include "../shared/geometry.h" /* IntRect */
 
-typedef enum {
-    EDITOR_ENTITY_CATEGORY_WORLD = 0,
-    EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
-    EDITOR_ENTITY_CATEGORY_ENEMIES,
-    EDITOR_ENTITY_CATEGORY_HAZARDS,
-    EDITOR_ENTITY_CATEGORY_SURFACES,
-    EDITOR_ENTITY_CATEGORY_DECORATIONS,
-    EDITOR_ENTITY_CATEGORY_COUNT
-} EditorEntityCategory;
+/* EditorEntityCategory is in editor.h: EditorState keeps one flag per category. */
 
 const char *editor_entity_type_name(EntityType type);
 const char *editor_entity_palette_name(EntityType type);

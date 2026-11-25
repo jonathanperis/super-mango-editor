@@ -363,6 +363,46 @@ typedef struct {
 /* The Campaign view's state (editor_campaign.c); NULL while it is closed. */
 typedef struct EditorCampaign EditorCampaign;
 
+/* The palette's groups of entity types, top to bottom (entity_meta.c says
+ * which type is in which). */
+typedef enum {
+    EDITOR_ENTITY_CATEGORY_WORLD = 0,
+    EDITOR_ENTITY_CATEGORY_COLLECTIBLES,
+    EDITOR_ENTITY_CATEGORY_ENEMIES,
+    EDITOR_ENTITY_CATEGORY_HAZARDS,
+    EDITOR_ENTITY_CATEGORY_SURFACES,
+    EDITOR_ENTITY_CATEGORY_DECORATIONS,
+    EDITOR_ENTITY_CATEGORY_COUNT
+} EditorEntityCategory;
+
+/*
+ * EditorPaletteView — how the palette is folded (palette.c).
+ *
+ * category_open : 1 for each category whose rows are shown; all start
+ *                 closed and a click on a header toggles one.
+ * shown_type    : the type the palette last showed while placing (-1 =
+ *                 none), and shown_place whether it was placing then.  A
+ *                 change opens that type's category and scrolls to its row.
+ */
+typedef struct {
+    int category_open[EDITOR_ENTITY_CATEGORY_COUNT];
+    int shown_type;
+    int shown_place;
+} EditorPaletteView;
+
+/*
+ * EditorConfigFoldouts — which collapsible groups of the Level Config panel
+ * are open (1) or closed (0): the physics overrides and the three layer
+ * lists.  properties_config.c draws and toggles them; editor_layout.c
+ * measures the panel with them.
+ */
+typedef struct {
+    int physics;
+    int background_layers;
+    int foreground_layers;
+    int fog_layers;
+} EditorConfigFoldouts;
+
 typedef struct {
     /* Editor owns its process-wide context and logical render target. */
     RenderTexture2D frame_target;
@@ -534,6 +574,9 @@ typedef struct {
      * while any other prompt is up cancels that prompt and then quits
      * as usual (dialog_choice.c). */
     int            quitting;
+    /* 1 while an in-window prompt (dialog_choice.c) is showing: a second
+     * one is never stacked on top of it. */
+    int            prompt_open;
 
     EditorValidationReport validation_report;
     EditorLoadReport load_report;   /* why the last Open failed */
@@ -590,7 +633,9 @@ typedef struct {
     float          zoom_wheel_accum;
     int            panel_open;    /* 1 = properties panel expanded, 0 = collapsed  */
     int            config_open;   /* 1 = level config panel expanded, 0 = collapsed */
+    EditorConfigFoldouts config_foldout; /* its collapsible groups            */
     int            palette_open;  /* 1 = palette panel expanded, 0 = collapsed      */
+    EditorPaletteView palette_view; /* its open categories (palette.c)        */
     int            debug_play;   /* 1 = launch game with --debug when playing      */
 
     /* ---- Mouse state (updated every frame from input commands) -------- */

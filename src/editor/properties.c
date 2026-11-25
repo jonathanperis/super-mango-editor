@@ -46,11 +46,6 @@
 #include "properties_internal.h"
 
 
-/* Collapsible subsection open states — accessed by editor.c for config_h computation */
-int g_plx_open  = 0;
-int g_fg_open   = 0;
-int g_fog_open  = 0;
-int g_phys_open = 0;
 
 
 
@@ -368,8 +363,8 @@ void properties_render(EditorState *es, int start_y, int available_h)
 
     /*
      * Use caller-supplied position instead of the old fixed PROP_Y / PROP_H
-     * constants.  The layout orchestrator in editor.c computes where this
-     * section starts and how tall it is based on the sections above it.
+     * constants.  editor_side_panel_layout (editor_panels.c) computes where
+     * this section starts and how tall it is from the sections above it.
      */
     int prop_x = PROP_X;
     int prop_y = start_y;

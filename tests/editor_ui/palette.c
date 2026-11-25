@@ -705,8 +705,10 @@ static int side_column_follows_the_tool(void)
     CHECK(open_editor(&es, "levels/02_lugio_02.toml") == 0);
     /* Long Level Config content: its later headers and lists lie below its
      * view, under the panels drawn there. */
-    g_plx_open = g_fg_open = g_fog_open = 1;
-    g_phys_open = 0;
+    es.config_foldout.background_layers = 1;
+    es.config_foldout.foreground_layers = 1;
+    es.config_foldout.fog_layers = 1;
+    es.config_foldout.physics = 0;
 
     editor_side_panel_layout(&es, &layout);
     CHECK(layout.props_h == 0 && !layout.palette_folded && layout.palette_h > 200);
@@ -722,11 +724,11 @@ static int side_column_follows_the_tool(void)
 
     /* Under Level Config's view, the click reaches the rail's first field
      * (its layout list), not a layer list scrolled out of sight there. */
-    int plx_open = g_plx_open, fg_open = g_fg_open, fog_open = g_fog_open, phys_open = g_phys_open;
+    EditorConfigFoldouts foldouts = es.config_foldout;
     click_frame(&es, PANEL_FIELD_X, layout.props_y + 36);
     CHECK(es.ui.dropdown_open_id == (int)ENT_RAIL * 100 + 1);
     /* ...and no Level Config header scrolled out of sight toggles. */
-    CHECK(g_plx_open == plx_open && g_fg_open == fg_open && g_fog_open == fog_open && g_phys_open == phys_open);
+    CHECK(memcmp(&es.config_foldout, &foldouts, sizeof(foldouts)) == 0);
     click_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(es.ui.dropdown_open_id == 0);
 
@@ -755,7 +757,6 @@ static int side_column_follows_the_tool(void)
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
     CHECK(es.props_scroll.offset == 0);
 done:
-    g_plx_open = g_fg_open = g_fog_open = 0;
     close_editor(&es);
     return failed;
 }
@@ -770,20 +771,20 @@ static int palette_shows_what_place_will_add(void)
     EditorState es;
     CHECK(open_editor(&es, NULL) == 0);
     int cat = (int)editor_entity_category(ENT_CIRCULAR_SAW);
-    CHECK(!palette_category_is_open(cat));
+    CHECK(!palette_category_is_open(&es, cat));
     es.tool = TOOL_PLACE;
     es.palette_type = ENT_CIRCULAR_SAW;
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(palette_category_is_open(cat));
+    CHECK(palette_category_is_open(&es, cat));
     CHECK(strcmp(editor_entity_palette_name(ENT_CIRCULAR_SAW), "Circular Saw") == 0);
     /* Closed while the palette is closed, the category opens again when
      * the palette shows while placing the same type. */
     es.palette_open = 0;
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    palette_set_category_open_for_test(cat, 0);
+    es.palette_view.category_open[cat] = 0;
     es.palette_open = 1;
     ui_frame(&es, NEUTRAL_X, NEUTRAL_Y);
-    CHECK(palette_category_is_open(cat));
+    CHECK(palette_category_is_open(&es, cat));
 
     {
         char label[64];
