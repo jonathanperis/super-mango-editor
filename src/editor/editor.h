@@ -420,6 +420,19 @@ typedef struct {
 } EditorDrag;
 
 /*
+ * EditorPaint — the Place tool's painted row (tools.c, tools_place.c).
+ * While the button is held, dragging paints a row of the palette's entity,
+ * one step apart, as one undo step.
+ */
+typedef struct {
+    int            active;        /* 1 while the button that paints is held   */
+    int            grouped;       /* an undo group is open for the row        */
+    int            count;         /* entities placed by this press            */
+    float          x, y;          /* where the last one went (world px)       */
+    PlacementData  last;          /* the last one placed, as stored           */
+} EditorPaint;
+
+/*
  * EditorMouse — the pointer as the editor last saw it, updated from every
  * input event (editor_events.c), and the view panning it drives.
  *
@@ -725,13 +738,8 @@ typedef struct {
 
     /* ---- Drag state (moving entities with the Select tool) ------------- */
     EditorDrag     drag;
-    /* Place tool: while the button is held, dragging paints a row of the
-     * palette's entity, one step apart, as one undo step (tools.c). */
-    int            painting;
-    int            paint_grouped;  /* an undo group is open for the row       */
-    int            paint_count;    /* entities placed by this press            */
-    float          paint_x, paint_y; /* where the last one went (world px)    */
-    PlacementData  paint_last;     /* the last one placed, as stored        */
+    /* Place tool: painting a row of entities while the button is held. */
+    EditorPaint    paint;
     /*
      * Where the last Select click landed (world px) when it selected
      * something without moving it.  A second click on that same spot steps

@@ -1069,7 +1069,7 @@ static int place_drag_paints_a_row(void)
     ui_frame(&es, 420, 300);
     /* 320 canvas px at 2x is 160 world px: about ten 16 px coins. */
     CHECK(es.level.coin_count >= 8 && es.level.coin_count <= 11);
-    CHECK(!es.painting && es.undo->top == undo_top + 1);
+    CHECK(!es.paint.active && es.undo->top == undo_top + 1);
     CHECK(strstr(es.status_message, "Placed") != NULL);
     for (int i = 1; i < es.level.coin_count; i++)
         CHECK(es.level.coins[i].x - es.level.coins[i - 1].x >= 16.0f);
@@ -1119,18 +1119,18 @@ static int place_drag_paints_a_row(void)
         push_event(INPUT_MOUSE_MOVE, 0, 0, 140, 300);
         push_event(INPUT_MOUSE_MOVE, 0, 0, 180, 300);
         ui_frame(&es, 180, 300);
-        CHECK(es.painting);
+        CHECK(es.paint.active);
         int coins = es.level.coin_count;
         CHECK(coins >= 2);
         push_event(INPUT_MOUSE_DOWN, MOUSE_BUTTON_RIGHT, 0, 100, 300);   /* on the first coin */
         push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_RIGHT, 0, 100, 300);
         push_key(KEY_F1, 0);
         ui_frame(&es, 180, 300);
-        CHECK(es.painting && es.level.coin_count == coins);
+        CHECK(es.paint.active && es.level.coin_count == coins);
         CHECK(!es.shortcut_sheet_open);
         push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 180, 300);
         ui_frame(&es, 180, 300);
-        CHECK(!es.painting && es.undo->top == steps_before + 1);
+        CHECK(!es.paint.active && es.undo->top == steps_before + 1);
         /* One undo takes the whole row, and only the row, away. */
         key_frame(&es, KEY_Z, INPUT_CTRL);
         CHECK(es.level.coin_count == 0 && es.undo->top == steps_before);
@@ -1141,7 +1141,7 @@ static int place_drag_paints_a_row(void)
     push_event(INPUT_MOUSE_MOVE, 0, 0, 300, 300);
     push_event(INPUT_MOUSE_UP, MOUSE_BUTTON_LEFT, 0, 300, 300);
     ui_frame(&es, 300, 300);
-    CHECK(!es.painting && es.level.coin_count == 0);
+    CHECK(!es.paint.active && es.level.coin_count == 0);
 done:
     close_editor(&es);
     return failed;

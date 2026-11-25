@@ -149,7 +149,7 @@ static void open_dropped_level(EditorState *es, const char *path)
         return;
     }
     /* So does a row being painted: its undo group is still open. */
-    if (es->painting) {
+    if (es->paint.active) {
         editor_set_status(es, "Release the mouse to finish placing first (Esc stops it)");
         return;
     }
@@ -336,11 +336,11 @@ static void editor_key_while_dragging(EditorState *es, int key)
      * and ends a row, keeping what was placed.  Modifier keys stay silent
      * because Shift is how a drag snaps to the grid. */
     if (key == KEY_ESCAPE) {
-        if (es->painting) tools_end_paint(es);
+        if (es->paint.active) tools_end_paint(es);
         else tools_cancel_drag(es);
     }
     else if (!is_modifier_key(key))
-        editor_set_status(es, es->painting
+        editor_set_status(es, es->paint.active
             ? "Release the mouse to finish the row first (Esc ends it)"
             : es->resizing
             ? "Release the mouse to finish the resize first (Esc cancels it)"
@@ -633,7 +633,7 @@ static void editor_key(EditorState *es, const InputEvent *event)
     int key = event->key;
     int ctrl = (event->mods & (INPUT_CTRL | INPUT_SUPER)) != 0;
     int shift = (event->mods & INPUT_SHIFT) != 0;
-    if (es->drag.active || es->painting) {
+    if (es->drag.active || es->paint.active) {
         editor_key_while_dragging(es, key);
         return;
     }
@@ -764,7 +764,7 @@ static void editor_mouse_down(EditorState *es, const InputEvent *event, float wx
          * "Placed N" step (or, with the group full, left out of history
          * altogether). The same goes for a click under an open dropdown
          * list. */
-        if (!es->drag.active && !es->painting && es->ui.dropdown_open_id == 0 && !es->campaign &&
+        if (!es->drag.active && !es->paint.active && es->ui.dropdown_open_id == 0 && !es->campaign &&
             canvas_contains(event->x, event->y) &&
             editor_finish_field_edit(es))
             tools_right_click(es, wx, wy);
