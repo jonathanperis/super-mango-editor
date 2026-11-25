@@ -23,7 +23,10 @@ export type DocsSectionId =
   | 'level-catalog'
   | 'overlay-snapshots'
   | 'build-system'
-  | 'release-checklist';
+  | 'release-checklist'
+  | 'decisions'
+  | 'glossary'
+  | 'troubleshooting';
 
 export type DocsPageMeta = {
   id: DocsSectionId;
@@ -161,18 +164,37 @@ export const DOCS_META: Record<DocsSectionId, DocsPageMeta> = {
     description: 'Pre-release source, docs, WebAssembly, archive, CI, and Pages verification gates.',
     route: '/docs/release-checklist/',
   },
+  decisions: {
+    id: 'decisions',
+    label: 'Design Decisions',
+    shortLabel: 'Decisions',
+    description: 'Why raylib, TOML, the fixed step, entity tables, QOA and the rest: context, decision and consequences.',
+    route: '/docs/decisions/',
+  },
+  glossary: {
+    id: 'glossary',
+    label: 'Glossary',
+    description: 'The words the code and manual use in a specific sense, each with a pointer to the code.',
+    route: '/docs/glossary/',
+  },
+  troubleshooting: {
+    id: 'troubleshooting',
+    label: 'Troubleshooting',
+    description: 'Machine-side failures: no window, no audio, no file picker, toolchain mismatches, and their fixes.',
+    route: '/docs/troubleshooting/',
+  },
 };
 
 export const SECTION_CATEGORIES: DocsCategory[] = [
   {
     label: 'Start Here',
     description: 'Where to begin: the lessons, the controls, how the code is organised and how to test a change.',
-    ids: ['home', 'learning-path', 'debugging-c', 'mechanics-museum', 'developer-guide', 'controls', 'testing', 'architecture'],
+    ids: ['home', 'learning-path', 'debugging-c', 'mechanics-museum', 'developer-guide', 'controls', 'testing', 'architecture', 'glossary'],
   },
   {
     label: 'Engine & Code',
     description: 'How the game works inside: every source file, the player, the numbers that tune it.',
-    ids: ['c-concepts', 'source-files', 'entity-walkthrough', 'player-module', 'constants-reference'],
+    ids: ['c-concepts', 'source-files', 'entity-walkthrough', 'player-module', 'constants-reference', 'decisions'],
   },
   {
     label: 'World Builder',
@@ -182,7 +204,7 @@ export const SECTION_CATEGORIES: DocsCategory[] = [
   {
     label: 'Assets & Builds',
     description: 'Art, sound, the generated catalogs, and how builds and releases are made.',
-    ids: ['assets', 'asset-inventory', 'asset-provenance', 'sounds', 'level-catalog', 'overlay-snapshots', 'build-system', 'release-checklist'],
+    ids: ['assets', 'asset-inventory', 'asset-provenance', 'sounds', 'level-catalog', 'overlay-snapshots', 'build-system', 'troubleshooting', 'release-checklist'],
   },
 ];
 

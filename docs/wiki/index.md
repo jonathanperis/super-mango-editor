@@ -22,12 +22,14 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 
 | Page | Description |
 |------|-------------|
-| [Architecture](architecture/) | Game loop, init/loop/cleanup pattern, GameState container, 33-layer render order |
+| [Architecture](architecture/) | Game loop, init/loop/cleanup pattern, module dependencies, GameState container, 33-layer render order |
+| [Glossary](glossary/) | Logical pixel, fixed step, `LevelDef`, `AppSession`, borrowed pointer and the other terms, each with a pointer to the code |
 | [Controls & Input](controls/) | Keyboard, gamepad, browser/WASM, replay, smoke, and runtime flag reference |
 | [Testing & Smoke Matrix](testing/) | Which local/CI checks to run for runtime, editor, docs, WASM, and release changes |
 | [Source Files](source-files/) | Module-by-module reference for every `.c` / `.h` file |
 | [Player Module](player-module/) | Input, physics, animation and lifecycle across `src/player/` |
 | [Constants Reference](constants-reference/) | Curated gameplay constants and runtime-width distinctions |
+| [Design Decisions](decisions/) | Why raylib, TOML, the fixed step, entity tables, QOA and the rest: context, decision, consequences |
 
 ### Content & Assets
 
@@ -47,6 +49,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 | Page | Description |
 |------|-------------|
 | [Build System](build-system/) | Makefile, compiler flags, build targets, prerequisites for all platforms |
+| [Troubleshooting](troubleshooting/) | No window, no audio device, no file picker, toolchain mismatches: symptom, cause and fix |
 | [Level Design — TOML Reference](level-design/) | Full TOML schema for every entity type; minimum level template |
 | [Level Editor](level-editor/) | Visual editor: canvas, palette, properties, undo, play-test, file I/O |
 | [Developer Guide](developer-guide/) | Coding conventions, ownership rules, physics, sound, music and text workflows |
