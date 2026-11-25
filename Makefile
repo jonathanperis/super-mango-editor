@@ -687,6 +687,18 @@ coverage-baseline: coverage ## Generate: Rewrite tools/coverage_baseline.txt fro
 coverage-ratchet: coverage ## Generate: Raise tools/coverage_baseline.txt where coverage improved
 	$(COVERAGE_CHECK) --ratchet
 
+# ── Mutation testing (tools/mutate.py) ──────────────────────────────
+# Makes one small change at a time to src/collision/ and the serializer's
+# parsing code (a flipped comparison, + for -, a constant off by one),
+# rebuilds the tests that exercise it in out/mutate on the Memory backend,
+# and reports the changes no test noticed. Slow (minutes per file) and
+# informational: MUTATE_ARGS="--max 50" samples, "--target src/x.c" picks
+# other files, "--report FILE" writes Markdown.
+MUTATE_ARGS ?=
+.PHONY: mutate
+mutate: ## Test: Mutation testing of collision and level parsing (slow; MUTATE_ARGS=...)
+	python3 tools/mutate.py --cc "$(CC)" $(MUTATE_ARGS)
+
 # ── Fuzzing (POSIX) ──────────────────────────────────────────────────
 # Each harness defines LLVMFuzzerTestOneInput.  fuzz-corpus links it with
 # tests/fuzz_replay_main.c under ASan/UBSan and replays the seed inputs

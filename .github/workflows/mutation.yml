@@ -1,0 +1,80 @@
+name: Mutation
+
+# Weekly mutation testing of src/collision/ and the serializer's parsing code
+# (tools/mutate.py; `make mutate` locally). Each mutant is one small change
+# (a flipped comparison, + for -, && for ||, a constant off by one); the job
+# rebuilds the test programs that exercise that file and reruns them, and
+# the report lists the changes no test noticed. It takes most of an hour, so
+# it is not run on pull requests, and it is informational: it fails only
+# when the tool itself cannot run (the unmutated code does not build or its
+# tests fail), never because mutants survived. Read the survivors in the job
+# summary or the `mutation-report` artifact; see the Testing page
+# (docs/wiki/testing.md, "Mutation testing") for how to act on them.
+on:
+  schedule:
+    - cron: "45 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      max:
+        description: "Test at most this many mutants (0 = all of them)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  mutate:
+    name: Mutation testing (Linux x86_64, informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      RAYLIB_ARCHIVE: .cache/raylib/source.tar.gz
+      MUTATE_MAX: ${{ github.event.inputs.max || '0' }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-linux-deps
+
+      # The Memory raylib tree in out/headless/raylib, as the Coverage job
+      # caches it; tools/mutate.py builds there with --outdir out/headless.
+      - name: Cache raylib
+        uses: ./.github/actions/raylib-cache
+        with:
+          variant: linux-clang-memory
+
+      - name: Mutate, rebuild and test
+        run: |
+          case "$MUTATE_MAX" in
+            ''|*[!0-9]*) echo "::error::max must be a whole number"; exit 1 ;;
+          esac
+          python3 tools/mutate.py --cc clang --outdir out/headless --max "$MUTATE_MAX" \
+            --report out/mutation/report.md
+
+      - name: Publish the report
+        if: always()
+        run: |
+          [ -f out/mutation/report.md ] && cat out/mutation/report.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-report
+          path: out/mutation/report.md
+          if-no-files-found: ignore
+          retention-days: 30
