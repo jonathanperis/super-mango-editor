@@ -160,8 +160,8 @@ checks that guard them together.
 ## CI/CD
 
 `build.yml` and `codeql.yml` run on every pull request and every push to
-`main`; `docs.yml`, `fuzz.yml` and `static-analysis.yml` run on narrower
-triggers. `build.yml` builds and tests the game and editor on Linux, macOS,
+`main`; `docs.yml`, `fuzz.yml`, `mutation.yml` and `static-analysis.yml` run
+on narrower triggers. `build.yml` builds and tests the game and editor on Linux, macOS,
 Windows and WebAssembly, and on `main` publishes the website. The
 [Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/#cicd-pipelines)
 page is the one place that lists every workflow, its triggers and its jobs,

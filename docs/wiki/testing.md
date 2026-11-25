@@ -149,6 +149,27 @@ file and leaves the new level in it (also through `serializer_install_temp`,
 which the profile and the Campaign view use). A try the test refuses never
 waits, so none of this depends on the clock.
 
+`level-serializer-test` also links `tests/serializer_io_test.c`, which takes
+`src/shared/serializer_io.c` through what a file system can do to a save: a
+folder where a level was expected, a file exactly one byte too big for its
+reader, a NUL byte in the middle of a level, a stale temporary file left by a
+crashed save of the same process id (stepped over, never reused), a target
+folder that does not exist, a name too long for the buffer (refused, never
+cut), a create-only save whose target already exists (refused by `link()` and,
+on a drive without hard links, by the `O_EXCL` copy), a dangling symlink, and a
+durable save of a bare file name. `session-test` links
+`tests/platform_paths_test.c` for the edges of `src/shared/platform.c` and
+`src/shared/asset_root.c`: text copies that would split a UTF-8 character,
+control bytes in a writable path, `preference_path()` with no `HOME` (and, on
+Linux, an empty or overlong `XDG_DATA_HOME`), a plain file where a preference
+folder must go, executable paths in Windows spelling, and the asset root found
+(or, from a build three folders deep, not found) from the test program's own
+folder. `editor-undo-recovery-test` reads twenty damaged recovery `.meta` files
+(cut short, a second line, unknown versions, ids and timestamps that are zero,
+not numbers or past 64 bits, a source path that is not hex or holds a NUL) and
+offers only the three well-formed ones, and refuses to recover a snapshot that no
+longer loads, leaving the open document as it was.
+
 The session harness compiles the production display boundary's Web path against
 test-owned platform calls. It verifies that visible and hidden Web windows leave
 raylib's blocking FPS limiter disabled. This guards the non-Asyncify browser loop
@@ -163,6 +184,42 @@ allocations, and `make parser-encoding-probe` checks all Python level readers.
 Both run under `make test`; `make sanitize` instruments the C probe as well.
 Level readers accept one leading UTF-8 BOM and preserve raw line endings so
 invalid CR-only documents remain rejected.
+
+## The Test Harness
+
+The native tests use no test framework: `tests/check.h` is the whole of it,
+about a hundred lines meant to be read. `CHECK(condition)` prints the file,
+the line and the condition's text, sets the case's `failed` flag and jumps to
+its `done:` label, where the case frees what it opened on both paths (C has no
+exceptions or destructors, so clean-up has to live in one place).
+`CHECK_GOTO(condition, label)` does the same for code that cleans up at
+another label. `test_run_cases()` runs a table of named cases and gives every
+program built on it (`editor-ui-test`, `editor-validation-test`,
+`editor-undo-recovery-test`, `session-test`, `gameplay-mechanics-test`) the
+same command line:
+
+```sh
+out/headless/gameplay-mechanics-test --list                   # case names
+out/headless/gameplay-mechanics-test --case parallax_scrolls_and_wraps
+out/headless/editor-ui-test --shuffle                         # random order, seed printed
+out/headless/editor-ui-test --shuffle=1234                    # that order again
+MANGO_TEST_SHUFFLE=random make test OUTDIR=out/headless RAYLIB_PLATFORM=memory
+```
+
+The cases of one program share one process: one window, the input queues,
+file-scope statics, the random streams. A case that leaves any of that
+changed can make a later case pass or fail only because of the table's order.
+Shuffling exposes that, and two leaks turned up when it was added: the
+editor's palette remembers its open categories in file-scope state, so
+`palette_shows_what_place_will_add` failed whenever a case that opened the
+Hazards category ran first (`editor-ui-test` now resets the palette and the
+Level Config foldouts after every case, with `palette_reset_for_test()`); and
+the gameplay random streams are seeded only in `main()`, so a replay's exact
+state depended on which cases ran before it (`mechanics_open_level()` now seeds
+them as a fresh run would). The fix for a leak is a reset in the runner's
+`after_each` hook or in the case, never putting the cases back in an order
+that happens to work. Fifty shuffled runs of the five programs (ten seeds
+each) pass.
 
 ## Coverage
 
@@ -179,32 +236,143 @@ xcrun llvm-cov show out/coverage/level-serializer-test \
     -instr-profile=out/coverage/tests.profdata src/levels/level_ref.c
 ```
 
-The report is also saved as `out/coverage/summary.txt`. `COVERAGE_MIN=<percent>`
-fails the run when the TOTAL line coverage drops below that floor; it is empty
-(report only) by default. The `Coverage (Linux x86_64)` CI job runs
-`make coverage` on the headless Memory backend with a floor set a little below
-the measured total (91.2% of lines when the floor was set), and publishes the
-per-file table in the job summary and as the `coverage-summary` artifact.
+The report is also saved as `out/coverage/summary.txt`. Two kinds of number
+are gated: lines (was each line run?) and branches (did each condition go both
+ways?). Branches are the stricter of the two: `if (!fp) return -1;` counts as a
+covered line as soon as it runs, but its branch is only covered once a test
+makes `fp` NULL, which is exactly the error path a line count lets slip.
 
-A total can hide one file losing its tests, so `make coverage` also compares
-every file's line coverage with its number in `tools/coverage_baseline.txt`
-(`tools/check_coverage_baseline.py`, tested by `tests/coverage_baseline_test.py`).
-`COVERAGE_TOLERANCE=<points>` fails the run when a file falls more than that
-many points below its baseline; it is empty (report only) by default, and CI
-sets 2. New and removed files are listed but never fail. When coverage changes
-on purpose (tests removed, a file split), refresh the baseline in the same pull
-request with the CI configuration:
+`tools/check_coverage_baseline.py` (tested by `tests/coverage_baseline_test.py`)
+checks three things, each empty (report only) by default:
+
+| Variable | CI | Fails the run when |
+|----------|----|--------------------|
+| `COVERAGE_MIN` / `COVERAGE_BRANCH_MIN` | 90 / 75 | the TOTAL line / branch coverage is below this percentage |
+| `COVERAGE_TOLERANCE` | 2 | a file's line or branch coverage is more than this many points below its numbers in `tools/coverage_baseline.txt` |
+| `COVERAGE_NEW_FILE_MIN_LINES` / `_BRANCHES` | 80 / 60 | a file the baseline does not list yet (new, or split out of another) is below this |
+
+The `Coverage (Linux x86_64)` CI job runs `make coverage` on the headless
+Memory backend with those values and publishes the per-file table (lines and
+branches, against the baseline) in the job summary and as the
+`coverage-summary` artifact. The totals' floors sit a little under the measured
+totals and exist to catch a large accidental drop; the per-file check is what
+notices one file losing its tests while the total barely moves. A removed
+file is listed and never fails.
+
+The baseline only moves on purpose, and it ratchets:
+
+- **After adding tests**, record the gain so the next pull request cannot give
+  it back unnoticed. `make coverage-ratchet` raises each number that
+  improved, adds new files and drops deleted ones, and never lowers anything.
+  The check also says how many files are above their baseline, as a reminder.
+- **After an intended drop** (tests moved to another file, a file split),
+  `make coverage-baseline` rewrites every number, lower ones included. Say why
+  in the pull request.
+
+Both use the CI configuration, which the baseline describes (Linux, clang, the
+Memory backend); on macOS run them in the `ubuntu:24.04` container, since
+another platform's counts differ slightly:
 
 ```sh
+make coverage-ratchet CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
 make coverage-baseline CC=clang OUTDIR=out/headless RAYLIB_PLATFORM=memory
 ```
 
-Coverage only measures what the tests execute. Use it to find untested
-branches; the CI floor only catches a large, accidental drop.
+When branch gating arrived, the native tests covered 94.29% of
+lines and 76.00% of branches. New cases aimed at the files with
+the weakest branch coverage, and at what goes wrong there in real use (damaged
+files, failing file systems, odd paths) rather than at the count, brought that
+to 94.51% and 76.86%:
+
+| File | Branches before | Branches after |
+|------|----------------:|---------------:|
+| `src/shared/platform.c` | 55.4% | 90.5% |
+| `src/shared/asset_root.c` | 58.1% | 83.9% |
+| `src/shared/serializer_io.c` | 64.5% | 79.3% |
+| `src/editor/editor_recovery.c` | 62.2% | 65.9% |
+| `src/collision/game_collision.c` | 76.7% | 86.7% |
+
+Coverage only measures what the tests execute, not whether they would notice
+a mistake there; [mutation testing](#mutation-testing) asks that.
+
+## Render Snapshots
+
+Almost every line in `src/render/` runs under the tests, but running a draw
+call says nothing about what it drew: a sprite in the wrong place, colour or
+layer passes them all. Three cases compare whole frames with recorded ones:
+
+| Snapshot | Case | What is drawn |
+|----------|------|---------------|
+| `hud` | `hud_frame_matches_its_snapshot` (`gameplay-mechanics-test`) | the HUD alone: two hearts, four lives, a score, a checkpoint label |
+| `level_hazards` | `level_frame_matches_its_snapshot` (`gameplay-mechanics-test`) | `tests/fixtures/runtime/hazards.toml` after a scripted second of running and a jump |
+| `editor_side_panels` | `side_panels_match_their_snapshot` (`editor-ui-test`) | the Level Config, palette and properties panels with a spike block selected |
+
+Each case reads the window back (`LoadImageFromScreen`), hashes the RGBA
+pixels (FNV-1a, 64 bit) and compares the hash with its line in
+`tests/snapshots/render_snapshots.txt`; the recorded frames are the PNGs beside
+it, to look at in a review. The helpers are in `tests/render_snapshot.c`. When
+a frame changes the case fails with the snapshot's name, how many pixels
+differ from the recorded PNG, the largest colour change and where the first
+changed pixel is, and writes the new frame to `OUTDIR/snapshots/<name>.png`. If
+the change is intended:
+
+```sh
+make render-snapshots-update
+```
+
+re-records the hashes and copies the new frames, compressed, into
+`tests/snapshots/`; commit them with the change.
+
+Only raylib's Memory backend is compared. It is a software renderer, so the
+same code computes every pixel on every system, while a GPU driver (Mesa on the
+Linux desktop leg, a laptop's driver) may round an edge its own way; on a
+desktop build the cases still draw and read back, and say they did not
+compare. The hashes are exact, not a tolerance: the same frames came out bit
+for bit on macOS arm64, Linux arm64 (GCC and Clang) and Linux x86_64 (GCC),
+and CI checks them on Linux, macOS and Windows (GCC and Clang) on every pull
+request. The frames avoid what could differ: nothing in them depends on the
+clock or on what an earlier case did to the random streams, and the game
+builds with `-ffp-contract=off`, so no compiler fuses a multiply and an add on
+one CPU and not on another. raylib's rasterizer builds with its compiler's
+defaults; should one platform ever round an edge differently, the failure's
+pixel count and largest colour change will show it, and the fix is a
+tolerance in `snapshot_check()`, not a separate recording per platform.
+
+## Cross-Platform Determinism
+
+The replay checks in `game_replay_test.c` and `simulation_test.c` and the
+scripted smoke compare two runs inside one process, so they cannot notice a
+compiler or a C library computing a float differently. One committed replay
+does: `tests/fixtures/determinism/jump-right.replay`, fifteen seconds of
+running, jumping and turning back through `tests/fixtures/determinism/sandbox.toml`
+(a frozen copy of the sandbox level, with every enemy, hazard and surface
+kind, nine lives so the whole replay is played, and no next level). The case
+`committed_replay_reaches_the_recorded_state` (`gameplay-mechanics-test`) plays
+it for 900 frames with seed 7 through the same injection, event handling and
+fixed-step loop as `game_frame`, then hashes the state field by field (the
+player, hearts, lives, score, camera, step count and every moving entity;
+floats by their exact bits, no pointers or padding) and compares it with
+`tests/fixtures/determinism/expected_state.txt`. A mismatch prints both
+states in words (position, hearts, lives, score) next to the hashes. After an
+intended change to the simulation, `make replay-state-update` records the new
+state.
+
+It runs on every native CI leg: Linux (GCC on the desktop backend, Clang in the
+coverage and sanitizer jobs), macOS arm64, and Windows (GCC, and Clang in the
+extras job). WebAssembly is not covered. Its tests would have to run the
+simulation under Node, but the Web build links raylib's Web backend, which
+needs a browser's WebGL context to start (`game_init` loads textures), and is
+built with `-s ENVIRONMENT=web`. Covering it would take a second Emscripten
+build of raylib on the Memory backend plus a Node-targeted build of the test
+program, a new raylib variant for the CI cache and several minutes per run; the
+browser check after each deploy (`Live site check`) runs the real game but
+cannot replay a script.
 
 ## Fuzzing
 
-Three harnesses feed untrusted text to the parsers the game and editor use
+## Fuzzing
+
+Six harnesses feed untrusted text to the parsers the game and editor use
 (POSIX only):
 
 - `tests/fuzz_level_parse.c` writes the input to a temporary `.toml` file and
@@ -219,18 +387,124 @@ Three harnesses feed untrusted text to the parsers the game and editor use
   `tests/fuzz/corpus/editor/`.
 - `tests/fuzz_profile_decode.c` calls `game_profile_decode()`. An accepted
   profile must encode, decode and encode again to identical text.
+- `tests/fuzz_campaign_experiment.c` loads campaign manifests and experiment
+  captures.
+- `tests/fuzz_replay_script.c` writes the input as a `--replay-script` file and
+  loads it with `game_replay_load()`. A refused script must leave no events
+  behind; an accepted one must hold 1 to 4096 events whose frames never go
+  backwards, written back in canonical form must load to the same events, and
+  played back every event must fire at its own frame. Words for libFuzzer are
+  in `tests/fuzz/replay.dict`.
+- `tests/fuzz_bindings.c` reads the input as twelve key and button numbers and
+  as the text of a profile's `keys = ...` line. Settings that
+  `game_settings_valid()` accepts must bind no key or button twice (not even
+  two numbers that reach the same physical key), translate there and back,
+  and survive a save and load; a profile with bindings the validator refuses
+  must not load with them (the decoder may only put a debug-inspector key back
+  on its default).
 
 Each defines the libFuzzer entry point `LLVMFuzzerTestOneInput`.
 
 | Command | What it does |
 |---------|--------------|
-| `make fuzz-corpus` | Builds every harness with `tests/fuzz_replay_main.c` under ASan/UBSan and replays the seeds: `levels/`, `levels/labs/`, `tests/fixtures/serializer_v1/`, `tests/fixtures/runtime/`, `tests/fuzz/corpus/level/` and `tests/fuzz/corpus/profile/`, and for the editor harness the level seeds plus `tests/fuzz/corpus/editor/`. `make sanitize` runs it too, and CI's sanitizer job adds `FUZZ_MUTATIONS=50`. `FUZZ_MUTATIONS=N` adds N blind byte mutations per seed: this is slower and weaker than libFuzzer, but needs no extra toolchain. |
-| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/level/`, `out/fuzz/editor/`, `out/fuzz/profile/` and `out/fuzz/campaign/`, and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. `.github/workflows/fuzz.yml` runs this weekly and on demand; it is not a required check. |
+| `make fuzz-corpus` | Builds every harness with `tests/fuzz_replay_main.c` under ASan/UBSan and replays the seeds: `levels/`, `levels/labs/`, `tests/fixtures/serializer_v1/`, `tests/fixtures/runtime/`, `tests/fuzz/corpus/level/` and `tests/fuzz/corpus/profile/`, for the editor harness the level seeds plus `tests/fuzz/corpus/editor/`, and `tests/fuzz/corpus/<harness>/` for the others. `make sanitize` runs it too, and CI's sanitizer job adds `FUZZ_MUTATIONS=50`. `FUZZ_MUTATIONS=N` adds N blind byte mutations per seed: this is slower and weaker than libFuzzer, but needs no extra toolchain. |
+| `make fuzz` | Coverage-guided libFuzzer run for `FUZZ_SECONDS` (default 60) per harness. New inputs go to `out/fuzz/<harness>/` (`level`, `editor`, `profile`, `campaign`, `replay`, `bindings`), and crashes to `out/fuzz/*-crash-*`. Apple clang has no libFuzzer, so use `make fuzz FUZZ_CC=$(brew --prefix llvm)/bin/clang` on macOS. `.github/workflows/fuzz.yml` runs this weekly and on demand; it is not a required check. |
 | `make fuzz-merge` | After `make fuzz`: replaces each `out/fuzz/<harness>/` corpus with the inputs libFuzzer's `-merge=1` keeps (only those that add coverage). The weekly workflow runs it after every successful search, then keeps the merged corpus in the Actions cache and uploads it as the `fuzz-corpus` artifact (90 days); a run with no cache entry downloads the newest such artifact (`gh run download`), so an evicted cache does not send the search back to the seeds. |
 
-Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-editor-replay`, `out/fuzz-profile-replay`, `out/fuzz-campaign-replay`).
+Replay a crash with `out/fuzz-level-replay <file>` (or `out/fuzz-editor-replay`, `out/fuzz-profile-replay`, `out/fuzz-campaign-replay`, `out/fuzz-replay-replay`, `out/fuzz-bindings-replay`).
 If an input exposed a real bug, add it to `tests/fuzz/corpus/` after the fix.
-Keep that corpus small and hand-reviewed.
+
+The committed corpus is what every pull request replays, so the search's
+finds belong there, not only in the Actions cache and artifact, which expire.
+`make fuzz-corpus-export` (after `make fuzz`) runs libFuzzer's `-merge=1` with
+the committed folder first, so it copies into `tests/fuzz/corpus/<harness>/`
+only the inputs that reach code the committed seeds do not, each named by its
+SHA-1 and cut to `FUZZ_EXPORT_MAX_LEN` (4096) bytes. Check what it added with
+`git status tests/fuzz/corpus` and commit it. The weekly workflow runs the same
+export and uploads only the new files as the `fuzz-corpus-new` artifact (and
+lists them in its summary); it cannot push, so to keep them, unpack that
+artifact into `tests/fuzz/corpus/` and commit. On macOS, where Apple clang has
+no libFuzzer, run the search and the export in the `ubuntu:24.04` container.
+
+The first export, after 90 to 100 seconds of search per harness in that
+container, took the committed corpus from 45 hand-written seeds to about 1,400
+inputs (325 KB): level 3 to 349, editor 4 to 314, profile 12 to 291, campaign
+3 to 195, bindings 15 to 198 and replay 15 to 21. Replaying all of them with
+50 blind mutations each, as the sanitizer job does, takes about half a minute.
+The bindings search also found a wrong assumption in its own harness: a
+controller paddle is a valid binding with no button behind it, which the
+settings screen reports as unavailable; the harness now checks that report
+instead.
+
+## Mutation Testing
+
+Coverage says which lines the tests run; it cannot say whether a test would
+notice if one of them were wrong. Mutation testing asks that directly.
+`tools/mutate.py` (`make mutate`) makes one small change at a time, the kind
+a real slip would make, rebuilds, and runs the test programs that exercise
+the file:
+
+| Operator | Change |
+|----------|--------|
+| boundary | `<` ↔ `<=`, `>` ↔ `>=` |
+| equality | `==` ↔ `!=` |
+| logic | `&&` ↔ `\|\|` |
+| arithmetic | binary `+` ↔ `-` |
+| constant | an integer `N` becomes `N + 1` |
+
+Comments, strings and preprocessor lines are left alone. A mutant is
+*killed* when a test fails, crashes or hangs, and *survives* when every test
+still passes. The kill rate is killed / (killed + survived); a mutant that
+does not compile says nothing about the tests and is counted apart.
+
+A survivor is one of two things. It may be a gap: some behaviour no test
+looks at, worth a test that would have caught the slip. Or it may be an
+*equivalent mutant*, a change the program cannot observe: `return 1` turned
+into `return 2` in a function whose result is only used as true or false, a
+sound volume of 128 turned into 129, `i < count` turned into `i <= count` where
+the element past the end is always inactive. Only a person can tell the two
+apart, so the report lists every survivor with its line, and the useful
+question for each is "what test would fail if this line were wrong?"
+
+```sh
+make mutate                                    # src/collision/ and serializer_parse*.c
+make mutate MUTATE_ARGS="--max 50 --seed 3"    # a random sample, repeatable
+make mutate MUTATE_ARGS="--target src/core/game_score.c --report out/mutation.md"
+```
+
+Each mutant rebuilds a few objects in `out/mutate/` (Memory backend) and
+reruns the programs one at a time, quickest first, stopping at the first
+failure; a survivor costs a full run, so a whole file takes minutes. The
+source file is always put back, even after Ctrl+C. `mutation.yml` runs it
+weekly (and on demand, with an optional sample size) and publishes the kill
+rate and the survivors in its job summary and the `mutation-report` artifact;
+it is informational and fails only when the unmutated code does not build or
+pass.
+
+The first run (all 132 mutants of `src/collision/`, kill rate 47.0%; a fixed sample of 150 of the 531 in `src/shared/serializer_parse.c`, `--max 150 --seed 1`, kill rate 76.5%) found real gaps among the survivors, and new
+cases now kill them:
+
+- **Retry after game over** (`src/collision/collision_damage.c`): no test
+  checked that a retry that arrives while the game is not over does nothing,
+  that a level's `initial_lives = 1` gives one life (and 0 the default), or
+  that the pause, the level timer, the start score and the Continue flags
+  start over. `retry_starts_the_level_afresh` (`gameplay-damage-test`) does.
+- **Which boxes hurt** (`src/collision/game_collision.c`): a spike row's
+  last tile, a blue flame waiting below its gap or switched off, collisions
+  after game over or level completion, and the damage-source table's bounds
+  were unchecked. `damage_comes_only_from_live_boxes`
+  (`gameplay-mechanics-test`) checks each with `game_collide()` alone.
+- **Array limits** (`src/shared/serializer_parse.c`): a level with one coin
+  too many was refused, but nothing loaded one with exactly `MAX_COINS`, so
+  `>` against the limit could become `>=`. `rejects_oversized_arrays` now
+  loads the full level too.
+
+
+Most of what still survives is equivalent: truth values written as `1`,
+sound volumes, loop bounds whose extra element is inactive, and guards
+against values tomlc17 never produces (a negative string length). A few are
+loop bounds that would read one element past an array; the sanitizer build
+would catch those, the plain mutation build does not.
 
 ## Static Analysis
 
