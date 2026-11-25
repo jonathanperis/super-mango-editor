@@ -445,7 +445,12 @@ $(TARGET) $(EDITOR_TARGET) $(TEST_TARGETS): $(LINK_FLAGS_STAMP)
 RENDER_SNAPSHOT_CASES_gameplay-mechanics-test = hud_frame_matches_its_snapshot \
                                                 level_frame_matches_its_snapshot
 RENDER_SNAPSHOT_CASES_editor-ui-test = side_panels_match_their_snapshot
-.PHONY: render-snapshots-update
+.PHONY: render-snapshots-update replay-state-update
+# The cross-platform replay check (tests/fixtures/determinism/): record the
+# state the committed replay ends in, after an intended simulation change.
+replay-state-update: $(OUTDIR)/gameplay-mechanics-test ## Generate: Re-record tests/fixtures/determinism/expected_state.txt
+	MANGO_REPLAY_STATE_UPDATE=1 $(RUN_PREFIX) "$(abspath $(OUTDIR))/gameplay-mechanics-test" \
+		--case committed_replay_reaches_the_recorded_state
 ifeq ($(RAYLIB_PLATFORM),memory)
 render-snapshots-update: $(OUTDIR)/gameplay-mechanics-test $(OUTDIR)/editor-ui-test ## Generate: Re-record the render snapshots in tests/snapshots/
 	rm -rf "$(OUTDIR)/snapshots"

@@ -1476,6 +1476,7 @@ int main(int argc, char **argv)
         CASE(every_overlay_state_renders),
         CASE(replay_scripts_drive_the_game),
         CASE(replay_scripts_reject_malformed_files),
+        CASE(committed_replay_reaches_the_recorded_state),
         CASE(thin_modules_cover_their_branches),
         CASE(hud_frame_matches_its_snapshot),
         CASE(level_frame_matches_its_snapshot),

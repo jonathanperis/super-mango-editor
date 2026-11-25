@@ -18,6 +18,7 @@ int mechanics_frames(GameState *gs, int n);
 
 int replay_scripts_drive_the_game(void);
 int replay_scripts_reject_malformed_files(void);
+int committed_replay_reaches_the_recorded_state(void);
 
 /* creature_update_test.c: birds_update, bird_variant_update, spiders_update. */
 int birds_update_patrols_and_turns(void);
