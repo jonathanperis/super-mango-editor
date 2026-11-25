@@ -22,9 +22,7 @@
 #include "player/player.h" /* PLAYER_FRAME_W/H, PLAYER_PHYS_PAD_X/TOP, PLAYER_FLOOR_SINK */
 #include "gameplay_mechanics_test.h"
 
-#define CHECK(test) do { if (!(test)) { \
-    fprintf(stderr, "player_climb_test:%d: %s\n", __LINE__, #test); \
-    failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 #define NEAR(a, b, tolerance) (fabsf((float)(a) - (float)(b)) <= (tolerance))
 
 /* player_input.c climbs and drifts at these speeds (px/s). */

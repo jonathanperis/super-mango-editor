@@ -38,9 +38,7 @@
 #define REPLAY_LEVEL "tests/fixtures/runtime/climbing.toml"
 #define REPLAY_DIR TEST_OUT "replays"
 
-#define CHECK(test) do { if (!(test)) { \
-    fprintf(stderr, "game_replay_test:%d: %s\n", __LINE__, #test); \
-    failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 
 static int make_dir(const char *path)
 {

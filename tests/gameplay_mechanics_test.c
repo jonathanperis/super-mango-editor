@@ -53,9 +53,7 @@
 #define TRANSITION_LEVEL "tests/fixtures/runtime/transition.toml"
 
 #define STEPS_PER_SECOND 60
-#define CHECK(test) do { if (!(test)) { \
-    fprintf(stderr, "gameplay_mechanics_test:%d: %s\n", __LINE__, #test); \
-    failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 #define NEAR(a, b, tolerance) (fabsf((float)(a) - (float)(b)) <= (tolerance))
 
 int mechanics_open_level(GameState *gs, const char *path, int debug)
@@ -1426,11 +1424,19 @@ done:
     return failed;
 }
 
-int main(void)
+/* Every case shares the one window, so each one starts from empty input
+ * queues and no held physical keys. */
+static void mechanics_after_each(void)
+{
+    input_clear();
+    game_input_test_set_physical_state(0, 0);
+}
+
+int main(int argc, char **argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
-    const struct { const char *name; int (*run)(void); } cases[] = {
-#define CASE(fn) {#fn, fn}
+    static const TestCase cases[] = {
+#define CASE TEST_CASE
         CASE(climbing_ladder_rope_and_vine),
         CASE(knockback_throws_a_climber_off),
         CASE(climb_grab_zones_cover_every_tile),
@@ -1473,21 +1479,17 @@ int main(void)
         CASE(thin_modules_cover_their_branches),
 #undef CASE
     };
-    int failures = 0;
-    if (setup_window()) {
+    int listing = argc > 1 && strcmp(argv[1], "--list") == 0;
+    if (!listing && setup_window()) {
         fprintf(stderr, "gameplay_mechanics_test: window/audio setup failed\n");
         return 1;
     }
-    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        int result = cases[i].run();
-        printf("mechanics: %s %s\n", cases[i].name, result ? "FAIL" : "PASS");
-        failures += result != 0;
-        input_clear();
-    }
+    TestHooks hooks = {.after_each = mechanics_after_each};
+    int status = test_run_cases("mechanics", cases, sizeof(cases) / sizeof(cases[0]),
+                                hooks, argc, argv);
     game_input_test_clear_physical_state();
     input_close();
     audio_close();
     if (IsWindowReady()) CloseWindow();
-    printf("gameplay_mechanics_test: %d failing cases\n", failures);
-    return failures ? 1 : 0;
+    return status;
 }

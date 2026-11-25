@@ -20,9 +20,7 @@
 #include "hazards/spike_platform.h"
 #include "gameplay_mechanics_test.h"
 
-#define CHECK(test) do { if (!(test)) { \
-    fprintf(stderr, "thin_coverage_test:%d: %s\n", __LINE__, #test); \
-    failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 
 static Texture2D *upload_square(Texture2D *storage)
 {

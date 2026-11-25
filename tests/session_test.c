@@ -17,6 +17,7 @@
 #include "shared/platform.h"  /* clock_wait */
 #include "shared/serializer_io.h"
 #include "test_paths.h"
+#include "check.h"       /* test_run_cases */
 
 #include "collision/collision_damage.h"
 #include "collision/game_collision.h"
@@ -2035,11 +2036,19 @@ static int experiment_rows_keep_the_physics_caps(void)
     return 0;
 }
 
-int main(void)
+/* Each case gets a fresh window and audio device and leaves none behind. */
+static void session_after_each(void)
+{
+    game_input_test_clear_physical_state();
+    input_close(); audio_close();
+    if (IsWindowReady()) CloseWindow();
+}
+
+int main(int argc, char **argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
-    const struct { const char *name; int (*run)(void); } cases[] = {
-#define CASE(fn) {#fn, fn}
+    static const TestCase cases[] = {
+#define CASE TEST_CASE
         CASE(audio_contract_test), CASE(qoa_bounds_contract_test),
         CASE(web_frame_pacing_contract_test), CASE(frame_cap_follows_the_monitor),
         CASE(game_simulation_contract_test), CASE(game_profile_contract_test),
@@ -2075,16 +2084,7 @@ int main(void)
         CASE(experiment_rows_keep_the_physics_caps)
 #undef CASE
     };
-    int failures = 0;
-    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        if (setup_raylib()) return 1;
-        int result = cases[i].run();
-        printf("session: %s %s\n", cases[i].name, result ? "FAIL" : "PASS");
-        failures += result != 0;
-        game_input_test_clear_physical_state();
-        input_close(); audio_close();
-        if (IsWindowReady()) CloseWindow();
-    }
-    printf("session_test: %d failing cases\n", failures);
-    return failures ? 1 : 0;
+    TestHooks hooks = {.before_each = setup_raylib, .after_each = session_after_each};
+    return test_run_cases("session", cases, sizeof(cases) / sizeof(cases[0]),
+                          hooks, argc, argv);
 }

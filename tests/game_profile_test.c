@@ -33,7 +33,10 @@
 #include <unistd.h>
 #endif
 
-#define CHECK(condition) do { if (!(condition)) { fprintf(stderr,"profile test failed: %s:%d: %s\n",__FILE__,__LINE__,#condition); goto fail; } } while (0)
+#include "check.h"
+/* These cases clean up at a `fail:` label and return 1 there. */
+#undef CHECK
+#define CHECK(condition) CHECK_GOTO(condition, fail)
 
 /* Only the session test's audio object redirects this public raylib call.
  * Forward to the real device while checking the exact applied mute value. */
