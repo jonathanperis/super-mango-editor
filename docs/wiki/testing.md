@@ -481,7 +481,9 @@ rate and the survivors in its job summary and the `mutation-report` artifact;
 it is informational and fails only when the unmutated code does not build or
 pass.
 
-The first run (all 132 mutants of `src/collision/`, kill rate 47.0%; a fixed sample of 150 of the 531 in `src/shared/serializer_parse.c`, `--max 150 --seed 1`, kill rate 76.5%) found real gaps among the survivors, and new
+The first run covered all 132 mutants of `src/collision/` (kill rate 44.7%)
+and a fixed sample of 150 of the 531 in `src/shared/serializer_parse.c`
+(`--max 150 --seed 1`, 62.8%). Among the survivors were real gaps, and new
 cases now kill them:
 
 - **Retry after game over** (`src/collision/collision_damage.c`): no test
@@ -499,12 +501,20 @@ cases now kill them:
   `>` against the limit could become `>=`. `rejects_oversized_arrays` now
   loads the full level too.
 
+With those cases `src/collision/` went from 44.7% to 58.3% (59 to 77 of 132
+killed). The serializer sample stayed level (62.8%, then 62.2%): its one real
+gap is now killed, and the rest of the difference is noise. A mutant that
+makes the parser read past an array (`i < size` turned into `i <= size`, or a
+type check turned off) is undefined behaviour, so whether a test fails
+depends on what memory happens to hold; such mutants can flip between runs.
+Compare kill rates with a margin of a few mutants, or look at the survivor
+lists.
 
 Most of what still survives is equivalent: truth values written as `1`,
 sound volumes, loop bounds whose extra element is inactive, and guards
 against values tomlc17 never produces (a negative string length). A few are
-loop bounds that would read one element past an array; the sanitizer build
-would catch those, the plain mutation build does not.
+loop bounds that would read one element past an array; a sanitizer build
+would catch those every time, the plain mutation build only sometimes.
 
 ## Static Analysis
 
