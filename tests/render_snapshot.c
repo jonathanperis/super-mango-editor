@@ -49,6 +49,10 @@ Image snapshot_grab_screen(void)
     return image;
 }
 
+/* Everything below compares or records frames, which only the Memory
+ * backend does (see render_snapshot.h); a desktop build leaves it out. */
+#ifdef MANGO_MEMORY_TESTS
+
 static uint64_t pixel_hash(Image image)
 {
     uint64_t hash = UINT64_C(1469598103934665603);
@@ -247,6 +251,8 @@ static void describe_difference(const char *name, Image image)
     }
     UnloadImage(recorded);
 }
+
+#endif /* MANGO_MEMORY_TESTS */
 
 int snapshot_check(const char *name, Image image)
 {
