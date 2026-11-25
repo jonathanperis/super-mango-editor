@@ -386,6 +386,71 @@ done:
     return failed;
 }
 
+/* Put the player's hitbox centre on target's centre and run game_collide
+ * alone (no movement, no hazard update). Returns the hearts it cost. */
+static int collide_cost_at(GameState *gs, IntRect target)
+{
+    Player *p = &gs->world.player;
+    IntRect body = player_get_hitbox(p);
+    p->x = target.x + target.w / 2.0f - body.w / 2.0f - PLAYER_PHYS_PAD_X;
+    p->y = target.y + target.h / 2.0f - body.h / 2.0f - PLAYER_PHYS_PAD_TOP;
+    p->vx = p->vy = 0.0f;
+    p->hurt_timer = 0.0f;
+    gs->world.hearts = 3;
+    game_collide(gs, 0.0f);
+    return 3 - gs->world.hearts;
+}
+
+/*
+ * Which box hurts, checked one collision pass at a time (mutation testing
+ * found each of these unchecked; see the Testing page): every tile of a
+ * spike row bites, the last as much as the first; a blue flame waiting
+ * below its gap, or switched off, does not; nothing hurts once the game is
+ * over or the level complete; and the damage-source table refuses an index
+ * outside it instead of reading past its end.
+ */
+static int damage_comes_only_from_live_boxes(void)
+{
+    int failed = 0;
+    GameState gs;
+    CHECK(mechanics_open_level(&gs, HAZARDS_LEVEL, 0) == 0);
+    const SpikeRow *row = &gs.world.spike_rows[0];
+    CHECK(row->count == 3);
+    IntRect first = {(int)row->x, (int)row->y, SPIKE_TILE_W, SPIKE_TILE_H};
+    IntRect last = {(int)row->x + 2 * SPIKE_TILE_W, (int)row->y, SPIKE_TILE_W, SPIKE_TILE_H};
+    CHECK(collide_cost_at(&gs, first) == 1);
+    CHECK(collide_cost_at(&gs, last) == 1);
+
+    CHECK(gs.world.blue_flame_count > 0);
+    BlueFlame *flame = &gs.world.blue_flames[0];
+    flame->state = BLUE_FLAME_RISING;
+    flame->active = 1;
+    IntRect fire = blue_flame_get_hitbox(flame);
+    CHECK(collide_cost_at(&gs, fire) == 1);
+    flame->state = BLUE_FLAME_WAITING;
+    CHECK(collide_cost_at(&gs, fire) == 0);
+    flame->state = BLUE_FLAME_RISING;
+    flame->active = 0;
+    CHECK(collide_cost_at(&gs, fire) == 0);
+
+    gs.screen.game_over = 1;
+    CHECK(collide_cost_at(&gs, first) == 0);
+    gs.screen.game_over = 0;
+    gs.screen.completion.complete = 1;
+    CHECK(collide_cost_at(&gs, first) == 0);
+    gs.screen.completion.complete = 0;
+
+    const int kinds = game_damage_source_count();
+    CHECK(kinds > 0);
+    CHECK(game_damage_source_items(&gs.world, -1) == 0);
+    CHECK(game_damage_source_items(&gs.world, kinds) == 0);
+    CHECK(game_damage_source_items(NULL, 0) == 0);
+    CHECK(game_damage_source_name(-1) == NULL && game_damage_source_name(kinds) == NULL);
+done:
+    game_cleanup(&gs);
+    return failed;
+}
+
 static int spikes_hurt_once_per_invincibility(void)
 {
     int failed = 0;
@@ -1452,6 +1517,7 @@ int main(int argc, char **argv)
         CASE(blue_flame_erupts_on_a_cycle_and_burns),
         CASE(axe_traps_swing_spin_and_hit),
         CASE(spikes_hurt_once_per_invincibility),
+        CASE(damage_comes_only_from_live_boxes),
         CASE(hurt_blink_honours_reduced_motion),
         CASE(spike_blocks_follow_their_rails),
         CASE(reduced_motion_does_not_change_the_run),
