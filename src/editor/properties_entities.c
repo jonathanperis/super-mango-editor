@@ -80,7 +80,8 @@ static const char *vine_type_opts[] = { "Green", "Brown" };
  * A row says which key it edits (the label and tooltip come from the key,
  * see field_label), which widget id it has, what kind of field it is, and
  * where the value lives: `offset` bytes into the entity's placement
- * struct (offsetof gives that number).
+ * struct (offsetof gives that number; "The byte-offset table pattern" in
+ * shared/serializer_schema.h explains the idea).
  *
  * The widget id is part of the row, not its position: a validation message
  * focuses a field by id, so a field keeps the id it always had even when
