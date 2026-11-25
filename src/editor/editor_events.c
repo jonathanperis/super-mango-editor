@@ -543,7 +543,7 @@ static void editor_plain_key(EditorState *es, int key, int shift)
         if (es->ui.active_id) ui_cancel_active_edit(&es->ui);
         else if (es->box.active) tools_cancel_drag(es);
         else if (es->tool == TOOL_PLACE || es->tool == TOOL_DELETE) es->tool = TOOL_SELECT;
-        else if (es->entity_list_open) editor_entity_list_close(es);
+        else if (es->entity_list.open) editor_entity_list_close(es);
         else if (es->selection.index >= 0) {
             editor_select_none(es);
         }

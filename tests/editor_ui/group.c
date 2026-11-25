@@ -183,7 +183,7 @@ static int shift_click_on_a_full_selection_says_so(void)
     /* The same in the Entities list (searched, so the row is in view). */
     list_search(&es, "spawn");
     key_frame(&es, KEY_ENTER, 0);               /* keep the search, leave the field */
-    CHECK(es.entity_list_open);
+    CHECK(es.entity_list.open);
     sy = list_row_y(&es, ENT_PLAYER_SPAWN, 0);
     CHECK(sy > 0);
     es.status_message[0] = '\0';

@@ -122,8 +122,8 @@ void editor_render_toolbar(EditorState *es)
 
     /* The Entities list (Ctrl+F) takes the right column's upper part. */
     bx += 60;
-    if (ui_toggle(&es->ui, bx, by, 68, bh, "Entities", es->entity_list_open)) {
-        if (es->entity_list_open) editor_entity_list_close(es);
+    if (ui_toggle(&es->ui, bx, by, 68, bh, "Entities", es->entity_list.open)) {
+        if (es->entity_list.open) editor_entity_list_close(es);
         else if (!es->campaign) editor_entity_list_open(es);
     }
     ui_tooltip(&es->ui, editor_shortcut_tooltip(EDITOR_SHORTCUT_ENTITY_LIST));

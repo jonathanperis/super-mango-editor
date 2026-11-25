@@ -17,7 +17,7 @@ static int list_row_y(const EditorState *es, EntityType type, int index)
     editor_side_panel_layout(es, &layout);
     if (!layout.list_open || row < 0) return -1;
     return layout.list_y + ENTITY_LIST_ROWS_TOP + row * ENTITY_LIST_ROW_H
-         - es->entity_list_scroll.offset + ENTITY_LIST_ROW_H / 2;
+         - es->entity_list.scroll.offset + ENTITY_LIST_ROW_H / 2;
 }
 
 /* Replace the search text: Ctrl+F puts the caret in the field, Ctrl+A
@@ -73,7 +73,7 @@ static int entity_list_finds_and_selects_entities(void)
     CHECK(strcmp(editor_shortcut_tooltip(EDITOR_SHORTCUT_ENTITY_LIST), "Entities list (Ctrl+F)") == 0);
 
     key_frame(&es, KEY_F, INPUT_CTRL);
-    CHECK(es.entity_list_open && es.ui.active_id == WIDGET_ENTITY_LIST_SEARCH);
+    CHECK(es.entity_list.open && es.ui.active_id == WIDGET_ENTITY_LIST_SEARCH);
     editor_side_panel_layout(&es, &layout);
     CHECK(layout.list_open && layout.list_y == TOOLBAR_H && layout.config_h == 0);
     CHECK(layout.list_h == EDITOR_H - STATUS_H - TOOLBAR_H);   /* nothing selected */
@@ -107,7 +107,7 @@ static int entity_list_finds_and_selects_entities(void)
     click_frame(&es, LIST_X, y);
     CHECK(es.selection.type == ENT_COIN && es.selection.index == last);
     CHECK(editor_selection_count(&es) == 1 && es.tool == TOOL_SELECT);
-    CHECK(es.ui.active_id == 0 && strcmp(es.entity_list_filter, "COIN") == 0);
+    CHECK(es.ui.active_id == 0 && strcmp(es.entity_list.filter, "COIN") == 0);
     {
         EditorRect r;
         CHECK(editor_entity_bounds(&es.level, ENT_COIN, last, &r) && canvas_shows(&es, &r));
@@ -182,9 +182,9 @@ static int entity_list_finds_and_selects_entities(void)
 
     /* Esc first gives up the typing, then closes the list. */
     key_frame(&es, KEY_ESCAPE, 0);
-    CHECK(es.entity_list_open && es.ui.active_id == 0);
+    CHECK(es.entity_list.open && es.ui.active_id == 0);
     key_frame(&es, KEY_ESCAPE, 0);
-    CHECK(!es.entity_list_open);
+    CHECK(!es.entity_list.open);
     editor_side_panel_layout(&es, &layout);
     CHECK(!layout.list_open && layout.config_h > 0);
     CHECK(es.selection.index >= 0);             /* the selection outlives it */
@@ -193,11 +193,11 @@ static int entity_list_finds_and_selects_entities(void)
      * opening the list from Place goes back to Select. */
     key_frame(&es, KEY_F, INPUT_CTRL);
     key_frame(&es, KEY_ESCAPE, 0);              /* leave the search field */
-    CHECK(es.entity_list_open);
+    CHECK(es.entity_list.open);
     key_frame(&es, KEY_TWO, 0);
-    CHECK(es.tool == TOOL_PLACE && !es.entity_list_open);
+    CHECK(es.tool == TOOL_PLACE && !es.entity_list.open);
     key_frame(&es, KEY_F, INPUT_CTRL);
-    CHECK(es.tool == TOOL_SELECT && es.entity_list_open);
+    CHECK(es.tool == TOOL_SELECT && es.entity_list.open);
 done:
     clear_dialog_seams();
     close_editor(&es);
@@ -219,7 +219,7 @@ static int entity_list_follows_the_level(void)
 
     list_search(&es, "coin");
     key_frame(&es, KEY_ENTER, 0);
-    CHECK(es.ui.active_id == 0 && strcmp(es.entity_list_filter, "coin") == 0);
+    CHECK(es.ui.active_id == 0 && strcmp(es.entity_list.filter, "coin") == 0);
     const int coins = es.level.coin_count;
     CHECK(coins >= 3 && editor_entity_list_row_count(&es) == 1 + coins);
     editor_entity_list_row_text(&es.level, ENT_COIN, 1, first, sizeof(first));
@@ -268,15 +268,15 @@ static int entity_list_follows_the_level(void)
         int rows = editor_entity_list_row_count(&es);
         int view = layout.list_h - ENTITY_LIST_ROWS_TOP;
         CHECK(rows * ENTITY_LIST_ROW_H > view);
-        CHECK(es.entity_list_scroll.offset == 0);
+        CHECK(es.entity_list.scroll.offset == 0);
         push_wheel(LIST_X, layout.list_y + 100, -3.0f, 0);
         ui_frame(&es, LIST_X, layout.list_y + 100);
-        CHECK(es.entity_list_scroll.offset == 3 * ENTITY_LIST_ROW_H);
+        CHECK(es.entity_list.scroll.offset == 3 * ENTITY_LIST_ROW_H);
         /* The canvas did not take the wheel. */
         const float camera_x = es.camera.x;
         push_wheel(LIST_X, layout.list_y + 100, -1000.0f, 0);
         ui_frame(&es, LIST_X, layout.list_y + 100);
-        CHECK(es.entity_list_scroll.offset == rows * ENTITY_LIST_ROW_H - view);
+        CHECK(es.entity_list.scroll.offset == rows * ENTITY_LIST_ROW_H - view);
         CHECK(es.camera.x == camera_x);
         /* The last entity's row is now in view and takes a click. */
         int y = list_row_y(&es, ENT_PLAYER_SPAWN, 0);
@@ -296,9 +296,9 @@ static int entity_list_follows_the_level(void)
         int rows = editor_entity_list_row_count(&es);
         int view = layout.list_h - ENTITY_LIST_ROWS_TOP;
         int most = rows * ENTITY_LIST_ROW_H > view ? rows * ENTITY_LIST_ROW_H - view : 0;
-        CHECK(es.entity_list_open);
+        CHECK(es.entity_list.open);
         CHECK(rows == level_entity_total(&es) + level_type_total(&es));
-        CHECK(es.entity_list_scroll.offset <= most);
+        CHECK(es.entity_list.scroll.offset <= most);
         /* No row names an entity the new level does not have. */
         for (int t = 0; t < ENT_COUNT; t++) {
             int n = editor_entity_count(&es.level, (EntityType)t);
