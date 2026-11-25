@@ -23,9 +23,7 @@
 #include "game_constants.h"       /* FLOOR_GAP_W, GAME_W */
 #include "gameplay_mechanics_test.h"
 
-#define CHECK(test) do { if (!(test)) { \
-    fprintf(stderr, "creature_update_test:%d: %s\n", __LINE__, #test); \
-    failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 #define NEAR(a, b, tolerance) (fabsf((float)(a) - (float)(b)) <= (tolerance))
 
 /* A bird flying right from x inside the patrol [x0, x1]. */

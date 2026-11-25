@@ -55,9 +55,7 @@
 #include "shared/serializer.h"
 #include "test_paths.h"
 
-#define CHECK(test) do { if (!(test)) { \
-    fprintf(stderr, "editor_undo_recovery_test:%d: %s\n", __LINE__, #test); \
-    failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 #define STARTS_WITH(text, prefix) (strncmp((text), (prefix), strlen(prefix)) == 0)
 
 /* ------------------------------------------------------------------ */
@@ -1198,11 +1196,11 @@ done:
 
 /* ------------------------------------------------------------------ */
 
-int main(void)
+int main(int argc, char **argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0);
-    const struct { const char *name; int (*run)(void); } cases[] = {
-#define CASE(fn) {#fn, fn}
+    static const TestCase cases[] = {
+#define CASE TEST_CASE
         CASE(place_and_delete_undo_in_place),
         CASE(singletons_move_and_bad_commands_are_ignored),
         CASE(tracked_edits_record_only_real_changes),
@@ -1227,12 +1225,6 @@ int main(void)
 #endif
 #undef CASE
     };
-    int failures = 0;
-    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        int result = cases[i].run();
-        printf("undo/recovery: %s %s\n", cases[i].name, result ? "FAIL" : "PASS");
-        failures += result != 0;
-    }
-    printf("editor_undo_recovery_test: %d failing cases\n", failures);
-    return failures ? 1 : 0;
+    return test_run_cases("undo/recovery", cases, sizeof(cases) / sizeof(cases[0]),
+                          (TestHooks){0}, argc, argv);
 }

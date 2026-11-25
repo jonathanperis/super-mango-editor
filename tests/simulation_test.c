@@ -31,7 +31,7 @@
 #include <unistd.h>    /* rmdir */
 #endif
 
-#define CHECK(test) do { if (!(test)) { fprintf(stderr, "simulation_test:%d: %s\n", __LINE__, #test); failed = 1; goto done; } } while (0)
+#include "check.h"  /* CHECK, test_run_cases */
 #define NEAR(a,b) (fabsf((a)-(b)) < 0.001f)
 
 static void key(GameState *gs, int keycode)
