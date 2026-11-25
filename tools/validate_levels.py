@@ -10,7 +10,7 @@ the campaign manifest lists real levels in a linear chain, and C source asset
 literals exist. If this fails in CI, a level is wrong. Fix the level, not the
 validator.
 
-validate_schema() stays as a type-shape mirror of serializer_parse.c for one
+validate_schema() stays as a type-shape mirror of serializer_schema.c for one
 job: `make docs-drift` checks partial TOML snippets in the manual with it,
 without a C compiler. Levels themselves never rely on it.
 """
@@ -98,7 +98,7 @@ def loaded_music_path(value: str) -> str:
     return SHIPPED_WAV_LOOPS.get(value, value)
 
 
-# These schemas mirror serializer_parse.c for docs-drift's TOML snippet check
+# These schemas mirror serializer_schema.c for docs-drift's TOML snippet check
 # (see the module docstring); levels are validated by the C loader.  Fields
 # remain optional because the C loader supplies LevelDef defaults for absent
 # values; present v1 values must still use the exact compatible TOML type.
@@ -330,7 +330,7 @@ def _is_finite_number(value) -> bool:
     try:
         numeric = float(value)
         # The C loader refuses fabs(v) > FLT_MAX before narrowing to float
-        # (serializer_parse.c). Rounding to a C float first, as this used
+        # (serializer_schema.c). Rounding to a C float first, as this used
         # to, accepts a double slightly above FLT_MAX that rounds down to
         # it, which the game then rejects.
         return math.isfinite(numeric) and abs(numeric) <= FLT_MAX

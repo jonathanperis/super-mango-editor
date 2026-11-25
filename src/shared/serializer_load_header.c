@@ -9,7 +9,7 @@
 
 /*
  * format_version is the one key that is not a row with storage in the
- * schema table (serializer_parse.c): it is not a value a level chooses but
+ * schema table (serializer_schema.c): it is not a value a level chooses but
  * a statement about the file, and the answer to a wrong one is to refuse
  * the file, not to fall back to a default.
  */

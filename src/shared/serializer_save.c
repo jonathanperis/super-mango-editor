@@ -7,7 +7,7 @@
 
 #include "serializer.h"
 #include "serializer_emit.h"
-#include "serializer_parse.h"   /* serializer_write_entry */
+#include "serializer_schema.h"  /* serializer_write_entry, the schema rows */
 #include "serializer_io.h"
 #include "serializer_types.h"
 #include "../levels/level_loader.h"
@@ -52,7 +52,7 @@ static void write_header_and_config(FILE *fp, const LevelDef *def,
 
     /* ---- Level-wide keys, floor gaps and checkpoints ---------------- */
     /*
-     * Each name is a row of the schema table in serializer_parse.c, which
+     * Each name is a row of the schema table in serializer_schema.c, which
      * knows the key's type, where its value lives in LevelDef and when it
      * is left out (an empty description, an empty floor_gaps).  Plain keys
      * must come before the first [table], or TOML would read them as keys
@@ -77,7 +77,7 @@ static void write_header_and_config(FILE *fp, const LevelDef *def,
  * the order they appear in a saved level.
  *
  * Like s_key_order, each name is a row of the schema table in
- * serializer_parse.c, which says what the section's keys are and in which
+ * serializer_schema.c, which says what the section's keys are and in which
  * order they are written (serializer_write_entry).  This list only decides
  * the order of the sections themselves.  Both orders are part of the file
  * format: changing either changes every saved level, and the round-trip
@@ -457,4 +457,106 @@ fail:
     fclose(fp);
     buf[0] = '\0';
     return -1;
+}
+
+/* ------------------------------------------------------------------ */
+/* One writer for every row of the schema table                        */
+/* ------------------------------------------------------------------ */
+
+/*
+ * The mirror of serializer_load_schema (serializer_load.c): the same rows
+ * of serializer_schema.c, the same "struct at this address plus the row's
+ * offset", and memcpy to move each value out.
+ */
+
+/* Find a root row by its key (NULL when there is none). */
+static const SerializerRootSpec *root_by_name(const char *name)
+{
+    for (size_t i = 0; i < serializer_schema_row_count(); i++)
+        if (strcmp(serializer_schema_row(i)->name, name) == 0) return serializer_schema_row(i);
+    return NULL;
+}
+
+/* Write one key of the struct at `item`, as its row says. key_width pads
+ * the key with spaces (0 = none). */
+static void write_field(FILE *fp, const SerializerFieldSpec *field, const char *item,
+                        int key_width)
+{
+    const char *member = item + field->offset;
+
+    switch (field->storage) {
+    case SERIALIZER_STORE_FLOAT: {
+        float value;
+        memcpy(&value, member, sizeof(value));
+        /* "%-*s": left-align the key in a column key_width wide. */
+        fprintf(fp, "%-*s = %s\n", key_width, field->name, fmt_float(value));
+        break;
+    }
+    case SERIALIZER_STORE_INT: {
+        int value;
+        memcpy(&value, member, sizeof(value));
+        if (field->omit == SERIALIZER_OMIT_ZERO && value == 0) break;
+        fprintf(fp, "%-*s = %d\n", key_width, field->name, value);
+        break;
+    }
+    case SERIALIZER_STORE_STRING:
+        if (member[0] == '\0' && field->omit == SERIALIZER_OMIT_EMPTY) break;
+        if (member[0] == '\0' && field->omit == SERIALIZER_WRITE_UNTITLED_IF_EMPTY)
+            member = LEVEL_UNTITLED_NAME;
+        write_toml_key_string(fp, field->name, member);
+        break;
+    case SERIALIZER_STORE_ENUM: {
+        int value;
+        memcpy(&value, member, sizeof(value));
+        write_toml_key_string(fp, field->name, field->enum_to_name(value));
+        break;
+    }
+    case SERIALIZER_STORE_NONE:
+        break;   /* written by hand elsewhere */
+    }
+}
+
+void serializer_write_entry(FILE *fp, const LevelDef *def, const char *name)
+{
+    const SerializerRootSpec *root = root_by_name(name);
+    const char *item;
+    int count = 0;
+
+    if (!fp || !def || !root) return;
+    if (root->item_size != 0) {
+        memcpy(&count, (const char *)def + root->count_offset, sizeof(count));
+        if (count > root->max_count) count = root->max_count;
+    }
+    item = (const char *)def + root->items_offset;
+
+    switch (root->type) {
+    case SERIALIZER_ROOT_VALUE:
+        if (root->fields) write_field(fp, &root->fields[0], (const char *)def, 0);
+        break;
+    case SERIALIZER_ROOT_TABLE:
+        fprintf(fp, "[%s]\n", root->name);
+        for (size_t f = 0; f < root->field_count; f++)
+            write_field(fp, &root->fields[f], (const char *)def, root->key_width);
+        fprintf(fp, "\n");
+        break;
+    case SERIALIZER_ROOT_ARRAY_INTEGER:
+        /* An empty array is left out; a missing one loads as empty. */
+        if (count <= 0) break;
+        fprintf(fp, "%s = [", root->name);
+        for (int i = 0; i < count; i++, item += root->item_size) {
+            int number;
+            memcpy(&number, item, sizeof(number));
+            fprintf(fp, "%s%d", i > 0 ? ", " : "", number);
+        }
+        fprintf(fp, "]\n");
+        break;
+    case SERIALIZER_ROOT_ARRAY_TABLE:
+        for (int i = 0; i < count; i++, item += root->item_size) {
+            fprintf(fp, "[[%s]]\n", root->name);
+            for (size_t f = 0; f < root->field_count; f++)
+                write_field(fp, &root->fields[f], item, 0);
+            fprintf(fp, "\n");
+        }
+        break;
+    }
 }

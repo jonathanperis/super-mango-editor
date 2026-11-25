@@ -177,7 +177,7 @@ def check_collectible_source_guards() -> None:
     is then that array's length. A row pointing "star_reds" at the yellow
     array would compile and silently load into the wrong place.
     """
-    parser = read(ROOT / "src" / "shared" / "serializer_parse.c")
+    parser = read(ROOT / "src" / "shared" / "serializer_schema.c")
     required_rows = {
         "star_greens": ("star_greens", "star_green_count"),
         "star_reds": ("star_reds", "star_red_count"),
@@ -186,7 +186,7 @@ def check_collectible_source_guards() -> None:
         pattern = rf'ROOT_TABLES\("{toml_key}",\s*XY_FIELDS,\s*{array},\s*{count}\)'
         if not re.search(pattern, parser, re.S):
             fail(
-                f"src/shared/serializer_parse.c: `{toml_key}` must load into "
+                f"src/shared/serializer_schema.c: `{toml_key}` must load into "
                 f"`{array}` / `{count}`"
             )
 

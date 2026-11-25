@@ -2,7 +2,7 @@
 """tools/validate_levels.py describes the same level schema as the C table.
 
 The game's serializer keeps one table of every key a level file may hold
-(src/shared/serializer_parse.c).  tools/validate_levels.py keeps a second
+(src/shared/serializer_schema.c).  tools/validate_levels.py keeps a second
 copy for checking the TOML snippets in the manual.  Two copies of one fact
 drift: this test runs `level-check --dump-schema`, which prints the C table,
 and fails for any key, type, enum value, string capacity, required key or

@@ -58,7 +58,7 @@ loader row and a render row and no update row; its pickup is written in
 
 Open `levels/labs/01_collision.toml`. Its `[[coins]]` record contains x/y values.
 
-1. `src/shared/serializer_parse.c` declares the schema entry
+1. `src/shared/serializer_schema.c` declares the schema entry
    `ROOT_TABLES("coins", XY_FIELDS, coins, coin_count)`: each element must be a
    table whose only keys are `x` and `y`, each a finite number (an omitted one
    reads as 0), and the array may not exceed the `LevelDef.coins` array
@@ -137,7 +137,7 @@ new `.c` in `src/collectibles/` automatically.
 |------|-----------------|
 | `src/levels/level.h` | Include the Token header (for `MAX_TOKENS`); add `TokenPlacement { float x, y; }`, a bounded placement array and a count to `LevelDef` |
 | `src/game.h` | Include the Token header; add the runtime array and count to `GameWorld`, the `gs->world` part of `GameState` |
-| `src/shared/serializer_parse.c` | Register `ROOT_TABLES("tokens", XY_FIELDS, tokens, token_count)` and add a `SAME_LAYOUT(CoinPlacement, TokenPlacement, ...)` line for `x` and `y`, since the token shares the coin's field table. That one row is all the loading there is |
+| `src/shared/serializer_schema.c` | Register `ROOT_TABLES("tokens", XY_FIELDS, tokens, token_count)` and add a `SAME_LAYOUT(CoinPlacement, TokenPlacement, ...)` line for `x` and `y`, since the token shares the coin's field table. That one row is all the loading there is |
 | `src/shared/serializer_save.c` | Add `"tokens"` to `s_table_order`, where the section should appear in a saved file |
 | `tests/fuzz/toml.dict` | Add `"tokens"` (and any new key name); `tests/fuzz_dict_test.py` fails until it is there |
 | `src/levels/level_validate.c` | Add `CHECK_COUNT(token_count, MAX_TOKENS)` to `level_validate_counts()` and a world-bounds check per placement to `level_validate_runtime()` |
@@ -371,7 +371,7 @@ find for you unless it says so.
 
 - [ ] **Module:** `src/<category>/<entity>.h` and `.c` with the struct, its `MAX_*`, an update function over the whole array (one fixed step), a render function and a `_get_hitbox` helper. Use `game_sinf()` / `game_cosf()` (`src/core/game_trig.h`), not `sinf` / `cosf`, for anything the step computes
 - [ ] **World:** include the header in `src/game.h` and add the array and count to `GameWorld`, stored by value
-- [ ] **File format:** placement struct, array and count in `LevelDef` (`src/levels/level.h`); a `ROOT_TABLES` row in `ROOT_FIELDS` (`src/shared/serializer_parse.c`); the key in `s_table_order` (`src/shared/serializer_save.c`); `CHECK_COUNT` and its checks in `src/levels/level_validate.c`; the same table in `tools/validate_levels.py` (`make validate-levels` compares the two) and the key in `tests/fuzz/toml.dict` (section 3)
+- [ ] **File format:** placement struct, array and count in `LevelDef` (`src/levels/level.h`); a `ROOT_TABLES` row in `ROOT_FIELDS` (`src/shared/serializer_schema.c`); the key in `s_table_order` (`src/shared/serializer_save.c`); `CHECK_COUNT` and its checks in `src/levels/level_validate.c`; the same table in `tools/validate_levels.py` (`make validate-levels` compares the two) and the key in `tests/fuzz/toml.dict` (section 3)
 - [ ] **Loading:** `load_<entities>()` and its `s_level_loaders` row in `src/levels/level_loader.c`, `LOAD_EVERY_LIFE` for an enemy (`LOAD_ONCE` for something that awards score)
 - [ ] **Moving:** `update_<entities>()` and its `s_update_steps` row in `src/core/game_update.c`, above the `collision` row, and the same row in the manual's [update order](../architecture/#update-order-one-fixed-step) table (`make docs-drift` compares them)
 - [ ] **Hurting:** a `_hitbox()` function and its `s_damage_sources` row in `src/collision/game_collision.c`; the `--debug` overlay outlines it from that row, so give it a colour in `damage_source_color()` (`src/core/debug.c`) or it is drawn plain red. Something collected instead gets pickup code in `game_collide()`

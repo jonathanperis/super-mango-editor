@@ -289,7 +289,7 @@ hurt by something they cannot see.
 running game and back out of the editor.
 
 **Read first:** the [Entity Walkthrough](../entity-walkthrough/),
-`src/shared/serializer_parse.c` (the schema table and
+`src/shared/serializer_schema.c` (the schema table and
 `serializer_load_schema()`) and `src/levels/level_loader.c`.
 
 **Steps:**
@@ -331,7 +331,7 @@ that succeeded does it call `editor_apply_loaded_level()` to copy the new level
 over the editor's current one. Any failure returns early with a status message,
 so the open level, its undo history and its unsaved edits are untouched. The
 parser itself refuses a fractional number for an integer field, a non-finite
-float (`isfinite()` in `serializer_parse.c`) and an array longer than its
+float (`isfinite()` in `serializer_validate.c`) and an array longer than its
 `MAX_*` limit.
 
 </details>
