@@ -60,7 +60,7 @@ class DocsDriftUnitTest(unittest.TestCase):
             ("c-concepts.md", "`campaign_catalog_load()` in `src/levels/campaign_catalog.c`",
              "`campaign_catalog_load()` in `src/levels/level_session.c`", drift.check_function_locations,
              "`campaign_catalog_load()` is not defined in `src/levels/level_session.c`"),
-            ("c-concepts.md", "`undo_group_begin()` and `undo_push()` in `src/editor/undo.c`",
+            ("c-concepts.md", "`undo_group_begin()` and `undo_try_push()` in `src/editor/undo.c`",
              "`undo_group_begin()` and `editor_push()` in `src/editor/undo.c`", drift.check_function_locations,
              "`editor_push()` is not defined in `src/editor/undo.c`"),
             ("entity-walkthrough.md", "`level_validate_runtime()` (`src/levels/level_validate.c`",

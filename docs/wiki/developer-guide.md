@@ -54,6 +54,23 @@ they preserve explicit ownership, logical coordinates and saved-binding IDs.
 | Assets | `snake_case` under `assets/sprites/<category>/` | `player/player.png`, `collectibles/coin.png`, `entities/spider.png` |
 | Sounds | `component_descriptor.qoa` under `assets/sounds/<category>/` | `player/player_jump.qoa`, `collectibles/coin.qoa`, `entities/bird.qoa` |
 
+### Return Values
+
+A function's name tells you how to read what it returns:
+
+| Kind of function | Returns | Example |
+|------------------|---------|---------|
+| An action that can fail (load, save, init, validate, insert) | `0` on success, `-1` on failure; the reason goes to stderr or an `err` buffer | `level_load_toml`, `level_validate_counts`, `editor_entity_insert` |
+| A question (`is_`, `has_`, `_contains`, `_valid`, `_matches`) | `1` for yes, `0` for no | `editor_is_selected`, `serializer_key_matches` |
+| An attempt that may simply not happen (`try_` in the name, or a pop from an empty stack) | `bool`: `true` when it happened | `undo_try_push`, `undo_pop` |
+| A count, size or index | that number; `-1` or `0` for "none" is stated in the header comment | `editor_entity_count`, `editor_selection_items` |
+
+So `if (level_load_toml(...) != 0)` reads as "if loading failed", and
+`if (!undo_try_push(...))` as "if it was not recorded". When a function does
+not fit these, its header comment says what it returns, and its name should
+make a reader check: a new function that returns `1` on success needs a name
+like the third row's, not a plain verb.
+
 ### Memory and Safety Rules
 
 - Clear each owning pointer after releasing its resource. A NULL guard only protects an already-NULL pointer; aliases and borrowed pointers require explicit lifetime discipline.

@@ -40,7 +40,7 @@ static int save_and_load_resets_editor_session(void)
     cmd.entity_type = ENT_COIN;
     cmd.entity_index = 0;
     cmd.after.coin = es.level.coins[0];
-    undo_push(es.undo, &cmd);
+    undo_try_push(es.undo, &cmd);
 
     if (editor_save_current_level(&es) != 0) goto cleanup;
     if (expect_int("saved modified", es.modified, 0) != 0) goto cleanup;
@@ -53,7 +53,7 @@ static int save_and_load_resets_editor_session(void)
     editor_level_init_defaults(&es.level);
     es.modified = 1;
     es.selection.index = 7;
-    undo_push(es.undo, &cmd);
+    undo_try_push(es.undo, &cmd);
     if (expect_int("dirty undo count", es.undo->top, 2) != 0) goto cleanup;
 
     if (editor_load_level(&es, EDITOR_WORKFLOW_LEVEL_PATH) != 0) goto cleanup;

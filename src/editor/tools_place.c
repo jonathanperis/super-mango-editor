@@ -13,7 +13,7 @@
 #include "editor_session.h" /* save-point dirty tracking */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers     */
 #include "hit_test.h"    /* editor_hit_test                                */
-#include "undo.h"    /* Command, PlacementData, undo_push                 */
+#include "undo.h"    /* Command, PlacementData, undo_try_push                 */
 #include "snapshot_equal.h" /* field comparison, not memcmp of the union */
 #include "../levels/level_loader.h" /* level_validate_runtime            */
 #include "../levels/level_validate.h" /* level_validate_preview, _each   */
@@ -317,7 +317,7 @@ int editor_add_placement(EditorState *es, EntityType type,
     cmd.entity_index = index;
     cmd.before       = before;
     cmd.after        = *pd;
-    if (!undo_push(es->undo, &cmd)) {
+    if (!undo_try_push(es->undo, &cmd)) {
         /* The placement could not be recorded, so take it back: an entity
          * that undo does not know about would shift every later index in
          * the history. */

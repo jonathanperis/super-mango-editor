@@ -14,7 +14,7 @@
 #include "editor_session.h" /* save-point dirty tracking */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers     */
 #include "hit_test.h"    /* editor_hit_test                                */
-#include "undo.h"    /* Command, PlacementData, undo_push                 */
+#include "undo.h"    /* Command, PlacementData, undo_try_push                 */
 #include "snapshot_equal.h" /* field comparison, not memcmp of the union */
 #include "../levels/level_loader.h" /* level_validate_runtime            */
 #include "../levels/level_validate.h" /* level_validate_preview, _each   */
@@ -132,7 +132,7 @@ void tools_nudge_selection(EditorState *es, float dx, float dy)
         cmd.group = es->nudge_group;
         cmd.before = before[i];
         cmd.after = after[i];
-        (void)undo_push(es->undo, &cmd);  /* fits the room begin reserved */
+        (void)undo_try_push(es->undo, &cmd);  /* fits the room begin reserved */
     }
     if (!merge) undo_group_end(es->undo);
     es->nudge_ms = now;

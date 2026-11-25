@@ -433,7 +433,7 @@ An entity edit needs only the one placement before and after, which fits in
 the small `PlacementData` union stored directly in each `UndoEntry`. A
 level-settings snapshot holds names, a description, layer paths and more, so it
 is much larger. Storing two of those inline in all 256 steps would make every
-slot huge even though most commands are entity edits. So `undo_push()` mallocs
+slot huge even though most commands are entity edits. So `undo_try_push()` mallocs
 the pair only for `CMD_CONFIG` commands and keeps a pointer in the entry.
 
 That pointer always has exactly one owner: the entry that recorded it. Undo and

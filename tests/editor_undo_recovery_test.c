@@ -373,16 +373,16 @@ static int undo_stack_grows_groups_and_forgets_taken_entries(void)
     int group = undo_group_begin(stack, 1);
     CHECK(group != 0);
     cmd.entity_index = 0;
-    CHECK(undo_push(stack, &cmd) == 1);
+    CHECK(undo_try_push(stack, &cmd) == 1);
     /* Without memory to grow, the second push is refused, history kept. */
     undo_test_limit_allocations(0);
     cmd.entity_index = 1;
-    CHECK(undo_push(stack, &cmd) == 0);
+    CHECK(undo_try_push(stack, &cmd) == 0);
     undo_test_limit_allocations(-1);
     CHECK(stack->count == 1 && stack->top == 1);
     for (int i = 1; i < 3; i++) {
         cmd.entity_index = i;
-        CHECK(undo_push(stack, &cmd) == 1);
+        CHECK(undo_try_push(stack, &cmd) == 1);
     }
     undo_group_end(stack);
     CHECK(stack->count == 1 && stack->top == 1);   /* the group is one step */

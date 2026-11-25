@@ -27,7 +27,7 @@
 #include "editor_session.h" /* save-point dirty tracking */
 #include "entity_meta.h" /* Editor display dimensions and rail helpers     */
 #include "hit_test.h"    /* editor_hit_test                                */
-#include "undo.h"    /* Command, PlacementData, undo_push                 */
+#include "undo.h"    /* Command, PlacementData, undo_try_push                 */
 #include "../levels/level_loader.h" /* level_validate_runtime            */
 #include "../levels/level_validate.h" /* level_validate_preview, _each   */
 #include "../game_constants.h" /* GAME_W, GAME_H, FLOOR_Y, TILE_SIZE, WORLD_W,
@@ -199,7 +199,7 @@ int delete_entity(EditorState *es, EntityType type, int index)
     cmd.entity_type  = (int)type;
     cmd.entity_index = index;
     cmd.before       = before;
-    if (!undo_push(es->undo, &cmd)) {
+    if (!undo_try_push(es->undo, &cmd)) {
         /* No room to record the delete (out of memory, or an open undo
          * group that is already full). An edit that cannot be undone
          * would shift every later index in the history, so put the entity

@@ -11,13 +11,13 @@ static int compact_history_owns_config_snapshots(void)
     for (int i = 0; i < UNDO_MAX + 2; i++) {
         command.config_before.screen_count = i;
         command.config_after.screen_count = i + 1;
-        if (!undo_push(stack, &command)) { failed = 1; break; }
+        if (!undo_try_push(stack, &command)) { failed = 1; break; }
     }
     if (!failed && (stack->top != UNDO_MAX || !undo_pop(stack, &popped) ||
         popped.config_after.screen_count != UNDO_MAX + 2 || !undo_pop(stack, &popped) ||
         !redo_pop(stack, &popped))) failed = 1;
     command.type = CMD_PLACE;
-    if (!undo_push(stack, &command) || stack->redo_top != 0) failed = 1;
+    if (!undo_try_push(stack, &command) || stack->redo_top != 0) failed = 1;
     undo_clear(stack);
     if (stack->top || stack->redo_top || sizeof(UndoStack) > 512 * 1024) failed = 1;
     printf("undo storage: %zu bytes plus config snapshots only when used\n", sizeof(UndoStack));

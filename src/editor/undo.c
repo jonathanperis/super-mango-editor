@@ -228,23 +228,23 @@ int redo_top_group(const UndoStack *stack)
         ? stack->steps[stack->count - stack->redo_top].group : 0;
 }
 
-int undo_amend_after(UndoStack *stack, int group, int entity_type,
-                     int entity_index, const PlacementData *after)
+bool undo_amend_after(UndoStack *stack, int group, int entity_type,
+                      int entity_index, const PlacementData *after)
 {
     UndoStep *step;
     UndoEntry *entries;
 
-    if (!stack || group == 0 || !after || stack->top == 0) return 0;
+    if (!stack || group == 0 || !after || stack->top == 0) return false;
     step = &stack->steps[stack->top - 1];
-    if (step->group != group) return 0;
+    if (step->group != group) return false;
     entries = step_entries(step);
     for (int i = step->applied - 1; i >= 0; i--) {
         if (entries[i].entity_type == entity_type && entries[i].entity_index == entity_index) {
             entries[i].after = *after;
-            return 1;
+            return true;
         }
     }
-    return 0;
+    return false;
 }
 
 /*
@@ -253,19 +253,19 @@ int undo_amend_after(UndoStack *stack, int group, int entity_type,
  * every call would be wasted work, and const promises the caller's command is
  * only read.
  */
-int undo_push(UndoStack *stack, const Command *cmd)
+bool undo_try_push(UndoStack *stack, const Command *cmd)
 {
     UndoStep *step = NULL;
     UndoEntry entry;
     int group;
 
-    if (!stack || !cmd) return 0;
+    if (!stack || !cmd) return false;
     group = cmd->group ? cmd->group : stack->open_group;
     /* Join the newest applied step when it is this command's group. */
     if (group != 0 && stack->top > 0 && stack->steps[stack->top - 1].group == group) {
         step = &stack->steps[stack->top - 1];
         /* After discard_redo the step holds exactly its applied entries. */
-        if (!make_room(step, step->applied + 1)) return 0; /* History intact. */
+        if (!make_room(step, step->applied + 1)) return false; /* History intact. */
     }
 
     memset(&entry, 0, sizeof(entry));
@@ -280,7 +280,7 @@ int undo_push(UndoStack *stack, const Command *cmd)
                        sizeof(entry.text->after) == sizeof(cmd->property_text_after),
                        "stored text matches the command's");
         entry.text = history_malloc(sizeof(*entry.text));
-        if (!entry.text) return 0; /* History remains intact. */
+        if (!entry.text) return false; /* History remains intact. */
         memcpy(entry.text->before, cmd->property_text_before, sizeof(entry.text->before));
         memcpy(entry.text->after, cmd->property_text_after, sizeof(entry.text->after));
     }
@@ -288,7 +288,7 @@ int undo_push(UndoStack *stack, const Command *cmd)
         entry.config = history_malloc(2 * sizeof(*entry.config));
         if (!entry.config) {
             free(entry.text);
-            return 0; /* History remains intact. */
+            return false; /* History remains intact. */
         }
         entry.config[0] = cmd->config_before;
         entry.config[1] = cmd->config_after;
@@ -312,7 +312,7 @@ int undo_push(UndoStack *stack, const Command *cmd)
     step_entries(step)[step->count++] = entry;
     step->applied = step->count;
     recount(stack);
-    return 1;
+    return true;
 }
 
 /* Copy a stored entry out as a Command (config snapshots by value). */
@@ -336,39 +336,39 @@ static void entry_to_command(const UndoEntry *entry, int group, Command *out)
     }
 }
 
-int undo_pop(UndoStack *stack, Command *out)
+bool undo_pop(UndoStack *stack, Command *out)
 {
     UndoStep *step;
 
-    if (!stack || !out || stack->top == 0) return 0;
+    if (!stack || !out || stack->top == 0) return false;
     step = &stack->steps[stack->top - 1];
     step->applied--;   /* the newest applied entry becomes the newest undone */
     entry_to_command(&step_entries(step)[step->applied], step->group, out);
     recount(stack);
-    return 1;
+    return true;
 }
 
-int redo_pop(UndoStack *stack, Command *out)
+bool redo_pop(UndoStack *stack, Command *out)
 {
     UndoStep *step;
 
-    if (!stack || !out || stack->redo_top == 0) return 0;
+    if (!stack || !out || stack->redo_top == 0) return false;
     step = &stack->steps[stack->count - stack->redo_top];
     entry_to_command(&step_entries(step)[step->applied], step->group, out);
     step->applied++;   /* the oldest undone entry is applied again */
     recount(stack);
-    return 1;
+    return true;
 }
 
-int undo_take(UndoStack *stack, Command *out)
+bool undo_take(UndoStack *stack, Command *out)
 {
     int index;
     UndoStep *step;
     UndoEntry *entries;
 
-    if (!stack || stack->top == 0) return 0;
+    if (!stack || stack->top == 0) return false;
     index = stack->top - 1;
-    if (!undo_pop(stack, out)) return 0;
+    if (!undo_pop(stack, out)) return false;
     /* The entry just undone sits at `applied`: forget it, closing the gap. */
     step = &stack->steps[index];
     entries = step_entries(step);
@@ -379,5 +379,5 @@ int undo_take(UndoStack *stack, Command *out)
     step->count--;
     if (step->count == 0) remove_step(stack, index);
     recount(stack);
-    return 1;
+    return true;
 }

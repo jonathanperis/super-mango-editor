@@ -22,12 +22,14 @@
  *
  * Usage:
  *   UndoStack *undo = undo_create();
- *   undo_push(undo, &cmd);          // after every editor action
+ *   undo_try_push(undo, &cmd);      // after every editor action
  *   if (undo_pop(undo, &cmd)) ...   // Ctrl+Z
  *   if (redo_pop(undo, &cmd)) ...   // Ctrl+Shift+Z
  *   undo_destroy(undo);             // on editor shutdown
  */
 #pragma once
+
+#include <stdbool.h>          /* bool: the yes/no results below */
 
 #include "../levels/level.h"   /* All Placement structs (CoinPlacement, etc.) */
 
@@ -283,7 +285,7 @@ UndoStack *undo_create(void);
 void undo_destroy(UndoStack *stack);
 
 /*
- * undo_push --- Record a new editor action on the undo stack.
+ * undo_try_push --- Record a new editor action on the undo stack.
  *
  * Appends cmd to the top of the undo stack and clears the redo stack
  * (because a new action invalidates any previously undone commands).
@@ -293,35 +295,40 @@ void undo_destroy(UndoStack *stack);
  * If the history is full (UNDO_MAX steps), the oldest step is discarded
  * whole by shifting the array left by one slot.  This keeps memory bounded
  * while preserving the most recent history.
+ *
+ * Returns true when the command was recorded.  It returns false, without
+ * changing the history, when there is no memory for it: the "try" in the
+ * name says it may not happen, unlike most functions in this project,
+ * which return 0 on success and -1 on failure.  The caller must roll back
+ * a config or text edit if its snapshot cannot be recorded.  Any other
+ * lone entity edit never allocates, and neither does a group push within
+ * the room undo_group_begin reserved.
  */
-/* Returns 0 without changing history on allocation failure. The caller must
- * roll back a config or text edit if its snapshot cannot be recorded.  Any
- * other lone entity edit never allocates, and neither does a group push
- * within the room undo_group_begin reserved. */
-int undo_push(UndoStack *stack, const Command *cmd);
+bool undo_try_push(UndoStack *stack, const Command *cmd);
 
 /*
  * undo_pop --- Pop the most recent command from the undo stack.
  *
  * On success: writes the newest applied entry into *out, moves it to the
- * redo stack, and returns 1.  A group step comes back one entry at a time,
- * newest first; undo_top_group says whether more of it is left.  The caller should then apply `out->before` to the
- * level to reverse the action.
+ * redo stack, and returns true.  A group step comes back one entry at a
+ * time, newest first; undo_top_group says whether more of it is left.  The
+ * caller should then apply `out->before` to the level to reverse the action.
  *
- * On failure (empty stack): returns 0 and leaves *out untouched.
+ * On an empty stack: returns false and leaves *out untouched.
  */
-int undo_pop(UndoStack *stack, Command *out);
+bool undo_pop(UndoStack *stack, Command *out);
 
 /*
  * redo_pop --- Pop the most recently undone command from the redo stack.
  *
  * On success: writes the oldest undone entry into *out, moves it back to
- * the undo stack, and returns 1.  A group comes back oldest entry first.  The caller should then apply `out->after` to
- * the level to re-apply the action.
+ * the undo stack, and returns true.  A group comes back oldest entry first.
+ * The caller should then apply `out->after` to the level to re-apply the
+ * action.
  *
- * On failure (empty stack): returns 0 and leaves *out untouched.
+ * On an empty stack: returns false and leaves *out untouched.
  */
-int redo_pop(UndoStack *stack, Command *out);
+bool redo_pop(UndoStack *stack, Command *out);
 
 /*
  * undo_group_begin / undo_group_end --- Bracket the pushes of one action
@@ -357,17 +364,18 @@ int redo_top_group(const UndoStack *stack);
  * undo_amend_after --- Replace the "after" snapshot of the entry for
  * (entity_type, entity_index) inside `group`, which must be the newest
  * step on the undo stack.  Used to fold a quick run of arrow-key nudges
- * into one step.  Returns 1 when such an entry was found.
+ * into one step.  Returns true when such an entry was found.
  */
-int undo_amend_after(UndoStack *stack, int group, int entity_type,
-                     int entity_index, const PlacementData *after);
+bool undo_amend_after(UndoStack *stack, int group, int entity_type,
+                      int entity_index, const PlacementData *after);
 
 /*
  * undo_take --- Remove the newest entry from the undo stack WITHOUT moving
  * it to the redo stack (it is forgotten).  Used to roll back a group action
- * that failed half way, which must leave nothing behind to redo.
+ * that failed half way, which must leave nothing behind to redo.  Returns
+ * false when the stack is empty.
  */
-int undo_take(UndoStack *stack, Command *out);
+bool undo_take(UndoStack *stack, Command *out);
 
 /*
  * undo_clear --- Reset both stacks to empty.

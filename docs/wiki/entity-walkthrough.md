@@ -261,7 +261,7 @@ You do not have to remember the switches: they have no `default:` case, so
 with `-Wall` the compiler names every `switch` that has no `ENT_TOKEN` case
 yet. The palette lists types from `entity_meta.c`, so `palette.c` needs no
 change. Undo needs no new code in `editor_undo_apply.c`: commands are built
-with `undo_push(stack, const Command *)` and store `PlacementData` snapshots
+with `undo_try_push(stack, const Command *)` and store `PlacementData` snapshots
 that are applied through the shared `editor_entity_*` helpers.
 
 These editor paths all operate on `LevelDef`, not live runtime objects.
