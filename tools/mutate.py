@@ -213,6 +213,20 @@ class Restorer:
         signal.signal(signal.SIGTERM, handler)
 
 
+def forget_objects(path: str, args) -> None:
+    """Delete the objects compiled from `path`, so the next build recompiles it.
+
+    make compares timestamps, and the make that ships with macOS (3.81)
+    keeps only whole seconds: a mutant written in the same second as the
+    previous build would look older than its object, and the tests would run
+    the previous mutant instead. Deleting the objects removes the guess.
+    """
+    stem = Path(path).with_suffix(".o").as_posix()
+    for obj in (ROOT / args.outdir / "obj").rglob(Path(path).stem + ".o"):
+        if obj.as_posix().endswith(stem):
+            obj.unlink()
+
+
 def build(programs: list[str], args) -> tuple[bool, str]:
     targets = [f"{args.outdir}/{p}" for p in programs]
     cmd = ["make", *targets, f"OUTDIR={args.outdir}", "RAYLIB_PLATFORM=memory", f"CC={args.cc}",
@@ -285,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
     programs_of = {f: (args.tests or tests_for(f)) for f in files}
     every_program = sorted({p for f in files for p in programs_of[f]})
     print(f"mutate: baseline build and tests ({', '.join(every_program)})", flush=True)
+    for f in files:
+        forget_objects(f, args)   # whatever an earlier, interrupted run left
     ok, log = build(every_program, args)
     if not ok:
         print(log)
@@ -305,13 +321,17 @@ def main(argv: list[str] | None = None) -> int:
             assert original[mutant.offset:mutant.offset + len(mutant.old)] == mutant.old
             path.write_text(original[:mutant.offset] + mutant.new +
                             original[mutant.offset + len(mutant.old):], encoding="utf-8")
+            forget_objects(mutant.path, args)
             status, detail = try_mutant(programs_of[mutant.path], args)
             path.write_text(original, encoding="utf-8")
+            forget_objects(mutant.path, args)
             results.append((mutant, status, detail))
             print(f"mutate: [{index}/{len(mutants)}] {status:10} {mutant.describe()}"
                   + (f" ({detail})" if detail else ""), flush=True)
     finally:
         restorer.restore()
+        for f in files:
+            forget_objects(f, args)
         # Rebuild once more so OUTDIR holds the real code again.
         build(every_program, args)
 
