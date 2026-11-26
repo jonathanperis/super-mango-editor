@@ -14,7 +14,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 |------|-------------|
 | [Sandbox School](learning-path/) | Eight guided labs, from first frame to reproducible experiments |
 | [Debugging C](debugging-c/) | Sanitizer reports, lldb/gdb on a real crash, and a quick profiling pass |
-| [Optimization Lessons](optimization-lessons/) | `make bench`, each optimization with before/after numbers, and the faster ones left out because they changed pixels |
+| [Optimization Lessons](optimization-lessons/) | `make bench`, each optimization with before/after numbers, the two that were allowed to change pixels, and the ones left out |
 | [C in This Codebase](c-concepts/) | Each C idea (ownership, `offsetof` tables, `goto` cleanup, overflow checks) mapped to where the game uses it |
 | [Mechanics Museum](mechanics-museum/) | Six standalone levels for focused inspection |
 | [Entity Walkthrough](entity-walkthrough/) | Trace a collectible through file format, runtime and editor; the checklist for adding any entity |
