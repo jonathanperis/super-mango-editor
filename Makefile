@@ -749,9 +749,10 @@ FUZZ_CAMPAIGN_SRCS = tests/fuzz_campaign_experiment.c src/levels/campaign_catalo
                      src/levels/level_path.c src/core/game_experiment_file.c \
                      $(FUZZ_SERIALIZER_SRCS)
 # The `--replay-script` parser (tests/fuzz_replay_script.c): input/game_replay.c
-# pushes its key events through input_backend.c.
+# pushes its key events through input_backend.c, which maps the pointer
+# through graphics.c; graphics.c counts texture switches with texture.c.
 FUZZ_REPLAY_SRCS = tests/fuzz_replay_script.c src/input/game_replay.c src/input/input_backend.c \
-                   src/shared/graphics.c src/shared/platform.c
+                   src/shared/graphics.c src/shared/texture.c src/shared/platform.c
 # The key and button bindings (tests/fuzz_bindings.c): game_bindings.c and the
 # profile code that saves and loads them, the same files the profile harness uses.
 FUZZ_BINDINGS_SRCS = tests/fuzz_bindings.c $(filter-out tests/fuzz_profile_decode.c,$(FUZZ_PROFILE_SRCS))
