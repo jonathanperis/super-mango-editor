@@ -53,6 +53,11 @@
         }
         canvas {
             display: block;
+            /* The game copies its picture to the canvas without blending,
+               so pixels under fog or the pause overlay keep an alpha below
+               1. The browser lays the canvas over what is behind it; black
+               behind it shows the same colours as the desktop window. */
+            background: #000;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
             max-width: 100%;
