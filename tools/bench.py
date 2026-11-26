@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import statistics
 import subprocess
 import sys
 import tomllib
@@ -115,6 +114,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.frames < 1 or args.repeat < 1:
         parser.error("--frames and --repeat must be at least 1")
+    # Windows builds `super-mango.exe`, and CreateProcess only adds the
+    # extension itself when the name has no directory part.
+    if not args.binary.exists() and args.binary.with_name(args.binary.name + ".exe").exists():
+        args.binary = args.binary.with_name(args.binary.name + ".exe")
 
     replay_dir = args.binary.resolve().parent / "bench-replays"
     replay_dir.mkdir(parents=True, exist_ok=True)
