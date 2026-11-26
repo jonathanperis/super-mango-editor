@@ -467,7 +467,7 @@ apart, so the report lists every survivor with its line, and the useful
 question for each is "what test would fail if this line were wrong?"
 
 ```sh
-make mutate                                    # src/collision/ and serializer_parse*.c
+make mutate                                    # src/collision/, serializer_validate.c, serializer_load.c
 make mutate MUTATE_ARGS="--max 50 --seed 3"    # a random sample, repeatable
 make mutate MUTATE_ARGS="--target src/core/game_score.c --report out/mutation.md"
 ```
@@ -482,8 +482,10 @@ it is informational and fails only when the unmutated code does not build or
 pass.
 
 The first run covered all 132 mutants of `src/collision/` (kill rate 44.7%)
-and a fixed sample of 150 of the 531 in `src/shared/serializer_parse.c`
-(`--max 150 --seed 1`, 62.8%). Among the survivors were real gaps, and new
+and a fixed sample of 150 of the 531 in the serializer's parsing file of the
+time, serializer_parse.c (`--max 150 --seed 1`, 62.8%); its checking and
+loading code now lives in `src/shared/serializer_validate.c` and
+`src/shared/serializer_load.c`. Among the survivors were real gaps, and new
 cases now kill them:
 
 - **Retry after game over** (`src/collision/collision_damage.c`): no test
@@ -496,7 +498,7 @@ cases now kill them:
   after game over or level completion, and the damage-source table's bounds
   were unchecked. `damage_comes_only_from_live_boxes`
   (`gameplay-mechanics-test`) checks each with `game_collide()` alone.
-- **Array limits** (`src/shared/serializer_parse.c`): a level with one coin
+- **Array limits** (now in `src/shared/serializer_load.c`): a level with one coin
   too many was refused, but nothing loaded one with exactly `MAX_COINS`, so
   `>` against the limit could become `>=`. `rejects_oversized_arrays` now
   loads the full level too.

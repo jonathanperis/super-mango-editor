@@ -29,8 +29,8 @@ objects and reruns the test programs, so a whole file takes minutes; --max
 picks that many mutants at random (with --seed, the same ones every time).
 
 By default the targets are src/collision/*.c and the serializer's parsing
-code (src/shared/serializer_parse*.c), each with the test programs that
-exercise it. The build uses raylib's Memory backend in --outdir, so it needs
+code (src/shared/serializer_validate.c and serializer_load.c), each with the
+test programs that exercise it. The build uses raylib's Memory backend in --outdir, so it needs
 no window and does not disturb an ordinary build. The source file is always
 put back, even after Ctrl+C; run `git status` if in doubt.
 
@@ -58,7 +58,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Which test programs exercise which files (Makefile names, without OUTDIR).
 # The first matching pattern wins.
-DEFAULT_TARGETS = ["src/collision/*.c", "src/shared/serializer_parse*.c"]
+DEFAULT_TARGETS = ["src/collision/*.c", "src/shared/serializer_validate.c",
+                   "src/shared/serializer_load.c"]
 TESTS_FOR = [
     ("src/collision/collision_damage.c",
      ["collision-test", "gameplay-damage-test", "gameplay-mechanics-test", "session-test"]),
