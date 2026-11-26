@@ -229,6 +229,12 @@ def forget_objects(path: str, args) -> None:
 
 def build(programs: list[str], args) -> tuple[bool, str]:
     targets = [f"{args.outdir}/{p}" for p in programs]
+    # Delete the linked programs too: with whole-second timestamps, an object
+    # rebuilt in the same second as the old program would not be relinked,
+    # and the tests would run the previous mutant (see forget_objects).
+    for target in targets:
+        for path in (ROOT / target, ROOT / (target + ".exe")):
+            path.unlink(missing_ok=True)
     cmd = ["make", *targets, f"OUTDIR={args.outdir}", "RAYLIB_PLATFORM=memory", f"CC={args.cc}",
            f"-j{args.jobs}"]
     result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
@@ -358,9 +364,9 @@ def main(argv: list[str] | None = None) -> int:
             nc = sum(1 for _, s in mine if s == "no-compile")
             fr = f"{100.0 * k / (k + sv):.1f}%" if k + sv else "-"
             lines.append(f"| `{f}` | {fr} | {k} | {sv} | {nc} |")
-        lines += ["", "### Survivors", "",
-                  "Each is a change no test noticed: a missing check, or a change the "
-                  "program cannot observe (an equivalent mutant).", ""]
+        survivors_note = ("Each is a change no test noticed: a missing check, or a change the "
+                          "program cannot observe (an equivalent mutant).")
+        lines += ["", "### Survivors", "", survivors_note, ""]
         for m in survived:
             source = (ROOT / m.path).read_text(encoding="utf-8").splitlines()[m.line - 1].strip()
             lines.append(f"- `{m.path}:{m.line}` {m.operator} `{m.old}` -> `{m.new}`: `{source}`")
