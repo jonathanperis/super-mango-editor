@@ -273,6 +273,7 @@ const manualColumns = SECTION_CATEGORIES.map(category => ({
                 if (!text) {
                     statusEl.style.display = 'none';
                     playBtn.style.display = 'none';
+                    canvas.classList.add('is-running');
                 } else {
                     if (statusMessage) statusMessage.textContent = text;
                     statusEl.style.display = '';

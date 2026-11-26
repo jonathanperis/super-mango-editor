@@ -218,6 +218,11 @@
     image-rendering: pixelated;
     touch-action: none;
 }
+/* Once the game runs, the poster gives way to black. The game copies its
+ * picture without blending, so pixels under fog or the pause overlay keep
+ * an alpha below 1 and the browser mixes them with what is behind the
+ * canvas; black keeps the colours the same as the desktop window. */
+#canvas.is-running { background: #000; }
 #touch-controls { margin-top: 10px; }
 #game-status {
     position: absolute;
