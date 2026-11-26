@@ -47,7 +47,7 @@ in-memory form is `LevelDef` (D-001 in the
 [level editor spec](https://github.com/jonathanperis/super-mango-editor/blob/main/.specs/features/level-editor/spec.md)).
 
 **Consequences.** One schema table, `ROOT_FIELDS` in
-`src/shared/serializer_parse.c`, names every key, its type, the struct member
+`src/shared/serializer_schema.c`, names every key, its type, the struct member
 that holds it and its default; the loader and the writer both walk it, and
 `tests/schema_parity_test.py` keeps the Python validator's copy in step.
 `tomlc17` carries project patches, recorded in `vendor/tomlc17/README.md`.
