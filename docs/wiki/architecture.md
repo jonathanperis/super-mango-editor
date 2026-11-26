@@ -29,20 +29,20 @@ and the Makefile, and `make docs-drift` fails when it is stale; run
 | Directory | Files | Includes headers from | Included by |
 |-----------|-------|-----------------------|-------------|
 | `src` | 5 | `src/collectibles`, `src/core`, `src/effects`, `src/entities`, `src/hazards`, `src/player`, `src/screens`, `src/shared`, `src/surfaces` | `src/collision`, `src/core`, `src/editor`, `src/entities`, `src/hazards`, `src/input`, `src/levels`, `src/player`, `src/render`, `src/screens`, `src/surfaces` |
-| `src/collectibles` | 6 | `src/core`, `src/shared` | `src`, `src/collision`, `src/core`, `src/levels`, `src/render` |
+| `src/collectibles` | 7 | `src/core`, `src/shared` | `src`, `src/collision`, `src/core`, `src/levels`, `src/render` |
 | `src/collision` | 6 | `src`, `src/collectibles`, `src/core`, `src/effects`, `src/entities`, `src/hazards`, `src/levels`, `src/player`, `src/shared` | `src/core`, `src/input` |
 | `src/core` | 55 | `src`, `src/collectibles`, `src/collision`, `src/effects`, `src/entities`, `src/hazards`, `src/input`, `src/levels`, `src/player`, `src/render`, `src/screens`, `src/shared`, `src/surfaces` | `src`, `src/collectibles`, `src/collision`, `src/effects`, `src/entities`, `src/hazards`, `src/input`, `src/levels`, `src/render`, `src/screens`, `src/surfaces` |
-| `src/editor` | 69 | `src`, `src/effects`, `src/input`, `src/levels`, `src/player`, `src/screens`, `src/shared`, `src/surfaces` | nothing |
-| `src/effects` | 6 | `src/core`, `src/shared` | `src`, `src/collision`, `src/core`, `src/editor`, `src/levels`, `src/render` |
-| `src/entities` | 12 | `src`, `src/core`, `src/shared` | `src`, `src/collision`, `src/core`, `src/levels`, `src/render` |
-| `src/hazards` | 12 | `src`, `src/core`, `src/shared`, `src/surfaces` | `src`, `src/collision`, `src/core`, `src/levels`, `src/player`, `src/render` |
+| `src/editor` | 70 | `src`, `src/effects`, `src/input`, `src/levels`, `src/player`, `src/shared`, `src/surfaces` | nothing |
+| `src/effects` | 7 | `src/core`, `src/shared` | `src`, `src/collision`, `src/core`, `src/editor`, `src/levels`, `src/render` |
+| `src/entities` | 13 | `src`, `src/core`, `src/shared` | `src`, `src/collision`, `src/core`, `src/levels`, `src/render` |
+| `src/hazards` | 13 | `src`, `src/core`, `src/shared`, `src/surfaces` | `src`, `src/collision`, `src/core`, `src/levels`, `src/player`, `src/render` |
 | `src/input` | 11 | `src`, `src/collision`, `src/core`, `src/player`, `src/screens`, `src/shared` | `src/core`, `src/editor`, `src/screens`, `src/shared` |
-| `src/levels` | 21 | `src`, `src/collectibles`, `src/core`, `src/effects`, `src/entities`, `src/hazards`, `src/player`, `src/screens`, `src/shared`, `src/surfaces` | `src/collision`, `src/core`, `src/editor`, `src/screens`, `src/shared`, `src/surfaces` |
+| `src/levels` | 21 | `src`, `src/collectibles`, `src/core`, `src/effects`, `src/entities`, `src/hazards`, `src/player`, `src/shared`, `src/surfaces` | `src/collision`, `src/core`, `src/editor`, `src/screens`, `src/shared`, `src/surfaces` |
 | `src/player` | 15 | `src`, `src/hazards`, `src/shared`, `src/surfaces` | `src`, `src/collision`, `src/core`, `src/editor`, `src/input`, `src/levels`, `src/render` |
 | `src/render` | 3 | `src`, `src/collectibles`, `src/core`, `src/effects`, `src/entities`, `src/hazards`, `src/player`, `src/screens`, `src/surfaces` | `src/core` |
-| `src/screens` | 6 | `src`, `src/core`, `src/input`, `src/levels`, `src/shared` | `src`, `src/core`, `src/editor`, `src/input`, `src/levels`, `src/render` |
-| `src/shared` | 37 | `src/input`, `src/levels` | `src`, `src/collectibles`, `src/collision`, `src/core`, `src/editor`, `src/effects`, `src/entities`, `src/hazards`, `src/input`, `src/levels`, `src/player`, `src/screens`, `src/surfaces` |
-| `src/surfaces` | 19 | `src`, `src/core`, `src/levels`, `src/shared` | `src`, `src/core`, `src/editor`, `src/hazards`, `src/levels`, `src/player`, `src/render` |
+| `src/screens` | 6 | `src`, `src/core`, `src/input`, `src/levels`, `src/shared` | `src`, `src/core`, `src/input`, `src/render` |
+| `src/shared` | 38 | `src/input`, `src/levels` | `src`, `src/collectibles`, `src/collision`, `src/core`, `src/editor`, `src/effects`, `src/entities`, `src/hazards`, `src/input`, `src/levels`, `src/player`, `src/screens`, `src/surfaces` |
+| `src/surfaces` | 17 | `src`, `src/core`, `src/levels`, `src/shared` | `src`, `src/core`, `src/editor`, `src/hazards`, `src/levels`, `src/player`, `src/render` |
 
 Game files the editor also compiles (the Makefile's `EDITOR_SRCS`, outside `src/editor/`):
 
@@ -62,9 +62,10 @@ Game files the editor also compiles (the Makefile's `EDITOR_SRCS`, outside `src/
 - `src/shared/serializer_io.c`
 - `src/shared/serializer_load.c`
 - `src/shared/serializer_load_header.c`
-- `src/shared/serializer_parse.c`
 - `src/shared/serializer_save.c`
+- `src/shared/serializer_schema.c`
 - `src/shared/serializer_types.c`
+- `src/shared/serializer_validate.c`
 - `src/shared/text.c`
 - `src/shared/texture.c`
 - `src/shared/ui.c`
