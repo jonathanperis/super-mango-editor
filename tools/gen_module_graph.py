@@ -76,7 +76,12 @@ def editor_game_sources(root: Path = ROOT) -> list[str]:
         if word == "$(wildcard":
             continue  # `$(wildcard src/shared/*.c)`: the pattern is the next word
         pattern = word.rstrip(")")
-        files.extend(sorted(glob.glob(pattern, root_dir=root)) if "*" in pattern else [pattern])
+        if "*" in pattern:
+            # glob returns OS-native separators (`src\shared\ui.c` on Windows);
+            # as_posix() keeps the `src/` prefix test below portable.
+            files.extend(Path(p).as_posix() for p in glob.glob(pattern, root_dir=root))
+        else:
+            files.append(pattern)
     return sorted({f for f in files if f.startswith("src/") and not f.startswith("src/editor/")})
 
 
