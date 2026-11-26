@@ -46,6 +46,10 @@ typedef struct {
 typedef struct {
     Texture2D *textures[MAX_FOG_TEXTURES]; /* held from the asset cache    */
     int          tex_count;                  /* number of textures loaded       */
+    /* Each image's band of rows with a visible pixel, read once at load
+     * time (image_file_visible_rows); only that band is drawn. */
+    int          first_row[MAX_FOG_TEXTURES];
+    int          row_count[MAX_FOG_TEXTURES];
     FogInstance  instances[FOG_MAX];         /* pool of simultaneous fog layers */
 } FogSystem;
 

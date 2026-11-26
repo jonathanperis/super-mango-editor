@@ -3,4 +3,4 @@
 # Written by `make render-snapshots-update`; see tests/render_snapshot.h.
 editor_side_panels 1280 720 0bca42125d72e4fa
 hud 400 300 201b8508866035ee
-level_hazards 400 300 3023a0a2a38a2f69
+level_hazards 400 300 efc6c77c307e092a

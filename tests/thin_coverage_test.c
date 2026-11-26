@@ -166,6 +166,13 @@ static int fog_waves_fade_overlap_and_fill(void)
     fog_init(&fog, NULL, (const char (*)[64])paths, MAX_FOG_TEXTURES + 1);
     CHECK(fog.tex_count == MAX_FOG_TEXTURES);
     CHECK(fog.textures[0] != NULL);
+    /* fog_1.png shows something only in rows 96..179; only those are drawn. */
+    CHECK(fog.first_row[0] == 96 && fog.row_count[0] == 84);
+    CHECK(fog.row_count[1] == 0);  /* not loaded: nothing to draw */
+    /* A band of no rows draws nothing, so it does not even switch texture. */
+    (void)texture_take_switches();
+    sprite_draw_rows(fog.textures[0], 0, 0, &(IntRect){0, 0, GAME_W, GAME_H}, WHITE);
+    CHECK(texture_take_switches() == 0);
     CHECK(fog.instances[0].active);
     fog.instances[0].tex_index = 0;
 

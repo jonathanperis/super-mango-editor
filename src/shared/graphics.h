@@ -125,6 +125,20 @@ int texture_take_switches(void);
  */
 int image_file_is_opaque(const char *path);
 
+/*
+ * image_file_visible_rows — Which rows of an image file show anything.
+ *
+ * Sets *first_row to the first row that has a pixel with alpha above 0 and
+ * *row_count to the number of rows from there to the last such row (0 for
+ * a fully transparent image). Rows above and below that band are see-through
+ * from edge to edge, so drawing them changes nothing on screen but still
+ * costs the renderer a visit to every one of their pixels. Decodes the
+ * file, so call it at load time, not per frame. Returns 0, and leaves both
+ * outputs alone, for a file that cannot be read.
+ * Defined in texture.c.
+ */
+int image_file_visible_rows(const char *path, int *first_row, int *row_count);
+
 #ifdef MANGO_TESTING
 /* Test builds only. texture_test_loads: image files texture_load has decoded
  * so far. texture_test_live: handles that exist right now, so a test can
@@ -179,4 +193,33 @@ static inline void sprite_draw(const Texture2D *texture, const IntRect *source,
     if (!dest) return;
     Vector2 pivot = {dest->w / 2.0f, dest->h / 2.0f};
     sprite_draw_pivot(texture, source, dest, angle, flip, pivot, tint);
+}
+
+/*
+ * sprite_draw_rows — Draw only rows [first_row, first_row + row_count) of a
+ * texture, exactly where they land when the whole texture is stretched over
+ * dest.
+ *
+ * A background layer stretched from 216 to 300 pixels is mostly transparent
+ * sky; its visible band (image_file_visible_rows) may be a fifth of it. The
+ * band's place on screen is worked out in floating point, so the band lines
+ * up with the full stretch. The rows it covers come out the same, except
+ * that a pixel row lying exactly on the border between two texture rows can
+ * pick the neighbouring one: the renderer steps through texture rows by
+ * adding a small amount per pixel row, and a quad that starts at a
+ * different row rounds those sums differently. See the optimization
+ * lessons page in the manual. texture and dest must be valid; a band of
+ * no rows draws nothing.
+ */
+static inline void sprite_draw_rows(const Texture2D *texture, int first_row, int row_count,
+                                    const IntRect *dest, Color tint)
+{
+    if (row_count <= 0) return;
+    texture_note_use(texture->id);
+    /* Screen pixels per texture row, e.g. 300 / 216 for a background layer. */
+    float scale_y = (float)dest->h / (float)texture->height;
+    Rectangle src = {0.0f, (float)first_row, (float)texture->width, (float)row_count};
+    Rectangle dst = {(float)dest->x, (float)dest->y + (float)first_row * scale_y,
+                     (float)dest->w, (float)row_count * scale_y};
+    DrawTexturePro(*texture, src, dst, (Vector2){0.0f, 0.0f}, 0.0f, tint);
 }

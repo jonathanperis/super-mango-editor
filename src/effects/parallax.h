@@ -35,6 +35,9 @@
  *            0.0 = static, 0.5 = half speed, 1.0 = full world speed.
  * opaque   : 1 when every pixel of the PNG has alpha 255 (the sky). Read
  *            once, at load time; such a layer is drawn without blending.
+ * first_row, row_count : the band of PNG rows that has any visible pixel,
+ *            also read once at load time. Only that band is drawn; the
+ *            fully transparent rows above and below it are skipped.
  */
 typedef struct {
     Texture2D *texture;     /* held from the asset cache; NULL = failed to load */
@@ -42,6 +45,8 @@ typedef struct {
     int          tex_h;     /* natural height of the loaded PNG in pixels      */
     float        speed;     /* parallax fraction: how fast this layer scrolls  */
     int          opaque;    /* 1 = no transparent pixel; drawn unblended       */
+    int          first_row; /* first PNG row with a visible pixel              */
+    int          row_count; /* rows from first_row to the last visible one     */
 } ParallaxLayer;
 
 /*
@@ -97,7 +102,8 @@ int parallax_layer_offset(const ParallaxLayer *layer, int cam_x);
  * cam_x is the integer camera offset for this frame (from game_frame).
  * Each layer computes its own scroll offset as (int)(cam_x × speed) % tex_w,
  * then tiles the texture to cover the full GAME_W canvas width. Opaque
- * layers are drawn without blending.
+ * layers are drawn without blending, and each layer draws only its band of
+ * visible rows.
  */
 void parallax_render(const ParallaxSystem *ps, int cam_x);
 
