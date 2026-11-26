@@ -55,7 +55,8 @@ done:
  * for a second and jumped, so the parallax, tiles, hazards mid-animation,
  * the player sprite and the HUD are all in it. game_render_frame draws it
  * into the logical target; it is then presented again here, the way
- * display_present does, inside a frame this test can read back.
+ * display_present does (a plain copy, blending off), inside a frame this
+ * test can read back.
  */
 int level_frame_matches_its_snapshot(void)
 {
@@ -71,11 +72,13 @@ int level_frame_matches_its_snapshot(void)
     RenderTexture2D target = gs.screen.frame_target;
     BeginDrawing();
     ClearBackground(BLACK);
+    rlDisableColorBlend();
     DrawTexturePro(target.texture,
                    (Rectangle){0, 0, (float)target.texture.width, -(float)target.texture.height},
                    (Rectangle){0, 0, (float)target.texture.width, (float)target.texture.height},
                    (Vector2){0}, 0, WHITE);
     rlDrawRenderBatchActive();
+    rlEnableColorBlend();
     frame = snapshot_grab_screen();
     EndDrawing();
     CHECK(snapshot_check("level_hazards", frame) == 0);
