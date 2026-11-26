@@ -1,14 +1,13 @@
 ---
 title: Optimization Lessons
-description: Measure a frame with make bench, then the optimizations we tried, with before and after numbers, and the ones we left out and why.
+description: Measure a frame with make bench, then the optimizations we tried, with before and after numbers, the two that were allowed to change pixels, and the ones we left out and why.
 ---
 
 # Optimization Lessons
 
 This page is a record of one round of performance work on the game: how I
 measured a frame, what I changed, what it bought, and what I tried and threw
-away. The ones I threw away are as useful to read as the ones I kept: most of
-them were faster and still not acceptable, because they changed pixels.
+away. The ones I threw away are as useful to read as the ones I kept.
 
 Two rules held for every change:
 
@@ -18,14 +17,24 @@ Two rules held for every change:
    frame against the version before it (see
    [Proving the picture did not change](#proving-the-picture-did-not-change)).
 
+The two biggest wins broke rule 2, so the first round left them out. They
+changed pixels in a way that is easy to describe and hard to see, so I showed
+the owner exactly what moved, the owner accepted it, and a second round put
+both in: [drawing only the rows that show](#drawing-only-the-rows-that-show)
+and [the final copy without blending](#the-final-copy-to-the-window-without-blending).
+Together they cut 42% of the instructions in a frame. A rule like "not one
+pixel may change" is a good default because it makes every change easy to
+check; breaking it should be a decision someone makes on purpose, with the
+difference in front of them, not a side effect.
+
 On this page:
 
 - [Running make bench](#running-make-bench)
 - [Counting instructions instead of milliseconds](#counting-instructions-instead-of-milliseconds)
 - [Where a frame goes](#where-a-frame-goes)
 - [Opaque layers without blending](#opaque-layers-without-blending)
-- [Drawing only the rows that show: faster, and not shipped](#drawing-only-the-rows-that-show-faster-and-not-shipped)
-- [The final copy to the window: also not shipped](#the-final-copy-to-the-window-also-not-shipped)
+- [Drawing only the rows that show](#drawing-only-the-rows-that-show)
+- [The final copy to the window without blending](#the-final-copy-to-the-window-without-blending)
 - [Precompute once: the floor and the HUD](#precompute-once-the-floor-and-the-hud)
 - [Draw calls and a texture atlas](#draw-calls-and-a-texture-atlas)
 - [The web download](#the-web-download)
@@ -50,10 +59,13 @@ run with the median frame time:
 ```text
 bench: 600 frames per run, median of 3 runs, per frame:
 level                         update ms   draw ms  frame ms  tex switches
-levels/00_sandbox_01.toml         0.003    11.605    11.693          24.8
-levels/01_lugio_01.toml           0.009    13.140    13.247          23.0
-levels/02_lugio_02.toml           0.008    12.503    12.599          21.9
+levels/00_sandbox_01.toml         0.004     7.477     7.593          24.8
+levels/01_lugio_01.toml           0.010     7.686     7.839          23.0
+levels/02_lugio_02.toml           0.011     7.856     8.006          21.9
 ```
+
+(An Apple M-series Mac, with every change on this page in. Before the two
+pixel-changing ones below, the same machine took 13.6 to 14.6 ms a frame.)
 
 - **update ms**: the fixed simulation steps of a frame.
 - **draw ms**: drawing, up to handing the frame to the renderer.
@@ -71,9 +83,10 @@ second line of the top-right panel, next to the frame interval. With VSync that
 interval is mostly the wait for the display, which is why it is not a measure
 of work.
 
-`tools/bench_budget.json` holds a budget per level, measured on the CI
-runner (a GitHub-hosted x86_64 machine takes about 37 ms a frame where an
-Apple M-series Mac takes 12). Shared runners vary from run to run, so a level
+`tools/bench_budget.json` holds a budget per level, set from the CI runner
+(a GitHub-hosted x86_64 machine took about 37 ms a frame where an Apple
+M-series Mac took 12, before the two changes that cut 42% of a frame; the
+budgets were then lowered by that measured share, to 21 to 22 ms). Shared runners vary from run to run, so a level
 fails only above twice its budget; texture switches are the same on every
 machine, so their limit is tight. The **Bench** workflow runs `make bench BENCH_CHECK=1` on
 every pull request for information only: it is not a required check.
@@ -139,7 +152,7 @@ I also tried two related ideas and left them out:
   of phones, clearing is what lets the GPU skip loading the old picture into
   its tile memory, so skipping it can make a frame slower there.
 
-## Drawing only the rows that show: faster, and not shipped
+## Drawing only the rows that show
 
 Most background layers are transparent over most of their height. The lone
 cloud has something to show in 31 of its 216 rows; the cloud bands sit in the
@@ -155,8 +168,8 @@ lands on the canvas.
 | 02 lugio | 143.8 M | 102.9 M | −28.4% |
 
 On the Mac the frame went from about 12.5 ms to 8.6 ms. By far the biggest win
-of the round, and it is not in the game, because it changed the picture:
-about 0.5% of the pixels of each frame came out different.
+of the round, and the first round left it out, because it changed the
+picture: about 0.5% of the pixels of each frame came out different.
 
 Here is why. A layer is 216 texel rows stretched over 300 pixel rows, so each
 pixel row has to pick one texel row, and on some pixel rows the exact answer
@@ -170,13 +183,40 @@ picture. (A GPU has the same kind of border rows, only at different places.)
 
 I could not find a way to draw a shorter quad that rounds exactly like the full
 one without copying the renderer's arithmetic, which would break with the next
-raylib. If one pixel in two hundred moving to its neighbouring texel at a
-texel border is acceptable, the change is about 40 lines (measure the band in
-`parallax_init_from_def`, draw it with `DrawTexturePro` and a source rectangle
-of just those rows) and gives back a third of the frame. The fog has the same shape (images stretched
-from 320×180 to 800×300, never opaque), so it got neither change.
+raylib. So the question became: is one pixel in two hundred moving to its
+neighbouring texel, only at texel borders, acceptable? The owner looked and
+said yes, and the second round shipped it, for the fog too (its images have
+the same shape: stretched from 320×180 to 800×300, mist only in the lower
+half).
 
-## The final copy to the window: also not shipped
+How it works:
+
+- At load time, `image_file_visible_rows` (`src/shared/texture.c`) reads the
+  image's alpha once and finds the first and last row with any pixel that is
+  not fully transparent. `parallax_init_from_def` and `fog_init` keep that
+  band per image.
+- Every frame, `sprite_draw_rows` (`src/shared/graphics.h`) draws just that
+  band. It works out where the band lands in the full stretch in floating
+  point (`first_row × 300 / 216`), so the clouds stay where they were; only
+  the rounding at texel borders differs.
+
+Measured again on top of everything else (Linux arm64, clang `-O2`; the
+"before" column is the code with every unchanged-pixel optimization of this
+page in, which is why it differs a little from the first table):
+
+| Level | Before | Visible rows only | Change |
+|---|---:|---:|---:|
+| 00 sandbox | 136.2 M | 91.4 M | −32.9% |
+| 01 lugio | 146.2 M | 94.9 M | −35.0% |
+| 02 lugio | 143.8 M | 94.8 M | −34.1% |
+
+Levels 01 and 02 have fog and level 00 has none, which is why those two now
+save more than in the first measurement, which covered the parallax alone. The render snapshot of a level frame
+(`tests/snapshots/level_hazards.png`, see [Testing](../testing/)) changed in
+772 of its 120,000 pixels (0.64%); 771 of them now show exactly the pixel one
+row above or below the old one. That is the whole visual difference.
+
+## The final copy to the window without blending
 
 `display_present()` copies the finished canvas into the window. The canvas
 covers the window, so blending looked like wasted work again. Turning it off
@@ -192,8 +232,36 @@ pause overlay. raylib's alpha blending also blends the alpha channel, so a
 canvas pixel under something translucent ends up with an alpha below 1. The
 blended copy over the black window then darkens it a little; the unblended
 copy did not. The darkening is arguably a bug, but fixing it is a visual change
-to decide on its own, not a side effect of an optimization. Blending stays on,
-with a comment in `display_present()` that says why.
+to decide on its own, not a side effect of an optimization, so the first round
+kept blending on.
+
+The owner then decided it: the darkening was never intended, so losing it is
+a fix. `display_present()` now turns blending off for the copy
+(`rlDisableColorBlend`), hands the copy to the renderer and turns blending
+back on, since blending is a setting of the whole batch, not of one quad.
+Measured on top of the visible-rows change:
+
+| Level | Visible rows only | + copy without blending | Change |
+|---|---:|---:|---:|
+| 00 sandbox | 91.4 M | 79.2 M | −13.3% |
+| 01 lugio | 94.9 M | 83.5 M | −12.1% |
+| 02 lugio | 94.8 M | 82.9 M | −12.5% |
+
+The copy costs the same 12 million instructions as before; it is a larger
+share now that the rest of the frame is smaller. No render snapshot changed:
+the level snapshot's fixture has no fog and no overlay, so every pixel of its
+canvas is opaque and copies the same either way. In the game, fog and the
+pause overlay now look slightly lighter than before, as they were drawn.
+
+Both changes together:
+
+| Level | Before both | After both | Change |
+|---|---:|---:|---:|
+| 00 sandbox | 136.2 M | 79.2 M | −41.8% |
+| 01 lugio | 146.2 M | 83.5 M | −42.9% |
+| 02 lugio | 143.8 M | 82.9 M | −42.3% |
+
+On the Mac, `make bench` went from 13.6–14.6 ms to 7.6–8.0 ms a frame.
 
 ## Precompute once: the floor and the HUD
 
@@ -297,6 +365,8 @@ backend with a small hook (not in the repository) that reads the window's
 pixels after every frame and prints a hash of them. Each of the 9 levels (the
 campaign and the six labs) ran three scripted inputs for 600 frames: walking
 right, running and jumping, and pausing. That is 16,200 frames per build, and
-every hash of the final build matches the hash of the same frame before this
-round. The two changes above that made any hash differ are the two that are not
-in the game.
+every hash of the final build of the first round matches the hash of the same
+frame before it. The two changes above that made any hash differ are the two
+that waited for a decision; they went in later, on purpose, with the
+committed render snapshot updated (`make render-snapshots-update`) and the
+reason in the commit message.
