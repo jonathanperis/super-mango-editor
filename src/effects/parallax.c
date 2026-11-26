@@ -57,15 +57,20 @@ static const struct {
 /* ------------------------------------------------------------------ */
 
 /*
- * measure_layer — Find out, once, whether the layer's PNG is opaque.
+ * measure_layer — Find out, once, whether the layer's PNG is opaque and
+ * which band of its rows has anything to show.
  *
- * This decodes the file a second time (the asset cache decoded it once to
- * upload the texture), only while the level loads: well under a
- * millisecond, against a saving on every frame drawn afterwards.
+ * This decodes the file again (the asset cache decoded it once to upload
+ * the texture), only while the level loads: well under a millisecond,
+ * against a saving on every frame drawn afterwards. If the file cannot be
+ * read again, the layer keeps all of its rows and is drawn as before.
  */
 static void measure_layer(ParallaxLayer *layer, const char *path)
 {
-    layer->opaque = image_file_is_opaque(path);
+    layer->opaque    = image_file_is_opaque(path);
+    layer->first_row = 0;
+    layer->row_count = layer->tex_h;
+    image_file_visible_rows(path, &layer->first_row, &layer->row_count);
 }
 
 /* ------------------------------------------------------------------ */
@@ -93,6 +98,8 @@ void parallax_init(ParallaxSystem *ps, AssetCache *cache)
         layer->tex_h   = 0;
         layer->texture = NULL;
         layer->opaque  = 0;
+        layer->first_row = 0;
+        layer->row_count = 0;
 
         /*
          * Get the image from the asset cache: decoded and uploaded to GPU
@@ -139,6 +146,8 @@ void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
         layer->tex_h   = 0;
         layer->texture = NULL;
         layer->opaque  = 0;
+        layer->first_row = 0;
+        layer->row_count = 0;
 
         layer->texture = asset_cache_texture_acquire(cache, paths[i]);
         if (!layer->texture) {
@@ -179,15 +188,20 @@ void parallax_init_from_def(ParallaxSystem *ps, AssetCache *cache,
  * The destination rect stretches each tile to tex_w × GAME_H so the layer
  * fills the full canvas height.  (Natural height is 216 px; GAME_H is 300 px.)
  *
- * Overdraw: level 02 stacks seven layers, so every canvas pixel is read,
- * blended and written seven times. An opaque layer (the sky) is drawn
- * with blending off: blending a pixel of alpha 255 gives the source colour
- * anyway, so reading the destination first is wasted work. Drawing only
- * the rows of each layer that are not transparent would save far more (a
- * third of the frame on the software renderer), but a shorter quad moves
- * where each stretched texel row starts by a rounding error, and that
- * changed about 0.5% of the pixels. The optimization lessons page in the
- * manual has the numbers and why that was left out.
+ * Overdraw: level 02 stacks seven layers, so every canvas pixel would be
+ * read, blended and written seven times. Two things cut that down:
+ *
+ *   - Visible rows only. Most layers are clouds or mountains with clear sky
+ *     above and below; measure_layer found the band of rows that has any
+ *     visible pixel, and only that band is drawn (sprite_draw_rows), placed
+ *     where it falls in the full 216 → 300 stretch. This saves about a
+ *     third of the frame on the software renderer. A pixel row that lies
+ *     exactly on a border between two texture rows can now pick the
+ *     neighbouring row (about 0.5% of the pixels moved by one texture row);
+ *     the optimization lessons page in the manual explains why.
+ *   - An opaque layer (the sky) is drawn with blending off: blending a
+ *     pixel of alpha 255 gives the source colour anyway, so reading the
+ *     destination first is wasted work.
  */
 int parallax_layer_offset(const ParallaxLayer *layer, int cam_x)
 {
@@ -251,9 +265,12 @@ void parallax_render(const ParallaxSystem *ps, int cam_x)
             IntRect dst = { dx, 0, layer->tex_w, GAME_H };
 
             /*
-             * Draw the full texture (NULL src = entire image) onto the canvas.
+             * Draw only the layer's visible rows, where they land in the
+             * full stretch; the transparent rows around them would not
+             * change a single pixel.
              */
-            sprite_draw(layer->texture, NULL, &dst, 0, SPRITE_NORMAL, WHITE);
+            sprite_draw_rows(layer->texture, layer->first_row, layer->row_count,
+                             &dst, WHITE);
         }
 
         if (opaque) {
@@ -280,6 +297,8 @@ void parallax_cleanup(ParallaxSystem *ps, AssetCache *cache)
         ps->layers[i].tex_h = 0;
         ps->layers[i].speed = 0.0f;
         ps->layers[i].opaque = 0;
+        ps->layers[i].first_row = 0;
+        ps->layers[i].row_count = 0;
     }
     ps->count = 0;
 }

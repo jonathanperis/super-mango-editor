@@ -67,6 +67,36 @@ int image_file_is_opaque(const char *path)
     return opaque;
 }
 
+int image_file_visible_rows(const char *path, int *first_row, int *row_count)
+{
+    Image image = LoadImage(path);
+    if (!IsImageValid(image)) return 0;
+    Color *pixels = LoadImageColors(image);  /* RGBA8, whatever the file held */
+    if (!pixels) {
+        UnloadImage(image);
+        return 0;
+    }
+    /* Walk the rows top to bottom and remember the first and the last one
+     * that has at least one pixel with some alpha. */
+    int first = -1, last = -1;
+    for (int y = 0; y < image.height; y++) {
+        const Color *row = &pixels[y * image.width];
+        for (int x = 0; x < image.width; x++) {
+            if (row[x].a > 0) {
+                if (first < 0) first = y;
+                last = y;
+                break;
+            }
+        }
+    }
+    UnloadImageColors(pixels);
+    UnloadImage(image);
+    /* A fully transparent image has no visible rows: count 0, draw nothing. */
+    *first_row = first < 0 ? 0 : first;
+    *row_count = first < 0 ? 0 : last - first + 1;
+    return 1;
+}
+
 /* The texture of the most recent sprite or text draw, and how many times
  * a draw has used another one since texture_take_switches last ran. */
 static unsigned int s_last_texture_id;

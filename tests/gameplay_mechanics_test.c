@@ -1440,6 +1440,21 @@ static int parallax_scrolls_and_wraps(void)
     CHECK(ps.layers[0].opaque == 1 && ps.layers[1].opaque == 0);
     CHECK(image_file_is_opaque("assets/sprites/backgrounds/clouds_mg_1.png") == 0);
     CHECK(image_file_is_opaque("assets/sprites/backgrounds/missing_layer.png") == 0);
+    /* Each layer draws only the band of rows with a visible pixel: all 216
+     * for the sky, rows 165..215 for the low cloud band. */
+    CHECK(ps.layers[0].first_row == 0 && ps.layers[0].row_count == ps.layers[0].tex_h);
+    int first = -1, rows = -1;
+    CHECK(image_file_visible_rows("assets/sprites/backgrounds/clouds_mg_1.png",
+                                  &first, &rows) == 1);
+    CHECK(first == 165 && rows == 51);
+    /* A file that cannot be read leaves both numbers alone. */
+    CHECK(image_file_visible_rows("assets/sprites/backgrounds/missing_layer.png",
+                                  &first, &rows) == 0);
+    CHECK(first == 165 && rows == 51);
+    /* A fully transparent image has no visible rows, so nothing is drawn. */
+    CHECK(image_file_visible_rows("tests/fixtures/images/transparent.png",
+                                  &first, &rows) == 1);
+    CHECK(first == 0 && rows == 0);
 done:
     parallax_cleanup(&ps, NULL);
     if (!failed && ps.count != 0) failed = 1;

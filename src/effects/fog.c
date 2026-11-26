@@ -135,7 +135,9 @@ void fog_init(FogSystem *fog, AssetCache *cache,
 
     /* Zero-init all texture slots (NULL = no texture loaded) */
     for (int i = 0; i < MAX_FOG_TEXTURES; i++) {
-        fog->textures[i] = NULL;
+        fog->textures[i]  = NULL;
+        fog->first_row[i] = 0;
+        fog->row_count[i] = 0;
     }
 
     /* Clamp to the maximum the array can hold */
@@ -153,6 +155,15 @@ void fog_init(FogSystem *fog, AssetCache *cache,
             fprintf(stderr, "Warning: fog layer %s not loaded\n", paths[i]);
             continue;
         }
+
+        /*
+         * Find the band of rows that has anything to show, once, so
+         * fog_render can skip the see-through rows above and below it.
+         * If the file cannot be read again, every row is drawn.
+         */
+        fog->first_row[i] = 0;
+        fog->row_count[i] = fog->textures[i]->height;
+        image_file_visible_rows(paths[i], &fog->first_row[i], &fog->row_count[i]);
 
         /* Alpha blending is selected by the frame owner. */
     }
@@ -267,7 +278,8 @@ void fog_render(FogSystem *fog)
          * Draw the fog texture at its current horizontal offset.
          * Width is FOG_W (= 2×GAME_W) so the image is always wider than the
          * screen; only a GAME_W-wide interior strip is ever visible at once.
-         * Height fills the full canvas.
+         * Height fills the full canvas. Only the image's visible rows are
+         * drawn, where they land in that stretch (see sprite_draw_rows).
          */
         IntRect dst = {
             .x = (int)inst->x,
@@ -275,7 +287,8 @@ void fog_render(FogSystem *fog)
             .w = FOG_W,
             .h = GAME_H,
         };
-        sprite_draw(tex, NULL, &dst, 0, SPRITE_NORMAL, tint);
+        sprite_draw_rows(tex, fog->first_row[inst->tex_index],
+                         fog->row_count[inst->tex_index], &dst, tint);
     }
 }
 
@@ -292,7 +305,9 @@ void fog_cleanup(FogSystem *fog, AssetCache *cache)
 {
     for (int i = 0; i < fog->tex_count; i++) {
         asset_cache_texture_release(cache, fog->textures[i]);
-        fog->textures[i] = NULL;
+        fog->textures[i]  = NULL;
+        fog->first_row[i] = 0;
+        fog->row_count[i] = 0;
     }
     for (int i = 0; i < FOG_MAX; i++) {
         fog->instances[i].active = 0;
