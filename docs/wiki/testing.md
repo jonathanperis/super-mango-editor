@@ -668,7 +668,7 @@ The pages around the game can also be smoked with plain HTTP:
 ```sh
 python3 - <<'PY'
 from urllib.request import Request, urlopen
-base = 'https://super-mango-editor.jonathanperis.tech/'
+base = 'https://jonathanperis.dev/super-mango-editor/'
 for path, markers in {
     '': ['Super Mango', 'super-mango.js'],
     'docs/': ['Builder Manual', 'Trace every wire'],

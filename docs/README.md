@@ -1,6 +1,6 @@
 # Website and Builder Manual
 
-Astro static site at <https://super-mango-editor.jonathanperis.tech/>.
+Astro static site at <https://jonathanperis.dev/super-mango-editor/>.
 The landing page hosts the game; `/docs/` publishes the manual from `wiki/`.
 
 ## Requirements and Commands
@@ -108,7 +108,7 @@ bun run preview
 
 Reassemble after rebuilding Astro, which replaces its output. Touch-control code
 is bundled into the generated game JavaScript. See the public
-[Build System](https://super-mango-editor.jonathanperis.tech/docs/build-system/)
+[Build System](https://jonathanperis.dev/super-mango-editor/docs/build-system/)
 for the CI-authoritative WebAssembly verification contract.
 
 ## Deployment and Analytics

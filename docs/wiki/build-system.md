@@ -664,7 +664,7 @@ records (such as `@astrojs/check`'s `typescript` range) before accepting a major
 bump.
 Locked transitive dependencies respect their upstream version constraints.
 
-Development and production both serve from `/`. The public host is `super-mango-editor.jonathanperis.tech`, so the repository name is not a path prefix. Astro does not compile or
+Development serves from `/`; production builds use the `/super-mango-editor` base because the public address is `https://jonathanperis.dev/super-mango-editor/`. Astro does not compile or
 copy WASM: see the [website maintainer guide](https://github.com/jonathanperis/super-mango-editor/blob/main/docs/README.md)
 for local game assembly, page registration and generated-content ownership.
 

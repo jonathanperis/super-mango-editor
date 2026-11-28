@@ -197,8 +197,13 @@ Sources: `.specs/archive/SPEC.md` (C23), [Build System](../build-system/#builder
 every other GitHub Pages site on the account (D-005, 2026-10-10).
 
 **Decision.** On 2026-10-21 the site moved to
-`super-mango-editor.jonathanperis.tech` (`d9982fe`, `docs/public/CNAME`).
+its own custom subdomain (`d9982fe`, `docs/public/CNAME`).
+On 2026-11-27 the owner retired that domain and the site
+moved to `https://jonathanperis.dev/super-mango-editor/`, a path on the
+account's GitHub Pages custom domain (no `CNAME`; Astro `base` is
+`/super-mango-editor`).
 
-**Consequences.** Profiles and ghosts in browser storage belong to the game's
-own origin. Saves made at the old address stay there. `SECURITY.md`
-describes the current scope.
+**Consequences.** Profiles and ghosts in browser storage again share an origin
+(`https://jonathanperis.dev`) with the account's other Pages sites, so the game
+keeps treating stored values as untrusted. Saves made at older addresses stay
+there. `SECURITY.md` describes the current scope.

@@ -1,6 +1,6 @@
 # Documentation and Website Audit
 
-> **Historical report, dated 2026-09-17:** it describes the repository at that time, so use the [Builder Manual](https://super-mango-editor.jonathanperis.tech/docs/) for current behaviour.
+> **Historical report, dated 2026-09-17:** it describes the repository at that time, so use the [Builder Manual](https://jonathanperis.dev/super-mango-editor/docs/) for current behaviour.
 
 Checked **2026-09-17**, against `origin/main` at `16be4a1` and the local
 `feature/documentation-refresh` changes. This is a dated audit, not a live status
@@ -114,7 +114,7 @@ publication before the website receives them.
 The table above is unchanged; these lines record where each item stands now.
 
 - **Publish the documentation changes — done.** PR #302 merged on 2026-09-17.
-  The site has since moved to `https://super-mango-editor.jonathanperis.tech/`
+  The site has since moved to `https://jonathanperis.dev/super-mango-editor/`
   (2026-10-21), where `robots.txt` points to `sitemap-index.xml` and that
   sitemap returns HTTP 200.
 - **New release with builder archives — done.** v1.0.976, v1.0.985 and v1.0.994

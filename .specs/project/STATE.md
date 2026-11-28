@@ -61,7 +61,7 @@ Gameplay advances in fixed 1/60 s steps from a frame-time accumulator instead of
 ### D-005: The Site Stays on github.io (superseded 2026-10-21)
 The website and the browser game stay at `https://jonathanperis.github.io/super-mango-editor/`; there is no custom domain (decided 2026-10-10). Browser storage is therefore shared with the account's other GitHub Pages sites, which `SECURITY.md` documents as an accepted risk: the game treats every stored value as untrusted input. A custom domain would isolate that storage, but it needs an owned domain and DNS, and players' saved profiles and ghosts are tied to the current address and would not carry over.
 
-**Superseded 2026-10-21:** the owner moved the website and the browser game to `https://super-mango-editor.jonathanperis.tech/` (commit `d9982fe`, `docs/public/CNAME`). The game now has its own origin, so profiles and ghosts in browser storage are no longer shared with the account's other GitHub Pages sites; `SECURITY.md` describes the new scope. Saves made at the old github.io address stay there and do not carry over. D-005 is kept above only as history.
+**Superseded 2026-10-21:** the owner moved the website and the browser game to its own custom subdomain (commit `d9982fe`, `docs/public/CNAME`), giving the game its own browser-storage origin. **Superseded 2026-11-27:** that domain was retired; the site now lives at `https://jonathanperis.dev/super-mango-editor/` and shares the `https://jonathanperis.dev` origin with the account's other GitHub Pages sites, which `SECURITY.md` documents. Saves made at older addresses stay there and do not carry over. D-005 is kept above only as history.
 
 ## Current Counts
 
