@@ -131,9 +131,8 @@ is merged and the matching build/deploy finishes. Keep website prose and WASM
 from the same revision when verifying a migration.
 
 Analytics is optional; see `.env.example`. With no `PUBLIC_GA_ID`, analytics
-scripts are omitted. Production builds map the repository secret
-`NEXT_PUBLIC_GA_ID` (a legacy Next.js-era name; renaming means creating a new
-repository secret and updating the `pages-build` job in `build.yml`) to `PUBLIC_GA_ID`. Local
+scripts are omitted. Production builds inject the `PUBLIC_GA_ID` repository
+secret in the `pages-build` job of `build.yml`. Local
 environment files stay untracked. Analytics loads only on manual pages
 (`pageType="docs"`), never on the home page that hosts the game, so the
 third-party script does not share a document with the running game. The

@@ -433,7 +433,7 @@ def check_public_readme_docs() -> None:
 
     docs_readme = read(ROOT / "docs" / "README.md")
     docs_package = read(ROOT / "docs" / "package.json")
-    for token in ["bun run lint", "bun run drift", "PUBLIC_GA_ID", "NEXT_PUBLIC_GA_ID"]:
+    for token in ["bun run lint", "bun run drift", "PUBLIC_GA_ID"]:
         if token not in docs_readme:
             fail(f"docs/README.md: missing docs command/environment token `{token}`")
     if '"drift": "cd .. && make docs-drift"' not in docs_package:
