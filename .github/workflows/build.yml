@@ -1053,10 +1053,7 @@ jobs:
         run: bun run build
         working-directory: docs
         env:
-          # NEXT_PUBLIC_GA_ID is a legacy secret name from the former Next.js
-          # site; Astro reads PUBLIC_GA_ID. Renaming the mapping requires
-          # creating the new repository secret first, then updating this line.
-          PUBLIC_GA_ID: ${{ secrets.NEXT_PUBLIC_GA_ID }}
+          PUBLIC_GA_ID: ${{ secrets.PUBLIC_GA_ID }}
           # The home page asks for super-mango.js/.wasm/.data as
           # <name>?v=<commit>, the same commit the build job stamped into the
           # standalone page (WEB_ASSET_VERSION there), so a browser that
