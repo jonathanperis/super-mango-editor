@@ -29,7 +29,7 @@ import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-const DEFAULT_URL = 'https://super-mango-editor.jonathanperis.tech/super-mango.html';
+const DEFAULT_URL = 'https://jonathanperis.dev/super-mango-editor/super-mango.html';
 const RUNNING_LABEL = 'Super Mango game canvas - running';
 
 /* Messages Chromium prints for every healthy load of this page:

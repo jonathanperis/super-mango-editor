@@ -63,10 +63,11 @@ selection in [`.github/SECURITY_TRIAGE.md`](.github/SECURITY_TRIAGE.md).
 ## Web build storage
 
 The browser game is served from
-`https://super-mango-editor.jonathanperis.tech/`. Browser storage is scoped to
-that origin. It is not shared with `jonathanperis.github.io` or with other
-names under `jonathanperis.tech`. The game still treats stored values as
-untrusted input:
+`https://jonathanperis.dev/super-mango-editor/`. Browser storage is scoped to
+the `https://jonathanperis.dev` origin, which every GitHub Pages site on the
+account shares (the personal site and each project at
+`jonathanperis.dev/<repository>/`). Any of those pages can read or overwrite
+these keys, so the game treats stored values as untrusted input:
 
 - Keys are prefixed: `super-mango-profile-v2` (with read-only fallback to
   `super-mango-profile-v1`) and one `super-mango-ghost-v1:<level path>` entry

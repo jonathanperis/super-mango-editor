@@ -76,7 +76,7 @@ Super Mango is a 2D platformer built in C11 with raylib, designed as an educatio
 - Keyboard, hot-plug gamepad and browser touch controls
 - Builds natively on macOS, Linux, Windows; WebAssembly via Emscripten
 
-**[Play in browser →](https://super-mango-editor.jonathanperis.tech/)**
+**[Play in browser →](https://jonathanperis.dev/super-mango-editor/)**
 
 ---
 

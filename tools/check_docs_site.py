@@ -13,7 +13,7 @@ from xml.etree import ElementTree
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from web_csp import CSP_META, problems as csp_problems  # noqa: E402
-SITE = "https://super-mango-editor.jonathanperis.tech/"
+SITE = "https://jonathanperis.dev/super-mango-editor/"
 OUT = ROOT / "docs/out"
 
 
